@@ -38,6 +38,7 @@ final class ThisWeekViewModel {
         weeks: [PlanWeek],
         recipes: [Recipe],
         feedback: [RecipeFeedback],
+        householdSize: Int,
         now: Date = .now
     ) -> [WeekMealPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
@@ -57,7 +58,10 @@ final class ThisWeekViewModel {
                     dateTitle: WeekCalendar.shortDate(date),
                     recipeName: recipe?.displayName ?? meal.recipeSlug,
                     minutes: recipe?.totalMinutes ?? 0,
-                    servings: meal.servings,
+                    servings: ActiveServings.resolve(
+                        mealServings: meal.servings,
+                        householdSize: householdSize
+                    ),
                     isCooked: meal.cookedAt != nil,
                     rating: ratings[meal.recipeSlug],
                     slug: meal.recipeSlug

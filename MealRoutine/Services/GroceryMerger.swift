@@ -74,6 +74,16 @@ enum GroceryMerger {
         UnitNormalization.parse(unit).code
     }
 
+    /// Identity of one automatic shopping row across rebuilds.
+    ///
+    /// Mass (`g` / `kg`) and volume (`ml` / `l`) share an identity, so a checked
+    /// gram row can become kilograms when the scaled total crosses that line.
+    /// Every other unit stays on its own canonical code.
+    static func rowIdentity(ingredientId: String, unit: String) -> String {
+        let parsed = UnitNormalization.parse(unit)
+        return "\(ingredientId)|\(bucketKey(for: parsed))"
+    }
+
     private static func bucketKey(for unit: ParsedUnit) -> String {
         if let family = unit.family {
             return "family:\(family.rawValue)"

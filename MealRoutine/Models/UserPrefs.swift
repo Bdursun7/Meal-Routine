@@ -4,6 +4,8 @@ import SwiftData
 /// Single local household profile. There is no account.
 @Model
 final class UserPrefs {
+    /// Default people count. New evenings copy it. A planned meal can override it.
+    /// Profile “Porsiyonu kaydet” writes this and stamps the open week’s meals.
     var householdSize: Int
     var eveningsPerWeek: Int
     var maxCookMinutes: Int

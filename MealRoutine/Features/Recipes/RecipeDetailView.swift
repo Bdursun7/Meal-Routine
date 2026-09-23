@@ -1,13 +1,28 @@
 import SwiftData
 import SwiftUI
 
+/// Who the portion stepper on recipe detail writes to.
+private struct PortionContext: Equatable {
+    var contextID: String
+    var persisted: Int
+    var mealUUID: UUID?
+}
+
 struct RecipeDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
+    @Query private var prefs: [UserPrefs]
+    @Query private var plannedMeals: [PlannedMeal]
 
     let route: RecipeRoute
     @State private var viewModel = RecipeDetailViewModel()
+    /// Unsaved stepper value. Nil follows the stored count for this context.
+    @State private var portionDraft: Int?
+    @State private var portionDraftContext: String?
+    /// Last count this screen successfully wrote, so a later household save can replace it.
+    @State private var lastWrittenServings: Int?
+    @State private var lastWrittenContext: String?
 
     private var recipe: Recipe? {
         recipes.first { $0.slug == route.slug }
@@ -81,6 +96,62 @@ struct RecipeDetailView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+        .alert("Kaydedildi", isPresented: portionStatusIsPresented) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(viewModel.portionStatusMessage ?? "")
+        }
+        .onChange(of: portionContext) { _, newContext in
+            let draftMatchesWrite = portionDraft == lastWrittenServings || portionDraft == newContext.persisted
+            guard portionDraftContext == newContext.contextID,
+                  lastWrittenContext == newContext.contextID,
+                  draftMatchesWrite
+            else { return }
+            portionDraft = nil
+            portionDraftContext = nil
+        }
+    }
+
+    private var householdSize: Int {
+        let stored = prefs.min { $0.createdAt < $1.createdAt }?.householdSize ?? 2
+        return HouseholdSizeLimits.clamped(stored)
+    }
+
+    private var portionContext: PortionContext {
+        if let mealUUID = route.plannedMealUUID,
+           let meal = plannedMeals.first(where: { $0.uuid == mealUUID }) {
+            return PortionContext(
+                contextID: mealUUID.uuidString,
+                persisted: ActiveServings.resolve(
+                    mealServings: meal.servings,
+                    householdSize: householdSize
+                ),
+                mealUUID: mealUUID
+            )
+        }
+        return PortionContext(
+            contextID: "household",
+            persisted: householdSize,
+            mealUUID: nil
+        )
+    }
+
+    /// Servings the ingredient list is showing. The stepper can move this before save.
+    private var activeServings: Int {
+        if portionDraftContext == portionContext.contextID, let portionDraft {
+            return portionDraft
+        }
+        return portionContext.persisted
+    }
+
+    private var servingsBinding: Binding<Int> {
+        Binding(
+            get: { activeServings },
+            set: { newValue in
+                portionDraftContext = portionContext.contextID
+                portionDraft = HouseholdSizeLimits.clamped(newValue)
+            }
+        )
     }
 
     private var alertIsPresented: Binding<Bool> {
@@ -88,6 +159,15 @@ struct RecipeDetailView: View {
             get: { viewModel.errorMessage != nil },
             set: { isPresented in
                 if !isPresented { viewModel.errorMessage = nil }
+            }
+        )
+    }
+
+    private var portionStatusIsPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.portionStatusMessage != nil },
+            set: { isPresented in
+                if !isPresented { viewModel.portionStatusMessage = nil }
             }
         )
     }
@@ -104,7 +184,7 @@ struct RecipeDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recipe.displayName)
                             .font(.title2.bold())
-                        Text("\(recipe.totalMinutes) dk · \(recipe.baseServings) kişilik taban")
+                        Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
                             .foregroundStyle(.secondary)
                         Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
                             .font(.subheadline)
@@ -129,19 +209,43 @@ struct RecipeDetailView: View {
                 }
             }
 
+            Section {
+                Stepper(value: servingsBinding, in: HouseholdSizeLimits.range) {
+                    Text(portionContext.mealUUID == nil
+                         ? "Ev halkı: \(activeServings) kişi"
+                         : "Bu akşam: \(activeServings) kişi")
+                }
+                .accessibilityLabel("Porsiyon \(activeServings) kişi")
+                Text(portionFootnote(baseServings: recipe.baseServings))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Button("Porsiyonu kaydet") {
+                    let saved = activeServings
+                    let contextID = portionContext.contextID
+                    viewModel.savePortions(
+                        servings: saved,
+                        mealUUID: portionContext.mealUUID,
+                        in: modelContext
+                    )
+                    if viewModel.errorMessage == nil {
+                        lastWrittenContext = contextID
+                        lastWrittenServings = saved
+                        portionDraftContext = contextID
+                        portionDraft = saved
+                    }
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityHint(portionContext.mealUUID == nil
+                    ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
+                    : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
+            } header: {
+                Text("Porsiyon")
+            }
+
             Section("Malzemeler") {
                 ForEach(recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }) { line in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(line.displayName)
-                        Text(QuantityFormat.quantityAndUnit(quantity: line.quantity, unit: line.unit))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        if !line.displayNote.isEmpty {
-                            Text(line.displayNote)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    ingredientRow(line, baseServings: recipe.baseServings)
                 }
             }
 
@@ -173,6 +277,35 @@ struct RecipeDetailView: View {
                     .textSelection(.enabled)
             }
         }
+    }
+
+    private func ingredientRow(_ line: IngredientLine, baseServings: Int) -> some View {
+        let quantity = PortionScaler.scale(
+            quantity: line.quantity,
+            scaling: line.scaling,
+            baseServings: baseServings,
+            householdSize: activeServings
+        )
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(line.displayName)
+            Text(QuantityFormat.quantityAndUnit(quantity: quantity, unit: line.unit))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if !line.displayNote.isEmpty {
+                Text(line.displayNote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func portionFootnote(baseServings: Int) -> String {
+        let base = max(baseServings, 1)
+        let amounts = "Tarif \(base) kişilik yazılmış. Miktarlar \(activeServings) kişiye göre."
+        let scope = portionContext.mealUUID == nil
+            ? "Market, Porsiyonu kaydet deyince bu haftanın her akşamıyla birlikte güncellenir."
+            : "Market, Porsiyonu kaydet deyince bu akşam için güncellenir. Ev halkı aynı kalır."
+        return "\(amounts) \(scope)"
     }
 
     private func currentRatingRow(_ rating: MealRating) -> some View {

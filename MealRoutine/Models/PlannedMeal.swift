@@ -8,6 +8,9 @@ final class PlannedMeal {
     var dayOffset: Int
     var slot: String
     var recipeSlug: String
+    /// People this evening is cooked and shopped for.
+    /// Overrides `UserPrefs.householdSize` for this meal only.
+    /// New weeks copy the household size. Profile “Porsiyonu kaydet” copies it again.
     var servings: Int
     var cookedAt: Date?
     var week: PlanWeek? = nil

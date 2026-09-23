@@ -2,8 +2,10 @@ import Foundation
 import SwiftData
 
 /// Rebuilds the current week's shopping list from planned meals.
-/// Lines are scaled first, then merged on ingredient id plus canonical unit.
-/// Manual rows and checked state on matching ingredient+unit rows are kept.
+/// Each meal is scaled to its own `servings`, or to the household size when
+/// that value is missing. Lines are then merged on ingredient id plus canonical unit.
+/// Manual rows stay. A checked automatic row stays checked when the same
+/// ingredient comes back, including when grams become kilograms.
 enum GroceryListService {
     @MainActor
     static func rebuild(in context: ModelContext, now: Date = .now) throws {
@@ -17,14 +19,19 @@ enum GroceryListService {
         }
         var sources: [GrocerySourceLine] = []
 
+        let householdSize = prefs.householdSize
         for meal in week.meals {
             guard let recipe = bySlug[meal.recipeSlug] else { continue }
+            let servings = ActiveServings.resolve(
+                mealServings: meal.servings,
+                householdSize: householdSize
+            )
             for ingredient in recipe.ingredients {
                 let quantity = PortionScaler.scale(
                     quantity: ingredient.quantity,
                     scaling: ingredient.scaling,
                     baseServings: recipe.baseServings,
-                    householdSize: prefs.householdSize
+                    householdSize: servings
                 )
                 sources.append(
                     GrocerySourceLine(
@@ -40,49 +47,63 @@ enum GroceryListService {
 
         let merged = GroceryMerger.merge(sources)
         let autoItems = week.groceries.filter { !$0.isManual }
-        var used: Set<UUID> = []
+        let plan = GroceryListReconciler.plan(
+            existingAuto: autoItems.map {
+                AutoGroceryRow(
+                    id: $0.uuid,
+                    ingredientId: $0.ingredientId,
+                    unit: $0.unit,
+                    isChecked: $0.isChecked
+                )
+            },
+            merged: merged
+        )
+        var byID: [UUID: GroceryItem] = [:]
+        for item in autoItems {
+            byID[item.uuid] = item
+        }
         var didChange = false
 
-        for line in merged {
+        for update in plan.updates {
+            guard let match = byID[update.existingID] else { continue }
+            let line = merged[update.mergedIndex]
             let normalizedUnit = GroceryMerger.normalize(line.unit)
-            if let match = autoItems.first(where: {
-                $0.ingredientId == line.ingredientId
-                    && GroceryMerger.normalize($0.unit) == normalizedUnit
-                    && !used.contains($0.uuid)
-            }) {
-                used.insert(match.uuid)
-                if match.nameTR != line.nameTR
-                    || match.nameEN != line.nameEN
-                    || match.quantity != line.quantity
-                    || match.unit != normalizedUnit
-                    || match.hasUnitConflict != line.hasUnitConflict {
-                    match.nameTR = line.nameTR
-                    match.nameEN = line.nameEN
-                    match.quantity = line.quantity
-                    match.unit = normalizedUnit
-                    match.hasUnitConflict = line.hasUnitConflict
-                    didChange = true
-                }
-            } else {
-                let item = GroceryItem(
-                    ingredientId: line.ingredientId,
-                    nameTR: line.nameTR,
-                    nameEN: line.nameEN,
-                    quantity: line.quantity,
-                    unit: normalizedUnit,
-                    hasUnitConflict: line.hasUnitConflict,
-                    isChecked: false,
-                    isManual: false
-                )
-                context.insert(item)
-                item.week = week
+            if match.nameTR != line.nameTR
+                || match.nameEN != line.nameEN
+                || match.quantity != line.quantity
+                || match.unit != normalizedUnit
+                || match.hasUnitConflict != line.hasUnitConflict {
+                match.nameTR = line.nameTR
+                match.nameEN = line.nameEN
+                match.quantity = line.quantity
+                match.unit = normalizedUnit
+                match.hasUnitConflict = line.hasUnitConflict
                 didChange = true
             }
         }
 
-        for item in autoItems where !used.contains(item.uuid) {
-            context.delete(item)
+        for index in plan.inserts {
+            let line = merged[index]
+            let item = GroceryItem(
+                ingredientId: line.ingredientId,
+                nameTR: line.nameTR,
+                nameEN: line.nameEN,
+                quantity: line.quantity,
+                unit: GroceryMerger.normalize(line.unit),
+                hasUnitConflict: line.hasUnitConflict,
+                isChecked: false,
+                isManual: false
+            )
+            context.insert(item)
+            item.week = week
             didChange = true
+        }
+
+        for id in plan.deletes {
+            if let item = byID[id] {
+                context.delete(item)
+                didChange = true
+            }
         }
         if didChange {
             try context.save()

@@ -12,14 +12,36 @@ final class ProfileViewModel {
     var didLoad = false
     var statusMessage: String?
     var errorMessage: String?
+    /// Last values read from the store. An untouched stepper adopts a save made elsewhere.
+    private var loadedHousehold = 2
+    private var loadedEvenings = 5
+    private var loadedMinutes = CookTimeOptions.defaultMinutes
+    private var loadedDislikes: [String] = []
 
-    func loadIfNeeded(_ prefs: UserPrefs?) {
-        guard !didLoad, let prefs else { return }
+    /// Refreshes the form from the store. A stepper the user has moved, and not saved, is left alone.
+    func load(_ prefs: UserPrefs?) {
+        guard let prefs else { return }
+        let storedHousehold = HouseholdSizeLimits.clamped(prefs.householdSize)
+        let storedEvenings = min(max(prefs.eveningsPerWeek, 1), MealRecommender.eveningCap)
+        let storedMinutes = CookTimeOptions.resolved(prefs.maxCookMinutes)
+        let storedDislikes = prefs.dislikedIngredientIds
+        if !didLoad || householdSize == loadedHousehold {
+            householdSize = storedHousehold
+        }
+        if !didLoad || evenings == loadedEvenings {
+            evenings = storedEvenings
+        }
+        if !didLoad || maxCookMinutes == loadedMinutes {
+            maxCookMinutes = storedMinutes
+        }
+        if !didLoad || dislikedIDs == loadedDislikes {
+            dislikedIDs = storedDislikes
+        }
+        loadedHousehold = storedHousehold
+        loadedEvenings = storedEvenings
+        loadedMinutes = storedMinutes
+        loadedDislikes = storedDislikes
         didLoad = true
-        householdSize = HouseholdSizeLimits.clamped(prefs.householdSize)
-        evenings = min(max(prefs.eveningsPerWeek, 1), MealRecommender.eveningCap)
-        maxCookMinutes = CookTimeOptions.resolved(prefs.maxCookMinutes)
-        dislikedIDs = prefs.dislikedIngredientIds
     }
 
     func dislikedNames(in recipes: [Recipe]) -> [String] {
@@ -47,20 +69,15 @@ final class ProfileViewModel {
     func savePortions(in context: ModelContext) {
         do {
             guard let prefs = try UserPrefsStore.existing(in: context) else { return }
-            prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
             prefs.eveningsPerWeek = min(max(evenings, 1), MealRecommender.eveningCap)
             prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
-            householdSize = prefs.householdSize
-            evenings = prefs.eveningsPerWeek
-            maxCookMinutes = prefs.maxCookMinutes
-            if let week = try WeekPlanService.currentWeek(in: context) {
-                week.householdSize = prefs.householdSize
-                for meal in week.meals {
-                    meal.servings = prefs.householdSize
-                }
-            }
-            try context.save()
-            try GroceryListService.rebuild(in: context)
+            try PortionSaveService.saveHouseholdSize(householdSize, in: context)
+            householdSize = HouseholdSizeLimits.clamped(prefs.householdSize)
+            evenings = min(max(prefs.eveningsPerWeek, 1), MealRecommender.eveningCap)
+            maxCookMinutes = CookTimeOptions.resolved(prefs.maxCookMinutes)
+            loadedHousehold = householdSize
+            loadedEvenings = evenings
+            loadedMinutes = maxCookMinutes
             statusMessage = "Porsiyon ve market listesi güncellendi."
         } catch {
             errorMessage = error.localizedDescription
@@ -76,6 +93,9 @@ final class ProfileViewModel {
             householdSize = prefs.householdSize
             evenings = prefs.eveningsPerWeek
             maxCookMinutes = prefs.maxCookMinutes
+            loadedHousehold = householdSize
+            loadedEvenings = evenings
+            loadedMinutes = maxCookMinutes
             try context.save()
             let request = WeekPlanService.planRequest(from: prefs)
             _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)

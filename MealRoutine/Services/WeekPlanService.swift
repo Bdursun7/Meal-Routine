@@ -139,6 +139,7 @@ enum WeekPlanService {
         MealExposureLog.record([outgoing], now: now)
         meal.recipeSlug = slug
         meal.cookedAt = nil
+        // Değiştir swaps the recipe and keeps this evening's servings.
         try context.save()
     }
 
