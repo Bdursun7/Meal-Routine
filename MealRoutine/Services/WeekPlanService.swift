@@ -39,7 +39,7 @@ enum WeekPlanService {
         guard let prefs = try UserPrefsStore.existing(in: context), prefs.hasCompletedOnboarding else {
             return nil
         }
-        return try replaceCurrentWeek(in: context, request: request(from: prefs), now: now)
+        return try replaceCurrentWeek(in: context, request: planRequest(from: prefs), now: now)
     }
 
     @MainActor
@@ -152,7 +152,7 @@ enum WeekPlanService {
         try context.save()
     }
 
-    private static func request(from prefs: UserPrefs) -> PlanRequest {
+    static func planRequest(from prefs: UserPrefs) -> PlanRequest {
         PlanRequest(
             householdSize: prefs.householdSize,
             evenings: prefs.eveningsPerWeek,

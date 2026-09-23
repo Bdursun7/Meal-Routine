@@ -17,32 +17,56 @@ enum CatalogError: LocalizedError {
     }
 }
 
+struct BundledCatalog: Sendable {
+    var file: RecipeCatalogFile
+    var fingerprint: String
+}
+
 enum RecipeCatalogLoader {
     static func load(bundle: Bundle = .main) throws -> RecipeCatalogFile {
-        guard let url = resourceURL(name: "recipes.v1", extension: "json", bundle: bundle) else {
-            throw CatalogError.missingFile("recipes.v1.json")
-        }
-        return try decode(RecipeCatalogFile.self, from: url, name: "recipes.v1.json")
+        try loadBundled(bundle: bundle).file
     }
 
     static func load(from url: URL) throws -> RecipeCatalogFile {
-        try decode(RecipeCatalogFile.self, from: url, name: url.lastPathComponent)
+        try loadBundled(from: url).file
+    }
+
+    static func loadBundled(bundle: Bundle = .main) throws -> BundledCatalog {
+        guard let url = resourceURL(name: "recipes.v1", extension: "json", bundle: bundle) else {
+            throw CatalogError.missingFile("recipes.v1.json")
+        }
+        return try loadBundled(from: url)
+    }
+
+    static func loadBundled(from url: URL) throws -> BundledCatalog {
+        let name = url.lastPathComponent
+        let data = try contents(of: url, name: name)
+        let file = try decode(RecipeCatalogFile.self, from: data, name: name)
+        return BundledCatalog(
+            file: file,
+            fingerprint: CatalogFingerprint.token(schemaVersion: file.schemaVersion, catalogFileBytes: data)
+        )
     }
 
     static func loadAliases(bundle: Bundle = .main) -> [String: String] {
         guard let url = resourceURL(name: "ingredient-aliases.tr", extension: "json", bundle: bundle) else {
             return [:]
         }
-        return (try? decode(IngredientAliasFile.self, from: url, name: "ingredient-aliases.tr.json").aliases) ?? [:]
+        guard let data = try? contents(of: url, name: "ingredient-aliases.tr.json") else {
+            return [:]
+        }
+        return (try? decode(IngredientAliasFile.self, from: data, name: "ingredient-aliases.tr.json").aliases) ?? [:]
     }
 
-    private static func decode<T: Decodable>(_ type: T.Type, from url: URL, name: String) throws -> T {
-        let data: Data
+    private static func contents(of url: URL, name: String) throws -> Data {
         do {
-            data = try Data(contentsOf: url)
+            return try Data(contentsOf: url)
         } catch {
             throw CatalogError.unreadable(name)
         }
+    }
+
+    private static func decode<T: Decodable>(_ type: T.Type, from data: Data, name: String) throws -> T {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
