@@ -23,6 +23,7 @@ struct RecipeDetailView: View {
     /// Last count this screen successfully wrote, so a later household save can replace it.
     @State private var lastWrittenServings: Int?
     @State private var lastWrittenContext: String?
+    @State private var isHeroPhotoShown = false
 
     private var recipe: Recipe? {
         recipes.first { $0.slug == route.slug }
@@ -176,20 +177,21 @@ struct RecipeDetailView: View {
     private func content(_ recipe: Recipe) -> some View {
         List {
             Section {
-                HStack(spacing: 16) {
-                    Image(systemName: "fork.knife.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(Theme.accent)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(recipe.displayName)
-                            .font(.title2.bold())
-                        Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
-                            .foregroundStyle(.secondary)
-                        Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(recipe.displayName)
+                        .font(.title2.bold())
+                    Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
+                        .foregroundStyle(.secondary)
+                    Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    RecipePhotoView(
+                        urlString: recipe.photoURL,
+                        author: recipe.photoAuthor,
+                        license: recipe.photoLicense,
+                        layout: .hero,
+                        isPhotoShown: $isHeroPhotoShown
+                    )
                 }
                 .padding(.vertical, 4)
                 if let currentRating {

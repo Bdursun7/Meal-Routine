@@ -86,6 +86,11 @@ enum RecipeSeedService {
 
     @MainActor
     private static func insert(_ dto: RecipeDTO, aliases: [String: String], into context: ModelContext) {
+        let photo = RecipePhoto.persisted(
+            url: dto.photo?.url,
+            author: dto.photo?.author,
+            license: dto.photo?.license
+        )
         let recipe = Recipe(
             slug: dto.id,
             nameEN: dto.name.en ?? "",
@@ -112,9 +117,9 @@ enum RecipeSeedService {
             sourceProvider: dto.source.provider ?? "unitools",
             sourceLicense: dto.source.license ?? "CC BY-SA 4.0",
             sourceAttribution: dto.source.attribution ?? "UniTools — theunitools.com",
-            photoURL: dto.photo?.url ?? "",
-            photoAuthor: dto.photo?.author ?? "",
-            photoLicense: dto.photo?.license ?? ""
+            photoURL: photo.url,
+            photoAuthor: photo.author,
+            photoLicense: photo.license
         )
         context.insert(recipe)
 

@@ -29,6 +29,8 @@ final class Recipe {
     var sourceProvider: String
     var sourceLicense: String
     var sourceAttribution: String
+    /// Catalog `photo` fields. Empty strings mean there is no photo. Seed copies the
+    /// JSON url, author, and license as shipped; the UI does not invent a credit.
     var photoURL: String
     var photoAuthor: String
     var photoLicense: String
