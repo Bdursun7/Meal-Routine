@@ -105,6 +105,12 @@ final class Recipe {
         return nativeName
     }
 
+    /// V1 shows the Turkish summary. English remains in the catalog for attribution.
+    var displaySummary: String {
+        if !summaryTR.isEmpty { return summaryTR }
+        return summaryEN
+    }
+
     var ingredientIDs: Set<String> {
         Set(ingredients.map(\.ingredientId))
     }

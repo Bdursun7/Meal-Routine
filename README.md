@@ -21,7 +21,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - Tabs: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - This week is filled by a naive deterministic picker (time cap, dislikes, “never”, loved boost, curated score). It is not the full recommender yet.
 - Grocery list merges UniTools ingredient `id`s when the unit matches, and flags unit conflicts instead of summing them.
-- Recipe steps stay English. Names and the rest of the UI are Turkish.
+- Summaries and cooking steps are Turkish localizations of the UniTools text. English source strings stay in the catalog for CC BY-SA attribution. Names and the rest of the UI are Turkish.
 - No ads, paywall, or LLM calls. Photos are not downloaded; the detail screen uses a local placeholder.
 
 ## Recipe data
@@ -59,7 +59,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - Sekmeler: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - Hafta, basit ve deterministik bir seçiciyle dolar (süre, sevmediğin malzeme, “bir daha asla”, sevdim önceliği, kürasyon skoru). Tam öneri motoru bu iskelette yok.
 - Market listesi, UniTools malzeme `id` değerlerini birim aynıysa toplar; birim çakışırsa miktarları birbirine katmaz, satırı işaretler.
-- Adımlar İngilizce kalır. İsimler ve arayüzün geri kalanı Türkçe.
+- Özet ve pişirme adımları, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin CC BY-SA atfı için katalogda durur. İsimler ve arayüzün geri kalanı Türkçe.
 - Reklam, ödeme duvarı ve LLM yok. Fotoğraflar indirilmez; detayda yerel bir yer tutucu vardır.
 
 ## Tarif verisi

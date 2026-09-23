@@ -130,7 +130,8 @@ enum RecipeSeedService {
                 quantity: ingredient.quantity,
                 unit: ingredient.unit,
                 scaling: ingredient.scaling,
-                note: ingredient.note ?? "",
+                note: ingredient.note?.en ?? "",
+                noteTR: ingredient.note?.tr ?? "",
                 trAliasCurated: ingredient.trAliasCurated,
                 sortIndex: index
             )

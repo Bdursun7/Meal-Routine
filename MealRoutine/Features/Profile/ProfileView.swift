@@ -63,7 +63,7 @@ struct ProfileView: View {
                         .foregroundStyle(.secondary)
                     Link("theunitools.com/en/data", destination: Attribution.landingURL)
                     Link("CC BY-SA 4.0", destination: Attribution.licenseURL)
-                    Text("Arayüz Türkçe. Tarif adımları V1'de İngilizce kalır.")
+                    Text("Özet ve adımlar, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin katalogda durur.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text("Sürüm \(appVersion)")

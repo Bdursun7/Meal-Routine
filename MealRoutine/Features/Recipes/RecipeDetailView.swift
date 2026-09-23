@@ -115,14 +115,11 @@ struct RecipeDetailView: View {
                 if let currentRating {
                     currentRatingRow(currentRating)
                 }
-                Text("Pişirme adımları V1'de İngilizce.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
-            if !recipe.summaryEN.isEmpty {
-                Section("Özet (İngilizce)") {
-                    Text(recipe.summaryEN)
+            if !recipe.displaySummary.isEmpty {
+                Section("Özet") {
+                    Text(recipe.displaySummary)
                 }
             }
 
@@ -139,8 +136,8 @@ struct RecipeDetailView: View {
                         Text(QuantityFormat.quantityAndUnit(quantity: line.quantity, unit: line.unit))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        if !line.note.isEmpty {
-                            Text(line.note)
+                        if !line.displayNote.isEmpty {
+                            Text(line.displayNote)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -148,7 +145,7 @@ struct RecipeDetailView: View {
                 }
             }
 
-            Section("Adımlar (İngilizce)") {
+            Section("Adımlar") {
                 let steps = recipe.steps.sorted { $0.sortIndex < $1.sortIndex }
                 ForEach(steps) { step in
                     VStack(alignment: .leading, spacing: 4) {
