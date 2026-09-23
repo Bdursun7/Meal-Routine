@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// A cook step. V1 text is English; `textTR` is reserved for a later translation pass.
+/// A cook step. V1 shows Turkish; English stays on `textEN` for attribution.
 @Model
 final class RecipeStep {
     var textEN: String
@@ -22,7 +22,7 @@ final class RecipeStep {
         self.sortIndex = sortIndex
     }
 
-    /// Steps stay English in V1. Turkish is used only when a translation exists.
+    /// Prefer the Turkish step. Fall back to English only when `textTR` is missing.
     var displayText: String {
         if !textTR.isEmpty { return textTR }
         return textEN

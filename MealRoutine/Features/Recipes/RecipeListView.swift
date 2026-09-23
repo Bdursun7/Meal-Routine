@@ -20,11 +20,6 @@ struct RecipeListView: View {
                     ContentUnavailableView.search(text: viewModel.searchText)
                 } else {
                     List {
-                        Section {
-                            Text("Adımlar V1'de İngilizce.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
                         ForEach(visible) { recipe in
                             NavigationLink(value: RecipeRoute(slug: recipe.slug)) {
                                 VStack(alignment: .leading, spacing: 4) {

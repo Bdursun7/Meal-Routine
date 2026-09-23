@@ -9,6 +9,7 @@ Run from anywhere:
 
 from __future__ import annotations
 
+import json
 import pathlib
 
 FNV_OFFSET = 0xCBF29CE484222325
@@ -64,6 +65,52 @@ def decide(
         return True, other_orphans
     leftovers = orphaned_slugs(current_week_slugs + other_week_slugs, live_recipe_slugs)
     return False, leftovers
+
+
+def _blank(value: object) -> bool:
+    return not isinstance(value, str) or not value.strip()
+
+
+def require_turkish(catalog: dict) -> tuple[int, int, int]:
+    """Fail when a summary, step, or displayed ingredient note has no Turkish text.
+
+    English source strings must stay. They are the CC BY-SA original.
+    """
+    recipes = catalog.get("recipes")
+    expect(isinstance(recipes, list) and len(recipes) == 125, "catalog has 125 recipes")
+    summary_count = 0
+    step_count = 0
+    note_count = 0
+    for recipe in recipes:
+        recipe_id = recipe.get("id", "?")
+        summary = recipe.get("summary") or {}
+        expect(not _blank(summary.get("en")), f"{recipe_id} summary.en missing")
+        expect(not _blank(summary.get("tr")), f"{recipe_id} summary.tr missing")
+        summary_count += 1
+        steps = recipe.get("steps") or []
+        expect(steps, f"{recipe_id} has no steps")
+        for index, step in enumerate(steps):
+            text = (step.get("text") or {})
+            expect(not _blank(text.get("en")), f"{recipe_id} step {index} text.en missing")
+            expect(not _blank(text.get("tr")), f"{recipe_id} step {index} text.tr missing")
+            step_count += 1
+        for ingredient in recipe.get("ingredients") or []:
+            note = ingredient.get("note")
+            if note is None:
+                continue
+            ingredient_id = ingredient.get("id", "?")
+            expect(
+                isinstance(note, dict),
+                f"{recipe_id} ingredient {ingredient_id} note is not bilingual",
+            )
+            if _blank(note.get("en")):
+                continue
+            expect(
+                not _blank(note.get("tr")),
+                f"{recipe_id} ingredient {ingredient_id} note.tr missing",
+            )
+            note_count += 1
+    return summary_count, step_count, note_count
 
 
 def expect(condition: bool, message: str) -> None:
@@ -163,6 +210,10 @@ def main() -> None:
     mutated[0] ^= 0x01
     expect(token(1, bytes(mutated)) != original, "a catalog byte change re-imports")
 
+    summary_count, step_count, note_count = require_turkish(json.loads(catalog.decode("utf-8")))
+    # Translations are catalog bytes, so the fingerprint above changes when they do
+    # and RecipeSeedService re-imports on the next launch.
+    print(f"turkish: {summary_count} summaries, {step_count} steps, {note_count} notes")
     print("ok")
 
 

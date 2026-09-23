@@ -10,7 +10,10 @@ final class IngredientLine {
     var quantity: Double?
     var unit: String
     var scaling: String
+    /// English source note from the catalog. Empty when the ingredient has no note.
     var note: String
+    /// Turkish localization of `note`. Empty when there is nothing to show in Turkish.
+    var noteTR: String = ""
     var trAliasCurated: Bool
     var sortIndex: Int
     var recipe: Recipe? = nil
@@ -23,6 +26,7 @@ final class IngredientLine {
         unit: String,
         scaling: String,
         note: String,
+        noteTR: String = "",
         trAliasCurated: Bool,
         sortIndex: Int
     ) {
@@ -33,6 +37,7 @@ final class IngredientLine {
         self.unit = unit
         self.scaling = scaling
         self.note = note
+        self.noteTR = noteTR
         self.trAliasCurated = trAliasCurated
         self.sortIndex = sortIndex
     }
@@ -41,5 +46,11 @@ final class IngredientLine {
         if !nameTR.isEmpty { return nameTR }
         if !nameEN.isEmpty { return nameEN }
         return ingredientId
+    }
+
+    /// Prefer the Turkish prep note. Fall back to English only when `noteTR` is missing.
+    var displayNote: String {
+        if !noteTR.isEmpty { return noteTR }
+        return note
     }
 }

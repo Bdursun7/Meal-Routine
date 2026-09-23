@@ -58,7 +58,7 @@ struct IngredientDTO: Decodable, Sendable {
     var quantity: Double?
     var unit: String
     var scaling: String
-    var note: String?
+    var note: LocalizedText?
     var trAliasCurated: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -71,9 +71,26 @@ struct IngredientDTO: Decodable, Sendable {
         name = try container.decode(LocalizedText.self, forKey: .name)
         unit = try container.decodeIfPresent(String.self, forKey: .unit) ?? ""
         scaling = try container.decodeIfPresent(String.self, forKey: .scaling) ?? "linear"
-        note = try container.decodeIfPresent(String.self, forKey: .note)
+        note = try Self.decodeNote(from: container)
         trAliasCurated = try container.decodeIfPresent(Bool.self, forKey: .trAliasCurated) ?? false
         quantity = try FlexibleJSONNumber.decodeDoubleIfPresent(from: container, forKey: .quantity)
+    }
+
+    /// Notes ship as `{ en, tr }`. A plain string is still accepted as English-only.
+    private static func decodeNote(from container: KeyedDecodingContainer<CodingKeys>) throws -> LocalizedText? {
+        guard container.contains(.note) else { return nil }
+        if try container.decodeNil(forKey: .note) { return nil }
+        if let localized = try? container.decode(LocalizedText.self, forKey: .note) {
+            let english = localized.en ?? ""
+            let turkish = localized.tr ?? ""
+            if english.isEmpty, turkish.isEmpty { return nil }
+            return localized
+        }
+        if let plain = try? container.decode(String.self, forKey: .note) {
+            if plain.isEmpty { return nil }
+            return LocalizedText(en: plain, tr: nil)
+        }
+        return nil
     }
 }
 
