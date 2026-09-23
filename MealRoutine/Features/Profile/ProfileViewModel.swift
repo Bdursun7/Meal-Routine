@@ -7,7 +7,7 @@ import SwiftData
 final class ProfileViewModel {
     var householdSize = 2
     var evenings = 5
-    var maxCookMinutes = 60
+    var maxCookMinutes = CookTimeOptions.defaultMinutes
     var dislikedIDs: [String] = []
     var didLoad = false
     var statusMessage: String?
@@ -16,9 +16,9 @@ final class ProfileViewModel {
     func loadIfNeeded(_ prefs: UserPrefs?) {
         guard !didLoad, let prefs else { return }
         didLoad = true
-        householdSize = prefs.householdSize
-        evenings = prefs.eveningsPerWeek
-        maxCookMinutes = prefs.maxCookMinutes
+        householdSize = HouseholdSizeLimits.clamped(prefs.householdSize)
+        evenings = min(max(prefs.eveningsPerWeek, 1), NaiveMealPicker.eveningCap)
+        maxCookMinutes = CookTimeOptions.resolved(prefs.maxCookMinutes)
         dislikedIDs = prefs.dislikedIngredientIds
     }
 
@@ -26,20 +26,33 @@ final class ProfileViewModel {
         var names: [String: String] = [:]
         for recipe in recipes {
             for line in recipe.ingredients where names[line.ingredientId] == nil {
-                names[line.ingredientId] = line.displayName
+                if let group = DislikeChipMerge.group(containing: line.ingredientId) {
+                    names[line.ingredientId] = group.name
+                } else {
+                    names[line.ingredientId] = line.displayName
+                }
             }
         }
-        return dislikedIDs.map { names[$0] ?? $0 }.sorted {
-            $0.localizedStandardCompare($1) == .orderedAscending
+        var seen: Set<String> = []
+        var labels: [String] = []
+        for id in dislikedIDs {
+            let label = names[id] ?? DislikeChipMerge.group(containing: id)?.name ?? id
+            if seen.insert(label).inserted {
+                labels.append(label)
+            }
         }
+        return labels.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     func savePortions(in context: ModelContext) {
         do {
             guard let prefs = try UserPrefsStore.existing(in: context) else { return }
-            prefs.householdSize = householdSize
+            prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
             prefs.eveningsPerWeek = min(max(evenings, 1), NaiveMealPicker.eveningCap)
-            prefs.maxCookMinutes = maxCookMinutes
+            prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
+            householdSize = prefs.householdSize
+            evenings = prefs.eveningsPerWeek
+            maxCookMinutes = prefs.maxCookMinutes
             if let week = try WeekPlanService.currentWeek(in: context) {
                 week.householdSize = prefs.householdSize
                 for meal in week.meals {
@@ -57,16 +70,14 @@ final class ProfileViewModel {
     func rebuildWeek(in context: ModelContext) {
         do {
             guard let prefs = try UserPrefsStore.existing(in: context) else { return }
-            prefs.householdSize = householdSize
+            prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
             prefs.eveningsPerWeek = min(max(evenings, 1), NaiveMealPicker.eveningCap)
-            prefs.maxCookMinutes = maxCookMinutes
+            prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
+            householdSize = prefs.householdSize
+            evenings = prefs.eveningsPerWeek
+            maxCookMinutes = prefs.maxCookMinutes
             try context.save()
-            let request = PlanRequest(
-                householdSize: prefs.householdSize,
-                evenings: prefs.eveningsPerWeek,
-                maxCookMinutes: prefs.maxCookMinutes,
-                dislikedIngredientIds: Set(prefs.dislikedIngredientIds)
-            )
+            let request = WeekPlanService.planRequest(from: prefs)
             _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)
             try GroceryListService.rebuild(in: context)
             statusMessage = "Bu hafta yeniden kuruldu."

@@ -1,23 +1,60 @@
 import SwiftData
 import SwiftUI
 
-/// Short first-run stub: household, dislikes, optional taste seeding.
+/// First-run flow: welcome, then Ev, dislikes, a short taste sample, and a summary.
+/// The week is built only from “Haftamı oluştur” on the summary.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var recipes: [Recipe]
     @State private var viewModel = OnboardingViewModel()
+    @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 40
 
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.step == 0 {
-                    basics
-                } else {
+                switch viewModel.step {
+                case .welcome:
+                    welcome
+                case .household:
+                    household
+                case .dislikes:
+                    dislikes
+                case .taste:
                     taste
+                case .summary:
+                    summary
                 }
             }
-            .navigationTitle(viewModel.step == 0 ? "Kurulum" : "Damak tadı")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(viewModel.step.title)
+            .navigationBarTitleDisplayMode(viewModel.step == .welcome ? .inline : .large)
+            .toolbar(navigationVisibility, for: .navigationBar)
+            .toolbar {
+                if viewModel.step != .welcome {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            viewModel.goBack()
+                        } label: {
+                            Image(systemName: "chevron.backward")
+                                .font(.body.weight(.semibold))
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .accessibilityLabel("Geri")
+                    }
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if viewModel.step.showsProgress {
+                    progressHeader
+                        .padding(.horizontal, 24)
+                        .padding(.top, 4)
+                        .padding(.bottom, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.bar)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomBar
+            }
         }
         .tint(Theme.accent)
         .onAppear { viewModel.loadChips(from: recipes) }
@@ -26,89 +63,203 @@ struct OnboardingView: View {
         }
     }
 
-    private var basics: some View {
-        @Bindable var viewModel = self.viewModel
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+    private var navigationVisibility: Visibility {
+        viewModel.step == .welcome ? .hidden : .visible
+    }
+
+    private var welcome: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
                     Image(systemName: "fork.knife")
-                        .font(.system(size: 36))
+                        .font(.system(size: heroIconSize))
                         .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                     Text("Haftan, önceden planlı.")
                         .font(.largeTitle.bold())
-                    Text("Akşam yemeği kararını kısaltırız. Tarifler telefonunda durur; hesap yok.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Akşam yemeği kararını kısaltırız. Tarifler telefonunda durur.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Hesap yok, ~1 dk.")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
 
-                Stepper(value: $viewModel.householdSize, in: 1...8) {
-                    Text("Ev halkı: \(viewModel.householdSize)")
+                VStack(alignment: .leading, spacing: 16) {
+                    bullet("Haftada en fazla 5 akşam", systemImage: "calendar")
+                    bullet("Tek yemek Değiştir (tüm haftayı silmez)", systemImage: "arrow.triangle.2.circlepath")
+                    bullet(
+                        "Pişirdim + Sevdim/İdare/Asla → sonraki haftalar; market plandan birleşir",
+                        systemImage: "cart"
+                    )
                 }
-                Stepper(value: $viewModel.evenings, in: 1...NaiveMealPicker.eveningCap) {
-                    Text("Akşam sayısı: \(viewModel.evenings)")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
+        }
+    }
+
+    private var household: some View {
+        @Bindable var viewModel = self.viewModel
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                Text("Kaç kişisiniz, haftada kaç akşam, en fazla kaç dakika?")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ev halkı")
+                        .font(.headline)
+                    Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
+                        Text("Ev halkı: \(viewModel.householdSize)")
+                    }
+                    .frame(minHeight: 44)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Akşam sayısı")
+                        .font(.headline)
+                    Stepper(value: $viewModel.evenings, in: 1...NaiveMealPicker.eveningCap) {
+                        Text("Akşam sayısı: \(viewModel.evenings)")
+                    }
+                    .frame(minHeight: 44)
+                    Text("Haftada en fazla 5 akşam.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("En fazla pişirme")
                         .font(.headline)
-                    Picker("En fazla pişirme", selection: $viewModel.maxCookMinutes) {
+                    FlowLayout {
                         ForEach(CookTimeOptions.minutes, id: \.self) { minutes in
-                            Text("\(minutes) dk").tag(minutes)
+                            selectionChip(
+                                title: CookTimeOptions.label(minutes),
+                                isSelected: viewModel.maxCookMinutes == minutes
+                            ) {
+                                viewModel.maxCookMinutes = minutes
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
                 }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Sevmediğin malzemeler")
-                        .font(.headline)
-                    Text("İşaretlediklerin bu haftanın seçimine girmez.")
-                        .font(.subheadline)
+    private var dislikes: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("İşaretlediklerin bu haftanın seçimine girmez. Seçmeden de devam edebilirsin.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if viewModel.chips.isEmpty {
+                    Text("Malzeme listesi henüz yok.")
                         .foregroundStyle(.secondary)
+                } else {
                     FlowLayout {
                         ForEach(viewModel.chips) { chip in
-                            dislikeChip(chip)
+                            selectionChip(
+                                title: chip.name,
+                                isSelected: viewModel.isDisliked(chip)
+                            ) {
+                                viewModel.toggleDislike(chip)
+                            }
                         }
                     }
                 }
-
-                Button("Devam") {
-                    viewModel.step = 1
-                }
-                .buttonStyle(PrimaryButtonStyle())
             }
-            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
     }
 
     private var taste: some View {
-        List {
-            Section {
-                Text("İstersen 20 tariften birini işaretle. Boş bırakırsan skor sırasıyla seçeriz. Adımlar şimdilik İngilizce.")
-                    .font(.subheadline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Birkaç tarife ne dersin?")
+                    .font(.title2.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("En fazla 8 tarif. Sevdim, idare veya asla — bir kısmını işaretlemen yeter.")
+                    .font(.body)
                     .foregroundStyle(.secondary)
-                    .listRowSeparator(.hidden)
-            }
-            ForEach(viewModel.sampleRecipes(from: recipes)) { recipe in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(recipe.displayName)
-                        .font(.headline)
-                    Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.turkish(recipe.difficulty))")
-                        .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                let sample = viewModel.sampleRecipes(from: recipes)
+                if sample.isEmpty {
+                    Text("Tarif listesi henüz yok.")
                         .foregroundStyle(.secondary)
-                    ratingButtons(for: recipe.slug)
+                } else {
+                    ForEach(sample) { recipe in
+                        tasteCard(recipe)
+                    }
                 }
-                .padding(.vertical, 4)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var summary: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Hafta, aşağıdaki tercihlerle kurulur.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                summaryRow(title: "Ev", value: viewModel.householdSummary) {
+                    viewModel.edit(.household)
                 }
+                summaryRow(title: "Sevmediğin malzemeler", value: viewModel.dislikeSummary) {
+                    viewModel.edit(.dislikes)
+                }
+                summaryRow(title: "Tat", value: viewModel.tasteSummary) {
+                    viewModel.edit(.taste)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
+        }
+    }
+
+    private var bottomBar: some View {
+        VStack(spacing: 8) {
+            if viewModel.step == .summary, let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            switch viewModel.step {
+            case .welcome:
+                Button("Kuruluma başla") {
+                    viewModel.continueForward()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            case .household, .dislikes:
+                Button("Devam") {
+                    viewModel.continueForward()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            case .taste:
+                Button("Devam") {
+                    viewModel.continueForward()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Button("Atla") {
+                    viewModel.skipTaste()
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 44)
+            case .summary:
                 Button {
                     viewModel.finish(in: modelContext)
                 } label: {
@@ -122,20 +273,44 @@ struct OnboardingView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(viewModel.isSaving)
             }
-            .padding(16)
-            .background(.bar)
+        }
+        .padding(16)
+        .background(.bar)
+    }
+
+    private var progressHeader: some View {
+        let index = viewModel.step.rawValue
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("\(index)/\(OnboardingStep.progressTotal)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .accessibilityLabel("Adım \(index) / \(OnboardingStep.progressTotal)")
+            ProgressView(value: Double(index), total: Double(OnboardingStep.progressTotal))
+                .tint(Theme.accent)
+                .accessibilityHidden(true)
         }
     }
 
-    private func dislikeChip(_ chip: IngredientChip) -> some View {
-        let isSelected = viewModel.disliked.contains(chip.id)
-        return Button {
-            viewModel.toggleDislike(chip.id)
-        } label: {
-            Text(chip.name)
-                .font(.subheadline)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+    private func bullet(_ text: String, systemImage: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func selectionChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 44)
                 .background(isSelected ? Theme.accent : Color(.secondarySystemFill))
                 .foregroundStyle(isSelected ? Color.white : Color.primary)
                 .clipShape(Capsule())
@@ -144,8 +319,24 @@ struct OnboardingView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    private func tasteCard(_ recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(recipe.displayName)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.turkish(recipe.difficulty))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            ratingButtons(for: recipe.slug)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    }
+
     private func ratingButtons(for slug: String) -> some View {
-        HStack(spacing: 8) {
+        FlowLayout {
             ForEach(MealRating.allCases) { rating in
                 let isSelected = viewModel.ratings[slug] == rating
                 Button(rating.title) {
@@ -155,11 +346,37 @@ struct OnboardingView: View {
                         viewModel.ratings[slug] = rating
                     }
                 }
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
+                .frame(minHeight: 44)
+                .padding(.horizontal, 4)
                 .buttonStyle(.bordered)
                 .tint(isSelected ? Theme.accent : .secondary)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
+    }
+
+    private func summaryRow(title: String, value: String, edit: @escaping () -> Void) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+
+            Button("Düzenle", action: edit)
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
+                .frame(minHeight: 44)
+                .accessibilityLabel("\(title), düzenle")
+        }
+        .padding(16)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }

@@ -83,12 +83,7 @@ final class ThisWeekViewModel {
                 alertMessage = WeekPlanError.missingPreferences.errorDescription
                 return
             }
-            let request = PlanRequest(
-                householdSize: prefs.householdSize,
-                evenings: prefs.eveningsPerWeek,
-                maxCookMinutes: prefs.maxCookMinutes,
-                dislikedIngredientIds: Set(prefs.dislikedIngredientIds)
-            )
+            let request = WeekPlanService.planRequest(from: prefs)
             _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)
             try GroceryListService.rebuild(in: context)
         } catch {

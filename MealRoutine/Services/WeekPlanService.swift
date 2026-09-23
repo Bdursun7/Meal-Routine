@@ -118,7 +118,7 @@ enum WeekPlanService {
         guard let slug = NaiveMealPicker.pick(
             candidates: candidates,
             evenings: 1,
-            maxCookMinutes: prefs.maxCookMinutes,
+            maxCookMinutes: CookTimeOptions.resolved(prefs.maxCookMinutes),
             dislikedIngredientIds: Set(prefs.dislikedIngredientIds),
             excludingSlugs: excluding
         ).first else {
@@ -154,9 +154,9 @@ enum WeekPlanService {
 
     static func planRequest(from prefs: UserPrefs) -> PlanRequest {
         PlanRequest(
-            householdSize: prefs.householdSize,
-            evenings: prefs.eveningsPerWeek,
-            maxCookMinutes: prefs.maxCookMinutes,
+            householdSize: HouseholdSizeLimits.clamped(prefs.householdSize),
+            evenings: min(max(prefs.eveningsPerWeek, 1), NaiveMealPicker.eveningCap),
+            maxCookMinutes: CookTimeOptions.resolved(prefs.maxCookMinutes),
             dislikedIngredientIds: Set(prefs.dislikedIngredientIds)
         )
     }

@@ -84,6 +84,27 @@ enum RegionLabel {
     }
 }
 
+/// Household size accepted by onboarding and Profile.
+enum HouseholdSizeLimits {
+    static let minimum = 1
+    static let maximum = 8
+    static var range: ClosedRange<Int> { minimum...maximum }
+
+    static func clamped(_ value: Int) -> Int {
+        min(max(value, minimum), maximum)
+    }
+}
+
+/// Max cook time choices. Default is 60. Values outside the list resolve to that default.
 enum CookTimeOptions {
-    static let minutes = [30, 45, 60, 90, 120]
+    static let minutes = [30, 45, 60, 90]
+    static let defaultMinutes = 60
+
+    static func resolved(_ value: Int) -> Int {
+        minutes.contains(value) ? value : defaultMinutes
+    }
+
+    static func label(_ minutes: Int) -> String {
+        "\(minutes) dk"
+    }
 }
