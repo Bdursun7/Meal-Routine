@@ -73,7 +73,7 @@
       "prepMinutes": 10,
       "cookMinutes": 20,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick", "spicy", "one-pan"],
       "trDogfoodScore": 91,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -266,7 +266,7 @@
       "prepMinutes": 10,
       "cookMinutes": 35,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["stew"],
       "trDogfoodScore": 89,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -481,7 +481,7 @@
       "prepMinutes": 30,
       "cookMinutes": 30,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["bread"],
       "trDogfoodScore": 85,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -732,7 +732,7 @@
       "prepMinutes": 60,
       "cookMinutes": 20,
       "totalMinutes": 80,
-      "tags": [],
+      "tags": ["spicy", "bread", "bake"],
       "trDogfoodScore": 77,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -970,7 +970,7 @@
       "prepMinutes": 20,
       "cookMinutes": 15,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["bread", "grill"],
       "trDogfoodScore": 71,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -1174,7 +1174,7 @@
       "prepMinutes": 25,
       "cookMinutes": 20,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["spicy", "fry"],
       "trDogfoodScore": 68,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -1408,7 +1408,7 @@
       "prepMinutes": 10,
       "cookMinutes": 35,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["spicy", "stew"],
       "trDogfoodScore": 68,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -1643,7 +1643,7 @@
       "prepMinutes": 20,
       "cookMinutes": 25,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["spicy", "one-pan", "curry"],
       "trDogfoodScore": 68,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -1877,7 +1877,7 @@
       "prepMinutes": 100,
       "cookMinutes": 25,
       "totalMinutes": 125,
-      "tags": [],
+      "tags": ["slow", "dumpling"],
       "trDogfoodScore": 67,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -2128,7 +2128,7 @@
       "prepMinutes": 15,
       "cookMinutes": 30,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["spicy", "stew"],
       "trDogfoodScore": 66,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -2372,7 +2372,7 @@
       "prepMinutes": 20,
       "cookMinutes": 25,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["one-pan"],
       "trDogfoodScore": 64,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -2611,7 +2611,7 @@
       "prepMinutes": 15,
       "cookMinutes": 35,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["spicy", "bread", "one-pan"],
       "trDogfoodScore": 63,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -2813,7 +2813,7 @@
       "prepMinutes": 20,
       "cookMinutes": 25,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["potato", "fry"],
       "trDogfoodScore": 62,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -2982,7 +2982,7 @@
       "prepMinutes": 20,
       "cookMinutes": 15,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["spicy", "bread", "one-pan"],
       "trDogfoodScore": 62,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -3227,7 +3227,7 @@
       "prepMinutes": 10,
       "cookMinutes": 25,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["rice", "one-pan"],
       "trDogfoodScore": 62,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -3429,7 +3429,7 @@
       "prepMinutes": 30,
       "cookMinutes": 15,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["bread", "grill"],
       "trDogfoodScore": 61,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -3660,7 +3660,7 @@
       "prepMinutes": 25,
       "cookMinutes": 15,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["potato", "steam"],
       "trDogfoodScore": 61,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -3870,7 +3870,7 @@
       "prepMinutes": 20,
       "cookMinutes": 15,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["spicy", "rice", "one-pan", "stir-fry"],
       "trDogfoodScore": 61,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -4113,7 +4113,7 @@
       "prepMinutes": 20,
       "cookMinutes": 30,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["bake"],
       "trDogfoodScore": 61,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -4340,7 +4340,7 @@
       "prepMinutes": 20,
       "cookMinutes": 0,
       "totalMinutes": 20,
-      "tags": [],
+      "tags": ["quick", "cold"],
       "trDogfoodScore": 61,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -4537,7 +4537,7 @@
       "prepMinutes": 40,
       "cookMinutes": 0,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["cold", "bulgur"],
       "trDogfoodScore": 60,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -4740,7 +4740,7 @@
       "prepMinutes": 25,
       "cookMinutes": 20,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["bread"],
       "trDogfoodScore": 60,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -4945,7 +4945,7 @@
       "prepMinutes": 25,
       "cookMinutes": 20,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["dumpling", "potato"],
       "trDogfoodScore": 59,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -5120,7 +5120,7 @@
       "prepMinutes": 20,
       "cookMinutes": 0,
       "totalMinutes": 20,
-      "tags": [],
+      "tags": ["quick", "cold"],
       "trDogfoodScore": 59,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -5302,7 +5302,7 @@
       "prepMinutes": 25,
       "cookMinutes": 15,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["one-pan", "stir-fry"],
       "trDogfoodScore": 59,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -5570,7 +5570,7 @@
       "prepMinutes": 20,
       "cookMinutes": 0,
       "totalMinutes": 20,
-      "tags": [],
+      "tags": ["quick", "spicy", "cold"],
       "trDogfoodScore": 58,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -5764,7 +5764,7 @@
       "prepMinutes": 15,
       "cookMinutes": 20,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["spicy", "rice", "stew"],
       "trDogfoodScore": 58,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -5960,7 +5960,7 @@
       "prepMinutes": 20,
       "cookMinutes": 25,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["fry"],
       "trDogfoodScore": 58,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -6189,7 +6189,7 @@
       "prepMinutes": 25,
       "cookMinutes": 10,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["spicy", "one-pan", "stir-fry"],
       "trDogfoodScore": 58,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -6437,7 +6437,7 @@
       "prepMinutes": 20,
       "cookMinutes": 15,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["steam"],
       "trDogfoodScore": 58,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -6651,7 +6651,7 @@
       "prepMinutes": 15,
       "cookMinutes": 0,
       "totalMinutes": 15,
-      "tags": [],
+      "tags": ["quick", "cold"],
       "trDogfoodScore": 57,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -6846,7 +6846,7 @@
       "prepMinutes": 30,
       "cookMinutes": 25,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["rice", "grill"],
       "trDogfoodScore": 57,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -7086,7 +7086,7 @@
       "prepMinutes": 40,
       "cookMinutes": 15,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["grill"],
       "trDogfoodScore": 57,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -7298,7 +7298,7 @@
       "prepMinutes": 25,
       "cookMinutes": 20,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["bread"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -7549,7 +7549,7 @@
       "prepMinutes": 20,
       "cookMinutes": 10,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick", "bread"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -7814,7 +7814,7 @@
       "prepMinutes": 15,
       "cookMinutes": 15,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick", "spicy", "one-pan"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -8044,7 +8044,7 @@
       "prepMinutes": 40,
       "cookMinutes": 50,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "bake", "pie"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -8252,7 +8252,7 @@
       "prepMinutes": 25,
       "cookMinutes": 0,
       "totalMinutes": 25,
-      "tags": [],
+      "tags": ["quick", "cold", "bulgur"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -8452,7 +8452,7 @@
       "prepMinutes": 15,
       "cookMinutes": 35,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["potato", "one-pan"],
       "trDogfoodScore": 55,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -8608,7 +8608,7 @@
       "prepMinutes": 25,
       "cookMinutes": 10,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["spicy", "noodle", "one-pan", "stir-fry"],
       "trDogfoodScore": 54,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -8871,7 +8871,7 @@
       "prepMinutes": 20,
       "cookMinutes": 10,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick", "grill"],
       "trDogfoodScore": 54,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -9060,7 +9060,7 @@
       "prepMinutes": 20,
       "cookMinutes": 20,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["spicy", "rice", "potato", "one-pan", "stir-fry"],
       "trDogfoodScore": 54,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -9290,7 +9290,7 @@
       "prepMinutes": 30,
       "cookMinutes": 25,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -9508,7 +9508,7 @@
       "prepMinutes": 35,
       "cookMinutes": 45,
       "totalMinutes": 80,
-      "tags": [],
+      "tags": ["bake", "pie"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -9695,7 +9695,7 @@
       "prepMinutes": 25,
       "cookMinutes": 50,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["spicy", "stew"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -9945,7 +9945,7 @@
       "prepMinutes": 30,
       "cookMinutes": 35,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "bake"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -10168,7 +10168,7 @@
       "prepMinutes": 30,
       "cookMinutes": 50,
       "totalMinutes": 80,
-      "tags": [],
+      "tags": ["bake", "pie"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -10373,7 +10373,7 @@
       "prepMinutes": 10,
       "cookMinutes": 8,
       "totalMinutes": 18,
-      "tags": [],
+      "tags": ["quick", "spicy", "rice", "one-pan", "stir-fry"],
       "trDogfoodScore": 53,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -10597,7 +10597,7 @@
       "prepMinutes": 15,
       "cookMinutes": 20,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["bread"],
       "trDogfoodScore": 52,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -10808,7 +10808,7 @@
       "prepMinutes": 25,
       "cookMinutes": 15,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["spicy", "bread", "grill"],
       "trDogfoodScore": 52,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -11058,7 +11058,7 @@
       "prepMinutes": 20,
       "cookMinutes": 15,
       "totalMinutes": 35,
-      "tags": [],
+      "tags": ["fry"],
       "trDogfoodScore": 52,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -11235,7 +11235,7 @@
       "prepMinutes": 10,
       "cookMinutes": 20,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick", "spicy", "pasta", "one-pan"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 4,
       "nutritionPerServing": {
@@ -11415,7 +11415,7 @@
       "prepMinutes": 45,
       "cookMinutes": 80,
       "totalMinutes": 125,
-      "tags": [],
+      "tags": ["slow", "rice", "potato", "bake", "stuffed"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -11650,7 +11650,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["spicy", "rice"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -11875,7 +11875,7 @@
       "prepMinutes": 25,
       "cookMinutes": 30,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["pasta"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -12066,7 +12066,7 @@
       "prepMinutes": 60,
       "cookMinutes": 10,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["bread", "bake"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -12262,7 +12262,7 @@
       "prepMinutes": 20,
       "cookMinutes": 10,
       "totalMinutes": 30,
-      "tags": [],
+      "tags": ["quick"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -12471,7 +12471,7 @@
       "prepMinutes": 15,
       "cookMinutes": 10,
       "totalMinutes": 25,
-      "tags": [],
+      "tags": ["quick", "rice", "one-pan", "stir-fry"],
       "trDogfoodScore": 51,
       "hardIngredientPenalty": 2,
       "nutritionPerServing": {
@@ -12699,7 +12699,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato", "stew"],
       "trDogfoodScore": 50,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -12904,7 +12904,7 @@
       "prepMinutes": 10,
       "cookMinutes": 40,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["stew"],
       "trDogfoodScore": 50,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -13106,7 +13106,7 @@
       "prepMinutes": 15,
       "cookMinutes": 45,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["rice", "stew"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -13316,7 +13316,7 @@
       "prepMinutes": 25,
       "cookMinutes": 30,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["spicy", "grill", "steam"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -13555,7 +13555,7 @@
       "prepMinutes": 25,
       "cookMinutes": 30,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["grill"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -13783,7 +13783,7 @@
       "prepMinutes": 20,
       "cookMinutes": 90,
       "totalMinutes": 110,
-      "tags": [],
+      "tags": ["slow", "bread", "fry"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -14033,7 +14033,7 @@
       "prepMinutes": 25,
       "cookMinutes": 35,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["potato", "fry"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -14240,7 +14240,7 @@
       "prepMinutes": 15,
       "cookMinutes": 30,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["spicy", "rice", "stew"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -14438,7 +14438,7 @@
       "prepMinutes": 30,
       "cookMinutes": 60,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "spicy", "pasta", "rice"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -14684,7 +14684,7 @@
       "prepMinutes": 30,
       "cookMinutes": 40,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["spicy", "curry"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -14947,7 +14947,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -15167,7 +15167,7 @@
       "prepMinutes": 20,
       "cookMinutes": 45,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["stew"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -15393,7 +15393,7 @@
       "prepMinutes": 45,
       "cookMinutes": 20,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "bread", "grill"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -15665,7 +15665,7 @@
       "prepMinutes": 30,
       "cookMinutes": 30,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["rice", "potato", "fry"],
       "trDogfoodScore": 49,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -15907,7 +15907,7 @@
       "prepMinutes": 25,
       "cookMinutes": 30,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["fry"],
       "trDogfoodScore": 48,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -16139,7 +16139,7 @@
       "prepMinutes": 30,
       "cookMinutes": 10,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["noodle", "one-pan", "stir-fry"],
       "trDogfoodScore": 48,
       "hardIngredientPenalty": 2,
       "nutritionPerServing": {
@@ -16402,7 +16402,7 @@
       "prepMinutes": 25,
       "cookMinutes": 50,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["rice", "one-pan"],
       "trDogfoodScore": 47,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -16633,7 +16633,7 @@
       "prepMinutes": 5,
       "cookMinutes": 15,
       "totalMinutes": 20,
-      "tags": [],
+      "tags": ["quick"],
       "trDogfoodScore": 47,
       "hardIngredientPenalty": 2,
       "nutritionPerServing": {
@@ -16817,7 +16817,7 @@
       "prepMinutes": 10,
       "cookMinutes": 15,
       "totalMinutes": 25,
-      "tags": [],
+      "tags": ["quick", "pasta", "one-pan"],
       "trDogfoodScore": 47,
       "hardIngredientPenalty": 4,
       "nutritionPerServing": {
@@ -17004,7 +17004,7 @@
       "prepMinutes": 30,
       "cookMinutes": 30,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["fry"],
       "trDogfoodScore": 46,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -17264,7 +17264,7 @@
       "prepMinutes": 15,
       "cookMinutes": 70,
       "totalMinutes": 85,
-      "tags": [],
+      "tags": ["spicy", "stew"],
       "trDogfoodScore": 46,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -17463,7 +17463,7 @@
       "prepMinutes": 20,
       "cookMinutes": 70,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "rice", "stew"],
       "trDogfoodScore": 46,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -17705,7 +17705,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 46,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -17911,7 +17911,7 @@
       "prepMinutes": 30,
       "cookMinutes": 25,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["spicy"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -18198,7 +18198,7 @@
       "prepMinutes": 15,
       "cookMinutes": 45,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -18376,7 +18376,7 @@
       "prepMinutes": 50,
       "cookMinutes": 45,
       "totalMinutes": 95,
-      "tags": [],
+      "tags": ["slow", "bulgur", "bake"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -18594,7 +18594,7 @@
       "prepMinutes": 25,
       "cookMinutes": 35,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["spicy", "curry"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -18840,7 +18840,7 @@
       "prepMinutes": 15,
       "cookMinutes": 25,
       "totalMinutes": 40,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -19026,7 +19026,7 @@
       "prepMinutes": 30,
       "cookMinutes": 60,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "potato", "bake", "pie"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -19282,7 +19282,7 @@
       "prepMinutes": 25,
       "cookMinutes": 25,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["spicy", "rice", "steam"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -19488,7 +19488,7 @@
       "prepMinutes": 30,
       "cookMinutes": 20,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["spicy", "bread"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -19725,7 +19725,7 @@
       "prepMinutes": 25,
       "cookMinutes": 25,
       "totalMinutes": 50,
-      "tags": [],
+      "tags": ["potato"],
       "trDogfoodScore": 45,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -19969,7 +19969,7 @@
       "prepMinutes": 60,
       "cookMinutes": 15,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["dumpling"],
       "trDogfoodScore": 44,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -20185,7 +20185,7 @@
       "prepMinutes": 25,
       "cookMinutes": 50,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["stew"],
       "trDogfoodScore": 44,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -20419,7 +20419,7 @@
       "prepMinutes": 30,
       "cookMinutes": 45,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["spicy", "fry"],
       "trDogfoodScore": 44,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -20675,7 +20675,7 @@
       "prepMinutes": 30,
       "cookMinutes": 50,
       "totalMinutes": 80,
-      "tags": [],
+      "tags": ["spicy", "rice"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -20965,7 +20965,7 @@
       "prepMinutes": 35,
       "cookMinutes": 90,
       "totalMinutes": 125,
-      "tags": [],
+      "tags": ["slow", "bread", "bake"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -21204,7 +21204,7 @@
       "prepMinutes": 25,
       "cookMinutes": 45,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["rice", "one-pan"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -21453,7 +21453,7 @@
       "prepMinutes": 50,
       "cookMinutes": 20,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["dumpling", "potato"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -21660,7 +21660,7 @@
       "prepMinutes": 30,
       "cookMinutes": 75,
       "totalMinutes": 105,
-      "tags": [],
+      "tags": ["slow", "spicy", "bread", "fry"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -21904,7 +21904,7 @@
       "prepMinutes": 30,
       "cookMinutes": 35,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "rice", "curry"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -22187,7 +22187,7 @@
       "prepMinutes": 15,
       "cookMinutes": 45,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["potato", "fry"],
       "trDogfoodScore": 43,
       "hardIngredientPenalty": 2,
       "nutritionPerServing": {
@@ -22402,7 +22402,7 @@
       "prepMinutes": 20,
       "cookMinutes": 70,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -22664,7 +22664,7 @@
       "prepMinutes": 20,
       "cookMinutes": 40,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -22887,7 +22887,7 @@
       "prepMinutes": 15,
       "cookMinutes": 60,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["bread", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -23102,7 +23102,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["spicy", "potato", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -23363,7 +23363,7 @@
       "prepMinutes": 25,
       "cookMinutes": 70,
       "totalMinutes": 95,
-      "tags": [],
+      "tags": ["slow", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -23621,7 +23621,7 @@
       "prepMinutes": 40,
       "cookMinutes": 30,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["spicy", "cold", "bread"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -23877,7 +23877,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -24125,7 +24125,7 @@
       "prepMinutes": 20,
       "cookMinutes": 40,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["potato", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -24357,7 +24357,7 @@
       "prepMinutes": 30,
       "cookMinutes": 25,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["fry", "stuffed"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -24582,7 +24582,7 @@
       "prepMinutes": 20,
       "cookMinutes": 40,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["cold", "potato"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -24796,7 +24796,7 @@
       "prepMinutes": 40,
       "cookMinutes": 25,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "rice", "grill"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 1,
       "nutritionPerServing": {
@@ -25068,7 +25068,7 @@
       "prepMinutes": 25,
       "cookMinutes": 70,
       "totalMinutes": 95,
-      "tags": [],
+      "tags": ["slow", "stew"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -25318,7 +25318,7 @@
       "prepMinutes": 25,
       "cookMinutes": 20,
       "totalMinutes": 45,
-      "tags": [],
+      "tags": ["fry"],
       "trDogfoodScore": 42,
       "hardIngredientPenalty": 4,
       "nutritionPerServing": {
@@ -25552,7 +25552,7 @@
       "prepMinutes": 20,
       "cookMinutes": 45,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "rice", "one-pan"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -25809,7 +25809,7 @@
       "prepMinutes": 40,
       "cookMinutes": 20,
       "totalMinutes": 60,
-      "tags": [],
+      "tags": ["spicy", "rice"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 2,
       "nutritionPerServing": {
@@ -26046,7 +26046,7 @@
       "prepMinutes": 30,
       "cookMinutes": 60,
       "totalMinutes": 90,
-      "tags": [],
+      "tags": ["slow", "bake", "curry"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -26327,7 +26327,7 @@
       "prepMinutes": 35,
       "cookMinutes": 40,
       "totalMinutes": 75,
-      "tags": [],
+      "tags": ["rice"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -26604,7 +26604,7 @@
       "prepMinutes": 20,
       "cookMinutes": 35,
       "totalMinutes": 55,
-      "tags": [],
+      "tags": ["potato", "stew"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -26854,7 +26854,7 @@
       "prepMinutes": 20,
       "cookMinutes": 45,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "rice", "stew"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -27094,7 +27094,7 @@
       "prepMinutes": 25,
       "cookMinutes": 45,
       "totalMinutes": 70,
-      "tags": [],
+      "tags": ["spicy", "grill"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -27318,7 +27318,7 @@
       "prepMinutes": 30,
       "cookMinutes": 90,
       "totalMinutes": 120,
-      "tags": [],
+      "tags": ["slow", "rice", "bake"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -27560,7 +27560,7 @@
       "prepMinutes": 30,
       "cookMinutes": 35,
       "totalMinutes": 65,
-      "tags": [],
+      "tags": ["spicy", "bake"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -27801,7 +27801,7 @@
       "prepMinutes": 25,
       "cookMinutes": 60,
       "totalMinutes": 85,
-      "tags": [],
+      "tags": ["curry"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -28028,7 +28028,7 @@
       "prepMinutes": 25,
       "cookMinutes": 100,
       "totalMinutes": 125,
-      "tags": [],
+      "tags": ["slow", "rice", "curry"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
@@ -28282,7 +28282,7 @@
       "prepMinutes": 30,
       "cookMinutes": 90,
       "totalMinutes": 120,
-      "tags": [],
+      "tags": ["slow", "rice", "bake"],
       "trDogfoodScore": 41,
       "hardIngredientPenalty": 0,
       "nutritionPerServing": {
