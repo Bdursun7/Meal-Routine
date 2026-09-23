@@ -26,7 +26,8 @@ enum QuantityFormat {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "tr_TR")
         formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 1
+        // Two places so a summed 1.25 kg is not rounded to the nearest tenth.
+        formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }

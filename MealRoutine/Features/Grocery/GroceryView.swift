@@ -28,7 +28,7 @@ struct GroceryView: View {
                         if viewModel.conflictCount(in: rows) > 0 {
                             Section {
                                 Label(
-                                    "Aynı malzeme farklı birimlerde. Miktarlar toplanmadı; satırlar ayrı duruyor.",
+                                    "Aynı malzeme uyumsuz birimlerde. Bu satırlar birbirine katılmadı.",
                                     systemImage: "exclamationmark.triangle"
                                 )
                                 .font(.subheadline)
@@ -40,7 +40,7 @@ struct GroceryView: View {
                                 groceryRow(row)
                             }
                         } footer: {
-                            Text("Aynı malzeme kimliği ve birim toplanır. Ev halkına göre ölçeklenir.")
+                            Text("Aynı malzeme kimliği toplanır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Ev halkına göre ölçeklenir.")
                         }
                     }
                     .refreshable {
