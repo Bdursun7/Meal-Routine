@@ -32,7 +32,7 @@ enum CatalogFingerprint {
 
 /// Which planned-meal slugs no longer name a recipe, and how to repair that.
 ///
-/// The current week is regenerated with the naive picker when it has an orphan and
+/// The current week is regenerated with the meal recommender when it has an orphan and
 /// preferences exist, so the week stays a full set of live dinners and grocery rebuild
 /// has a coherent source. Deleting only the holes would leave a short week.
 /// Orphans on any other week are removed and those weeks are not rewritten.

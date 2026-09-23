@@ -58,7 +58,7 @@ final class OnboardingViewModel {
 
     var step: OnboardingStep = .welcome
     var householdSize = 2
-    var evenings = NaiveMealPicker.eveningCap
+    var evenings = MealRecommender.eveningCap
     var maxCookMinutes = CookTimeOptions.defaultMinutes
     var disliked: Set<String> = []
     var ratings: [String: MealRating] = [:]
@@ -229,7 +229,7 @@ final class OnboardingViewModel {
                 context.insert(prefs)
             }
             prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
-            prefs.eveningsPerWeek = min(max(evenings, 1), NaiveMealPicker.eveningCap)
+            prefs.eveningsPerWeek = min(max(evenings, 1), MealRecommender.eveningCap)
             prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
             prefs.dislikedIngredientIds = disliked.sorted()
             prefs.hasCompletedOnboarding = false

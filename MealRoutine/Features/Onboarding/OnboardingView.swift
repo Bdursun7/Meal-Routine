@@ -122,7 +122,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Akşam sayısı")
                         .font(.headline)
-                    Stepper(value: $viewModel.evenings, in: 1...NaiveMealPicker.eveningCap) {
+                    Stepper(value: $viewModel.evenings, in: 1...MealRecommender.eveningCap) {
                         Text("Akşam sayısı: \(viewModel.evenings)")
                     }
                     .frame(minHeight: 44)
