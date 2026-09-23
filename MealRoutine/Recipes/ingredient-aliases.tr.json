@@ -1,0 +1,782 @@
+{
+  "locale": "tr",
+  "aliases": {
+    "allpurposeflour": "Un",
+    "allspice": "Yenibahar",
+    "almond": "Badem",
+    "almonds": "Badem",
+    "anchovy": "Ançuez",
+    "apple": "Elma",
+    "applecidervinegar": "Elma sirkesi",
+    "apricots": "Kuru kayısı",
+    "aubergine": "Patlıcan",
+    "avocado": "Avokado",
+    "bacon": "Bacon",
+    "bacon-bits": "Közlenmiş pastırma",
+    "baking-powder": "Kabartma tozu",
+    "bakingpowder": "Kabartma tozu",
+    "bakingsoda": "Karbonat",
+    "balsamic": "Balsamik sirke",
+    "balsamicvinegar": "Balsamik sirke",
+    "banana": "Muz",
+    "basil": "Fesleğen",
+    "basmati": "Basmati",
+    "bay": "Defne",
+    "bay-leaf": "Defne yaprağı",
+    "bayleaf": "Defne yaprağı",
+    "bayleaves": "Defne yaprağı",
+    "beans": "Fasulye",
+    "beansprouts": "Filiz",
+    "beef": "Dana eti",
+    "beef-stock": "Et suyu",
+    "beefsteak": "Biftek",
+    "beefstock": "Et suyu",
+    "beer": "Bira",
+    "beetroot": "Pancar",
+    "bell-pepper": "Kapya / dolmalık biber",
+    "bellpepper": "Dolmalık biber",
+    "black-pepper": "Karabiber",
+    "black-peppercorns": "Tane karabiber",
+    "blackbeans": "Siyah fasulye",
+    "blackpepper": "Karabiber",
+    "bouillon": "Bulyon",
+    "bread": "Ekmek",
+    "breadcrumbs": "Galeta unu",
+    "broccoli": "Brokoli",
+    "broth": "Et suyu",
+    "brownlentils": "Kahverengi mercimek",
+    "brownsugar": "Esmer şeker",
+    "bulgur": "Bulgur",
+    "butter": "Tereyağı",
+    "butterbeans": "İri fasulye",
+    "buttermilk": "Ayran / buttermilk",
+    "cabbage": "Lahana",
+    "canned-tomato": "Konserve domates",
+    "cannellini": "Cannellini fasulye",
+    "canolaoil": "Kanola yağı",
+    "capers": "Kapari",
+    "cardamom": "Kakule",
+    "carrot": "Havuç",
+    "carrots": "Havuç",
+    "cauliflower": "Karnabahar",
+    "celery": "Kereviz",
+    "cheddar": "Cheddar",
+    "cheese": "Peynir",
+    "chicken": "Tavuk",
+    "chicken-breast": "Tavuk göğsü",
+    "chicken-stock": "Tavuk suyu",
+    "chicken-thigh": "Tavuk but",
+    "chickenbreast": "Tavuk göğsü",
+    "chickenstock": "Tavuk suyu",
+    "chickenthigh": "Tavuk but",
+    "chickpea": "Nohut",
+    "chickpeas": "Nohut",
+    "chile": "Acı biber",
+    "chili": "Acı biber",
+    "chili-flakes": "Pul biber",
+    "chili-pepper": "Acı biber",
+    "chiliflakes": "Pul biber",
+    "chilli": "Acı biber",
+    "chillies": "Acı biber",
+    "chipotle": "Chipotle",
+    "chives": "Frenk soğanı",
+    "chocolate": "Çikolata",
+    "chopped-tomatoes": "Doğranmış domates",
+    "chorizo": "Chorizo",
+    "cilantro": "Kişniş (taze)",
+    "cinnamon": "Tarçın",
+    "clarified-butter": "Sade yağ",
+    "clarifiedbutter": "Sade yağ",
+    "clove": "Karanfil",
+    "cloves": "Karanfil",
+    "cocoa": "Kakao",
+    "coconut": "Hindistan cevizi",
+    "coconut-milk": "Hindistan cevizi sütü",
+    "coconutmilk": "Hindistan cevizi sütü",
+    "coffee": "Kahve",
+    "coriander": "Kişniş",
+    "corn": "Mısır",
+    "corn-tortilla": "Mısır tortilla",
+    "cornflour": "Mısır unu",
+    "cornstarch": "Nişasta",
+    "courgette": "Kabak",
+    "courgettes": "Kabak",
+    "couscous": "Kuskus",
+    "cream": "Krema",
+    "cream-cheese": "Labne / krem peynir",
+    "creamcheese": "Krem peynir",
+    "cucumber": "Salatalık",
+    "cumin": "Kimyon",
+    "curry": "Köri",
+    "currypowder": "Köri tozu",
+    "dashi": "Dashi",
+    "date": "Hurma",
+    "dates": "Hurma",
+    "dijon": "Dijon hardal",
+    "dill": "Dereotu",
+    "doublecream": "Krema",
+    "driedmint": "Kuru nane",
+    "dryyeast": "Kuru maya",
+    "egg": "Yumurta",
+    "eggplant": "Patlıcan",
+    "eggs": "Yumurta",
+    "fenugreek": "Çemen otu",
+    "feta": "Beyaz peynir",
+    "fetacheese": "Beyaz peynir",
+    "fig": "İncir",
+    "filo": "Yufka",
+    "fish": "Balık",
+    "fish-sauce": "Balık sosu",
+    "fishsauce": "Balık sosu",
+    "flour": "Un",
+    "flour-wheat": "Buğday unu",
+    "freshparsley": "Maydanoz",
+    "galangal": "Galangal",
+    "garammasala": "Garam masala",
+    "garlic": "Sarımsak",
+    "garlic-clove": "Sarımsak",
+    "garlicclove": "Sarımsak",
+    "garliccloves": "Sarımsak",
+    "gelatin": "Jelatin",
+    "ghee": "Sade yağ",
+    "ginger": "Zencefil",
+    "gochujang": "Gochujang",
+    "grape molasses": "Üzüm pekmezi",
+    "grapemolasses": "Üzüm pekmezi",
+    "green-beans": "Taze fasulye",
+    "green-chili": "Yeşil acı biber",
+    "green-pepper": "Yeşil biber",
+    "greenbeans": "Taze fasulye",
+    "greenchili": "Yeşil acı biber",
+    "greenlentils": "Yeşil mercimek",
+    "greenpepper": "Yeşil biber",
+    "ground-beef": "Dana kıyma",
+    "ground-lamb": "Kuzu kıyma",
+    "groundbeef": "Dana kıyma",
+    "groundmeat": "Kıyma",
+    "guanciale": "Guanciale (pancetta olur)",
+    "halloumi": "Hellim",
+    "haloumi": "Hellim",
+    "ham": "Jambon",
+    "heavyccream": "Krema",
+    "heavycream": "Krema",
+    "hellim": "Hellim",
+    "honey": "Bal",
+    "hot-dog": "Sosis",
+    "ice": "Buz",
+    "icewater": "Buzlu su",
+    "kaffir-lime": "Kaffir lime yaprağı",
+    "kasar": "Kaşar",
+    "kashar": "Kaşar",
+    "ketchup": "Ketçap",
+    "kimchi": "Kimchi",
+    "labne": "Labne",
+    "labneh": "Labne",
+    "lamb": "Kuzu eti",
+    "lamb-mince": "Kuzu kıyma",
+    "lambchops": "Kuzu pirzola",
+    "lavash": "Lavaş",
+    "leek": "Pırasa",
+    "lemon": "Limon",
+    "lemongrass": "Limon otu",
+    "lemonjuice": "Limon suyu",
+    "lentil": "Mercimek",
+    "lentils": "Mercimek",
+    "lettuce": "Marul",
+    "lime": "Misket limonu",
+    "limejuice": "Misket limonu suyu",
+    "maple-syrup": "Akçaağaç şurubu",
+    "mascarpone": "Mascarpone",
+    "mayo": "Mayonez",
+    "merguez": "Merguez sosis",
+    "milk": "Süt",
+    "mince": "Kıyma",
+    "minced-meat": "Kıyma",
+    "mincedbeef": "Dana kıyma",
+    "mincedlamb": "Kuzu kıyma",
+    "mincedmeat": "Kıyma",
+    "mint": "Nane",
+    "mirin": "Mirin",
+    "miso": "Miso",
+    "molasses": "Pekmez",
+    "mozzarella": "Mozzarella",
+    "mushroom": "Mantar",
+    "mushrooms": "Mantar",
+    "mussels": "Midye",
+    "mustard": "Hardal",
+    "mustard-seed": "Hardal tohumu",
+    "noodles": "Erişte",
+    "nori": "Nori",
+    "nutmeg": "Muskat",
+    "oil": "Yağ",
+    "okra": "Bamya",
+    "olive": "Zeytin",
+    "olive-oil": "Zeytinyağı",
+    "oliveoil": "Zeytinyağı",
+    "olives": "Zeytin",
+    "onion": "Soğan",
+    "onions": "Soğan",
+    "orange": "Portakal",
+    "oregano": "Kekik",
+    "orzo": "Arpa şehriye",
+    "pancetta": "Pancetta",
+    "paneer": "Paneer (beyaz peynir yedek)",
+    "paprika": "Toz biber",
+    "parmesan": "Parmesan",
+    "parsley": "Maydanoz",
+    "passata": "Süzme domates",
+    "pasta": "Makarna",
+    "peanut": "Fıstık",
+    "peanuts": "Fıstık",
+    "peas": "Bezelye",
+    "pecorino": "Pecorino (kaşar/parmesan yedek)",
+    "pepper": "Karabiber",
+    "pepper-paste": "Biber salçası",
+    "pepperflakes": "Pul biber",
+    "peppers": "Biber",
+    "phyllo": "Yufka",
+    "pine nuts": "Çam fıstığı",
+    "pinenuts": "Çam fıstığı",
+    "pistachio": "Antep fıstığı",
+    "pistachios": "Antep fıstığı",
+    "pita": "Pide",
+    "plainflour": "Un",
+    "pomegranate": "Nar",
+    "pomegranate-molasses": "Nar ekşisi",
+    "pomegranatemolasses": "Nar ekşisi",
+    "pork": "Domuz eti",
+    "porkbelly": "Domuz göbeği",
+    "potato": "Patates",
+    "potatoes": "Patates",
+    "prawns": "Karides",
+    "prosciutto": "Prosciutto",
+    "pumpkin": "Balkabağı",
+    "quinoa": "Kinoa",
+    "radish": "Turp",
+    "raisin": "Kuru üzüm",
+    "raisins": "Kuru üzüm",
+    "rakı": "Rakı",
+    "red-chili": "Kırmızı acı biber",
+    "red-lentils": "Kırmızı mercimek",
+    "red-pepper": "Kırmızı biber",
+    "red-pepper-flakes": "Pul biber",
+    "red-wine": "Kırmızı şarap",
+    "redlentils": "Kırmızı mercimek",
+    "redpepper": "Kırmızı biber",
+    "redwine": "Kırmızı şarap",
+    "rice": "Pirinç",
+    "rice-noodles": "Pirinç eriştesi",
+    "riceflour": "Pirinç unu",
+    "ricenoodles": "Pirinç eriştesi",
+    "ricotta": "Ricotta",
+    "rosemary": "Biberiye",
+    "saffron": "Safran",
+    "sake": "Sake",
+    "salmon": "Somon",
+    "salt": "Tuz",
+    "sausage": "Sosis",
+    "scallion": "Taze soğan",
+    "sesame": "Susam",
+    "sesame-oil": "Susam yağı",
+    "sesameoil": "Susam yağı",
+    "shallot": "Arpacık soğan",
+    "shallots": "Arpacık soğan",
+    "shrimp": "Karides",
+    "smokedpaprika": "Füme toz biber",
+    "soda": "Soda",
+    "sour-cream": "Ekşi krema",
+    "sourcream": "Ekşi krema",
+    "soy": "Soya",
+    "soy sauce": "Soya sosu",
+    "soy-sauce": "Soya sosu",
+    "soysauce": "Soya sosu",
+    "spaghetti": "Spagetti",
+    "spinach": "Ispanak",
+    "split-peas": "Sarı bezelye",
+    "spring": "Taze soğan",
+    "spring-onion": "Taze soğan",
+    "springonion": "Taze soğan",
+    "springonions": "Taze soğan",
+    "squid": "Kalamar",
+    "star-anise": "Yıldız anason",
+    "starch": "Nişasta",
+    "stock": "Et suyu",
+    "stock-cube": "Bulyon",
+    "stockcube": "Bulyon",
+    "sugar": "Şeker",
+    "sumac": "Sumak",
+    "sunfloweroil": "Ayçiçek yağı",
+    "tahini": "Tahin",
+    "tamarind": "Demirhindi",
+    "tarragon": "Tarhun",
+    "tea": "Çay",
+    "thyme": "Kekik",
+    "tofu": "Tofu",
+    "tomatillo": "Tomatillo",
+    "tomato": "Domates",
+    "tomato puree": "Domates püresi",
+    "tomato-paste": "Domates salçası",
+    "tomato-sauce": "Domates sosu",
+    "tomatoes": "Domates",
+    "tomatojuice": "Domates suyu",
+    "tomatopaste": "Domates salçası",
+    "tomatopuree": "Domates püresi",
+    "tortilla": "Tortilla",
+    "trout": "Alabalık",
+    "tuna": "Ton",
+    "turmeric": "Zerdeçal",
+    "vanilla": "Vanilya",
+    "veal": "Dana (buzağı)",
+    "vegetableoil": "Ayçiçek yağı",
+    "vegetablestock": "Sebze suyu",
+    "vermicelli": "Şehriye",
+    "vinegar": "Sirke",
+    "vinegar-apple": "Elma sirkesi",
+    "walnut": "Ceviz",
+    "walnuts": "Ceviz",
+    "wasabi": "Wasabi",
+    "water": "Su",
+    "white-beans": "Kuru fasulye",
+    "white-pepper": "Beyaz biber",
+    "white-wine": "Beyaz şarap",
+    "whitebeans": "Kuru fasulye",
+    "whitepepper": "Beyaz biber",
+    "whitewine": "Beyaz şarap",
+    "wine": "Şarap",
+    "yeast": "Maya",
+    "yoghurt": "Yoğurt",
+    "yogurt": "Yoğurt",
+    "yolk": "Yumurta sarısı",
+    "yolks": "Yumurta sarısı",
+    "yufka": "Yufka",
+    "zucchini": "Kabak",
+    "zucchinis": "Kabak",
+    "flatbread": "Lavaş / pide",
+    "biber": "Biber",
+    "pide": "Pide",
+    "tomatopassata": "Süzme domates",
+    "pepperpaste": "Biber salçası",
+    "greenchilli": "Yeşil acı biber",
+    "harissa": "Harissa",
+    "kajmak": "Kaymak",
+    "curdcheese": "Lor peyniri",
+    "asafoetida": "Çörtük (hing)",
+    "caraway": "Kimyon (caraway)",
+    "oystersauce": "İstiridye sosu",
+    "sichuanpepper": "Sichuan biberi",
+    "gruyere": "Gruyère",
+    "kale": "Karalahana",
+    "cod": "Morina",
+    "curryleaves": "Köri yaprağı",
+    "fennel": "Rezene",
+    "palmsugar": "Hurma şekeri",
+    "plantain": "Plantain",
+    "cassava": "Maniyok",
+    "cornmeal": "Mısır unu",
+    "fat": "Yağ / iç yağı",
+    "pandan": "Pandan",
+    "aji": "Aji biber"
+  },
+  "missingInCatalog": [
+    [
+      "flatbread",
+      3
+    ],
+    [
+      "asafoetida",
+      2
+    ],
+    [
+      "greenchilli",
+      2
+    ],
+    [
+      "caraway",
+      2
+    ],
+    [
+      "kajmak",
+      2
+    ],
+    [
+      "oystersauce",
+      2
+    ],
+    [
+      "aji",
+      2
+    ],
+    [
+      "sichuanpepper",
+      2
+    ],
+    [
+      "curdcheese",
+      2
+    ],
+    [
+      "gruyere",
+      2
+    ],
+    [
+      "kale",
+      2
+    ],
+    [
+      "cod",
+      2
+    ],
+    [
+      "curryleaves",
+      2
+    ],
+    [
+      "pandan",
+      2
+    ],
+    [
+      "fennel",
+      2
+    ],
+    [
+      "palmsugar",
+      2
+    ],
+    [
+      "plantain",
+      2
+    ],
+    [
+      "cassava",
+      2
+    ],
+    [
+      "biber",
+      1
+    ],
+    [
+      "pide",
+      1
+    ],
+    [
+      "tomatopassata",
+      1
+    ],
+    [
+      "pepperpaste",
+      1
+    ],
+    [
+      "cornmeal",
+      1
+    ],
+    [
+      "fat",
+      1
+    ],
+    [
+      "harissa",
+      1
+    ],
+    [
+      "roti",
+      1
+    ],
+    [
+      "currysauce",
+      1
+    ],
+    [
+      "terasi",
+      1
+    ],
+    [
+      "kecap",
+      1
+    ],
+    [
+      "somun",
+      1
+    ],
+    [
+      "fries",
+      1
+    ],
+    [
+      "sevenspice",
+      1
+    ],
+    [
+      "freshmint",
+      1
+    ],
+    [
+      "qurut",
+      1
+    ],
+    [
+      "fatir",
+      1
+    ],
+    [
+      "brynza",
+      1
+    ],
+    [
+      "sweetpotato",
+      1
+    ],
+    [
+      "eggwhite",
+      1
+    ],
+    [
+      "redcabbage",
+      1
+    ],
+    [
+      "sardines",
+      1
+    ],
+    [
+      "coarsesalt",
+      1
+    ],
+    [
+      "doubanjiang",
+      1
+    ],
+    [
+      "douchi",
+      1
+    ],
+    [
+      "bun",
+      1
+    ],
+    [
+      "mayonnaise",
+      1
+    ],
+    [
+      "watermelon",
+      1
+    ],
+    [
+      "rocket",
+      1
+    ],
+    [
+      "cockles",
+      1
+    ],
+    [
+      "chinesesausage",
+      1
+    ],
+    [
+      "darksoy",
+      1
+    ],
+    [
+      "lightsoy",
+      1
+    ],
+    [
+      "sambal",
+      1
+    ],
+    [
+      "lard",
+      1
+    ],
+    [
+      "holybasil",
+      1
+    ],
+    [
+      "codfish",
+      1
+    ],
+    [
+      "fryoil",
+      1
+    ],
+    [
+      "khmelisuneli",
+      1
+    ],
+    [
+      "brinedcheese",
+      1
+    ],
+    [
+      "sparklingwater",
+      1
+    ],
+    [
+      "butterfat",
+      1
+    ],
+    [
+      "vacherin",
+      1
+    ],
+    [
+      "kirsch",
+      1
+    ],
+    [
+      "bucatini",
+      1
+    ],
+    [
+      "doughsalt",
+      1
+    ],
+    [
+      "cucumbers",
+      1
+    ],
+    [
+      "matsun",
+      1
+    ],
+    [
+      "dzavar",
+      1
+    ],
+    [
+      "chourico",
+      1
+    ],
+    [
+      "chillipowder",
+      1
+    ],
+    [
+      "cashew",
+      1
+    ],
+    [
+      "methi",
+      1
+    ],
+    [
+      "peppercorns",
+      1
+    ],
+    [
+      "macaroni",
+      1
+    ],
+    [
+      "ryebread",
+      1
+    ],
+    [
+      "attieke",
+      1
+    ],
+    [
+      "gingergarlic",
+      1
+    ],
+    [
+      "papaya",
+      1
+    ],
+    [
+      "chickpeaflour",
+      1
+    ],
+    [
+      "naan",
+      1
+    ],
+    [
+      "barramundi",
+      1
+    ],
+    [
+      "lemonmyrtle",
+      1
+    ],
+    [
+      "tomatosauce",
+      1
+    ],
+    [
+      "kombu",
+      1
+    ],
+    [
+      "katsuobushi",
+      1
+    ],
+    [
+      "wakame",
+      1
+    ],
+    [
+      "cuttlefish",
+      1
+    ],
+    [
+      "ink",
+      1
+    ],
+    [
+      "lingonberry",
+      1
+    ],
+    [
+      "gravy",
+      1
+    ],
+    [
+      "berbere",
+      1
+    ],
+    [
+      "molokhia",
+      1
+    ],
+    [
+      "guajillo",
+      1
+    ],
+    [
+      "ancho",
+      1
+    ],
+    [
+      "pineapple",
+      1
+    ],
+    [
+      "achiote",
+      1
+    ],
+    [
+      "tortillas",
+      1
+    ],
+    [
+      "worcestershire",
+      1
+    ],
+    [
+      "crab",
+      1
+    ],
+    [
+      "tomatoketchup",
+      1
+    ],
+    [
+      "chilipaste",
+      1
+    ]
+  ]
+}

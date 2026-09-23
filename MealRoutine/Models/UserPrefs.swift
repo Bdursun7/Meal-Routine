@@ -1,0 +1,29 @@
+import Foundation
+import SwiftData
+
+/// Single local household profile. There is no account.
+@Model
+final class UserPrefs {
+    var householdSize: Int
+    var eveningsPerWeek: Int
+    var maxCookMinutes: Int
+    var dislikedIngredientIds: [String]
+    var hasCompletedOnboarding: Bool
+    var createdAt: Date
+
+    init(
+        householdSize: Int = 2,
+        eveningsPerWeek: Int = 5,
+        maxCookMinutes: Int = 60,
+        dislikedIngredientIds: [String] = [],
+        hasCompletedOnboarding: Bool = false,
+        createdAt: Date = .now
+    ) {
+        self.householdSize = householdSize
+        self.eveningsPerWeek = eveningsPerWeek
+        self.maxCookMinutes = maxCookMinutes
+        self.dislikedIngredientIds = dislikedIngredientIds
+        self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.createdAt = createdAt
+    }
+}
