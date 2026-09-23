@@ -17,7 +17,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 ## V1 scope
 
-- Onboarding stub: household size, up to 5 evenings, max cook time, disliked ingredients, optional Loved / Okay / Never on 20 recipes.
+- Onboarding: welcome, then four steps (household, dislikes, up to 8 taste ratings, summary). The week is created only from “Haftamı oluştur” on the summary. Household size is 1–8, evenings are 1–5, max cook time is 30 / 45 / 60 / 90 minutes (default 60). Egg and eggs share one “Yumurta” dislike chip.
 - Tabs: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - This week is filled by a naive deterministic picker (time cap, dislikes, “never”, loved boost, curated score). It is not the full recommender yet.
 - Grocery list merges UniTools ingredient `id`s when the unit matches, and flags unit conflicts instead of summing them.
@@ -55,7 +55,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 ## V1 kapsamı
 
-- Kurulum taslağı: ev halkı, en fazla 5 akşam, pişirme süresi, sevmediğin malzemeler, 20 tarifte isteğe bağlı Sevdim / İdare eder / Bir daha asla.
+- Kurulum: karşılama, sonra dört adım (ev, sevmediğin malzemeler, en fazla 8 tat puanı, özet). Hafta yalnızca özetteki “Haftamı oluştur” ile kurulur. Ev halkı 1–8, akşam 1–5, en fazla pişirme 30 / 45 / 60 / 90 dk (varsayılan 60). Yumurta chip’i `egg` ve `eggs` kimliklerini birlikte saklar.
 - Sekmeler: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - Hafta, basit ve deterministik bir seçiciyle dolar (süre, sevmediğin malzeme, “bir daha asla”, sevdim önceliği, kürasyon skoru). Tam öneri motoru bu iskelette yok.
 - Market listesi, UniTools malzeme `id` değerlerini birim aynıysa toplar; birim çakışırsa miktarları birbirine katmaz, satırı işaretler.

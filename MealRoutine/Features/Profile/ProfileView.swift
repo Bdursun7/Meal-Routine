@@ -12,7 +12,7 @@ struct ProfileView: View {
         NavigationStack {
             Form {
                 Section("Ev") {
-                    Stepper(value: $viewModel.householdSize, in: 1...8) {
+                    Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
                     }
                     Stepper(value: $viewModel.evenings, in: 1...NaiveMealPicker.eveningCap) {
@@ -20,7 +20,7 @@ struct ProfileView: View {
                     }
                     Picker("En fazla pişirme", selection: $viewModel.maxCookMinutes) {
                         ForEach(CookTimeOptions.minutes, id: \.self) { minutes in
-                            Text("\(minutes) dk").tag(minutes)
+                            Text(CookTimeOptions.label(minutes)).tag(minutes)
                         }
                     }
                     Button("Porsiyonu kaydet") {
