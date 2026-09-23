@@ -18,6 +18,7 @@ final class RecipeDetailViewModel {
     var isShowingRatingPrompt = false
     var errorMessage: String?
     var savedNotice: SavedRatingNotice?
+    var portionStatusMessage: String?
     private var pendingCooked = false
     private var pendingPlannedMealUUID: UUID?
     private var isSavingRating = false
@@ -79,5 +80,25 @@ final class RecipeDetailViewModel {
 
     func dismissSavedNotice() {
         savedNotice = nil
+    }
+
+    /// Persists the stepper count for this screen.
+    /// A planned evening overrides only that meal. Otherwise the household default
+    /// is locked and copied onto every evening of the open week.
+    func savePortions(servings: Int, mealUUID: UUID?, in context: ModelContext) {
+        let count = HouseholdSizeLimits.clamped(servings)
+        errorMessage = nil
+        do {
+            if let mealUUID {
+                try PortionSaveService.saveMealServings(count, mealUUID: mealUUID, in: context)
+                portionStatusMessage = "Bu akşam \(count) kişilik kaydedildi. Market listesi güncellendi."
+            } else {
+                try PortionSaveService.saveHouseholdSize(count, in: context)
+                portionStatusMessage = "Ev halkı \(count) kişilik kaydedildi. Bu haftanın akşamları ve market listesi güncellendi."
+            }
+        } catch {
+            portionStatusMessage = nil
+            errorMessage = error.localizedDescription
+        }
     }
 }

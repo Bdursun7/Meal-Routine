@@ -40,7 +40,7 @@ struct GroceryView: View {
                                 groceryRow(row)
                             }
                         } footer: {
-                            Text("Aynı malzeme kimliği toplanır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Ev halkına göre ölçeklenir.")
+                            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir.")
                         }
                     }
                     .refreshable {

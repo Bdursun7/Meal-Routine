@@ -6,10 +6,21 @@ struct ThisWeekView: View {
     @Query private var weeks: [PlanWeek]
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
+    @Query private var prefs: [UserPrefs]
     @State private var viewModel = ThisWeekViewModel()
 
+    private var householdSize: Int {
+        let stored = prefs.min { $0.createdAt < $1.createdAt }?.householdSize ?? 2
+        return HouseholdSizeLimits.clamped(stored)
+    }
+
     var body: some View {
-        let meals = viewModel.meals(weeks: weeks, recipes: recipes, feedback: feedback)
+        let meals = viewModel.meals(
+            weeks: weeks,
+            recipes: recipes,
+            feedback: feedback,
+            householdSize: householdSize
+        )
         let summary = viewModel.summary(meals: meals)
 
         NavigationStack {

@@ -26,6 +26,9 @@ struct ProfileView: View {
                     Button("Porsiyonu kaydet") {
                         viewModel.savePortions(in: modelContext)
                     }
+                    Text("Ev halkını kaydetmek bu haftanın her akşamını aynı porsiyona çeker. Tarif detayı ve market aynı sayıyı kullanır. İşaretli market satırları durur.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Button("Bu haftayı yeniden kur") {
                         viewModel.rebuildWeek(in: modelContext)
                     }
@@ -84,7 +87,7 @@ struct ProfileView: View {
             }
         }
         .onAppear {
-            viewModel.loadIfNeeded(prefs.min { $0.createdAt < $1.createdAt })
+            viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
         }
     }
 
