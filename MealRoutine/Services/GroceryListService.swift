@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 
 /// Rebuilds the current week's shopping list from planned meals.
+/// Lines are scaled first, then merged on ingredient id plus canonical unit.
 /// Manual rows and checked state on matching ingredient+unit rows are kept.
 enum GroceryListService {
     @MainActor

@@ -20,8 +20,10 @@ struct MergedGroceryLine: Equatable, Sendable, Identifiable {
 }
 
 /// Groups shopping lines by UniTools ingredient id.
-/// Quantities sum only when the unit matches. Mixed units stay on separate
-/// rows and are flagged for a person to reconcile.
+///
+/// Equivalent spellings (`g` / `gr` / `gram`, `adet` / `piece`, `yemek kaşığı` / `tbsp`)
+/// sum into one row. Gram converts with kilogram, and millilitre with litre.
+/// Anything else with the same id stays on its own row and is flagged.
 enum GroceryMerger {
     static func merge(_ lines: [GrocerySourceLine]) -> [MergedGroceryLine] {
         let grouped = Dictionary(grouping: lines, by: \.ingredientId)
@@ -29,25 +31,31 @@ enum GroceryMerger {
         merged.reserveCapacity(grouped.count)
 
         for (ingredientId, group) in grouped {
-            let units = Set(group.map { normalize($0.unit) })
-            let hasConflict = units.count > 1
-            let byUnit = Dictionary(grouping: group) { normalize($0.unit) }
+            let parsed = group.map { line in
+                (line: line, unit: UnitNormalization.parse(line.unit))
+            }
+            let buckets = Dictionary(grouping: parsed) { item in
+                bucketKey(for: item.unit)
+            }
+            let hasConflict = buckets.count > 1
 
-            for unit in byUnit.keys.sorted() {
-                let unitLines = byUnit[unit] ?? []
-                let quantities = unitLines.compactMap(\.quantity)
-                let quantity: Double? = quantities.isEmpty ? nil : quantities.reduce(0, +)
-                let nameTR = unitLines.first(where: { !$0.nameTR.isEmpty })?.nameTR
-                    ?? unitLines.first?.nameEN
+            for key in buckets.keys.sorted() {
+                let unitLines = buckets[key] ?? []
+                let combined = UnitNormalization.combine(
+                    quantities: unitLines.map(\.line.quantity),
+                    units: unitLines.map(\.unit)
+                )
+                let nameTR = unitLines.first(where: { !$0.line.nameTR.isEmpty })?.line.nameTR
+                    ?? unitLines.first?.line.nameEN
                     ?? ingredientId
-                let nameEN = unitLines.first(where: { !$0.nameEN.isEmpty })?.nameEN ?? ""
+                let nameEN = unitLines.first(where: { !$0.line.nameEN.isEmpty })?.line.nameEN ?? ""
                 merged.append(
                     MergedGroceryLine(
                         ingredientId: ingredientId,
                         nameTR: nameTR,
                         nameEN: nameEN,
-                        quantity: quantity,
-                        unit: unit,
+                        quantity: combined.quantity,
+                        unit: combined.code,
                         hasUnitConflict: hasConflict
                     )
                 )
@@ -61,7 +69,15 @@ enum GroceryMerger {
         }
     }
 
+    /// Canonical unit code. Safe to store and to compare across rebuilds.
     static func normalize(_ unit: String) -> String {
-        unit.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        UnitNormalization.parse(unit).code
+    }
+
+    private static func bucketKey(for unit: ParsedUnit) -> String {
+        if let family = unit.family {
+            return "family:\(family.rawValue)"
+        }
+        return "unit:\(unit.code)"
     }
 }
