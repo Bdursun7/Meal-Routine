@@ -318,12 +318,92 @@ private func checkExposureLog() {
     defaults.removePersistentDomain(forName: suite)
 }
 
+/// Keep in sync with `ALLOWLIST` in Tools/recipe_tags.py.
+private let catalogTagAllowlist: Set<String> = [
+    "quick",
+    "slow",
+    "spicy",
+    "cold",
+    "pasta",
+    "noodle",
+    "dumpling",
+    "rice",
+    "potato",
+    "bread",
+    "bulgur",
+    "one-pan",
+    "grill",
+    "fry",
+    "stir-fry",
+    "bake",
+    "stew",
+    "curry",
+    "steam",
+    "pie",
+    "stuffed",
+]
+
+private func checkSharedTagRanking() {
+    let pastaPan = candidate(
+        "spaghetti-carbonara",
+        score: 80,
+        cuisine: "IT",
+        category: "main",
+        protein: "red-meat",
+        tags: ["pasta", "one-pan"]
+    )
+    let anotherPastaPan = candidate(
+        "bucatini-all-amatriciana",
+        score: 78,
+        cuisine: "MX",
+        category: "soup",
+        protein: "legume",
+        tags: ["pasta", "one-pan"]
+    )
+    let grill = candidate(
+        "sardinhas-assadas",
+        score: 70,
+        cuisine: "JP",
+        category: "salad",
+        protein: "tofu",
+        tags: ["grill"]
+    )
+    let sharedPenalty = MealRecommender.diversityPenalty(for: anotherPastaPan, anchoredMeals: [pastaPan])
+    check(
+        sharedPenalty == MealRecommender.sharedTagPenalty * 2,
+        "pasta + one-pan should cost two shared-tag penalties, got \(sharedPenalty)"
+    )
+    var quiet = anotherPastaPan
+    quiet.tags = []
+    check(
+        MealRecommender.diversityPenalty(for: quiet, anchoredMeals: [pastaPan]) == 0,
+        "the same pair without tags should not pay a tag penalty"
+    )
+    let picked = MealRecommender.pick(
+        candidates: [pastaPan, anotherPastaPan, grill],
+        evenings: 2,
+        maxCookMinutes: 90,
+        dislikedIngredientIds: []
+    )
+    check(
+        picked == ["spaghetti-carbonara", "sardinhas-assadas"],
+        "a second pasta/one-pan should lose to a lower-scored grill, got \(picked)"
+    )
+}
+
 private func checkBundledCatalog() throws {
     let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent("MealRoutine/Recipes/recipes.v1.json")
     let data = try Data(contentsOf: url)
     let file = try JSONDecoder().decode(RecipeCatalogFile.self, from: data)
     check(file.recipes.count == 125, "catalog count \(file.recipes.count)")
+    for dto in file.recipes {
+        let tags = dto.tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        check((1...5).contains(tags.count), "\(dto.id) should have 1 to 5 tags, got \(dto.tags)")
+        check(Set(tags).count == tags.count, "\(dto.id) has duplicate tags \(dto.tags)")
+        let unknown = tags.filter { !catalogTagAllowlist.contains($0) }
+        check(unknown.isEmpty, "\(dto.id) tags outside the allowlist: \(unknown)")
+    }
     let candidates = file.recipes.map { dto -> PickerCandidate in
         let ids = dto.ingredients.map(\.id)
         let course = dto.unitoolsCategory.isEmpty ? dto.category : dto.unitoolsCategory
@@ -367,6 +447,38 @@ private func checkBundledCatalog() throws {
     check(cuisineCounts.values.allSatisfy { $0 <= 2 }, "bundled week should not stack one cuisine, got \(cuisineCounts)")
     check(proteins.count >= 3, "bundled week should vary protein, got \(picked.map(\.protein))")
     check(courses.count >= 2, "bundled week should vary course, got \(picked.map(\.category))")
+    var tagCounts: [String: Int] = [:]
+    for meal in picked {
+        for tag in meal.tags {
+            tagCounts[tag, default: 0] += 1
+        }
+    }
+    let stacked = tagCounts.filter { $0.value > 1 }
+    check(stacked.isEmpty, "bundled week should not repeat a tag, got \(tagCounts)")
+
+    guard let carbonara = bySlug["spaghetti-carbonara"], let amatriciana = bySlug["bucatini-all-amatriciana"] else {
+        check(false, "catalog is missing the pasta fixtures")
+        return
+    }
+    let sharedStyle = carbonara.tags.intersection(amatriciana.tags)
+    check(sharedStyle.contains("pasta"), "carbonara and amatriciana should share pasta, got \(sharedStyle)")
+    check(sharedStyle.contains("one-pan"), "carbonara and amatriciana should share one-pan, got \(sharedStyle)")
+    let pastaPenalty = MealRecommender.diversityPenalty(for: amatriciana, anchoredMeals: [carbonara])
+    let expectedPasta = MealRecommender.sameCuisinePenalty
+        + MealRecommender.sameCategoryPenalty
+        + MealRecommender.sameProteinPenalty
+        + MealRecommender.sharedTagPenalty * sharedStyle.count
+    check(
+        pastaPenalty == expectedPasta,
+        "two Italian pan pastas should pay cuisine, course, protein, and \(sharedStyle.count) tags, got \(pastaPenalty)"
+    )
+    var untagged = amatriciana
+    untagged.tags = []
+    let untaggedPenalty = MealRecommender.diversityPenalty(for: untagged, anchoredMeals: [carbonara])
+    check(
+        untaggedPenalty == pastaPenalty - MealRecommender.sharedTagPenalty * sharedStyle.count,
+        "dropping tags should remove only the shared-tag term, got \(untaggedPenalty)"
+    )
 
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let recent = picked.map { RecentMealSighting(slug: $0.slug, at: now, wasCooked: false) }
@@ -380,13 +492,22 @@ private func checkBundledCatalog() throws {
     )
     check(Set(rebuilt).isDisjoint(with: Set(week)), "rebuilding the week should drop meals planned today, got \(rebuilt)")
     check(
-        week == ["menemen", "mercimek-corbasi", "chapli-kebab", "fattoush", "draniki"],
+        week == ["menemen", "mercimek-corbasi", "draniki", "cevapi", "qingzheng-yu"],
         "fresh 60-minute catalog week, got \(week)"
     )
     check(
-        rebuilt == ["iskender-kebab", "tarator", "dal-tadka", "tabbouleh", "moules-marinieres"],
+        rebuilt == ["iskender-kebab", "tarator", "dal-tadka", "moules-marinieres", "joojeh-kabab"],
         "catalog rebuild after planning that week, got \(rebuilt)"
     )
+    let rebuiltMeals = rebuilt.compactMap { bySlug[$0] }
+    var rebuiltTagCounts: [String: Int] = [:]
+    for meal in rebuiltMeals {
+        for tag in meal.tags {
+            rebuiltTagCounts[tag, default: 0] += 1
+        }
+    }
+    let rebuiltStacked = rebuiltTagCounts.filter { $0.value > 1 }
+    check(rebuiltStacked.isEmpty, "rebuilt week should not repeat a tag, got \(rebuiltTagCounts)")
 }
 
 @main
@@ -395,6 +516,7 @@ struct RecommenderChecks {
         checkFilters()
         checkLovedAndRecency()
         checkDiversitySignals()
+        checkSharedTagRanking()
         checkWeekAndReplace()
         checkProteinAndRegion()
         checkExposureLog()

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 
 FNV_OFFSET = 0xCBF29CE484222325
 FNV_PRIME = 0x100000001B3
@@ -210,7 +211,30 @@ def main() -> None:
     mutated[0] ^= 0x01
     expect(token(1, bytes(mutated)) != original, "a catalog byte change re-imports")
 
-    summary_count, step_count, note_count = require_turkish(json.loads(catalog.decode("utf-8")))
+    parsed = json.loads(catalog.decode("utf-8"))
+    summary_count, step_count, note_count = require_turkish(parsed)
+    tools = pathlib.Path(__file__).resolve().parent
+    if str(tools) not in sys.path:
+        sys.path.insert(0, str(tools))
+    from recipe_tags import ALLOWLIST, assign_tags
+
+    tagged = 0
+    for recipe in parsed["recipes"]:
+        recipe_id = recipe.get("id", "?")
+        expected = assign_tags(recipe)
+        actual = recipe.get("tags")
+        expect(actual == expected, f"{recipe_id} tags {actual} != rules {expected}")
+        expect(1 <= len(actual) <= 5, f"{recipe_id} tag count {len(actual)}")
+        for tag in actual:
+            expect(tag in ALLOWLIST, f"{recipe_id} tag {tag} is not in the allowlist")
+        tagged += 1
+    expect(tagged == 125, "every recipe was tag-checked")
+    swift = (root / "Tools/meal_recommender_checks.swift").read_text()
+    for tag in ALLOWLIST:
+        expect(f'"{tag}"' in swift, f"recommender checks allowlist missing {tag}")
+    week = (root / "MealRoutine/Services/WeekPlanService.swift").read_text()
+    expect("tags: Set(tags)" in week, "picker copies recipe tags")
+    expect("tags: dto.tags" in seed, "seed copies catalog tags")
     # Translations are catalog bytes, so the fingerprint above changes when they do
     # and RecipeSeedService re-imports on the next launch.
     print(f"turkish: {summary_count} summaries, {step_count} steps, {note_count} notes")

@@ -67,7 +67,8 @@ enum MealRecommender {
     static let similarCuisinePenalty = 10
     static let sameCategoryPenalty = 8
     static let sameProteinPenalty = 18
-    /// Per shared tag. Bundled `tags` are empty today, so this stays quiet until the catalog fills them.
+    /// Per shared tag. Catalog tags are style, format, starch, and heat
+    /// (`Tools/recipe_tags.py`). Cuisine and protein are separate fields.
     static let sharedTagPenalty = 14
     /// Stops a long anchor list from flattening every candidate to the same floor.
     static let diversityPenaltyCap = 140
