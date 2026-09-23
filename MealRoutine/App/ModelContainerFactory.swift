@@ -12,6 +12,7 @@ enum ModelContainerFactory {
             GroceryItem.self,
             UserPrefs.self,
             RecipeFeedback.self,
+            CatalogImportState.self,
         ])
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: inMemory,
