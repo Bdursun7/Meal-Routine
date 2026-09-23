@@ -19,7 +19,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 - Onboarding: welcome, then four steps (household, dislikes, up to 8 taste ratings, summary). The week is created only from “Haftamı oluştur” on the summary. Household size is 1–8, evenings are 1–5, max cook time is 30 / 45 / 60 / 90 minutes (default 60). Egg and eggs share one “Yumurta” dislike chip.
 - Tabs: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
-- This week is filled by a naive deterministic picker (time cap, dislikes, “never”, loved boost, curated score). It is not the full recommender yet.
+- This week is filled by a deterministic recommender: cook time, disliked ingredients, and Never-again are hard filters; the curated score and Loved still boost; meals cooked or planned in the last 21 days rank lower; the same week avoids repeating cuisine, course, protein, and tags. No LLM.
 - Grocery list merges UniTools ingredient `id`s when the unit matches, and flags unit conflicts instead of summing them.
 - Summaries and cooking steps are Turkish localizations of the UniTools text. English source strings stay in the catalog for CC BY-SA attribution. Names and the rest of the UI are Turkish.
 - No ads, paywall, or LLM calls. Photos are not downloaded; the detail screen uses a local placeholder.
@@ -57,7 +57,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 - Kurulum: karşılama, sonra dört adım (ev, sevmediğin malzemeler, en fazla 8 tat puanı, özet). Hafta yalnızca özetteki “Haftamı oluştur” ile kurulur. Ev halkı 1–8, akşam 1–5, en fazla pişirme 30 / 45 / 60 / 90 dk (varsayılan 60). Yumurta chip’i `egg` ve `eggs` kimliklerini birlikte saklar.
 - Sekmeler: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
-- Hafta, basit ve deterministik bir seçiciyle dolar (süre, sevmediğin malzeme, “bir daha asla”, sevdim önceliği, kürasyon skoru). Tam öneri motoru bu iskelette yok.
+- Hafta, deterministik bir öneri motoruyla dolar: süre, sevmediğin malzeme ve “bir daha asla” elenir; kürasyon skoru ve Sevdim hâlâ yükseltir; son 21 günde pişen veya planlanan tarif geride kalır; aynı hafta mutfak, tür, protein ve etiketi tekrarlamamaya çalışır. LLM yok.
 - Market listesi, UniTools malzeme `id` değerlerini birim aynıysa toplar; birim çakışırsa miktarları birbirine katmaz, satırı işaretler.
 - Özet ve pişirme adımları, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin CC BY-SA atfı için katalogda durur. İsimler ve arayüzün geri kalanı Türkçe.
 - Reklam, ödeme duvarı ve LLM yok. Fotoğraflar indirilmez; detayda yerel bir yer tutucu vardır.

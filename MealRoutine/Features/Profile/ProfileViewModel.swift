@@ -17,7 +17,7 @@ final class ProfileViewModel {
         guard !didLoad, let prefs else { return }
         didLoad = true
         householdSize = HouseholdSizeLimits.clamped(prefs.householdSize)
-        evenings = min(max(prefs.eveningsPerWeek, 1), NaiveMealPicker.eveningCap)
+        evenings = min(max(prefs.eveningsPerWeek, 1), MealRecommender.eveningCap)
         maxCookMinutes = CookTimeOptions.resolved(prefs.maxCookMinutes)
         dislikedIDs = prefs.dislikedIngredientIds
     }
@@ -48,7 +48,7 @@ final class ProfileViewModel {
         do {
             guard let prefs = try UserPrefsStore.existing(in: context) else { return }
             prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
-            prefs.eveningsPerWeek = min(max(evenings, 1), NaiveMealPicker.eveningCap)
+            prefs.eveningsPerWeek = min(max(evenings, 1), MealRecommender.eveningCap)
             prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
             householdSize = prefs.householdSize
             evenings = prefs.eveningsPerWeek
@@ -71,7 +71,7 @@ final class ProfileViewModel {
         do {
             guard let prefs = try UserPrefsStore.existing(in: context) else { return }
             prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
-            prefs.eveningsPerWeek = min(max(evenings, 1), NaiveMealPicker.eveningCap)
+            prefs.eveningsPerWeek = min(max(evenings, 1), MealRecommender.eveningCap)
             prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)
             householdSize = prefs.householdSize
             evenings = prefs.eveningsPerWeek

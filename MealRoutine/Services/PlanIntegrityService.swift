@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: "com.mealroutine.app", category: "plan")
 
 /// Drops planned meals whose recipe disappeared, then leaves grocery rebuild to the caller.
 ///
-/// Current-week orphans are replaced by `WeekPlanService.replaceCurrentWeek` (naive picker)
+/// Current-week orphans are replaced by `WeekPlanService.replaceCurrentWeek` (meal recommender)
 /// when onboarding is done. A hole-only delete would keep grocery math "correct" for the
 /// meals that remain, but the week would no longer match the household's evening count.
 /// Replacing the week deletes that week's grocery rows; manual extras are copied onto the

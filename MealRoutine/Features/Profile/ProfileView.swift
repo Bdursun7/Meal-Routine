@@ -15,7 +15,7 @@ struct ProfileView: View {
                     Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
                     }
-                    Stepper(value: $viewModel.evenings, in: 1...NaiveMealPicker.eveningCap) {
+                    Stepper(value: $viewModel.evenings, in: 1...MealRecommender.eveningCap) {
                         Text("Akşam sayısı: \(viewModel.evenings)")
                     }
                     Picker("En fazla pişirme", selection: $viewModel.maxCookMinutes) {
@@ -29,7 +29,7 @@ struct ProfileView: View {
                     Button("Bu haftayı yeniden kur") {
                         viewModel.rebuildWeek(in: modelContext)
                     }
-                    Text("Yeniden kurmak yemekleri ve market listesini baştan yazar. Süre ve sevmediğin malzemeler seçiciyi etkiler.")
+                    Text("Yeniden kurmak bu haftanın yemeklerini ve market listesini baştan yazar. Az önce planlanan tarifler bir sonraki kurulumda geride kalır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -49,7 +49,7 @@ struct ProfileView: View {
 
                 Section("Katalog") {
                     Text("\(recipes.count) akşam tarifi yerelde yüklü.")
-                    Text("Öneri motoru şimdilik basit bir seçici. Hesap, reklam ve yapay zeka yok.")
+                    Text("Öneri motoru süreye, sevmediğin malzemeye, son yemeklere ve haftanın çeşitliliğine bakar. Hesap, reklam ve yapay zeka yok.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
