@@ -28,7 +28,7 @@ struct OnboardingView: View {
 
     private var basics: some View {
         @Bindable var viewModel = self.viewModel
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     Image(systemName: "fork.knife")
