@@ -60,8 +60,7 @@ enum RecipeCatalogLoader {
             return url
         }
         let expected = "\(name).\(ext)"
-        return bundle.urls(forResourcesWithExtension: ext, subdirectory: nil)?.first {
-            $0.lastPathComponent == expected
-        }
+        return bundle.urls(forResourcesWithExtension: ext, subdirectory: nil)?
+            .first(where: { $0.lastPathComponent == expected })
     }
 }
