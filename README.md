@@ -2,7 +2,7 @@
 
 Personal iOS meal planner. The week, already planned.
 
-TR-first UI. Local-first Swift, SwiftUI, and SwiftData. Minimum iOS 18. V1 has no backend, login, or network call on the happy path.
+TR-first UI. Local-first Swift, SwiftUI, and SwiftData. Minimum iOS 18. V1 has no backend or login. The week, grocery list, and cooking stay on device. Opening a recipe photo is the only network call, and only when that photo is not already cached.
 
 Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
@@ -22,7 +22,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - This week is filled by a deterministic recommender: cook time, disliked ingredients, and Never-again are hard filters; the curated score and Loved still boost; meals cooked or planned in the last 21 days rank lower; the same week avoids repeating cuisine, course, protein, and tags. No LLM.
 - Grocery list merges UniTools ingredient `id`s. Equivalent unit spellings sum together, and grams convert with kilograms (millilitres with litres). Incompatible units stay on separate rows and are flagged. Each evening scales from the recipe base to that meal’s servings (1–8). The default is the household size. Recipe detail shows the same scaled amounts. **Porsiyonu kaydet** on Profile locks the household onto every evening; on a planned meal it locks that evening only.
 - Summaries and cooking steps are Turkish localizations of the UniTools text. English source strings stay in the catalog for CC BY-SA attribution. Names and the rest of the UI are Turkish.
-- No ads, paywall, or LLM calls. Photos are not downloaded; the detail screen uses a local placeholder.
+- No ads, paywall, or LLM calls. When a catalog `photo` URL is HTTPS, recipe detail shows it under the title and the week and recipe lists show a fixed thumbnail. The catalog author and license are shown with the image. The file is cached on disk after the first successful fetch. A fork-and-knife placeholder is used when the recipe has no photo, or when the image is not cached and cannot be fetched. Planning, the grocery list, and cooking do not wait on the network.
 
 ## Recipe data
 
@@ -30,7 +30,9 @@ Bundled catalog: `MealRoutine/Recipes/recipes.v1.json` (125 dinners).
 
 Turkish ingredient alias reference: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
-Source: UniTools World Recipes, CC BY-SA 4.0. Do not scrape commercial recipe sites, and do not invent recipes. Dataset derivatives stay CC BY-SA 4.0. App code may stay under its own license.
+Source: UniTools World Recipes, CC BY-SA 4.0. Do not scrape commercial recipe sites, and do not invent recipes. Dataset derivatives stay CC BY-SA 4.0. App code may stay under its own license. Photo files stay on UniTools URLs with the catalog's own author and license; they are not replaced with other images.
+
+`Recipe.photoURL`, `photoAuthor`, and `photoLicense` are already on the SwiftData model. Seed copies `photo.url`, `photo.author`, and `photo.license`, or empty strings when `photo` is null. The catalog file bytes are the import fingerprint, and showing photos does not add model fields, so no SwiftData migration is required. An install that already seeded this catalog already has the photo strings.
 
 Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
@@ -40,7 +42,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 Kişisel iOS yemek planlayıcı. Haftan, önceden planlı.
 
-Arayüz önce Türkçe. Swift, SwiftUI ve SwiftData; veri cihazda. En düşük sürüm iOS 18. V1'de hesap, sunucu ve mutlu yolda ağ çağrısı yok.
+Arayüz önce Türkçe. Swift, SwiftUI ve SwiftData; veri cihazda. En düşük sürüm iOS 18. V1'de hesap ve sunucu yok. Hafta, market ve pişirme cihazda kalır. Tarif fotoğrafı, yalnızca önbellekte yoksa ağ ister.
 
 Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
@@ -60,7 +62,7 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - Hafta, deterministik bir öneri motoruyla dolar: süre, sevmediğin malzeme ve “bir daha asla” elenir; kürasyon skoru ve Sevdim hâlâ yükseltir; son 21 günde pişen veya planlanan tarif geride kalır; aynı hafta mutfak, tür, protein ve etiketi tekrarlamamaya çalışır. LLM yok.
 - Market listesi, UniTools malzeme `id` değerlerini toplar. Eş anlamlı birimler birleşir; gram ile kilogram ve mililitre ile litre çevrilir. Uyumsuz birimler ayrı satırda kalır ve işaretlenir. Her akşam, tarif tabanından o akşamın porsiyonuna ölçeklenir (1–8). Varsayılan ev halkıdır. Tarif detayı aynı ölçekli miktarı gösterir. Profil’de **Porsiyonu kaydet** ev halkını bütün akşamlara yazar; planlı bir akşamda yalnız o akşamı kilitler.
 - Özet ve pişirme adımları, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin CC BY-SA atfı için katalogda durur. İsimler ve arayüzün geri kalanı Türkçe.
-- Reklam, ödeme duvarı ve LLM yok. Fotoğraflar indirilmez; detayda yerel bir yer tutucu vardır.
+- Reklam, ödeme duvarı ve LLM yok. Katalogdaki `photo` adresi HTTPS ise tarif detayında başlığın altında, hafta ve tarif listesinde sabit bir küçük görsel olarak gösterilir. Yazar ve lisans katalogdaki metindir. İlk başarılı indirme önbelleğe yazılır. Fotoğraf yoksa veya önbellekte olmayıp indirilemiyorsa çatal-bıçak yer tutucusu kalır. Hafta, market ve pişirme ağı beklemez.
 
 ## Tarif verisi
 
@@ -68,6 +70,8 @@ Paket: `MealRoutine/Recipes/recipes.v1.json` (125 akşam yemeği).
 
 Türkçe malzeme eşanlamlıları: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
-Kaynak: UniTools World Recipes, CC BY-SA 4.0. Ticari tarif sitelerini kazıma ve tarif uydurma yok. Veri setinin türevleri CC BY-SA 4.0 olarak kalır. Uygulama kodu kendi lisansında durabilir.
+Kaynak: UniTools World Recipes, CC BY-SA 4.0. Ticari tarif sitelerini kazıma ve tarif uydurma yok. Veri setinin türevleri CC BY-SA 4.0 olarak kalır. Uygulama kodu kendi lisansında durabilir. Fotoğraflar UniTools adresinde kalır; yazar ve lisans katalogdaki `photo` alanıdır, başka görselle değiştirilmez.
+
+`Recipe.photoURL`, `photoAuthor` ve `photoLicense` SwiftData modelinde zaten var. Seed, `photo.url`, `photo.author` ve `photo.license` değerlerini yazar; `photo` yoksa boş metin kalır. İçe aktarma parmak izi katalog dosyasının baytlarıdır. Fotoğraf göstermek modele yeni alan eklemez, SwiftData göçü gerekmez. Bu kataloğu daha önce alan kurulumda fotoğraf metinleri zaten durur.
 
 Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)

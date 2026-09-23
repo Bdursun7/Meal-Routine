@@ -42,7 +42,12 @@ struct ThisWeekView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             summaryCard(summary)
                             ForEach(meals) { meal in
-                                mealCard(meal)
+                                WeekMealCard(
+                                    meal: meal,
+                                    recipe: recipes.first { $0.slug == meal.slug },
+                                    isWorking: viewModel.isWorking,
+                                    onReplace: { viewModel.replace(mealID: meal.id, in: modelContext) }
+                                )
                             }
                         }
                         .padding(16)
@@ -91,7 +96,16 @@ struct ThisWeekView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func mealCard(_ meal: WeekMealPresentation) -> some View {
+}
+
+private struct WeekMealCard: View {
+    var meal: WeekMealPresentation
+    var recipe: Recipe?
+    var isWorking: Bool
+    var onReplace: () -> Void
+    @State private var isPhotoShown = false
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -111,28 +125,44 @@ struct ThisWeekView: View {
             }
 
             NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(meal.recipeName)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("\(meal.minutes) dk · \(meal.servings) kişilik")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if let rating = meal.rating {
-                        Label(rating.title, systemImage: rating.systemImage)
-                            .font(.caption)
+                HStack(alignment: .top, spacing: 12) {
+                    RecipePhotoView(
+                        urlString: recipe?.photoURL ?? "",
+                        author: recipe?.photoAuthor ?? "",
+                        license: recipe?.photoLicense ?? "",
+                        layout: .thumbnail,
+                        isPhotoShown: $isPhotoShown
+                    )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(meal.recipeName)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("\(meal.minutes) dk · \(meal.servings) kişilik")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
+                        if let rating = meal.rating {
+                            Label(rating.title, systemImage: rating.systemImage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if isPhotoShown {
+                            RecipePhotoCreditText(
+                                author: recipe?.photoAuthor ?? "",
+                                license: recipe?.photoLicense ?? "",
+                                style: .compact
+                            )
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
 
             Button("Değiştir") {
-                viewModel.replace(mealID: meal.id, in: modelContext)
+                onReplace()
             }
             .font(.subheadline.weight(.semibold))
-            .disabled(viewModel.isWorking)
+            .disabled(isWorking)
             .accessibilityHint("Bu akşamın tarifini başka bir tarifle değiştirir")
         }
         .padding(16)
