@@ -126,7 +126,7 @@ struct GroceryView: View {
 
     private var addSheet: some View {
         @Bindable var viewModel = self.viewModel
-        NavigationStack {
+        return NavigationStack {
             Form {
                 TextField("Malzeme", text: $viewModel.draftName)
                 TextField("Miktar", text: $viewModel.draftQuantity)
