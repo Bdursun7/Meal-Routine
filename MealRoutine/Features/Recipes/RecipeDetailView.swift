@@ -13,8 +13,12 @@ struct RecipeDetailView: View {
         recipes.first { $0.slug == route.slug }
     }
 
+    private var currentRating: MealRating? {
+        guard let recipe else { return nil }
+        return FeedbackIndex.latestRatings(in: feedback)[recipe.slug]
+    }
+
     var body: some View {
-        @Bindable var viewModel = self.viewModel
         Group {
             if let recipe {
                 content(recipe)
@@ -28,17 +32,46 @@ struct RecipeDetailView: View {
         }
         .navigationTitle(recipe?.displayName ?? "Tarif")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "Bu yemek nasıldı?",
-            isPresented: $viewModel.isShowingFeedback,
-            titleVisibility: .visible
-        ) {
-            Button("Sevdim") { viewModel.commit(rating: .loved, slug: route.slug, in: modelContext) }
-            Button("İdare eder") { viewModel.commit(rating: .okay, slug: route.slug, in: modelContext) }
-            Button("Bir daha asla", role: .destructive) {
-                viewModel.commit(rating: .never, slug: route.slug, in: modelContext)
+        .safeAreaInset(edge: .bottom, spacing: viewModel.savedNotice == nil ? 0 : 12) {
+            Group {
+                if let notice = viewModel.savedNotice {
+                    SavedRatingToast(notice: notice, onDismiss: viewModel.dismissSavedNotice)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-            Button("Vazgeç", role: .cancel) {}
+            .animation(.easeInOut(duration: 0.2), value: viewModel.savedNotice?.id)
+        }
+        .overlay {
+            Group {
+                if viewModel.isShowingRatingPrompt {
+                    CookRatingPrompt(
+                        currentRating: currentRating,
+                        onSelect: { rating in
+                            viewModel.saveRating(rating: rating, slug: route.slug, in: modelContext)
+                        },
+                        onCancel: viewModel.cancelRating
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: viewModel.isShowingRatingPrompt)
+            .allowsHitTesting(viewModel.isShowingRatingPrompt)
+        }
+        .sensoryFeedback(.success, trigger: viewModel.savedNotice?.id) { _, newValue in
+            newValue != nil
+        }
+        .onChange(of: viewModel.savedNotice?.id) { _, newID in
+            guard newID != nil, let notice = viewModel.savedNotice else { return }
+            AccessibilityNotification.Announcement(notice.message).post()
+        }
+        .task(id: viewModel.savedNotice?.id) {
+            guard viewModel.savedNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(3.2))
+            guard !Task.isCancelled else { return }
+            viewModel.dismissSavedNotice()
         }
         .alert(
             "Kaydedilemedi",
@@ -61,7 +94,6 @@ struct RecipeDetailView: View {
 
     @ViewBuilder
     private func content(_ recipe: Recipe) -> some View {
-        let latest = FeedbackIndex.latestRatings(in: feedback)[recipe.slug]
         List {
             Section {
                 HStack(spacing: 16) {
@@ -80,8 +112,8 @@ struct RecipeDetailView: View {
                     }
                 }
                 .padding(.vertical, 4)
-                if let latest {
-                    Label(latest.title, systemImage: latest.systemImage)
+                if let currentRating {
+                    currentRatingRow(currentRating)
                 }
                 Text("Pişirme adımları V1'de İngilizce.")
                     .font(.footnote)
@@ -132,11 +164,7 @@ struct RecipeDetailView: View {
 
             Section {
                 Button("Bunu pişirdim") {
-                    viewModel.markCooked(
-                        slug: recipe.slug,
-                        plannedMealUUID: route.plannedMealUUID,
-                        in: modelContext
-                    )
+                    viewModel.markCooked(plannedMealUUID: route.plannedMealUUID)
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -148,5 +176,25 @@ struct RecipeDetailView: View {
                     .textSelection(.enabled)
             }
         }
+    }
+
+    private func currentRatingRow(_ rating: MealRating) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Mevcut puan")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Label(rating.title, systemImage: rating.systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .accessibilityLabel("Mevcut puan: \(rating.title)")
+                Spacer(minLength: 8)
+                Button("Puanı değiştir", action: viewModel.presentRatingChange)
+                    .font(.subheadline.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(Theme.accent)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
