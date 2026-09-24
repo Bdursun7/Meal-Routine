@@ -169,3 +169,20 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         return .other
     }
 }
+
+/// One row handed to the aisle grouper. Checked rows leave the open sections.
+struct GroceryGroupInput: Equatable, Sendable {
+    var name: String
+    var category: GroceryCategory
+    var isChecked: Bool
+}
+
+enum GroceryListGrouping {
+    /// Open rows follow the market walk. Checked rows are not returned here.
+    static func openCategories(in rows: [GroceryGroupInput]) -> [GroceryCategory] {
+        let open = rows.filter { !$0.isChecked }
+        return GroceryCategory.sectionOrder.filter { category in
+            open.contains { $0.category == category }
+        }
+    }
+}

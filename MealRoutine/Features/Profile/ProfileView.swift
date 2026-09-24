@@ -79,6 +79,12 @@ struct ProfileView: View {
                 }
 
                 Section("Uygulama") {
+                    NavigationLink {
+                        PrivacyView()
+                    } label: {
+                        Text("Gizlilik")
+                    }
+                    .accessibilityHint("Verinin cihazda kaldığını açıklar")
                     Button("Yerel veriyi sıfırla", role: .destructive) {
                         viewModel.isConfirmingReset = true
                     }

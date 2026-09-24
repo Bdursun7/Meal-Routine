@@ -91,6 +91,9 @@ struct RecipeDetailView: View {
             guard !Task.isCancelled else { return }
             viewModel.dismissSavedNotice()
         }
+        .onAppear {
+            Analytics.track(.recipeOpened)
+        }
         .alert(
             "Kaydedilemedi",
             isPresented: alertIsPresented
@@ -182,6 +185,7 @@ struct RecipeDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(recipe.displayName)
                         .font(.title2.bold())
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
                         .foregroundStyle(.secondary)
                     Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
@@ -199,6 +203,7 @@ struct RecipeDetailView: View {
                 if let currentRating {
                     currentRatingRow(currentRating)
                 }
+                favoriteButton(isLoved: currentRating == .loved)
             }
 
             if !recipe.displaySummary.isEmpty {
@@ -339,6 +344,23 @@ struct RecipeDetailView: View {
             ? "Market, Porsiyonu kaydet deyince bu haftanın her akşamıyla birlikte güncellenir."
             : "Market, Porsiyonu kaydet deyince bu akşam için güncellenir. Ev halkı aynı kalır."
         return "\(amounts) \(scope)"
+    }
+
+    private func favoriteButton(isLoved: Bool) -> some View {
+        Button {
+            viewModel.toggleFavorite(isLoved: isLoved, slug: route.slug, in: modelContext)
+        } label: {
+            Label(
+                isLoved ? "Favorilerde" : "Favorilere ekle",
+                systemImage: isLoved ? "heart.fill" : "heart"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .tint(Theme.accent)
+        .accessibilityLabel(isLoved ? "Favorilerde" : "Favorilere ekle")
+        .accessibilityHint(isLoved ? "Sevdiklerim listesinden çıkarır" : "Pişirmeden Sevdiklerime ekler")
     }
 
     private func currentRatingRow(_ rating: MealRating) -> some View {

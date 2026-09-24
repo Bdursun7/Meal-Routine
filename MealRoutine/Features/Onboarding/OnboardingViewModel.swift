@@ -67,6 +67,13 @@ final class OnboardingViewModel {
     var errorMessage: String?
     /// Set when Düzenle jumps backward. The next Devam / Atla returns to the summary.
     private var editingFromSummary = false
+    @ObservationIgnored private var didTrackStart = false
+
+    func trackStartIfNeeded() {
+        guard step == .welcome, !didTrackStart else { return }
+        didTrackStart = true
+        Analytics.track(.onboardingStarted)
+    }
 
     /// Staples that are poor dislike chips.
     private let pantryIDs: Set<String> = [
@@ -250,6 +257,7 @@ final class OnboardingViewModel {
             try GroceryListService.rebuild(in: context)
             prefs.hasCompletedOnboarding = true
             try context.save()
+            Analytics.track(.onboardingCompleted)
             isSaving = false
         } catch {
             errorMessage = error.localizedDescription

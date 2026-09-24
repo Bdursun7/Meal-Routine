@@ -95,6 +95,7 @@ struct GroceryView: View {
         }
         .onAppear {
             viewModel.rebuild(in: modelContext)
+            Analytics.track(.groceryOpened)
         }
     }
 
@@ -108,24 +109,27 @@ struct GroceryView: View {
     }
 
     private func groceryRow(_ row: GroceryRowPresentation, showsAisle: Bool = false) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        @Bindable var viewModel = self.viewModel
+        return HStack(alignment: .top, spacing: 12) {
             Button {
                 viewModel.toggle(row.id, in: modelContext)
             } label: {
                 Image(systemName: row.isChecked ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundStyle(row.isChecked ? Theme.accent : Color.secondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityHidden(true)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(row.isChecked ? "Alındı" : "Alınacak")
+            .accessibilityLabel(row.isChecked ? "\(row.name) alındı" : "\(row.name) alınacak")
+            .accessibilityHint(row.isChecked ? "İşareti kaldırır" : "Alındı olarak işaretler")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
                     .strikethrough(row.isChecked)
                     .foregroundStyle(row.isChecked ? .secondary : .primary)
-                Text(row.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                GroceryQuantityControl(row: row, viewModel: viewModel)
                 if row.hasUnitConflict {
                     Text("Birim çakışması")
                         .font(.caption.weight(.semibold))
@@ -180,5 +184,71 @@ struct GroceryView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+private struct GroceryQuantityControl: View {
+    var row: GroceryRowPresentation
+    @Bindable var viewModel: GroceryViewModel
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        if viewModel.editingID == row.id {
+            VStack(alignment: .leading, spacing: 8) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        amountField
+                        Text(row.unitLabel)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        amountField
+                        Text(row.unitLabel)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                HStack(spacing: 12) {
+                    Button("Kaydet") {
+                        viewModel.commitQuantity(in: modelContext)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .accessibilityHint("Miktarı kaydeder. Birim aynı kalır.")
+                    Button("Vazgeç") {
+                        viewModel.cancelQuantityEdit()
+                    }
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
+                }
+            }
+        } else if row.canEditQuantity {
+            Button {
+                viewModel.beginQuantityEdit(row)
+            } label: {
+                Text(row.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("\(row.name) miktarı \(row.detail)")
+            .accessibilityHint("Miktarı düzenler, birim aynı kalır")
+        } else {
+            Text(row.detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var amountField: some View {
+        TextField("Miktar", text: $viewModel.editingQuantity)
+            .keyboardType(.decimalPad)
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 140)
+            .accessibilityLabel("Yeni miktar")
     }
 }

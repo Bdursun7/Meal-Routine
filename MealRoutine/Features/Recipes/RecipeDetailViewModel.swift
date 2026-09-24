@@ -64,6 +64,22 @@ final class RecipeDetailViewModel {
             pendingPlannedMealUUID = nil
             isShowingRatingPrompt = false
             savedNotice = SavedRatingNotice(rating: rating)
+            Analytics.track(.recipeRated)
+            Analytics.track(.mealFeedbackGiven)
+            if rating == .loved {
+                Analytics.track(.recipeLoved)
+            } else if rating == .never {
+                Analytics.track(.recipeDisliked)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Loved is the favorite list. Adding one does not require a new cook.
+    func toggleFavorite(isLoved: Bool, slug: String, in context: ModelContext) {
+        do {
+            try WeekPlanService.setFavorite(slug: slug, loved: !isLoved, in: context)
         } catch {
             errorMessage = error.localizedDescription
         }

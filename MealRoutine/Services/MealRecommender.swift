@@ -15,6 +15,8 @@ struct PickerCandidate: Equatable, Sendable {
     /// Primary protein family (`poultry`, `red-meat`, `seafood`, `egg`, `legume`, `tofu`, `dairy`).
     /// Empty when no mapped ingredient is present, and empty does not count as a repeat.
     var protein: String
+    /// Catalog diet tags (`vegetarian`, `vegan`, …). Empty when the recipe lists none.
+    var diets: Set<String> = []
 }
 
 /// A cook or a plan that should pull this recipe down for a while.
