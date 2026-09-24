@@ -8,6 +8,7 @@ struct OnboardingView: View {
     @Query private var recipes: [Recipe]
     @State private var viewModel = OnboardingViewModel()
     @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 40
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -31,7 +32,7 @@ struct OnboardingView: View {
             .navigationBarTitleDisplayMode(viewModel.step == .welcome || viewModel.step == .slogan ? .inline : .large)
             .toolbar(navigationVisibility, for: .navigationBar)
             .toolbar {
-                if viewModel.step != .welcome {
+                if showsSetupChrome {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             viewModel.goBack()
@@ -69,39 +70,66 @@ struct OnboardingView: View {
     }
 
     private var navigationVisibility: Visibility {
-        viewModel.step == .welcome ? .hidden : .visible
+        showsSetupChrome ? .visible : .hidden
+    }
+
+    /// Welcome and the slogan are full-bleed. Setup steps keep the back button and progress.
+    private var showsSetupChrome: Bool {
+        switch viewModel.step {
+        case .welcome, .slogan: false
+        case .household, .dislikes, .taste, .summary: true
+        }
+    }
+
+    /// Light cream. Dark uses the system background, not a lifted cream card.
+    private var sloganBackground: Color {
+        colorScheme == .dark ? Color(.systemBackground) : Theme.bgCream
+    }
+
+    private var sloganBodyColor: Color {
+        colorScheme == .dark ? .primary : Theme.textCharcoal
     }
 
     /// Shown once, after welcome and before Ev. Copy is locked.
     private var slogan: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.sage.opacity(0.35))
-                        .frame(width: 88, height: 88)
-                    Image(systemName: "fork.knife")
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(Theme.sage.opacity(colorScheme == .dark ? 0.8 : 0.9))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(geo.size.height * 0.28, 88))
+                        .accessibilityHidden(true)
+                    Spacer(minLength: 8)
+                    sloganLine
+                        .padding(.horizontal, 24)
+                    Spacer(minLength: 32)
                 }
-                .accessibilityHidden(true)
-
-                (
-                    Text("Diğer uygulamalar neler pişirebileceğini gösterir. ").foregroundStyle(Theme.textCharcoal)
-                    + Text("MealRoutine").fontWeight(.semibold).foregroundStyle(Theme.accent)
-                    + Text(" ise gerçekten ne pişirmek istediğini öğrenir.").foregroundStyle(Theme.textCharcoal)
-                )
-                .font(.title2)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Diğer uygulamalar neler pişirebileceğini gösterir. MealRoutine ise gerçekten ne pişirmek istediğini öğrenir.")
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.screenPadding)
-            .padding(.top, 36)
-            .padding(.bottom, 24)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .background(Theme.bgCream)
+        .background(sloganBackground.ignoresSafeArea())
+    }
+
+    private var sloganLine: some View {
+        (
+            Text("Diğer uygulamalar neler pişirebileceğini gösterir. ")
+                .font(.title2)
+                .foregroundStyle(sloganBodyColor)
+            + Text("MealRoutine")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            + Text(" ise gerçekten ne pişirmek istediğini öğrenir.")
+                .font(.title2)
+                .foregroundStyle(sloganBodyColor)
+        )
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Diğer uygulamalar neler pişirebileceğini gösterir. MealRoutine ise gerçekten ne pişirmek istediğini öğrenir.")
     }
 
     private var welcome: some View {
@@ -326,8 +354,15 @@ struct OnboardingView: View {
                 .disabled(viewModel.isSaving)
             }
         }
-        .padding(16)
-        .background(.bar)
+        .padding(.horizontal, viewModel.step == .slogan ? 24 : 16)
+        .padding(.vertical, 16)
+        .background {
+            if viewModel.step == .slogan {
+                sloganBackground.ignoresSafeArea(edges: .bottom)
+            } else {
+                Rectangle().fill(.bar)
+            }
+        }
     }
 
     private var progressHeader: some View {
