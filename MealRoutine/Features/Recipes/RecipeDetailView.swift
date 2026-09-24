@@ -24,6 +24,8 @@ struct RecipeDetailView: View {
     @State private var lastWrittenServings: Int?
     @State private var lastWrittenContext: String?
     @State private var isHeroPhotoShown = false
+    /// Cook-along checks. Local to this screen; they are not saved.
+    @State private var checkedIngredientKeys: Set<String> = []
 
     private var recipe: Recipe? {
         recipes.first { $0.slug == route.slug }
@@ -281,6 +283,10 @@ struct RecipeDetailView: View {
         }
     }
 
+    private func ingredientKey(_ line: IngredientLine) -> String {
+        "\(line.sortIndex)|\(line.ingredientId)"
+    }
+
     private func ingredientRow(_ line: IngredientLine, baseServings: Int) -> some View {
         let quantity = PortionScaler.scale(
             quantity: line.quantity,
@@ -288,17 +294,42 @@ struct RecipeDetailView: View {
             baseServings: baseServings,
             householdSize: activeServings
         )
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(line.displayName)
-            Text(QuantityFormat.quantityAndUnit(quantity: quantity, unit: line.unit))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if !line.displayNote.isEmpty {
-                Text(line.displayNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        let key = ingredientKey(line)
+        let isChecked = checkedIngredientKeys.contains(key)
+        let amount = QuantityFormat.quantityAndUnit(quantity: quantity, unit: line.unit)
+        return Button {
+            if isChecked {
+                checkedIngredientKeys.remove(key)
+            } else {
+                checkedIngredientKeys.insert(key)
             }
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isChecked ? Theme.accent : Color.secondary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(line.displayName)
+                        .strikethrough(isChecked)
+                        .foregroundStyle(isChecked ? .secondary : .primary)
+                    Text(amount)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if !line.displayNote.isEmpty {
+                        Text(line.displayNote)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("\(line.displayName), \(amount)")
+        .accessibilityAddTraits(isChecked ? .isSelected : [])
+        .accessibilityHint(isChecked ? "İşareti kaldırır" : "Malzemeyi işaretler")
     }
 
     private func portionFootnote(baseServings: Int) -> String {

@@ -8,8 +8,10 @@ struct WeekMealPresentation: Identifiable, Equatable {
     var dateTitle: String
     var recipeName: String
     var minutes: Int
+    var difficultyTitle: String
     var servings: Int
     var isCooked: Bool
+    var isToday: Bool
     var rating: MealRating?
     var slug: String
 }
@@ -25,6 +27,19 @@ struct WeekSummaryPresentation: Equatable {
 final class ThisWeekViewModel {
     var alertMessage: String?
     var isWorking = false
+
+    /// Today's planned evening, or the next uncooked slot when today is not on the plan.
+    func featuredEvening(in meals: [WeekMealPresentation]) -> WeekMealPresentation? {
+        if let today = meals.first(where: \.isToday) { return today }
+        if let upcoming = meals.first(where: { !$0.isCooked }) { return upcoming }
+        return meals.last
+    }
+
+    func featuredEveningTitle(for meal: WeekMealPresentation) -> String {
+        if meal.isToday { return "Bu akşam" }
+        if meal.isCooked { return "Son akşam" }
+        return "Sıradaki akşam"
+    }
 
     func summary(meals: [WeekMealPresentation]) -> WeekSummaryPresentation {
         WeekSummaryPresentation(
@@ -58,11 +73,13 @@ final class ThisWeekViewModel {
                     dateTitle: WeekCalendar.shortDate(date),
                     recipeName: recipe?.displayName ?? meal.recipeSlug,
                     minutes: recipe?.totalMinutes ?? 0,
+                    difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
                     servings: ActiveServings.resolve(
                         mealServings: meal.servings,
                         householdSize: householdSize
                     ),
                     isCooked: meal.cookedAt != nil,
+                    isToday: WeekCalendar.isSameDay(date, now),
                     rating: ratings[meal.recipeSlug],
                     slug: meal.recipeSlug
                 )
