@@ -127,6 +127,10 @@
 		FAAEADD99759A35A9C873AC6 /* recipes.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = recipes.v1.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000000000000000000001 /* MealRoutine */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MealRoutine; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		A10000000000000000000003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -358,6 +362,7 @@
 				};
 			};
 			buildConfigurationList = A1000000000000000000000E /* Build configuration list for PBXProject "MealRoutine" */;
+			compatibilityVersion = "Xcode 16.0.Superseded.1";
 			developmentRegion = tr;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -367,7 +372,6 @@
 			);
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 70;
 			productRefGroup = A10000000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
