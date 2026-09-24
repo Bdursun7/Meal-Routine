@@ -208,7 +208,7 @@ private struct RecipeListRow: View {
             Button(action: onToggleFavorite) {
                 Image(systemName: isLoved ? "heart.fill" : "heart")
                     .font(.title3)
-                    .foregroundStyle(isLoved ? Theme.sage : Color.secondary)
+                    .foregroundStyle(isLoved ? Theme.accent : Color.secondary)
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.borderless)

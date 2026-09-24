@@ -90,7 +90,7 @@ struct MealReplacementSheet: View {
                 Text(errorMessage ?? "")
             }
         }
-        .tint(Theme.sage)
+        .tint(Theme.accent)
         .mealAppearance()
         .presentationDetents([.medium, .large])
         .presentationBackground(Theme.canvas)
@@ -143,7 +143,7 @@ private struct ReplacementChoiceRow: View {
                 if !choice.reason.isEmpty {
                     Text(choice.reason)
                         .font(.footnote)
-                        .foregroundStyle(Theme.sage)
+                        .foregroundStyle(Theme.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if isPhotoShown {

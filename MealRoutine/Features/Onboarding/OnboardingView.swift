@@ -60,7 +60,7 @@ struct OnboardingView: View {
                 bottomBar
             }
         }
-        .tint(Theme.sage)
+        .tint(Theme.accent)
         .onAppear {
             viewModel.loadChips(from: recipes)
             viewModel.trackStartIfNeeded()
@@ -143,7 +143,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Image(systemName: "fork.knife")
                         .font(.system(size: heroIconSize))
-                        .foregroundStyle(Theme.sage)
+                        .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                     Text("Haftan, önceden planlı.")
                         .font(.largeTitle.bold())
@@ -375,10 +375,10 @@ struct OnboardingView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("\(index)/\(OnboardingStep.progressTotal)")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.sage)
+                .foregroundStyle(Theme.accent)
                 .accessibilityLabel("Adım \(index) / \(OnboardingStep.progressTotal)")
             ProgressView(value: Double(index), total: Double(OnboardingStep.progressTotal))
-                .tint(Theme.sage)
+                .tint(Theme.accent)
                 .accessibilityHidden(true)
         }
     }
@@ -386,7 +386,7 @@ struct OnboardingView: View {
     private func bullet(_ text: String, systemImage: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: systemImage)
-                .foregroundStyle(Theme.sage)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 28)
                 .accessibilityHidden(true)
             Text(text)
@@ -404,7 +404,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
                 .background(isSelected ? Theme.accent : Color(.secondarySystemFill))
-                .foregroundStyle(isSelected ? Theme.onAccent : Color.primary)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -442,7 +442,7 @@ struct OnboardingView: View {
                 .frame(minHeight: 44)
                 .padding(.horizontal, 4)
                 .buttonStyle(.bordered)
-                .tint(isSelected ? Theme.sage : .secondary)
+                .tint(isSelected ? Theme.accent : .secondary)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
@@ -463,7 +463,7 @@ struct OnboardingView: View {
 
             Button("Düzenle", action: edit)
                 .buttonStyle(.bordered)
-                .tint(Theme.sage)
+                .tint(Theme.accent)
                 .frame(minHeight: 44)
                 .accessibilityLabel("\(title), düzenle")
         }

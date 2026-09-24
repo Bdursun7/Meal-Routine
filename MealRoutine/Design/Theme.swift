@@ -1,48 +1,45 @@
 import SwiftUI
 import UIKit
 
-/// Cream ground, muted-green symbols, warm-orange emphasis, dark-green text.
-/// Locked: #F5EEE6, #5D6D55, #E7A966, #343D36.
-/// Dark mode keeps those accents and uses the system background.
+/// Warm terracotta, cream, and sage tokens.
+/// Light values follow the moodboard. Dark values are a lifted cream, not pure black.
+/// Accent stays the existing terracotta in both modes.
 enum Theme {
-    /// Vurgu. #E7A966. Primary button fills, selected chips, and the MealRoutine word.
-    /// Too light for small type on cream; those labels use `sage` or `textCharcoal`.
-    static let accent = Color(uiColor: ui(0xE7A966))
+    /// Existing terracotta, #C4622D. CTA, tab tint, Tonight fill, selected chip.
+    static let accent = Color(red: 0.769, green: 0.384, blue: 0.176)
     static let primary = accent
+    static let onAccent = Color.white
 
-    /// Kontrast on the orange fill. #343D36 in both modes.
-    static let onAccent = Color(uiColor: ui(0x343D36))
-
-    /// Ana zemin. #F5EEE6 in light. System background in dark.
-    static let canvasUIColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? .systemBackground : ui(0xF5EEE6)
-    }
-    static let bgCream = Color(uiColor: canvasUIColor)
+    /// Screen background. #F8F4ED in light.
+    static let bgCream = adaptive(
+        light: ui(0xF8F4ED),
+        dark: ui(0x1C1916)
+    )
     static let canvas = bgCream
     static let cream = bgCream
 
-    /// Same cream in light. Elevated system surface in dark.
-    static let cardUIColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? .secondarySystemBackground : ui(0xF5EEE6)
-    }
-    static let cardSurface = Color(uiColor: cardUIColor)
+    /// Slightly lighter than the cream canvas. #FFFCF7 in light.
+    static let cardSurface = adaptive(
+        light: ui(0xFFFCF7),
+        dark: ui(0x2A2622)
+    )
     static let card = cardSurface
 
-    /// Kontrast. #343D36 in light. System label in dark.
+    /// Title and body. #2C2A26 in light. Not pure black.
     static let textCharcoal = adaptive(
-        light: ui(0x343D36),
-        dark: .label
+        light: ui(0x2C2A26),
+        dark: ui(0xF7F3EC)
     )
     static let ink = textCharcoal
 
-    /// Dark green at 73% on cream, which stays above 4.5:1. System secondary in dark.
+    /// Charcoal at about 55% in light. System secondary in dark so it stays readable.
     static let secondaryText = adaptive(
-        light: ui(0x343D36, alpha: 0.73),
+        light: ui(0x2C2A26, alpha: 0.55),
         dark: .secondaryLabel
     )
 
-    /// Ana sembol. #5D6D55. Icon stroke, selected tab, and progress.
-    static let sage = Color(uiColor: ui(0x5D6D55))
+    /// Success and progress only. #8FA88A. Not a primary color.
+    static let sage = Color(red: 143.0 / 255.0, green: 168.0 / 255.0, blue: 138.0 / 255.0)
 
     /// Soft lift for cards. Light is black at 10%. Dark is heavier so the edge still reads.
     static let cardShadow = adaptive(
@@ -181,7 +178,7 @@ struct FilterChip: View {
     }
 }
 
-/// Four-point muted-green track for cooked and grocery progress. Not a primary control.
+/// Four-point sage track for cooked and grocery progress. Not a primary control.
 struct ThinSageProgress: View {
     var value: Double
     var total: Double
@@ -230,16 +227,16 @@ struct MealCheckBox: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(isChecked ? Theme.sage : Color.clear)
+            .fill(isChecked ? Theme.accent : Color.clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(isChecked ? Theme.sage : Theme.secondaryText.opacity(0.85), lineWidth: 1.5)
+                    .strokeBorder(isChecked ? Theme.accent : Theme.secondaryText.opacity(0.85), lineWidth: 1.5)
             }
             .overlay {
                 if isChecked {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(Theme.onAccent)
                 }
             }
             .frame(width: 26, height: 26)
@@ -269,11 +266,11 @@ struct WarmEmptyState: View {
                     .offset(x: isCompact ? 18 : 30, y: isCompact ? 12 : 20)
                 Image(systemName: symbolName)
                     .font(.system(size: isCompact ? 26 : 36, weight: .semibold))
-                    .foregroundStyle(Theme.sage)
+                    .foregroundStyle(Theme.accent)
                 if let accentSymbolName {
                     Image(systemName: accentSymbolName)
                         .font(.system(size: isCompact ? 14 : 18, weight: .semibold))
-                        .foregroundStyle(Theme.textCharcoal)
+                        .foregroundStyle(Theme.sage)
                         .offset(x: isCompact ? -22 : -34, y: isCompact ? -16 : -26)
                 }
             }

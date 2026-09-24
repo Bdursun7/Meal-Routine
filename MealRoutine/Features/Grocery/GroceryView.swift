@@ -80,10 +80,10 @@ struct GroceryView: View {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "cart.fill")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.sage)
+                    .foregroundStyle(Theme.accent)
                     .frame(width: 44, height: 44)
                     .background(
-                        Theme.sage.opacity(0.12),
+                        Theme.accent.opacity(0.12),
                         in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                     )
                     .accessibilityHidden(true)
@@ -144,11 +144,13 @@ struct GroceryView: View {
     private func aisleHeader(_ section: GrocerySectionPresentation, in list: GroceryListPresentation) -> some View {
         let done = list.checked.filter { $0.category == section.category }.count
         let total = section.rows.count + done
-        let tint = Theme.sage.opacity(0.18)
+        let tint = section.category == .produce || section.category == .protein
+            ? Theme.accent.opacity(0.15)
+            : Theme.sage.opacity(0.22)
         return HStack(alignment: .center, spacing: 12) {
             Image(systemName: section.category.symbolName)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(Theme.sage)
+                .foregroundStyle(section.category == .produce || section.category == .protein ? Theme.accent : Theme.sage)
                 .frame(width: 36, height: 36)
                 .background(tint, in: Circle())
                 .accessibilityHidden(true)
@@ -218,7 +220,7 @@ struct GroceryView: View {
                 if let remaining = row.remainingDetail, !row.isChecked {
                     Text(remaining)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.sage)
+                        .foregroundStyle(Theme.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if row.hasUnitConflict {

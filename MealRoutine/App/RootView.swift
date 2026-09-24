@@ -16,7 +16,7 @@ struct RootView: View {
         Group {
             if isSeeding {
                 ProgressView("Tarifler yükleniyor…")
-                    .tint(Theme.sage)
+                    .tint(Theme.accent)
             } else if let seedError {
                 ContentUnavailableView {
                     Label("Katalog açılamadı", systemImage: "exclamationmark.triangle")
@@ -26,7 +26,8 @@ struct RootView: View {
                     Button("Tekrar dene") {
                         seedAttempt += 1
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
                 }
             } else if didFinishOnboarding {
                 MainTabView()
