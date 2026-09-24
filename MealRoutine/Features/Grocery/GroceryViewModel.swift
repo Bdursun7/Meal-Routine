@@ -6,10 +6,14 @@ struct GroceryRowPresentation: Identifiable, Equatable {
     var id: UUID
     var name: String
     var detail: String
+    var quantity: Double?
+    var unitLabel: String
     var category: GroceryCategory
     var hasUnitConflict: Bool
     var isChecked: Bool
     var isManual: Bool
+
+    var canEditQuantity: Bool { quantity != nil }
 }
 
 struct GrocerySectionPresentation: Identifiable, Equatable {
@@ -37,6 +41,8 @@ final class GroceryViewModel {
     var draftQuantity = ""
     var draftUnit = "piece"
     var errorMessage: String?
+    var editingID: UUID?
+    var editingQuantity = ""
 
     static let manualUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "toTaste"]
 
@@ -69,6 +75,8 @@ final class GroceryViewModel {
                     id: item.uuid,
                     name: item.displayName,
                     detail: QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit),
+                    quantity: item.quantity,
+                    unitLabel: UnitLabels.turkish(item.unit),
                     category: GroceryCategory.classify(ingredientId: item.ingredientId, name: item.displayName),
                     hasUnitConflict: item.hasUnitConflict,
                     isChecked: item.isChecked,
@@ -87,6 +95,31 @@ final class GroceryViewModel {
         do {
             _ = try WeekPlanService.ensureCurrentWeek(in: context)
             try GroceryListService.rebuild(in: context)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func beginQuantityEdit(_ row: GroceryRowPresentation) {
+        guard row.canEditQuantity else { return }
+        editingID = row.id
+        editingQuantity = QuantityFormat.string(row.quantity)
+    }
+
+    func cancelQuantityEdit() {
+        editingID = nil
+        editingQuantity = ""
+    }
+
+    func commitQuantity(in context: ModelContext) {
+        guard let editingID else { return }
+        guard let quantity = GroceryQuantityEdit.parse(editingQuantity) else {
+            errorMessage = "Miktar bir sayı olmalı."
+            return
+        }
+        do {
+            try GroceryListService.updateQuantity(editingID, quantity: quantity, in: context)
+            cancelQuantityEdit()
         } catch {
             errorMessage = error.localizedDescription
         }

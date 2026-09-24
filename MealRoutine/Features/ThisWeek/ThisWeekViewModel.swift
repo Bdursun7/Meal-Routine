@@ -41,6 +41,27 @@ final class ThisWeekViewModel {
         return "Sıradaki akşam"
     }
 
+    func preferenceInsight(
+        recipes: [Recipe],
+        feedback: [RecipeFeedback],
+        now: Date = .now
+    ) -> PreferenceInsight? {
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
+        let proteinBySlug = Dictionary(uniqueKeysWithValues: catalog.map { ($0.slug, $0.protein) })
+        var latest: [String: (date: Date, rating: MealRating)] = [:]
+        for item in feedback {
+            if let existing = latest[item.recipeSlug], existing.date > item.createdAt {
+                continue
+            }
+            latest[item.recipeSlug] = (item.createdAt, item.rating)
+        }
+        let loved = latest.compactMap { slug, value -> LovedMealSample? in
+            guard value.rating == .loved else { return nil }
+            return LovedMealSample(protein: proteinBySlug[slug] ?? "", createdAt: value.date)
+        }
+        return PreferenceInsightBuilder.make(loved: loved, now: now)
+    }
+
     func summary(meals: [WeekMealPresentation]) -> WeekSummaryPresentation {
         WeekSummaryPresentation(
             planned: meals.count,
@@ -112,15 +133,69 @@ final class ThisWeekViewModel {
         }
     }
 
-    func replace(mealID: UUID, in context: ModelContext) {
-        guard !isWorking else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            try WeekPlanService.replaceMeal(uuid: mealID, in: context)
-            try GroceryListService.rebuild(in: context)
-        } catch {
-            alertMessage = error.localizedDescription
+}
+
+struct ReplacementChoicePresentation: Identifiable, Equatable {
+    var slug: String
+    var name: String
+    var minutes: Int
+    var difficultyTitle: String
+    var categoryTitle: String
+    var reason: String
+
+    var id: String { slug }
+}
+
+struct ReplacementBoard: Equatable {
+    var currentName: String
+    var choices: [ReplacementChoicePresentation]
+}
+
+enum ReplacementPresenter {
+    static func board(
+        mealID: UUID,
+        chips: Set<ReplacementChip>,
+        weeks: [PlanWeek],
+        recipes: [Recipe],
+        feedback: [RecipeFeedback],
+        prefs: [UserPrefs],
+        now: Date = .now
+    ) -> ReplacementBoard {
+        let start = WeekCalendar.weekStart(containing: now)
+        guard let week = weeks.first(where: { WeekCalendar.isSameDay($0.weekStart, start) }),
+              let meal = week.meals.first(where: { $0.uuid == mealID }) else {
+            return ReplacementBoard(currentName: "", choices: [])
         }
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let bySlug = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        let currentName = bySlug[meal.recipeSlug]?.displayName ?? meal.recipeSlug
+        guard let current = catalog.first(where: { $0.slug == meal.recipeSlug }) else {
+            return ReplacementBoard(currentName: currentName, choices: [])
+        }
+        let blocked = Set(week.meals.map(\.recipeSlug))
+        let anchors = catalog.filter { blocked.contains($0.slug) }
+        let stored = prefs.min { $0.createdAt < $1.createdAt }
+        let picked = MealReplacement.choices(
+            catalog: catalog,
+            current: current,
+            blockedSlugs: blocked,
+            maxCookMinutes: CookTimeOptions.resolved(stored?.maxCookMinutes ?? CookTimeOptions.defaultMinutes),
+            dislikedIngredientIds: Set(stored?.dislikedIngredientIds ?? []),
+            activeChips: chips,
+            anchors: anchors
+        )
+        let choices = picked.map { choice in
+            let recipe = bySlug[choice.slug]
+            return ReplacementChoicePresentation(
+                slug: choice.slug,
+                name: recipe?.displayName ?? choice.slug,
+                minutes: choice.minutes,
+                difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
+                categoryTitle: CategoryLabel.turkish(recipe?.unitoolsCategory ?? ""),
+                reason: choice.reason
+            )
+        }
+        return ReplacementBoard(currentName: currentName, choices: choices)
     }
 }

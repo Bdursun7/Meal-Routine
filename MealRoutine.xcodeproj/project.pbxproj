@@ -60,6 +60,13 @@
 		BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */; };
 		BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAECC4845BB7251D105C954C /* RecipeRoute.swift */; };
 		BA077293179F729097805D16 /* WeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */; };
+		BA0A11A1A11A11A11A11A001 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A001 /* Analytics.swift */; };
+		BA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift */; };
+		BA0A11A1A11A11A11A11A003 /* MealReplacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A003 /* MealReplacement.swift */; };
+		BA0A11A1A11A11A11A11A004 /* PreferenceInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A004 /* PreferenceInsight.swift */; };
+		BA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */; };
+		BA0A11A1A11A11A11A11A006 /* MealReplacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A006 /* MealReplacementView.swift */; };
+		BA0A11A1A11A11A11A11A007 /* PrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */; };
 		BAA3BC739E766D6D3DF2263E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA9B309E6853B11B906A5077 /* Assets.xcassets */; };
 		BAE79929CB2D00C1135A093F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA4E801F3A031C2E9BA55415 /* PrivacyInfo.xcprivacy */; };
 		BA460A646DD6DDF48F7CA56B /* ingredient-aliases.tr.json in Resources */ = {isa = PBXBuildFile; fileRef = FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */; };
@@ -121,6 +128,13 @@
 		FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryCategory.swift; sourceTree = "<group>"; };
 		FAECC4845BB7251D105C954C /* RecipeRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeRoute.swift; sourceTree = "<group>"; };
 		FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendar.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A001 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeBrowse.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A003 /* MealReplacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealReplacement.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A004 /* PreferenceInsight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferenceInsight.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryQuantityEdit.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A006 /* MealReplacementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealReplacementView.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyView.swift; sourceTree = "<group>"; };
 		FA9B309E6853B11B906A5077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FA4E801F3A031C2E9BA55415 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ingredient-aliases.tr.json"; sourceTree = "<group>"; };
@@ -221,6 +235,7 @@
 			children = (
 				FADD987C968552E5F25E8C68 /* ProfileView.swift */,
 				FA107E944F1DC3099FA8FFD0 /* ProfileViewModel.swift */,
+				FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -241,6 +256,7 @@
 		CA0DD2C1DB7F82D01B0540D5 /* ThisWeek */ = {
 			isa = PBXGroup;
 			children = (
+				FA0A11A1A11A11A11A11A006 /* MealReplacementView.swift */,
 				FA8FE074D8A29C1FEC5071EC /* ThisWeekView.swift */,
 				FA197BDEDFA96DDB7489736E /* ThisWeekViewModel.swift */,
 			);
@@ -277,12 +293,17 @@
 			isa = PBXGroup;
 			children = (
 				CA9F9083EE730028C05A65F8 /* Catalog */,
+				FA0A11A1A11A11A11A11A001 /* Analytics.swift */,
 				FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */,
+				FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */,
 				FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */,
 				FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */,
 				FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */,
 				FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */,
+				FA0A11A1A11A11A11A11A003 /* MealReplacement.swift */,
 				FA623D3EC229E249353BDFE4 /* MealRecommender.swift */,
+				FA0A11A1A11A11A11A11A004 /* PreferenceInsight.swift */,
+				FA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift */,
 				FA1E7DB4EFE162675EF706A8 /* PlanIntegrityService.swift */,
 				FA5E014AE4161C0694D9167D /* PortionSaveService.swift */,
 				FAD8545137AD1A735412E0E2 /* PortionScaler.swift */,
@@ -453,6 +474,13 @@
 				BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */,
 				BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */,
 				BA077293179F729097805D16 /* WeekCalendar.swift in Sources */,
+				BA0A11A1A11A11A11A11A001 /* Analytics.swift in Sources */,
+				BA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift in Sources */,
+				BA0A11A1A11A11A11A11A003 /* MealReplacement.swift in Sources */,
+				BA0A11A1A11A11A11A11A004 /* PreferenceInsight.swift in Sources */,
+				BA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift in Sources */,
+				BA0A11A1A11A11A11A11A006 /* MealReplacementView.swift in Sources */,
+				BA0A11A1A11A11A11A11A007 /* PrivacyView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

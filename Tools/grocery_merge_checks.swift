@@ -327,6 +327,34 @@ private func checkAisles() {
     )
 }
 
+private func checkGroupingAndQuantityEdits() {
+    let rows = [
+        GroceryGroupInput(name: "Tuz", category: .spicesAndSauces, isChecked: false),
+        GroceryGroupInput(name: "Tavuk", category: .protein, isChecked: false),
+        GroceryGroupInput(name: "Domates", category: .produce, isChecked: true),
+        GroceryGroupInput(name: "Süt", category: .dairyAndEggs, isChecked: false),
+        GroceryGroupInput(name: "Un", category: .pantry, isChecked: false),
+        GroceryGroupInput(name: "Su", category: .other, isChecked: true),
+    ]
+    check(
+        GroceryListGrouping.openCategories(in: rows) == [.protein, .dairyAndEggs, .pantry, .spicesAndSauces],
+        "open aisles keep market order and drop checked rows"
+    )
+    check(GroceryQuantityEdit.parse("1,25") == Optional(1.25), "comma decimal")
+    check(GroceryQuantityEdit.parse("2") == Optional(2.0), "whole number")
+    check(GroceryQuantityEdit.parse("  ") == nil, "blank quantity")
+    check(GroceryQuantityEdit.parse("abc") == nil, "non numeric quantity")
+    check(GroceryQuantityEdit.parse("-1") == nil, "negative quantity")
+    check(
+        GroceryQuantityEdit.quantityToStore(planned: 1.25, edited: 2, isCustom: true) == Optional(2.0),
+        "custom amount survives rebuild"
+    )
+    check(
+        GroceryQuantityEdit.quantityToStore(planned: 1.25, edited: 2, isCustom: false) == Optional(1.25),
+        "planned amount stays until the row is edited"
+    )
+}
+
 private func checkEveningLabels() {
     check(EveningCountOptions.values == [1, 2, 3, 4, 5], "evening choices stay 1...5")
     check(EveningCountOptions.label(1) == "1 akşam", "one evening label")
@@ -349,6 +377,7 @@ struct GroceryMergeChecks {
         }
 
         checkAisles()
+        checkGroupingAndQuantityEdits()
         checkEveningLabels()
 
         if failures > 0 {

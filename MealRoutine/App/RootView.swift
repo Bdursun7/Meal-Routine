@@ -38,6 +38,9 @@ struct RootView: View {
         .task(id: seedAttempt) {
             await seedCatalog()
         }
+        .onAppear {
+            Analytics.trackOnce(.appOpened)
+        }
     }
 
     @MainActor

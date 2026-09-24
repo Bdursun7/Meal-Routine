@@ -13,6 +13,8 @@ final class GroceryItem {
     var hasUnitConflict: Bool
     var isChecked: Bool
     var isManual: Bool
+    /// Set when the household edits the amount. Rebuild keeps this quantity and its unit.
+    var quantityIsCustom: Bool = false
     var week: PlanWeek? = nil
 
     init(
@@ -24,7 +26,8 @@ final class GroceryItem {
         unit: String,
         hasUnitConflict: Bool,
         isChecked: Bool = false,
-        isManual: Bool = false
+        isManual: Bool = false,
+        quantityIsCustom: Bool = false
     ) {
         self.uuid = uuid
         self.ingredientId = ingredientId
@@ -35,6 +38,7 @@ final class GroceryItem {
         self.hasUnitConflict = hasUnitConflict
         self.isChecked = isChecked
         self.isManual = isManual
+        self.quantityIsCustom = quantityIsCustom
     }
 
     var displayName: String {

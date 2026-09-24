@@ -84,6 +84,9 @@ enum WeekPlanService {
             meal.week = week
         }
         try context.save()
+        if !slugs.isEmpty {
+            Analytics.track(.planGenerated)
+        }
         return week
     }
 
@@ -116,12 +119,6 @@ enum WeekPlanService {
         excluding.insert(meal.recipeSlug)
 
         let now = Date()
-        let plannedAt = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
-        let outgoing = RecentMealSighting(
-            slug: meal.recipeSlug,
-            at: meal.cookedAt ?? plannedAt,
-            wasCooked: meal.cookedAt != nil
-        )
         let recent = recentSightings(meals: meals, feedback: feedback)
         guard let slug = MealRecommender.pick(
             candidates: candidates,
@@ -136,11 +133,54 @@ enum WeekPlanService {
             throw WeekPlanError.noAlternative
         }
 
-        MealExposureLog.record([outgoing], now: now)
-        meal.recipeSlug = slug
+        try replaceMeal(uuid: uuid, with: slug, in: context)
+    }
+
+    /// Swaps one evening for a chosen slug. Other evenings stay. Grocery rebuild is the caller's job.
+    @MainActor
+    static func replaceMeal(uuid: UUID, with slug: String, in context: ModelContext) throws {
+        guard let prefs = try UserPrefsStore.existing(in: context) else {
+            throw WeekPlanError.missingPreferences
+        }
+        let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
+        guard let meal = meals.first(where: { $0.uuid == uuid }), let week = meal.week else {
+            throw WeekPlanError.noAlternative
+        }
+        let trimmed = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != meal.recipeSlug else {
+            throw WeekPlanError.noAlternative
+        }
+        if week.meals.contains(where: { $0.uuid != meal.uuid && $0.recipeSlug == trimmed }) {
+            throw WeekPlanError.noAlternative
+        }
+
+        let recipes = try context.fetch(FetchDescriptor<Recipe>())
+        guard let recipe = recipes.first(where: { $0.slug == trimmed }) else {
+            throw WeekPlanError.noAlternative
+        }
+        let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        guard let candidate = pickerCandidates(from: [recipe], ratings: ratings).first,
+              MealRecommender.passesFilters(
+                candidate,
+                maxCookMinutes: CookTimeOptions.resolved(prefs.maxCookMinutes),
+                dislikedIngredientIds: Set(prefs.dislikedIngredientIds),
+                blockedSlugs: []
+              ) else {
+            throw WeekPlanError.noAlternative
+        }
+
+        let plannedAt = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
+        let outgoing = RecentMealSighting(
+            slug: meal.recipeSlug,
+            at: meal.cookedAt ?? plannedAt,
+            wasCooked: meal.cookedAt != nil
+        )
+        MealExposureLog.record([outgoing], now: Date())
+        meal.recipeSlug = trimmed
         meal.cookedAt = nil
-        // Değiştir swaps the recipe and keeps this evening's servings.
         try context.save()
+        Analytics.track(.mealReplaced)
     }
 
     @MainActor
@@ -150,6 +190,20 @@ enum WeekPlanService {
         if meal.cookedAt == nil {
             meal.cookedAt = date
             try context.save()
+            Analytics.track(.mealCooked)
+        }
+    }
+
+    /// Loved is the favorite. Clearing it writes a newer Okay rating and does not mark a cook.
+    @MainActor
+    static func setFavorite(slug: String, loved: Bool, in context: ModelContext) throws {
+        let trimmed = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let rating: MealRating = loved ? .loved : .okay
+        try recordFeedback(slug: trimmed, rating: rating, cooked: false, in: context)
+        Analytics.track(.recipeRated)
+        if loved {
+            Analytics.track(.recipeLoved)
         }
     }
 
@@ -174,7 +228,7 @@ enum WeekPlanService {
         )
     }
 
-    private static func pickerCandidates(
+    static func pickerCandidates(
         from recipes: [Recipe],
         ratings: [String: MealRating]
     ) -> [PickerCandidate] {
@@ -198,7 +252,8 @@ enum WeekPlanService {
                 cuisine: recipe.country,
                 category: course,
                 tags: Set(tags),
-                protein: MealRecommender.proteinFamily(in: orderedIds)
+                protein: MealRecommender.proteinFamily(in: orderedIds),
+                diets: Set(recipe.diets.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
             )
         }
     }

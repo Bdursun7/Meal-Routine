@@ -57,7 +57,10 @@ struct OnboardingView: View {
             }
         }
         .tint(Theme.accent)
-        .onAppear { viewModel.loadChips(from: recipes) }
+        .onAppear {
+            viewModel.loadChips(from: recipes)
+            viewModel.trackStartIfNeeded()
+        }
         .onChange(of: recipes.count) { _, _ in
             viewModel.loadChips(from: recipes)
         }

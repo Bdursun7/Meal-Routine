@@ -68,16 +68,23 @@ enum GroceryListService {
             guard let match = byID[update.existingID] else { continue }
             let line = merged[update.mergedIndex]
             let normalizedUnit = GroceryMerger.normalize(line.unit)
+            let nextQuantity = GroceryQuantityEdit.quantityToStore(
+                planned: line.quantity,
+                edited: match.quantity,
+                isCustom: match.quantityIsCustom
+            )
+            let nextUnit = match.quantityIsCustom ? match.unit : normalizedUnit
+            let nextConflict = match.quantityIsCustom ? match.hasUnitConflict : line.hasUnitConflict
             if match.nameTR != line.nameTR
                 || match.nameEN != line.nameEN
-                || match.quantity != line.quantity
-                || match.unit != normalizedUnit
-                || match.hasUnitConflict != line.hasUnitConflict {
+                || match.quantity != nextQuantity
+                || match.unit != nextUnit
+                || match.hasUnitConflict != nextConflict {
                 match.nameTR = line.nameTR
                 match.nameEN = line.nameEN
-                match.quantity = line.quantity
-                match.unit = normalizedUnit
-                match.hasUnitConflict = line.hasUnitConflict
+                match.quantity = nextQuantity
+                match.unit = nextUnit
+                match.hasUnitConflict = nextConflict
                 didChange = true
             }
         }
@@ -114,7 +121,23 @@ enum GroceryListService {
     static func toggle(_ uuid: UUID, in context: ModelContext) throws {
         let items = try context.fetch(FetchDescriptor<GroceryItem>())
         guard let item = items.first(where: { $0.uuid == uuid }) else { return }
+        let wasChecked = item.isChecked
         item.isChecked.toggle()
+        try context.save()
+        guard item.isChecked, !wasChecked else { return }
+        Analytics.track(.groceryItemChecked)
+        if let week = item.week, !week.groceries.isEmpty, week.groceries.allSatisfy(\.isChecked) {
+            Analytics.track(.groceryListCompleted)
+        }
+    }
+
+    /// Writes a new amount and keeps the stored unit, aisle, and checked state.
+    @MainActor
+    static func updateQuantity(_ uuid: UUID, quantity: Double, in context: ModelContext) throws {
+        let items = try context.fetch(FetchDescriptor<GroceryItem>())
+        guard let item = items.first(where: { $0.uuid == uuid }) else { return }
+        item.quantity = quantity
+        item.quantityIsCustom = true
         try context.save()
     }
 

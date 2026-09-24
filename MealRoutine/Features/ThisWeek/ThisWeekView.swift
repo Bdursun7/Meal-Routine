@@ -9,6 +9,7 @@ struct ThisWeekView: View {
     @Query private var feedback: [RecipeFeedback]
     @Query private var prefs: [UserPrefs]
     @State private var viewModel = ThisWeekViewModel()
+    @State private var replacingMeal: ReplacingMeal?
 
     private var householdSize: Int {
         let stored = prefs.min { $0.createdAt < $1.createdAt }?.householdSize ?? 2
@@ -46,6 +47,9 @@ struct ThisWeekView: View {
                             if let featured {
                                 tonightCard(featured)
                             }
+                            if let insight = viewModel.preferenceInsight(recipes: recipes, feedback: feedback) {
+                                insightCard(insight)
+                            }
                             Text("Haftanın akşamları")
                                 .font(.headline)
                                 .padding(.top, 4)
@@ -54,7 +58,7 @@ struct ThisWeekView: View {
                                     meal: meal,
                                     recipe: recipes.first { $0.slug == meal.slug },
                                     isWorking: viewModel.isWorking,
-                                    onReplace: { viewModel.replace(mealID: meal.id, in: modelContext) }
+                                    onReplace: { replacingMeal = ReplacingMeal(id: meal.id) }
                                 )
                             }
                         }
@@ -65,6 +69,9 @@ struct ThisWeekView: View {
             .navigationTitle("Bu Hafta")
             .navigationDestination(for: RecipeRoute.self) { route in
                 RecipeDetailView(route: route)
+            }
+            .sheet(item: $replacingMeal) { meal in
+                MealReplacementSheet(mealID: meal.id)
             }
             .alert(
                 "İşlem tamamlanamadı",
@@ -77,6 +84,7 @@ struct ThisWeekView: View {
         }
         .onAppear {
             viewModel.ensureWeek(in: modelContext)
+            Analytics.track(.planViewed)
         }
     }
 
@@ -111,6 +119,7 @@ struct ThisWeekView: View {
             }
             .buttonStyle(.bordered)
             .tint(Theme.accent)
+            .accessibilityHint("Market sekmesini açar")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -124,27 +133,32 @@ struct ThisWeekView: View {
             ? "\(meal.minutes) dk"
             : "\(meal.minutes) dk · \(meal.difficultyTitle)"
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(viewModel.featuredEveningTitle(for: meal))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
-                Spacer()
-                Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
-                    .font(.caption)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(viewModel.featuredEveningTitle(for: meal))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(meal.recipeName)
+                    .font(.title2.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(meta)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if meal.isCooked {
+                    Label("Pişti", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
             }
-            Text(meal.recipeName)
-                .font(.title2.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            Text(meta)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if meal.isCooked {
-                Label("Pişti", systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-            }
-            HStack(spacing: 8) {
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(viewModel.featuredEveningTitle(for: meal)). \(meal.recipeName). \(meta)")
+
+            AdaptiveActions {
                 NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
                     Text("Tarifi aç")
                         .font(.subheadline.weight(.semibold))
@@ -152,14 +166,19 @@ struct ThisWeekView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
+                .accessibilityLabel("Tarifi aç")
+                .accessibilityHint("\(meal.recipeName) tarifini açar")
+            } second: {
                 Button("Değiştir") {
-                    viewModel.replace(mealID: meal.id, in: modelContext)
+                    replacingMeal = ReplacingMeal(id: meal.id)
                 }
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .buttonStyle(.bordered)
                 .tint(Theme.accent)
                 .disabled(viewModel.isWorking)
+                .accessibilityLabel("Değiştir")
+                .accessibilityHint("Bu akşam için alternatif tarifleri açar")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,6 +188,48 @@ struct ThisWeekView: View {
         .accessibilityElement(children: .contain)
     }
 
+    private func insightCard(_ insight: PreferenceInsight) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(insight.title, systemImage: "sparkles")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            Text(insight.message)
+                .font(.body)
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.cream)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(insight.title). \(insight.message)")
+    }
+
+}
+
+private struct ReplacingMeal: Identifiable {
+    var id: UUID
+}
+
+private struct AdaptiveActions<First: View, Second: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ViewBuilder var first: () -> First
+    @ViewBuilder var second: () -> Second
+
+    var body: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 8) {
+                first()
+                second()
+            }
+        } else {
+            HStack(spacing: 8) {
+                first()
+                second()
+            }
+        }
+    }
 }
 
 private struct WeekMealCard: View {
@@ -235,8 +296,10 @@ private struct WeekMealCard: View {
                 onReplace()
             }
             .font(.subheadline.weight(.semibold))
+            .frame(minHeight: 44)
             .disabled(isWorking)
-            .accessibilityHint("Bu akşamın tarifini başka bir tarifle değiştirir")
+            .accessibilityLabel("Değiştir")
+            .accessibilityHint("Bu akşam için alternatif tarifleri açar")
         }
         .padding(16)
         .background(Color(.secondarySystemBackground))
