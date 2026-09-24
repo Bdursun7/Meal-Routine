@@ -19,7 +19,9 @@ targets:
     platform: iOS
     deploymentTarget: "18.0"
     sources:
+      # Explicit group, not a synchronized folder, so each Swift file is a Compile Sources member.
       - path: MealRoutine
+        type: group
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mealroutine.app
