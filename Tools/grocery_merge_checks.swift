@@ -295,6 +295,46 @@ private func checkCatalog() throws {
     check(shown.contains("1,25") || shown.contains("1.25"), "week line should show 1.25, got \(shown)")
 }
 
+private func checkAisles() {
+    check(GroceryCategory.classify(ingredientId: "chicken", name: "Tavuk") == .protein, "chicken is protein")
+    check(GroceryCategory.classify(ingredientId: "tomato", name: "Domates") == .produce, "tomato is produce")
+    check(GroceryCategory.classify(ingredientId: "eggs", name: "Yumurta") == .dairyAndEggs, "eggs are dairy")
+    check(GroceryCategory.classify(ingredientId: "flour", name: "Un") == .pantry, "flour is pantry")
+    check(GroceryCategory.classify(ingredientId: "salt", name: "Tuz") == .spicesAndSauces, "salt is spice")
+    check(GroceryCategory.classify(ingredientId: "water", name: "Su") == .other, "water is other")
+    check(GroceryCategory.classify(ingredientId: "manual:1", name: "Süt") == .dairyAndEggs, "manual milk")
+    check(GroceryCategory.classify(ingredientId: "manual:2", name: "Bilinmeyen") == .other, "manual unknown")
+    check(GroceryCategory.knownCategory(ingredientId: "black-pepper") == .spicesAndSauces, "hyphenated pepper id")
+
+    let url = URL(fileURLWithPath: "MealRoutine/Recipes/recipes.v1.json")
+    guard let data = try? Data(contentsOf: url),
+          let file = try? JSONDecoder().decode(RecipeCatalogFile.self, from: data) else {
+        check(false, "catalog json should decode for aisle coverage")
+        return
+    }
+    var missing: [String] = []
+    for recipe in file.recipes {
+        for ingredient in recipe.ingredients where GroceryCategory.knownCategory(ingredientId: ingredient.id) == nil {
+            missing.append(ingredient.id)
+        }
+    }
+    check(missing.isEmpty, "catalog ids missing an aisle: \(Set(missing).sorted())")
+    check(
+        GroceryCategory.sectionOrder.map(\.title) == [
+            "Sebze ve meyve", "Protein", "Süt ve yumurta", "Kiler", "Baharat ve soslar", "Diğer"
+        ],
+        "aisle titles"
+    )
+}
+
+private func checkEveningLabels() {
+    check(EveningCountOptions.values == [1, 2, 3, 4, 5], "evening choices stay 1...5")
+    check(EveningCountOptions.label(1) == "1 akşam", "one evening label")
+    check(EveningCountOptions.label(3) == "3 akşam", "three evening label")
+    check(EveningCountOptions.label(5) == "5 akşam", "five evening label")
+    check(!EveningCountOptions.label(4).contains("Evening"), "labels stay Turkish")
+}
+
 @main
 struct GroceryMergeChecks {
     static func main() {
@@ -307,6 +347,9 @@ struct GroceryMergeChecks {
             failures += 1
             fputs("FAIL catalog \(error)\n", stderr)
         }
+
+        checkAisles()
+        checkEveningLabels()
 
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)

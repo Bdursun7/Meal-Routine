@@ -57,6 +57,7 @@
 		BAFFDD22284AE9CCCC936592 /* WeekPlanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2B97BCA1BF25AEC1FBE495 /* WeekPlanService.swift */; };
 		BA0264BF5A4B2A38CA62AE15 /* Attribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC71FE3F8721C3482A26C2A /* Attribution.swift */; };
 		BAB0EBAAEABD42835C266F88 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0639308B58F464227BB3BD /* Formatters.swift */; };
+		BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */; };
 		BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAECC4845BB7251D105C954C /* RecipeRoute.swift */; };
 		BA077293179F729097805D16 /* WeekCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */; };
 		BAA3BC739E766D6D3DF2263E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA9B309E6853B11B906A5077 /* Assets.xcassets */; };
@@ -117,6 +118,7 @@
 		FA2B97BCA1BF25AEC1FBE495 /* WeekPlanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekPlanService.swift; sourceTree = "<group>"; };
 		FAC71FE3F8721C3482A26C2A /* Attribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attribution.swift; sourceTree = "<group>"; };
 		FA0639308B58F464227BB3BD /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
+		FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryCategory.swift; sourceTree = "<group>"; };
 		FAECC4845BB7251D105C954C /* RecipeRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeRoute.swift; sourceTree = "<group>"; };
 		FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekCalendar.swift; sourceTree = "<group>"; };
 		FA9B309E6853B11B906A5077 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -305,6 +307,7 @@
 			children = (
 				FAC71FE3F8721C3482A26C2A /* Attribution.swift */,
 				FA0639308B58F464227BB3BD /* Formatters.swift */,
+				FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */,
 				FAECC4845BB7251D105C954C /* RecipeRoute.swift */,
 				FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */,
 			);
@@ -443,6 +446,7 @@
 				BAFFDD22284AE9CCCC936592 /* WeekPlanService.swift in Sources */,
 				BA0264BF5A4B2A38CA62AE15 /* Attribution.swift in Sources */,
 				BAB0EBAAEABD42835C266F88 /* Formatters.swift in Sources */,
+				BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */,
 				BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */,
 				BA077293179F729097805D16 /* WeekCalendar.swift in Sources */,
 			);

@@ -8,10 +8,10 @@ struct GroceryView: View {
 
     var body: some View {
         @Bindable var viewModel = self.viewModel
-        let rows = viewModel.rows(weeks: weeks)
+        let list = viewModel.presentation(weeks: weeks)
         NavigationStack {
             Group {
-                if rows.isEmpty {
+                if list.isEmpty {
                     ContentUnavailableView {
                         Label("Market listesi boş", systemImage: "cart")
                     } description: {
@@ -25,7 +25,20 @@ struct GroceryView: View {
                     }
                 } else {
                     List {
-                        if viewModel.conflictCount(in: rows) > 0 {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(list.checkedCount)/\(list.totalCount) alındı")
+                                    .font(.headline)
+                                ProgressView(
+                                    value: Double(list.checkedCount),
+                                    total: Double(max(list.totalCount, 1))
+                                )
+                                .tint(Theme.accent)
+                                .accessibilityLabel("\(list.checkedCount) / \(list.totalCount) ürün alındı")
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        if list.conflictCount > 0 {
                             Section {
                                 Label(
                                     "Aynı malzeme uyumsuz birimlerde. Bu satırlar birbirine katılmadı.",
@@ -35,12 +48,24 @@ struct GroceryView: View {
                                 .foregroundStyle(.orange)
                             }
                         }
-                        Section {
-                            ForEach(rows) { row in
-                                groceryRow(row)
+                        ForEach(list.openSections) { section in
+                            Section(section.category.title) {
+                                ForEach(section.rows) { row in
+                                    groceryRow(row)
+                                }
                             }
-                        } footer: {
-                            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir.")
+                        }
+                        if !list.checked.isEmpty {
+                            Section("Alındı") {
+                                ForEach(list.checked) { row in
+                                    groceryRow(row, showsAisle: true)
+                                }
+                            }
+                        }
+                        Section {
+                            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Alınan ürünler listenin altına iner.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .refreshable {
@@ -82,7 +107,7 @@ struct GroceryView: View {
         )
     }
 
-    private func groceryRow(_ row: GroceryRowPresentation) -> some View {
+    private func groceryRow(_ row: GroceryRowPresentation, showsAisle: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Button {
                 viewModel.toggle(row.id, in: modelContext)
@@ -105,6 +130,11 @@ struct GroceryView: View {
                     Text("Birim çakışması")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange)
+                }
+                if showsAisle {
+                    Text(row.category.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 if row.isManual {
                     Text("Elle eklendi")
