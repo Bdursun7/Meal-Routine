@@ -182,7 +182,7 @@ struct RecipeDetailView: View {
     private func content(_ recipe: Recipe) -> some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topTrailing) {
                         RecipePhotoView(
                             urlString: recipe.photoURL,
@@ -192,23 +192,18 @@ struct RecipeDetailView: View {
                             isPhotoShown: $isHeroPhotoShown
                         )
                         favoriteHeart(isLoved: currentRating == .loved)
-                            .padding(8)
+                            .padding(10)
                     }
-                    Text(recipe.displayName)
-                        .font(.title2.bold())
-                        .foregroundStyle(Theme.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
-                        .foregroundStyle(.secondary)
-                    Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    recipeSummaryCard(recipe)
+                        .padding(.horizontal, 12)
+                        .offset(y: -28)
+                        .padding(.bottom, -16)
                 }
-                .padding(.vertical, 4)
-                .listRowBackground(Theme.card)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Theme.bgCream)
                 if let currentRating {
                     currentRatingRow(currentRating)
-                        .listRowBackground(Theme.card)
+                        .listRowBackground(Theme.cardSurface)
                 }
             }
 
@@ -233,7 +228,7 @@ struct RecipeDetailView: View {
                 .accessibilityLabel("Porsiyon \(activeServings) kişi")
                 Text(portionFootnote(baseServings: recipe.baseServings))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
                 Button("Porsiyonu kaydet") {
                     let saved = activeServings
                     let contextID = portionContext.contextID
@@ -272,7 +267,7 @@ struct RecipeDetailView: View {
                         if let minutes = step.minutes {
                             Text("\(minutes) dk")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.secondaryText)
                         }
                     }
                 }
@@ -321,19 +316,19 @@ struct RecipeDetailView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: isChecked ? "checkmark.square.fill" : "square")
                     .font(.title2)
-                    .foregroundStyle(isChecked ? Theme.sage : Color.secondary)
+                    .foregroundStyle(isChecked ? Theme.accent : Theme.secondaryText)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.displayName)
                         .strikethrough(isChecked)
-                        .foregroundStyle(isChecked ? .secondary : .primary)
+                        .foregroundStyle(isChecked ? Theme.secondaryText : Theme.textCharcoal)
                     Text(amount)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                     if !line.displayNote.isEmpty {
                         Text(line.displayNote)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,6 +348,30 @@ struct RecipeDetailView: View {
             ? "Market, Porsiyonu kaydet deyince bu haftanın her akşamıyla birlikte güncellenir."
             : "Market, Porsiyonu kaydet deyince bu akşam için güncellenir. Ev halkı aynı kalır."
         return "\(amounts) \(scope)"
+    }
+
+    private func recipeSummaryCard(_ recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(recipe.displayName)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.textCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                Label("\(recipe.totalMinutes) dk", systemImage: "clock")
+                Label("\(activeServings) kişilik", systemImage: "person.2")
+            }
+            .font(.footnote)
+            .foregroundStyle(Theme.secondaryText)
+            Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.shadow, radius: 12, y: 4)
     }
 
     private func favoriteHeart(isLoved: Bool) -> some View {
@@ -375,7 +394,7 @@ struct RecipeDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Mevcut puan")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
             HStack(spacing: 12) {
                 Label(rating.title, systemImage: rating.systemImage)
                     .font(.body.weight(.semibold))

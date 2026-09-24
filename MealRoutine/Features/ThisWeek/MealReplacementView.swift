@@ -34,19 +34,21 @@ struct MealReplacementSheet: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    FlowLayout(spacing: 8) {
-                        ForEach(ReplacementChip.allCases) { chip in
-                            FilterChip(
-                                title: chip.title,
-                                isSelected: chips.contains(chip),
-                                hint: "Bu akşamın alternatiflerini süzer"
-                            ) {
-                                chips = MealReplacement.toggled(chips, chip)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(ReplacementChip.allCases) { chip in
+                                FilterChip(
+                                    title: chip.title,
+                                    isSelected: chips.contains(chip),
+                                    hint: "Bu akşamın alternatiflerini süzer"
+                                ) {
+                                    chips = MealReplacement.toggled(chips, chip)
+                                }
                             }
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
-                    .listRowBackground(Theme.card)
+                    .listRowBackground(Theme.cardSurface)
                 }
                 if board.choices.isEmpty {
                     Section {
@@ -61,23 +63,7 @@ struct MealReplacementSheet: View {
                             Button {
                                 commit(choice.slug)
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(choice.name)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text(meta(choice))
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text(choice.reason)
-                                        .font(.subheadline)
-                                        .foregroundStyle(Theme.accent)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 4)
+                                ReplacementChoiceRow(choice: choice)
                             }
                             .buttonStyle(.plain)
                             .disabled(isWorking)
@@ -118,13 +104,6 @@ struct MealReplacementSheet: View {
         )
     }
 
-    private func meta(_ choice: ReplacementChoicePresentation) -> String {
-        var parts = ["\(choice.minutes) dk"]
-        if !choice.difficultyTitle.isEmpty { parts.append(choice.difficultyTitle) }
-        if !choice.categoryTitle.isEmpty { parts.append(choice.categoryTitle) }
-        return parts.joined(separator: " · ")
-    }
-
     private func commit(_ slug: String) {
         guard !isWorking else { return }
         isWorking = true
@@ -136,5 +115,46 @@ struct MealReplacementSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct ReplacementChoiceRow: View {
+    var choice: ReplacementChoicePresentation
+    @State private var isPhotoShown = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RecipePhotoView(
+                urlString: choice.photoURL,
+                author: choice.photoAuthor,
+                license: choice.photoLicense,
+                layout: .thumbnail,
+                isPhotoShown: $isPhotoShown
+            )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(choice.name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.textCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label("\(choice.minutes) dk", systemImage: "clock")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                if !choice.reason.isEmpty {
+                    Text(choice.reason)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if isPhotoShown {
+                    RecipePhotoCreditText(
+                        author: choice.photoAuthor,
+                        license: choice.photoLicense,
+                        style: .compact
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 4)
     }
 }

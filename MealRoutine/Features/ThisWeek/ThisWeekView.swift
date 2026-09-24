@@ -123,7 +123,7 @@ struct ThisWeekView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .mealCardSurface()
+        .mealCardSurface(fill: Theme.bgCream)
         .accessibilityElement(children: .contain)
     }
 
@@ -131,17 +131,16 @@ struct ThisWeekView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Haftalık ilerleme")
                 .font(.headline)
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.textCharcoal)
             Text("\(summary.cooked)/\(summary.planned) yemek pişirildi")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.textCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
-            ProgressView(value: Double(summary.cooked), total: Double(max(summary.planned, 1)))
-                .tint(Theme.sage)
+            ThinSageProgress(value: Double(summary.cooked), total: Double(max(summary.planned, 1)))
             if summary.loved > 0 {
                 Text("\(summary.loved) sevildi")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
             }
             Button {
                 selectedTab = .grocery
@@ -163,7 +162,7 @@ struct ThisWeekView: View {
                 .foregroundStyle(Theme.accent)
             Text(insight.message)
                 .font(.body)
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.textCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,14 +213,12 @@ private struct WeekMealCard: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.accent)
                     Text(meal.dateTitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
                 }
                 Spacer()
                 if meal.isCooked {
-                    Label("Pişti", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.sage)
+                    CookedMark()
                 }
             }
 
@@ -236,11 +233,11 @@ private struct WeekMealCard: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text(meal.recipeName)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.primary)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.textCharcoal)
                         Text("\(meal.minutes) dk · \(meal.servings) kişilik")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.secondaryText)
                         if let rating = meal.rating {
                             Label(rating.title, systemImage: rating.systemImage)
                                 .font(.caption)
@@ -263,6 +260,9 @@ private struct WeekMealCard: View {
                 onReplace()
             }
             .font(.subheadline.weight(.semibold))
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
+            .tint(Theme.accent)
             .frame(minHeight: 44)
             .disabled(isWorking)
             .accessibilityLabel("Değiştir")
@@ -303,71 +303,81 @@ private struct WeekProgressRing: View {
     }
 }
 
+private struct CookedMark: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Theme.sage)
+                .accessibilityHidden(true)
+            Text("Pişti")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.textCharcoal)
+        }
+    }
+}
+
 private struct TonightDinnerCard: View {
     var meal: WeekMealPresentation
     var recipe: Recipe?
     var title: String
     var isWorking: Bool
     var onReplace: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isPhotoShown = false
 
-    private var meta: String {
+    private var timeLabel: String {
         meal.difficultyTitle.isEmpty
             ? "\(meal.minutes) dk"
             : "\(meal.minutes) dk · \(meal.difficultyTitle)"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            RecipePhotoView(
-                urlString: recipe?.photoURL ?? "",
-                author: recipe?.photoAuthor ?? "",
-                license: recipe?.photoLicense ?? "",
-                layout: .hero,
-                isPhotoShown: $isPhotoShown
-            )
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                    Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) {
+                    tonightMark
+                    tonightCopy
                 }
-                Text(meal.recipeName)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(meta)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if meal.isCooked {
-                    Label("Pişti", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.sage)
+            } else {
+                HStack(alignment: .center, spacing: 14) {
+                    tonightMark
+                    tonightCopy
                 }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(title). \(meal.recipeName). \(meta)")
+
+            if isPhotoShown {
+                RecipePhotoCreditText(
+                    author: recipe?.photoAuthor ?? "",
+                    license: recipe?.photoLicense ?? "",
+                    style: .compact
+                )
+                .foregroundStyle(Color.white.opacity(0.8))
+            }
 
             AdaptiveActions {
                 NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
                     Text("Tarifi aç")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
                         .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
+                .buttonStyle(.plain)
                 .accessibilityLabel("Tarifi aç")
                 .accessibilityHint("\(meal.recipeName) tarifini açar")
             } second: {
                 Button("Değiştir", action: onReplace)
                     .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.bordered)
-                    .tint(Theme.accent)
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .background(Color.clear)
+                    .buttonStyle(.plain)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5)
+                    }
                     .disabled(isWorking)
                     .accessibilityLabel("Değiştir")
                     .accessibilityHint("Bu akşam için alternatif tarifleri açar")
@@ -375,7 +385,57 @@ private struct TonightDinnerCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .mealCardSurface()
+        .background(Theme.accent)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.shadow, radius: 12, y: 4)
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private var tonightMark: some View {
+        let hasPhoto = RecipePhoto.remoteURL(from: recipe?.photoURL ?? "") != nil
+        if hasPhoto {
+            RecipePhotoView(
+                urlString: recipe?.photoURL ?? "",
+                author: recipe?.photoAuthor ?? "",
+                license: recipe?.photoLicense ?? "",
+                layout: .thumbnail,
+                isPhotoShown: $isPhotoShown
+            )
+        } else {
+            Image(systemName: "fork.knife")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 64, height: 64)
+                .background(Color.white.opacity(0.92))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous))
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var tonightCopy: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.9))
+            Text(meal.recipeName)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.white)
+                .fixedSize(horizontal: false, vertical: true)
+            Label(timeLabel, systemImage: "clock")
+                .font(.footnote)
+                .foregroundStyle(Color.white.opacity(0.9))
+            Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
+                .font(.footnote)
+                .foregroundStyle(Color.white.opacity(0.8))
+            if meal.isCooked {
+                Label("Pişti", systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(meal.recipeName). \(timeLabel)")
     }
 }

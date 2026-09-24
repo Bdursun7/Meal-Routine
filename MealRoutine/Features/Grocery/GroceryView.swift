@@ -28,18 +28,16 @@ struct GroceryView: View {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(list.checkedCount)/\(list.totalCount) alındı")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(Theme.ink)
+                                    .font(.headline)
+                                    .foregroundStyle(Theme.textCharcoal)
                                 Text(progressDetail(list))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.secondaryText)
                                     .fixedSize(horizontal: false, vertical: true)
-                                ProgressView(
+                                ThinSageProgress(
                                     value: Double(list.checkedCount),
                                     total: Double(max(list.totalCount, 1))
                                 )
-                                .tint(Theme.sage)
-                                .accessibilityLabel("\(list.checkedCount) / \(list.totalCount) ürün alındı")
                             }
                             .padding(.vertical, 6)
                             .listRowBackground(Theme.card)
@@ -55,11 +53,13 @@ struct GroceryView: View {
                             }
                         }
                         ForEach(list.openSections) { section in
-                            Section(section.category.title) {
+                            Section {
                                 ForEach(section.rows) { row in
                                     groceryRow(row)
-                                        .listRowBackground(Theme.card)
+                                        .listRowBackground(Theme.cardSurface)
                                 }
+                            } header: {
+                                aisleHeader(section, in: list)
                             }
                         }
                         if !list.checked.isEmpty {
@@ -108,6 +108,24 @@ struct GroceryView: View {
         }
     }
 
+    private func aisleHeader(_ section: GrocerySectionPresentation, in list: GroceryListPresentation) -> some View {
+        let done = list.checked.filter { $0.category == section.category }.count
+        let total = section.rows.count + done
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(section.category.title, systemImage: section.category.symbolName)
+                .font(.headline)
+                .foregroundStyle(Theme.textCharcoal)
+            ThinSageProgress(value: Double(done), total: Double(max(total, 1)))
+            Text("\(done)/\(total)")
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+        }
+        .textCase(nil)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(section.category.title). \(done) / \(total) alındı")
+    }
+
     private func progressDetail(_ list: GroceryListPresentation) -> String {
         let remaining = list.totalCount - list.checkedCount
         if remaining == 0 { return "Liste tamam" }
@@ -131,7 +149,7 @@ struct GroceryView: View {
             } label: {
                 Image(systemName: row.isChecked ? "checkmark.square.fill" : "square")
                     .font(.title2)
-                    .foregroundStyle(row.isChecked ? Theme.sage : Color.secondary)
+                    .foregroundStyle(row.isChecked ? Theme.accent : Theme.secondaryText)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityHidden(true)
             }

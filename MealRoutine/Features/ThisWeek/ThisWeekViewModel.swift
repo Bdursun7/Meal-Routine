@@ -142,6 +142,9 @@ struct ReplacementChoicePresentation: Identifiable, Equatable {
     var difficultyTitle: String
     var categoryTitle: String
     var reason: String
+    var photoURL: String
+    var photoAuthor: String
+    var photoLicense: String
 
     var id: String { slug }
 }
@@ -193,7 +196,10 @@ enum ReplacementPresenter {
                 minutes: choice.minutes,
                 difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
                 categoryTitle: CategoryLabel.turkish(recipe?.unitoolsCategory ?? ""),
-                reason: choice.reason
+                reason: choice.reason,
+                photoURL: recipe?.photoURL ?? "",
+                photoAuthor: recipe?.photoAuthor ?? "",
+                photoLicense: recipe?.photoLicense ?? ""
             )
         }
         return ReplacementBoard(currentName: currentName, choices: choices)
