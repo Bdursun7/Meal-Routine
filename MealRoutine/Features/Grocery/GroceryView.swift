@@ -11,98 +11,44 @@ struct GroceryView: View {
         let fullList = viewModel.presentation(weeks: weeks)
         let list = viewModel.applyingSearch(to: fullList)
         NavigationStack {
-            Group {
+            List {
                 if fullList.isEmpty {
-                    WarmEmptyState(
-                        title: "Market henüz dolmadı",
-                        message: "Haftanın yemekleri hazır olunca malzemeler burada, reyona göre toplanır.",
-                        symbolName: "cart",
-                        accentSymbolName: "leaf.fill",
-                        actionTitle: "Listeyi oluştur",
-                        action: { viewModel.rebuild(in: modelContext) }
-                    )
+                    Section {
+                        WarmEmptyState(
+                            title: "Market henüz dolmadı",
+                            message: "Haftanın yemekleri hazır olunca malzemeler burada, reyona göre toplanır.",
+                            symbolName: "cart",
+                            accentSymbolName: "leaf.fill",
+                            actionTitle: "Listeyi oluştur",
+                            action: { viewModel.rebuild(in: modelContext) }
+                        )
+                        .listRowBackground(Theme.bgCream)
+                    }
                 } else if list.isEmpty {
-                    WarmEmptyState(
-                        title: "Sonuç yok",
-                        message: "Bu aramayla eşleşen malzeme yok.",
-                        symbolName: "magnifyingglass",
-                        accentSymbolName: "cart",
-                        isCompact: true
-                    )
+                    Section {
+                        WarmEmptyState(
+                            title: "Sonuç yok",
+                            message: "Bu aramayla eşleşen malzeme yok.",
+                            symbolName: "magnifyingglass",
+                            accentSymbolName: "cart",
+                            isCompact: true
+                        )
+                        .listRowBackground(Theme.bgCream)
+                    }
                 } else {
-                    List {
-                        Section {
-                            HStack(alignment: .center, spacing: 12) {
-                                Image(systemName: "cart.fill")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Theme.accent)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        Theme.accent.opacity(0.12),
-                                        in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-                                    )
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("\(list.checkedCount)/\(list.totalCount) alındı")
-                                        .font(.headline)
-                                        .foregroundStyle(Theme.textCharcoal)
-                                    Text(progressDetail(list))
-                                        .font(.footnote)
-                                        .foregroundStyle(Theme.secondaryText)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    ThinSageProgress(
-                                        value: Double(list.checkedCount),
-                                        total: Double(max(list.totalCount, 1))
-                                    )
-                                }
-                            }
-                            .padding(.vertical, 6)
-                            .listRowBackground(Theme.card)
-                        }
-                        if list.conflictCount > 0 {
-                            Section {
-                                Label(
-                                    "Aynı malzeme uyumsuz birimlerde. Bu satırlar birbirine katılmadı.",
-                                    systemImage: "exclamationmark.triangle"
-                                )
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
-                            }
-                        }
-                        ForEach(list.openSections) { section in
-                            Section {
-                                aisleHeader(section, in: list)
-                                    .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 6, trailing: 16))
-                                    .listRowBackground(Theme.bgCream)
-                                    .listRowSeparator(.hidden)
-                                ForEach(section.rows) { row in
-                                    groceryRow(row)
-                                        .listRowBackground(Theme.cardSurface)
-                                }
-                            }
-                        }
-                        if !list.checked.isEmpty {
-                            Section("Alındı") {
-                                ForEach(list.checked) { row in
-                                    groceryRow(row, showsAisle: true)
-                                        .listRowBackground(Theme.card)
-                                }
-                            }
-                        }
-                        Section {
-                            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Alınan ürünler listenin altına iner.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .refreshable {
-                        viewModel.rebuild(in: modelContext)
-                    }
-                    .mealCanvas()
+                    marketSections(list)
                 }
             }
+            .refreshable {
+                viewModel.rebuild(in: modelContext)
+            }
+            .mealCanvas()
             .navigationTitle("Market")
-            .searchable(text: $viewModel.searchText, prompt: "Malzeme ara")
+            .searchable(
+                text: $viewModel.searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Malzeme ara"
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -125,6 +71,73 @@ struct GroceryView: View {
         .onAppear {
             viewModel.rebuild(in: modelContext)
             Analytics.track(.groceryOpened)
+        }
+    }
+
+    @ViewBuilder
+    private func marketSections(_ list: GroceryListPresentation) -> some View {
+        Section {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "cart.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Theme.accent.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(list.checkedCount)/\(list.totalCount) alındı")
+                        .font(.headline)
+                        .foregroundStyle(Theme.textCharcoal)
+                    Text(progressDetail(list))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ThinSageProgress(
+                        value: Double(list.checkedCount),
+                        total: Double(max(list.totalCount, 1))
+                    )
+                }
+            }
+            .padding(.vertical, 6)
+            .listRowBackground(Theme.card)
+        }
+        if list.conflictCount > 0 {
+            Section {
+                Label(
+                    "Aynı malzeme uyumsuz birimlerde. Bu satırlar birbirine katılmadı.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.orange)
+            }
+        }
+        ForEach(list.openSections) { section in
+            Section {
+                aisleHeader(section, in: list)
+                    .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 6, trailing: 16))
+                    .listRowBackground(Theme.bgCream)
+                    .listRowSeparator(.hidden)
+                ForEach(section.rows) { row in
+                    groceryRow(row)
+                        .listRowBackground(Theme.cardSurface)
+                }
+            }
+        }
+        if !list.checked.isEmpty {
+            Section("Alındı") {
+                ForEach(list.checked) { row in
+                    groceryRow(row, showsAisle: true)
+                        .listRowBackground(Theme.card)
+                }
+            }
+        }
+        Section {
+            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Alınan ürünler listenin altına iner.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 

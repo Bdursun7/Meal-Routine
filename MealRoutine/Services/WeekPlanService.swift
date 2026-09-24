@@ -57,7 +57,22 @@ enum WeekPlanService {
         if let existing = try currentWeek(in: context, now: now) {
             // Capture the outgoing plan before the week row (and its meals) is deleted.
             MealExposureLog.record(exposureSightings(in: existing), now: now)
+            let retiredMealIDs = Set(existing.meals.map(\.uuid))
+            let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+            for check in checks {
+                guard let mealUUID = check.mealUUID, retiredMealIDs.contains(mealUUID) else { continue }
+                context.delete(check)
+            }
+            for meal in existing.meals {
+                context.delete(meal)
+            }
+            for item in existing.groceries {
+                context.delete(item)
+            }
             context.delete(existing)
+            // Commit the delete before inserting the new week. One transaction can
+            // leave the old cooked meals attached to the replacement week.
+            try context.save()
         }
         let slugs = MealRecommender.pick(
             candidates: candidates,
@@ -78,9 +93,11 @@ enum WeekPlanService {
             let meal = PlannedMeal(
                 dayOffset: offset,
                 recipeSlug: slug,
-                servings: request.householdSize
+                servings: request.householdSize,
+                cookedAt: nil
             )
             context.insert(meal)
+            meal.cookedAt = nil
             meal.week = week
         }
         try context.save()

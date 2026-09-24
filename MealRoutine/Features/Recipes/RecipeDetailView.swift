@@ -17,6 +17,8 @@ struct RecipeDetailView: View {
     @Query private var ingredientChecks: [IngredientCheck]
 
     let route: RecipeRoute
+    /// Only Bu Hafta passes true. Tarifler and Profil leave this false, so the cook bar is never built.
+    var allowsCookBar = false
     @State private var viewModel = RecipeDetailViewModel()
     /// Unsaved stepper value. Nil follows the stored count for this context.
     @State private var portionDraft: Int?
@@ -204,9 +206,19 @@ struct RecipeDetailView: View {
         )
     }
 
-    /// Cook belongs to a planned evening. Tarifler and Profil open the catalog without this bar.
+    /// The evening opened from Bu Hafta, and only if it still belongs to this week.
+    /// A previous week's cooked copy of the same recipe does not count.
+    private var currentWeekCookMeal: PlannedMeal? {
+        guard allowsCookBar, let mealUUID = route.plannedMealUUID else { return nil }
+        let start = WeekCalendar.weekStart(containing: .now)
+        return plannedMeals.first { meal in
+            meal.uuid == mealUUID
+                && meal.week.map { WeekCalendar.isSameDay($0.weekStart, start) } == true
+        }
+    }
+
     private var showsCookAction: Bool {
-        route.plannedMealUUID != nil
+        currentWeekCookMeal != nil
     }
 
     @ViewBuilder
@@ -358,7 +370,7 @@ struct RecipeDetailView: View {
             }
             let cooked = isCurrentMealCooked
             Button(cooked ? "Pişirildi" : "Bunu pişirdim") {
-                viewModel.markCooked(plannedMealUUID: cookTarget?.uuid ?? route.plannedMealUUID)
+                viewModel.markCooked(plannedMealUUID: currentWeekCookMeal?.uuid)
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(cooked || viewModel.isShowingRatingPrompt)
@@ -392,7 +404,7 @@ struct RecipeDetailView: View {
     }
 
     private var isCurrentMealCooked: Bool {
-        cookTarget?.cookedAt != nil
+        currentWeekCookMeal?.cookedAt != nil
     }
 
     private func storedCheck(for line: IngredientLine) -> IngredientCheck? {

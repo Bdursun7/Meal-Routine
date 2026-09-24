@@ -84,7 +84,7 @@ struct ThisWeekView: View {
             .navigationTitle("Bu Hafta")
             .background(Theme.canvas)
             .navigationDestination(for: RecipeRoute.self) { route in
-                RecipeDetailView(route: route)
+                RecipeDetailView(route: route, allowsCookBar: true)
             }
             .sheet(item: $replacingMeal) { meal in
                 MealReplacementSheet(mealID: meal.id)

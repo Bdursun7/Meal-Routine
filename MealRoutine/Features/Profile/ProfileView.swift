@@ -258,7 +258,7 @@ private struct CookingHistoryView: View {
             } else {
                 List(rows, id: \.uuid) { item in
                     NavigationLink {
-                        RecipeDetailView(route: RecipeRoute(slug: item.recipeSlug))
+                        RecipeDetailView(route: RecipeRoute(slug: item.recipeSlug), allowsCookBar: false)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(recipeName(item.recipeSlug))
@@ -314,7 +314,7 @@ private struct RatedRecipesView: View {
             } else {
                 List(slugs, id: \.self) { slug in
                     NavigationLink {
-                        RecipeDetailView(route: RecipeRoute(slug: slug))
+                        RecipeDetailView(route: RecipeRoute(slug: slug), allowsCookBar: false)
                     } label: {
                         Label(recipeName(slug), systemImage: kind.systemImage)
                     }

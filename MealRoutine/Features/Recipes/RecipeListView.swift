@@ -54,13 +54,17 @@ struct RecipeListView: View {
                         }
                     }
                     .mealCanvas()
+                    .searchable(
+                        text: $viewModel.searchText,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Tarif ara"
+                    )
                 }
             }
             .navigationTitle("Tarifler")
             .navigationDestination(for: RecipeRoute.self) { route in
-                RecipeDetailView(route: route)
+                RecipeDetailView(route: route, allowsCookBar: false)
             }
-            .searchable(text: $viewModel.searchText, prompt: "Tarif ara")
             .alert("Kaydedilemedi", isPresented: alertIsPresented) {
                 Button("Tamam", role: .cancel) {}
             } message: {
