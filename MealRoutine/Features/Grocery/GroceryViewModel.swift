@@ -12,6 +12,8 @@ struct GroceryRowPresentation: Identifiable, Equatable {
     var hasUnitConflict: Bool
     var isChecked: Bool
     var isManual: Bool
+    /// Spoken and shown when only part of the merged amount is still needed.
+    var remainingDetail: String?
 
     var canEditQuantity: Bool { quantity != nil }
 }
@@ -80,7 +82,10 @@ final class GroceryViewModel {
                     category: GroceryCategory.classify(ingredientId: item.ingredientId, name: item.displayName),
                     hasUnitConflict: item.hasUnitConflict,
                     isChecked: item.isChecked,
-                    isManual: item.isManual
+                    isManual: item.isManual,
+                    remainingDetail: item.uncoveredQuantity.map { remaining in
+                        "\(QuantityFormat.quantityAndUnit(quantity: remaining, unit: item.unit)) kaldı"
+                    }
                 )
             }
             .sorted { lhs, rhs in

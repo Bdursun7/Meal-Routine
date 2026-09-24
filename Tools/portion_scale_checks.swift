@@ -296,6 +296,139 @@ private func checkQuantityChangeClearsCheck() {
     check(tastePlan.updates.first?.isChecked == true, "unchanged to-taste row stays checked")
 }
 
+private func tomatoCheck(
+    meal: UUID,
+    slug: String,
+    sort: Int,
+    checked: Bool,
+    quantity: Double
+) -> IngredientCheckRecord {
+    IngredientCheckRecord(
+        mealUUID: meal,
+        recipeSlug: slug,
+        ingredientId: "tomato",
+        sortIndex: sort,
+        isChecked: checked,
+        coveredQuantity: quantity,
+        unit: "piece"
+    )
+}
+
+private func tomatoContribution(meal: UUID, slug: String, sort: Int, quantity: Double) -> GroceryContribution {
+    GroceryContribution(
+        mealUUID: meal,
+        recipeSlug: slug,
+        sortIndex: sort,
+        ingredientId: "tomato",
+        quantity: quantity,
+        unit: "piece"
+    )
+}
+
+private func checkIngredientCoverage() {
+    let mealA = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
+    let mealB = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
+    let checkedThree = tomatoCheck(meal: mealA, slug: "recipe-a", sort: 0, checked: true, quantity: 3)
+    let openTwo = tomatoCheck(meal: mealB, slug: "recipe-b", sort: 1, checked: false, quantity: 2)
+    let contributions = [
+        tomatoContribution(meal: mealA, slug: "recipe-a", sort: 0, quantity: 3),
+        tomatoContribution(meal: mealB, slug: "recipe-b", sort: 1, quantity: 2),
+    ]
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let decoder = JSONDecoder()
+    let payload = try? encoder.encode(checkedThree)
+    let restored = payload.flatMap { try? decoder.decode(IngredientCheckRecord.self, from: $0) }
+    check(restored == checkedThree, "ingredient check survives a JSON round trip")
+
+    check(
+        GroceryCoverage.stillCovers(
+            isChecked: true,
+            coveredQuantity: 3,
+            coveredUnit: "piece",
+            quantity: 5,
+            unit: "piece"
+        ) == false,
+        "a check stored at 3 does not cover a line that scaled to 5"
+    )
+    check(
+        GroceryCoverage.stillCovers(
+            isChecked: true,
+            coveredQuantity: 3,
+            coveredUnit: "adet",
+            quantity: 3,
+            unit: "piece"
+        ),
+        "3 adet still covers 3 piece"
+    )
+
+    let partial = GroceryCoverage.outcome(
+        requiredQuantity: 5,
+        requiredUnit: "piece",
+        contributions: contributions,
+        checks: [checkedThree, openTwo]
+    )
+    let partialResolved = GroceryCoverage.resolved(legacyKeepsCheck: true, outcome: partial)
+    check(partial.hasCoverage, "recipe checks count toward the merged tomato row")
+    check(partial.isFullyChecked == false, "3 of 5 tomatoes is not a fully checked grocery row")
+    close(partial.remainingQuantity, 2, "3 checked + 2 open leaves 2 tomatoes")
+    check(partialResolved.isChecked == false, "partial coverage leaves the grocery row unchecked")
+    close(partialResolved.uncoveredQuantity, 2, "grocery remainder is the uncovered 2")
+
+    let both = GroceryCoverage.outcome(
+        requiredQuantity: 5,
+        requiredUnit: "piece",
+        contributions: contributions,
+        checks: [
+            checkedThree,
+            tomatoCheck(meal: mealB, slug: "recipe-b", sort: 1, checked: true, quantity: 2),
+        ]
+    )
+    let bothResolved = GroceryCoverage.resolved(legacyKeepsCheck: false, outcome: both)
+    check(both.isFullyChecked, "both recipes checked covers all 5 tomatoes")
+    check(both.remainingQuantity == nil, "a fully covered row has no remainder")
+    check(bothResolved.isChecked && bothResolved.uncoveredQuantity == nil, "grocery row is fully checked")
+
+    let drifted = tomatoCheck(meal: mealA, slug: "recipe-a", sort: 0, checked: true, quantity: 3)
+    let driftedOutcome = GroceryCoverage.outcome(
+        requiredQuantity: 7,
+        requiredUnit: "piece",
+        contributions: [
+            tomatoContribution(meal: mealA, slug: "recipe-a", sort: 0, quantity: 5),
+            tomatoContribution(meal: mealB, slug: "recipe-b", sort: 1, quantity: 2),
+        ],
+        checks: [drifted, openTwo]
+    )
+    check(driftedOutcome.didCoverSome == false, "a stale 3-piece check does not cover the new 5")
+    check(driftedOutcome.isFullyChecked == false, "a drifted check does not check the grocery row")
+    let driftedResolved = GroceryCoverage.resolved(legacyKeepsCheck: true, outcome: driftedOutcome)
+    check(
+        driftedResolved.isChecked == false && driftedResolved.uncoveredQuantity == nil,
+        "a drifted check clears the grocery check instead of keeping the old one"
+    )
+
+    let custom = GroceryCoverage.outcome(
+        requiredQuantity: 3,
+        requiredUnit: "piece",
+        contributions: contributions,
+        checks: [
+            checkedThree,
+            tomatoCheck(meal: mealB, slug: "recipe-b", sort: 1, checked: true, quantity: 2),
+        ]
+    )
+    check(custom.isFullyChecked, "checks that exceed a custom quantity of 3 still cover it")
+
+    let untouched = GroceryCoverage.outcome(
+        requiredQuantity: 5,
+        requiredUnit: "piece",
+        contributions: contributions,
+        checks: []
+    )
+    let kept = GroceryCoverage.resolved(legacyKeepsCheck: true, outcome: untouched)
+    check(untouched.hasCoverage == false && kept.isChecked && kept.uncoveredQuantity == nil, "no recipe checks keep a manual grocery check")
+}
+
 @main
 struct PortionScaleChecks {
     static func main() {
@@ -304,6 +437,7 @@ struct PortionScaleChecks {
         checkPerMealGrocerySum()
         checkReconcileKeepsChecks()
         checkQuantityChangeClearsCheck()
+        checkIngredientCoverage()
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)
             exit(1)

@@ -98,6 +98,33 @@ final class RecipeDetailViewModel {
         savedNotice = nil
     }
 
+    /// Saves one ingredient check for this recipe or planned evening, then refreshes Market.
+    func setIngredientChecked(
+        isChecked: Bool,
+        mealUUID: UUID?,
+        recipeSlug: String,
+        ingredientId: String,
+        sortIndex: Int,
+        quantity: Double?,
+        unit: String,
+        in context: ModelContext
+    ) {
+        do {
+            try GroceryListService.setIngredientCheck(
+                mealUUID: mealUUID,
+                recipeSlug: recipeSlug,
+                ingredientId: ingredientId,
+                sortIndex: sortIndex,
+                isChecked: isChecked,
+                quantity: quantity,
+                unit: unit,
+                in: context
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     /// Persists the stepper count for this screen.
     /// A planned evening overrides only that meal. Otherwise the household default
     /// is locked and copied onto every evening of the open week.

@@ -12,32 +12,40 @@ struct GroceryView: View {
         NavigationStack {
             Group {
                 if list.isEmpty {
-                    ContentUnavailableView {
-                        Label("Market listesi boş", systemImage: "cart")
-                    } description: {
-                        Text("Bu haftanın yemeklerinden malzeme çıkmadı.")
-                    } actions: {
-                        Button("Listeyi oluştur") {
-                            viewModel.rebuild(in: modelContext)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                    }
+                    WarmEmptyState(
+                        title: "Market henüz dolmadı",
+                        message: "Haftanın yemekleri hazır olunca malzemeler burada, reyona göre toplanır.",
+                        symbolName: "cart",
+                        accentSymbolName: "leaf.fill",
+                        actionTitle: "Listeyi oluştur",
+                        action: { viewModel.rebuild(in: modelContext) }
+                    )
                 } else {
                     List {
                         Section {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(list.checkedCount)/\(list.totalCount) alındı")
-                                    .font(.headline)
-                                    .foregroundStyle(Theme.textCharcoal)
-                                Text(progressDetail(list))
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.secondaryText)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                ThinSageProgress(
-                                    value: Double(list.checkedCount),
-                                    total: Double(max(list.totalCount, 1))
-                                )
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "cart.fill")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        Theme.accent.opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                                    )
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("\(list.checkedCount)/\(list.totalCount) alındı")
+                                        .font(.headline)
+                                        .foregroundStyle(Theme.textCharcoal)
+                                    Text(progressDetail(list))
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.secondaryText)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    ThinSageProgress(
+                                        value: Double(list.checkedCount),
+                                        total: Double(max(list.totalCount, 1))
+                                    )
+                                }
                             }
                             .padding(.vertical, 6)
                             .listRowBackground(Theme.card)
@@ -111,19 +119,42 @@ struct GroceryView: View {
     private func aisleHeader(_ section: GrocerySectionPresentation, in list: GroceryListPresentation) -> some View {
         let done = list.checked.filter { $0.category == section.category }.count
         let total = section.rows.count + done
-        return VStack(alignment: .leading, spacing: 6) {
-            Label(section.category.title, systemImage: section.category.symbolName)
-                .font(.headline)
-                .foregroundStyle(Theme.textCharcoal)
-            ThinSageProgress(value: Double(done), total: Double(max(total, 1)))
-            Text("\(done)/\(total)")
-                .font(.footnote)
-                .foregroundStyle(Theme.secondaryText)
+        return HStack(alignment: .center, spacing: 10) {
+            Image(systemName: section.category.symbolName)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.sage)
+                .frame(width: 36, height: 36)
+                .background(
+                    Theme.sage.opacity(0.2),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(section.category.title)
+                        .font(.headline)
+                        .foregroundStyle(Theme.textCharcoal)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Text("\(done)/\(total)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                ThinSageProgress(value: Double(done), total: Double(max(total, 1)))
+            }
         }
         .textCase(nil)
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(section.category.title). \(done) / \(total) alındı")
+    }
+
+    private func groceryAccessibilityLabel(_ row: GroceryRowPresentation) -> String {
+        if row.isChecked { return "\(row.name) alındı" }
+        if let remaining = row.remainingDetail {
+            return "\(row.name), \(remaining)"
+        }
+        return "\(row.name) alınacak"
     }
 
     private func progressDetail(_ list: GroceryListPresentation) -> String {
@@ -154,7 +185,7 @@ struct GroceryView: View {
                     .accessibilityHidden(true)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(row.isChecked ? "\(row.name) alındı" : "\(row.name) alınacak")
+            .accessibilityLabel(groceryAccessibilityLabel(row))
             .accessibilityHint(row.isChecked ? "İşareti kaldırır" : "Alındı olarak işaretler")
 
             VStack(alignment: .leading, spacing: 2) {
@@ -163,6 +194,12 @@ struct GroceryView: View {
                     .foregroundStyle(row.isChecked ? .secondary : .primary)
                     .fixedSize(horizontal: false, vertical: true)
                 GroceryQuantityControl(row: row, viewModel: viewModel)
+                if let remaining = row.remainingDetail, !row.isChecked {
+                    Text(remaining)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if row.hasUnitConflict {
                     Text("Birim çakışması")
                         .font(.caption.weight(.semibold))

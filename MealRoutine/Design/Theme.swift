@@ -138,6 +138,7 @@ struct FilterChip: View {
                 .background(isSelected ? Theme.accent : Theme.cardSurface)
                 .foregroundStyle(isSelected ? Theme.onAccent : Theme.textCharcoal)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous))
+                .shadow(color: isSelected ? Theme.accent.opacity(0.22) : Color.clear, radius: 6, y: 2)
                 .overlay {
                     RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                         .strokeBorder(
@@ -185,9 +186,69 @@ struct PrimaryButtonStyle: ButtonStyle {
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.vertical, 14)
-            .background(Theme.accent.opacity(configuration.isPressed ? 0.82 : 1))
-            .foregroundStyle(Theme.onAccent)
+            .background(
+                isEnabled
+                    ? Theme.accent.opacity(configuration.isPressed ? 0.82 : 1)
+                    : Theme.textCharcoal.opacity(0.28)
+            )
+            .foregroundStyle(Theme.onAccent.opacity(isEnabled ? 1 : 0.85))
             .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
-            .opacity(isEnabled ? 1 : 0.45)
+    }
+}
+
+/// Illustrated empty state. Symbols stay in SF Symbols; copy stays Turkish.
+struct WarmEmptyState: View {
+    var title: String
+    var message: String
+    var symbolName: String
+    var accentSymbolName: String?
+    var actionTitle: String?
+    var action: (() -> Void)?
+    var isCompact = false
+
+    var body: some View {
+        VStack(spacing: isCompact ? 10 : 16) {
+            ZStack {
+                Circle()
+                    .fill(Theme.accent.opacity(0.12))
+                    .frame(width: isCompact ? 72 : 112, height: isCompact ? 72 : 112)
+                Circle()
+                    .fill(Theme.sage.opacity(0.32))
+                    .frame(width: isCompact ? 40 : 68, height: isCompact ? 40 : 68)
+                    .offset(x: isCompact ? 18 : 30, y: isCompact ? 12 : 20)
+                Image(systemName: symbolName)
+                    .font(.system(size: isCompact ? 26 : 36, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                if let accentSymbolName {
+                    Image(systemName: accentSymbolName)
+                        .font(.system(size: isCompact ? 14 : 18, weight: .semibold))
+                        .foregroundStyle(Theme.sage)
+                        .offset(x: isCompact ? -22 : -34, y: isCompact ? -16 : -26)
+                }
+            }
+            .accessibilityHidden(true)
+            Text(title)
+                .font(isCompact ? .headline : .title3.weight(.semibold))
+                .foregroundStyle(Theme.textCharcoal)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(message)
+                .font(isCompact ? .subheadline : .body)
+                .foregroundStyle(Theme.secondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+            }
+        }
+        .padding(isCompact ? 8 : 28)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: isCompact ? Optional<CGFloat>.none : Optional<CGFloat>.some(.infinity)
+        )
+        .background(isCompact ? Color.clear : Theme.bgCream)
+        .accessibilityElement(children: .contain)
     }
 }

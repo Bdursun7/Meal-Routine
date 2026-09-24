@@ -44,21 +44,26 @@ struct RecipePhotoView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Color.clear
-                .frame(maxWidth: layout == .hero ? .infinity : 64)
-                .frame(width: layout == .thumbnail ? 64 : nil, height: layout == .hero ? 220 : 64)
+                .frame(maxWidth: layout == .hero ? .infinity : side)
+                .frame(width: layout == .hero ? nil : side, height: layout == .hero ? 248 : side)
                 .overlay {
                     ZStack {
-                        Theme.accent.opacity(0.16)
+                        Theme.accent.opacity(layout == .hero ? 0.14 : 0.16)
                         if let image, phase == .shown {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
+                            if layout == .hero {
+                                LinearGradient(
+                                    colors: [Color.black.opacity(0.02), Color.black.opacity(0.42)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            }
                         } else {
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: layout == .hero ? 36 : 18, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
+                            placeholderMark
                         }
                         if phase == .loading, layout == .hero {
                             ProgressView()
@@ -69,18 +74,21 @@ struct RecipePhotoView: View {
                     }
                 }
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: layout == .hero ? 14 : 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: layout == .hero ? Theme.cardRadius : 12, style: .continuous))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(accessibilityText)
                 .accessibilityAddTraits(phase == .shown ? .isImage : [])
 
             if layout == .hero, phase == .shown {
                 RecipePhotoCreditText(author: author, license: license, style: .full)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
             }
             if layout == .hero, phase == .missing {
                 Text("Fotoğraf yok")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
+                    .padding(.horizontal, 16)
                     .accessibilityHidden(true)
             }
         }
@@ -88,6 +96,35 @@ struct RecipePhotoView: View {
         .task(id: urlString) {
             await load()
         }
+    }
+
+    private var side: CGFloat {
+        layout == .hero ? 248 : 64
+    }
+
+    /// Stacked plate mark used when the catalog photo is missing or still loading.
+    private var placeholderMark: some View {
+        let isHero = layout == .hero
+        return ZStack {
+            Circle()
+                .fill(Theme.sage.opacity(0.35))
+                .frame(width: isHero ? 116 : 28, height: isHero ? 116 : 28)
+                .offset(x: isHero ? -28 : -8, y: isHero ? 8 : 2)
+            Circle()
+                .fill(Theme.cardSurface.opacity(0.92))
+                .frame(width: isHero ? 84 : 22, height: isHero ? 84 : 22)
+                .offset(x: isHero ? 24 : 7, y: isHero ? 16 : 4)
+            Image(systemName: "fork.knife")
+                .font(.system(size: isHero ? 34 : 16, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            if isHero {
+                Image(systemName: "leaf.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.sage)
+                    .offset(x: -48, y: -36)
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     private var accessibilityText: String {

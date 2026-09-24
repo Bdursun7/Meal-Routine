@@ -177,6 +177,10 @@ enum WeekPlanService {
             wasCooked: meal.cookedAt != nil
         )
         MealExposureLog.record([outgoing], now: Date())
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        for check in checks where check.mealUUID == meal.uuid {
+            context.delete(check)
+        }
         meal.recipeSlug = trimmed
         meal.cookedAt = nil
         try context.save()

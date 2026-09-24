@@ -14,6 +14,7 @@ struct RecipeDetailView: View {
     @Query private var feedback: [RecipeFeedback]
     @Query private var prefs: [UserPrefs]
     @Query private var plannedMeals: [PlannedMeal]
+    @Query private var ingredientChecks: [IngredientCheck]
 
     let route: RecipeRoute
     @State private var viewModel = RecipeDetailViewModel()
@@ -24,8 +25,6 @@ struct RecipeDetailView: View {
     @State private var lastWrittenServings: Int?
     @State private var lastWrittenContext: String?
     @State private var isHeroPhotoShown = false
-    /// Cook-along checks. Local to this screen; they are not saved.
-    @State private var checkedIngredientKeys: Set<String> = []
 
     private var recipe: Recipe? {
         recipes.first { $0.slug == route.slug }
@@ -182,7 +181,8 @@ struct RecipeDetailView: View {
     private func content(_ recipe: Recipe) -> some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 0) {
+                // Photo, then the credit strip, then the title card. Keep them stacked so the title never covers the attribution.
+                VStack(alignment: .leading, spacing: 16) {
                     ZStack(alignment: .topTrailing) {
                         RecipePhotoView(
                             urlString: recipe.photoURL,
@@ -192,14 +192,14 @@ struct RecipeDetailView: View {
                             isPhotoShown: $isHeroPhotoShown
                         )
                         favoriteHeart(isLoved: currentRating == .loved)
-                            .padding(10)
+                            .padding(12)
                     }
                     recipeSummaryCard(recipe)
-                        .padding(.horizontal, 12)
-                        .offset(y: -28)
-                        .padding(.bottom, -16)
+                        .padding(.horizontal, 16)
                 }
+                .padding(.bottom, 8)
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                .listRowSeparator(.hidden)
                 .listRowBackground(Theme.bgCream)
                 if let currentRating {
                     currentRatingRow(currentRating)
@@ -274,13 +274,15 @@ struct RecipeDetailView: View {
             }
 
             Section {
-                Button("Bunu pişirdim") {
-                    viewModel.markCooked(plannedMealUUID: route.plannedMealUUID)
+                let cooked = isCurrentMealCooked
+                Button(cooked ? "Pişirildi" : "Bunu pişirdim") {
+                    viewModel.markCooked(plannedMealUUID: cookTarget?.uuid ?? route.plannedMealUUID)
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                .disabled(cooked || viewModel.isShowingRatingPrompt)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(Theme.canvas)
-                .accessibilityHint("Pişirme puanını sorar")
+                .accessibilityHint(cooked ? "Bu akşam zaten pişirildi" : "Pişirme puanını sorar")
             }
 
             Section("Kaynak") {
@@ -292,8 +294,31 @@ struct RecipeDetailView: View {
         .mealCanvas()
     }
 
-    private func ingredientKey(_ line: IngredientLine) -> String {
-        "\(line.sortIndex)|\(line.ingredientId)"
+    /// Evening this screen cooks and shops for. A route without a meal still
+    /// finds the current week's copy of the recipe, so checks reach Market.
+    private var cookTarget: PlannedMeal? {
+        if let mealUUID = route.plannedMealUUID {
+            return plannedMeals.first { $0.uuid == mealUUID }
+        }
+        let start = WeekCalendar.weekStart(containing: .now)
+        return plannedMeals.first { meal in
+            meal.recipeSlug == route.slug
+                && meal.week.map { WeekCalendar.isSameDay($0.weekStart, start) } == true
+        }
+    }
+
+    private var isCurrentMealCooked: Bool {
+        cookTarget?.cookedAt != nil
+    }
+
+    private func storedCheck(for line: IngredientLine) -> IngredientCheck? {
+        let mealID = cookTarget?.uuid
+        return ingredientChecks.first { check in
+            check.ingredientId == line.ingredientId
+                && check.sortIndex == line.sortIndex
+                && check.recipeSlug == route.slug
+                && check.mealUUID == mealID
+        }
     }
 
     private func ingredientRow(_ line: IngredientLine, baseServings: Int) -> some View {
@@ -303,15 +328,26 @@ struct RecipeDetailView: View {
             baseServings: baseServings,
             householdSize: activeServings
         )
-        let key = ingredientKey(line)
-        let isChecked = checkedIngredientKeys.contains(key)
+        let stored = storedCheck(for: line)
+        let isChecked = GroceryCoverage.stillCovers(
+            isChecked: stored?.isChecked == true,
+            coveredQuantity: stored?.coveredQuantity,
+            coveredUnit: stored?.unit ?? line.unit,
+            quantity: quantity,
+            unit: line.unit
+        )
         let amount = QuantityFormat.quantityAndUnit(quantity: quantity, unit: line.unit)
         return Button {
-            if isChecked {
-                checkedIngredientKeys.remove(key)
-            } else {
-                checkedIngredientKeys.insert(key)
-            }
+            viewModel.setIngredientChecked(
+                isChecked: !isChecked,
+                mealUUID: cookTarget?.uuid,
+                recipeSlug: route.slug,
+                ingredientId: line.ingredientId,
+                sortIndex: line.sortIndex,
+                quantity: quantity,
+                unit: line.unit,
+                in: modelContext
+            )
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: isChecked ? "checkmark.square.fill" : "square")
@@ -356,12 +392,10 @@ struct RecipeDetailView: View {
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(Theme.textCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 14) {
-                Label("\(recipe.totalMinutes) dk", systemImage: "clock")
-                Label("\(activeServings) kişilik", systemImage: "person.2")
+            HStack(spacing: 8) {
+                metaChip(symbol: "clock", text: "\(recipe.totalMinutes) dk")
+                metaChip(symbol: "person.2", text: "\(activeServings) kişilik")
             }
-            .font(.footnote)
-            .foregroundStyle(Theme.secondaryText)
             Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
@@ -372,6 +406,15 @@ struct RecipeDetailView: View {
         .background(Theme.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .shadow(color: Theme.shadow, radius: 12, y: 4)
+    }
+
+    private func metaChip(symbol: String, text: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.textCharcoal)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Theme.accent.opacity(0.12), in: Capsule())
     }
 
     private func favoriteHeart(isLoved: Bool) -> some View {

@@ -30,17 +30,14 @@ struct ThisWeekView: View {
         NavigationStack {
             Group {
                 if meals.isEmpty {
-                    ContentUnavailableView {
-                        Label("Bu hafta boş", systemImage: "calendar")
-                    } description: {
-                        Text("Filtrelere uyan tarif çıkmadı. Profil'den süre sınırını yükselt veya sevmediğin malzemeleri azalt.")
-                    } actions: {
-                        Button("Planı yeniden kur") {
-                            viewModel.regenerate(in: modelContext)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                    }
+                    WarmEmptyState(
+                        title: "Bu hafta henüz kurulmadı",
+                        message: "Akşamlarını birlikte seçelim. Süre sınırını yükseltmek veya sevmediğin malzemeleri azaltmak yeni tarifler açar.",
+                        symbolName: "calendar",
+                        accentSymbolName: "fork.knife",
+                        actionTitle: "Planı yeniden kur",
+                        action: { viewModel.regenerate(in: modelContext) }
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -57,10 +54,16 @@ struct ThisWeekView: View {
                             if let insight = viewModel.preferenceInsight(recipes: recipes, feedback: feedback) {
                                 insightCard(insight)
                             }
-                            Text("Haftanın akşamları")
-                                .font(.headline)
-                                .foregroundStyle(Theme.ink)
-                                .padding(.top, 4)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Haftanın akşamları")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(Theme.textCharcoal)
+                                Text("Her akşam kendi kartında")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.secondaryText)
+                            }
+                            .padding(.top, 4)
+                            .accessibilityElement(children: .combine)
                             ForEach(meals) { meal in
                                 WeekMealCard(
                                     meal: meal,
@@ -212,6 +215,9 @@ private struct WeekMealCard: View {
                     Text(meal.dayTitle)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
                     Text(meal.dateTitle)
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
@@ -384,10 +390,16 @@ private struct TonightDinnerCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.accent)
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [Theme.accent, Theme.accent.opacity(0.82)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .shadow(color: Theme.shadow, radius: 12, y: 4)
+        .shadow(color: Theme.accent.opacity(0.28), radius: 16, y: 8)
         .accessibilityElement(children: .contain)
     }
 
@@ -403,13 +415,23 @@ private struct TonightDinnerCard: View {
                 isPhotoShown: $isPhotoShown
             )
         } else {
-            Image(systemName: "fork.knife")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Theme.accent)
-                .frame(width: 64, height: 64)
-                .background(Color.white.opacity(0.92))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous))
-                .accessibilityHidden(true)
+            ZStack {
+                Circle()
+                    .fill(Theme.sage.opacity(0.45))
+                    .frame(width: 28, height: 28)
+                    .offset(x: -14, y: 6)
+                Image(systemName: "fork.knife")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                Image(systemName: "leaf.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.sage)
+                    .offset(x: 18, y: -16)
+            }
+            .frame(width: 72, height: 72)
+            .background(Color.white.opacity(0.94))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous))
+            .accessibilityHidden(true)
         }
     }
 
@@ -423,8 +445,11 @@ private struct TonightDinnerCard: View {
                 .foregroundStyle(Color.white)
                 .fixedSize(horizontal: false, vertical: true)
             Label(timeLabel, systemImage: "clock")
-                .font(.footnote)
-                .foregroundStyle(Color.white.opacity(0.9))
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.16), in: Capsule())
             Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
                 .font(.footnote)
                 .foregroundStyle(Color.white.opacity(0.8))

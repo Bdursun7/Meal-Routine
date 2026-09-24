@@ -14,10 +14,11 @@ struct RecipeListView: View {
         NavigationStack {
             Group {
                 if recipes.isEmpty {
-                    ContentUnavailableView(
-                        "Tarif yok",
-                        systemImage: "book.closed",
-                        description: Text("Katalog henüz yüklenmedi.")
+                    WarmEmptyState(
+                        title: "Tarifler yolda",
+                        message: "Katalog açılınca akşam yemekleri burada listelenir.",
+                        symbolName: "book.closed",
+                        accentSymbolName: "fork.knife"
                     )
                 } else {
                     List {
@@ -32,17 +33,16 @@ struct RecipeListView: View {
                         }
                         if visible.isEmpty {
                             Section {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Eşleşen tarif yok")
-                                        .font(.headline)
-                                    Text("Bu aramaya veya filtrelere uyan tarif yok.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Button("Filtreleri temizle", action: viewModel.clearFilters)
-                                        .frame(minHeight: 44)
-                                }
-                                .padding(.vertical, 8)
+                                WarmEmptyState(
+                                    title: "Bu süzgeçte tarif yok",
+                                    message: "Filtreleri temizleyince bütün katalog geri gelir.",
+                                    symbolName: "line.3.horizontal.decrease.circle",
+                                    accentSymbolName: "book.closed",
+                                    actionTitle: "Filtreleri temizle",
+                                    action: { viewModel.clearFilters() },
+                                    isCompact: true
+                                )
+                                .listRowBackground(Theme.cardSurface)
                             }
                         } else {
                             Section {
