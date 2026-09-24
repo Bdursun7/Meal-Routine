@@ -38,6 +38,7 @@ struct GroceryListPresentation: Equatable {
 @MainActor
 @Observable
 final class GroceryViewModel {
+    var searchText = ""
     var isPresentingAdd = false
     var draftName = ""
     var draftQuantity = ""
@@ -64,6 +65,31 @@ final class GroceryViewModel {
             checkedCount: checked.count,
             totalCount: rows.count
         )
+    }
+
+    /// Narrows the current list by ingredient name or Turkish aisle title. An empty query returns the list unchanged.
+    func applyingSearch(to list: GroceryListPresentation) -> GroceryListPresentation {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return list }
+        let openSections = list.openSections.compactMap { section -> GrocerySectionPresentation? in
+            let rows = section.rows.filter { matchesSearch($0, query) }
+            guard !rows.isEmpty else { return nil }
+            return GrocerySectionPresentation(category: section.category, rows: rows)
+        }
+        let checked = list.checked.filter { matchesSearch($0, query) }
+        let visible = openSections.flatMap(\.rows) + checked
+        return GroceryListPresentation(
+            openSections: openSections,
+            checked: checked,
+            conflictCount: Set(visible.filter(\.hasUnitConflict).map(\.name)).count,
+            checkedCount: checked.count,
+            totalCount: visible.count
+        )
+    }
+
+    private func matchesSearch(_ row: GroceryRowPresentation, _ query: String) -> Bool {
+        row.name.localizedCaseInsensitiveContains(query)
+            || row.category.title.localizedCaseInsensitiveContains(query)
     }
 
     private func sortedRows(weeks: [PlanWeek], now: Date) -> [GroceryRowPresentation] {

@@ -8,10 +8,11 @@ struct GroceryView: View {
 
     var body: some View {
         @Bindable var viewModel = self.viewModel
-        let list = viewModel.presentation(weeks: weeks)
+        let fullList = viewModel.presentation(weeks: weeks)
+        let list = viewModel.applyingSearch(to: fullList)
         NavigationStack {
             Group {
-                if list.isEmpty {
+                if fullList.isEmpty {
                     WarmEmptyState(
                         title: "Market henüz dolmadı",
                         message: "Haftanın yemekleri hazır olunca malzemeler burada, reyona göre toplanır.",
@@ -19,6 +20,14 @@ struct GroceryView: View {
                         accentSymbolName: "leaf.fill",
                         actionTitle: "Listeyi oluştur",
                         action: { viewModel.rebuild(in: modelContext) }
+                    )
+                } else if list.isEmpty {
+                    WarmEmptyState(
+                        title: "Sonuç yok",
+                        message: "Bu aramayla eşleşen malzeme yok.",
+                        symbolName: "magnifyingglass",
+                        accentSymbolName: "cart",
+                        isCompact: true
                     )
                 } else {
                     List {
@@ -93,6 +102,7 @@ struct GroceryView: View {
                 }
             }
             .navigationTitle("Market")
+            .searchable(text: $viewModel.searchText, prompt: "Malzeme ara")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

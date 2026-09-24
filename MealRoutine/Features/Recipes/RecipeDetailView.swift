@@ -204,12 +204,19 @@ struct RecipeDetailView: View {
         )
     }
 
+    /// Cook belongs to a planned evening. Tarifler and Profil open the catalog without this bar.
+    private var showsCookAction: Bool {
+        route.plannedMealUUID != nil
+    }
+
     @ViewBuilder
     private func content(_ recipe: Recipe) -> some View {
         VStack(spacing: 0) {
             recipeList(recipe)
                 .layoutPriority(1)
-            cookBar
+            if showsCookAction {
+                cookBar
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.bgCream)

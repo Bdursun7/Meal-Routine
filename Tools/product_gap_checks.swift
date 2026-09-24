@@ -103,6 +103,9 @@ private func checkBrowse() {
     let search = RecipeBrowse.filter(catalog, query: RecipeBrowseQuery(searchText: "balık")).map(\.slug)
     check(search == ["balik"], "search \(search)")
 
+    let byTag = RecipeBrowse.filter(catalog, query: RecipeBrowseQuery(searchText: "pasta")).map(\.slug)
+    check(byTag == ["makarna"], "search tag \(byTag)")
+
     let none = RecipeBrowse.filter(
         catalog,
         query: RecipeBrowseQuery(category: .fish, lovedOnly: true)

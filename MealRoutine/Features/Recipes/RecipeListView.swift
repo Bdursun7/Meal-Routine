@@ -33,16 +33,7 @@ struct RecipeListView: View {
                         }
                         if visible.isEmpty {
                             Section {
-                                WarmEmptyState(
-                                    title: "Bu süzgeçte tarif yok",
-                                    message: "Filtreleri temizleyince bütün katalog geri gelir.",
-                                    symbolName: "line.3.horizontal.decrease.circle",
-                                    accentSymbolName: "book.closed",
-                                    actionTitle: "Filtreleri temizle",
-                                    action: { viewModel.clearFilters() },
-                                    isCompact: true
-                                )
-                                .listRowBackground(Theme.cardSurface)
+                                recipeSearchEmpty
                             }
                         } else {
                             Section {
@@ -76,6 +67,31 @@ struct RecipeListView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
+    }
+
+    private var recipeSearchEmpty: some View {
+        let searching = viewModel.hasSearchText
+        let filtering = viewModel.hasChipFilters
+        let title = searching ? "Sonuç yok" : "Bu süzgeçte tarif yok"
+        let message: String
+        if searching && filtering {
+            message = "Bu arama ve süzgeçle eşleşen tarif yok."
+        } else if searching {
+            message = "Bu aramayla eşleşen tarif yok."
+        } else {
+            message = "Filtreleri temizleyince bütün katalog geri gelir."
+        }
+        let actionTitle = searching && !filtering ? "Aramayı temizle" : "Filtreleri temizle"
+        return WarmEmptyState(
+            title: title,
+            message: message,
+            symbolName: searching ? "magnifyingglass" : "line.3.horizontal.decrease.circle",
+            accentSymbolName: "book.closed",
+            actionTitle: actionTitle,
+            action: { viewModel.clearFilters() },
+            isCompact: true
+        )
+        .listRowBackground(Theme.cardSurface)
     }
 
     private var alertIsPresented: Binding<Bool> {
