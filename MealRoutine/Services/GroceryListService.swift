@@ -14,18 +14,29 @@ import SwiftData
 /// amount on the row. A partial cover leaves the row unchecked and stores
 /// the remainder in `uncoveredQuantity`.
 enum GroceryListService {
+    /// Skips a repeat rebuild when meals, portions, checks, and custom amounts are unchanged.
+    /// Set only after a full rebuild. Incremental check updates refresh it when the market
+    /// row already exists, so a later visit does not merge the whole week again.
+    private static var appliedFingerprint: Int?
+
+    /// Drops the skip key after the catalog or the household store is replaced.
+    @MainActor
+    static func discardRebuildCache() {
+        appliedFingerprint = nil
+    }
+
     @MainActor
     static func rebuild(in context: ModelContext, now: Date = .now) throws {
         guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return }
         guard let prefs = try UserPrefsStore.existing(in: context) else { return }
-
-        let recipes = try context.fetch(FetchDescriptor<Recipe>())
-        var bySlug: [String: Recipe] = [:]
-        for recipe in recipes {
-            bySlug[recipe.slug] = recipe
+        let householdSize = prefs.householdSize
+        let storedChecks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        if inputFingerprint(week: week, householdSize: householdSize, checks: storedChecks) == appliedFingerprint {
+            return
         }
 
-        let householdSize = prefs.householdSize
+        let bySlug = try recipesBySlug(Set(week.meals.map(\.recipeSlug)), in: context)
+
         var sources: [GrocerySourceLine] = []
         var contributions: [GroceryContribution] = []
         for meal in week.meals {
@@ -64,7 +75,11 @@ enum GroceryListService {
         }
 
         let mealIDs = Set(week.meals.map(\.uuid))
-        _ = try reconcileStoredChecks(contributions: contributions, weekMealIDs: mealIDs, in: context)
+        let checksChanged = try reconcileStoredChecks(
+            contributions: contributions,
+            weekMealIDs: mealIDs,
+            in: context
+        )
         let checks = try context.fetch(FetchDescriptor<IngredientCheck>()).map(record(from:))
 
         let merged = GroceryMerger.merge(sources)
@@ -158,9 +173,14 @@ enum GroceryListService {
                 didChange = true
             }
         }
-        if didChange {
+        if didChange || checksChanged {
             try context.save()
         }
+        appliedFingerprint = inputFingerprint(
+            week: week,
+            householdSize: householdSize,
+            checks: try context.fetch(FetchDescriptor<IngredientCheck>())
+        )
     }
 
     @MainActor
@@ -171,12 +191,24 @@ enum GroceryListService {
         if item.isManual {
             item.isChecked = turningOn
             try context.save()
+        } else if let prepared = try preparedCoverage(for: item, in: context) {
+            try writeChecks(prepared.lines, checked: turningOn, in: context)
+            item.isChecked = turningOn
+            item.uncoveredQuantity = nil
+            let updatedRow = try applyCoverage(
+                matching: prepared.identity,
+                week: prepared.week,
+                contributions: prepared.lines,
+                in: context
+            )
+            try context.save()
+            if updatedRow {
+                try rememberFingerprint(in: context)
+            }
         } else {
-            try setContributionChecks(matching: item, checked: turningOn, in: context)
             item.isChecked = turningOn
             item.uncoveredQuantity = nil
             try context.save()
-            try rebuild(in: context)
         }
         guard item.isChecked, turningOn else { return }
         Analytics.track(.groceryItemChecked)
@@ -187,7 +219,7 @@ enum GroceryListService {
 
     /// Writes a new amount and keeps the stored unit and aisle.
     /// A different amount clears the check so the new figure is visible.
-    /// The next rebuild then recalculates how much of that displayed amount the recipe checks still cover.
+    /// Coverage for that row is refreshed from the recipe checks immediately.
     @MainActor
     static func updateQuantity(_ uuid: UUID, quantity: Double, in context: ModelContext) throws {
         let items = try context.fetch(FetchDescriptor<GroceryItem>())
@@ -201,13 +233,16 @@ enum GroceryListService {
         item.quantity = quantity
         item.quantityIsCustom = true
         item.uncoveredQuantity = nil
+        let updatedRow = item.isManual
+            ? false
+            : try applyCoverage(ingredientId: item.ingredientId, unit: item.unit, in: context)
         try context.save()
-        if !item.isManual {
-            try rebuild(in: context)
+        if updatedRow {
+            try rememberFingerprint(in: context)
         }
     }
 
-    /// Persists one ingredient check. Planned meals also rebuild Market.
+    /// Persists one ingredient check and updates only the matching market row.
     @MainActor
     static func setIngredientCheck(
         mealUUID: UUID?,
@@ -243,9 +278,12 @@ enum GroceryListService {
             )
             context.insert(created)
         }
+        let updatedRow = mealUUID == nil
+            ? false
+            : try applyCoverage(ingredientId: ingredientId, unit: storedUnit, in: context)
         try context.save()
-        if mealUUID != nil {
-            try rebuild(in: context)
+        if updatedRow {
+            try rememberFingerprint(in: context)
         }
     }
 
@@ -321,55 +359,39 @@ enum GroceryListService {
                 didChange = true
             }
         }
-        if didChange {
-            try context.save()
-        }
         return didChange
     }
 
+    private struct PreparedCoverage {
+        var week: PlanWeek
+        var identity: String
+        var lines: [GroceryContribution]
+    }
+
+    /// Week recipes that feed one grocery identity, loaded once for a checkbox tap.
     @MainActor
-    private static func setContributionChecks(
-        matching item: GroceryItem,
+    private static func preparedCoverage(
+        for item: GroceryItem,
+        in context: ModelContext
+    ) throws -> PreparedCoverage? {
+        guard let week = try item.week ?? WeekPlanService.currentWeek(in: context) else { return nil }
+        guard let prefs = try UserPrefsStore.existing(in: context) else { return nil }
+        let identity = GroceryMerger.rowIdentity(ingredientId: item.ingredientId, unit: item.unit)
+        let lines = try contributions(
+            for: identity,
+            week: week,
+            householdSize: prefs.householdSize,
+            in: context
+        )
+        return PreparedCoverage(week: week, identity: identity, lines: lines)
+    }
+
+    @MainActor
+    private static func writeChecks(
+        _ contributions: [GroceryContribution],
         checked: Bool,
         in context: ModelContext
     ) throws {
-        guard let week = try item.week ?? WeekPlanService.currentWeek(in: context) else { return }
-        guard let prefs = try UserPrefsStore.existing(in: context) else { return }
-        let recipes = try context.fetch(FetchDescriptor<Recipe>())
-        var bySlug: [String: Recipe] = [:]
-        for recipe in recipes {
-            bySlug[recipe.slug] = recipe
-        }
-        let identity = GroceryMerger.rowIdentity(ingredientId: item.ingredientId, unit: item.unit)
-        var contributions: [GroceryContribution] = []
-        for meal in week.meals {
-            guard let recipe = bySlug[meal.recipeSlug] else { continue }
-            let servings = ActiveServings.resolve(
-                mealServings: meal.servings,
-                householdSize: prefs.householdSize
-            )
-            for ingredient in recipe.ingredients {
-                let quantity = PortionScaler.scale(
-                    quantity: ingredient.quantity,
-                    scaling: ingredient.scaling,
-                    baseServings: recipe.baseServings,
-                    householdSize: servings
-                )
-                guard GroceryMerger.rowIdentity(ingredientId: ingredient.ingredientId, unit: ingredient.unit) == identity else {
-                    continue
-                }
-                contributions.append(
-                    GroceryContribution(
-                        mealUUID: meal.uuid,
-                        recipeSlug: meal.recipeSlug,
-                        sortIndex: ingredient.sortIndex,
-                        ingredientId: ingredient.ingredientId,
-                        quantity: quantity,
-                        unit: ingredient.unit
-                    )
-                )
-            }
-        }
         let existing = try context.fetch(FetchDescriptor<IngredientCheck>())
         for contribution in contributions {
             let match = existing.first { check in
@@ -397,6 +419,194 @@ enum GroceryListService {
                 )
             }
         }
+    }
+
+    /// Updates one merged row from the checks that feed it. False when that row is not on the week yet.
+    @MainActor
+    @discardableResult
+    private static func applyCoverage(
+        ingredientId: String,
+        unit: String,
+        in context: ModelContext
+    ) throws -> Bool {
+        guard let week = try WeekPlanService.currentWeek(in: context) else { return false }
+        guard let prefs = try UserPrefsStore.existing(in: context) else { return false }
+        let identity = GroceryMerger.rowIdentity(ingredientId: ingredientId, unit: unit)
+        let lines = try contributions(
+            for: identity,
+            week: week,
+            householdSize: prefs.householdSize,
+            in: context
+        )
+        return try applyCoverage(matching: identity, week: week, contributions: lines, in: context)
+    }
+
+    @MainActor
+    @discardableResult
+    private static func applyCoverage(
+        matching identity: String,
+        week: PlanWeek,
+        contributions: [GroceryContribution],
+        in context: ModelContext
+    ) throws -> Bool {
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>()).map(record(from:))
+        let planned = GroceryMerger.merge(
+            contributions.map {
+                GrocerySourceLine(
+                    ingredientId: $0.ingredientId,
+                    nameTR: "",
+                    nameEN: "",
+                    quantity: $0.quantity,
+                    unit: $0.unit
+                )
+            }
+        )
+        let plannedLine = planned.first {
+            GroceryMerger.rowIdentity(ingredientId: $0.ingredientId, unit: $0.unit) == identity
+        }
+        let targets = week.groceries.filter {
+            !$0.isManual && GroceryMerger.rowIdentity(ingredientId: $0.ingredientId, unit: $0.unit) == identity
+        }
+        guard !targets.isEmpty else { return false }
+        for item in targets {
+            let requiredQuantity = item.quantityIsCustom ? item.quantity : (plannedLine?.quantity ?? item.quantity)
+            let requiredUnit = item.quantityIsCustom ? item.unit : (plannedLine?.unit ?? item.unit)
+            let resolution = resolution(
+                legacyKeepsCheck: item.isChecked,
+                requiredQuantity: requiredQuantity,
+                requiredUnit: requiredUnit,
+                ingredientId: item.ingredientId,
+                contributions: contributions,
+                checks: checks
+            )
+            item.isChecked = resolution.isChecked
+            item.uncoveredQuantity = resolution.uncoveredQuantity
+        }
+        return true
+    }
+
+    @MainActor
+    private static func contributions(
+        for identity: String,
+        week: PlanWeek,
+        householdSize: Int,
+        in context: ModelContext
+    ) throws -> [GroceryContribution] {
+        let bySlug = try recipesBySlug(Set(week.meals.map(\.recipeSlug)), in: context)
+        var lines: [GroceryContribution] = []
+        for meal in week.meals {
+            guard let recipe = bySlug[meal.recipeSlug] else { continue }
+            let servings = ActiveServings.resolve(
+                mealServings: meal.servings,
+                householdSize: householdSize
+            )
+            for ingredient in recipe.ingredients {
+                guard GroceryMerger.rowIdentity(ingredientId: ingredient.ingredientId, unit: ingredient.unit) == identity else {
+                    continue
+                }
+                let quantity = PortionScaler.scale(
+                    quantity: ingredient.quantity,
+                    scaling: ingredient.scaling,
+                    baseServings: recipe.baseServings,
+                    householdSize: servings
+                )
+                lines.append(
+                    GroceryContribution(
+                        mealUUID: meal.uuid,
+                        recipeSlug: meal.recipeSlug,
+                        sortIndex: ingredient.sortIndex,
+                        ingredientId: ingredient.ingredientId,
+                        quantity: quantity,
+                        unit: ingredient.unit
+                    )
+                )
+            }
+        }
+        return lines
+    }
+
+    /// Week recipes only. The catalog is much larger than one week's dinners.
+    @MainActor
+    private static func recipesBySlug(
+        _ slugs: Set<String>,
+        in context: ModelContext
+    ) throws -> [String: Recipe] {
+        var bySlug: [String: Recipe] = [:]
+        for slug in slugs {
+            if let recipe = try recipe(slug: slug, in: context) {
+                bySlug[recipe.slug] = recipe
+            }
+        }
+        return bySlug
+    }
+
+    @MainActor
+    private static func recipe(slug: String, in context: ModelContext) throws -> Recipe? {
+        var descriptor = FetchDescriptor<Recipe>(
+            predicate: #Predicate { $0.slug == slug }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    /// Refreshes the skip key after a cheap row update. No-ops until a full rebuild has run,
+    /// so a check made before the list exists still creates that list on the next rebuild.
+    @MainActor
+    private static func rememberFingerprint(in context: ModelContext) throws {
+        guard appliedFingerprint != nil else { return }
+        guard let week = try WeekPlanService.currentWeek(in: context) else { return }
+        guard let prefs = try UserPrefsStore.existing(in: context) else { return }
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        appliedFingerprint = inputFingerprint(
+            week: week,
+            householdSize: prefs.householdSize,
+            checks: checks
+        )
+    }
+
+    private static func inputFingerprint(
+        week: PlanWeek,
+        householdSize: Int,
+        checks: [IngredientCheck]
+    ) -> Int {
+        var hasher = Hasher()
+        hasher.combine(householdSize)
+        hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
+        for meal in week.meals.sorted(by: { $0.uuid.uuidString < $1.uuid.uuidString }) {
+            hasher.combine(meal.uuid)
+            hasher.combine(meal.recipeSlug)
+            hasher.combine(meal.servings)
+        }
+        let ordered = checks.sorted { lhs, rhs in
+            let left = "\(lhs.mealUUID?.uuidString ?? "")|\(lhs.sortIndex)|\(lhs.ingredientId)|\(lhs.recipeSlug)"
+            let right = "\(rhs.mealUUID?.uuidString ?? "")|\(rhs.sortIndex)|\(rhs.ingredientId)|\(rhs.recipeSlug)"
+            return left < right
+        }
+        for check in ordered {
+            hasher.combine(check.mealUUID?.uuidString ?? "")
+            hasher.combine(check.recipeSlug)
+            hasher.combine(check.ingredientId)
+            hasher.combine(check.sortIndex)
+            hasher.combine(check.isChecked)
+            hasher.combine(check.coveredQuantity == nil)
+            hasher.combine(check.coveredQuantity ?? 0)
+            hasher.combine(check.unit)
+        }
+        let autoRows = week.groceries
+            .filter { !$0.isManual }
+            .sorted { $0.uuid.uuidString < $1.uuid.uuidString }
+        hasher.combine(autoRows.count)
+        for item in autoRows {
+            hasher.combine(item.uuid)
+            hasher.combine(item.ingredientId)
+            hasher.combine(item.unit)
+            hasher.combine(item.quantityIsCustom)
+            if item.quantityIsCustom {
+                hasher.combine(item.quantity == nil)
+                hasher.combine(item.quantity ?? 0)
+            }
+        }
+        return hasher.finalize()
     }
 
     private static func resolution(

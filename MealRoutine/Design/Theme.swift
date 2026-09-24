@@ -74,8 +74,6 @@ enum Theme {
     static let screenPadding: CGFloat = 20
     static let cardGap: CGFloat = 16
     static let sectionGap: CGFloat = 28
-    /// How far a following sheet tucks over a hero.
-    static let heroOverlap: CGFloat = 24
 
     private static func ui(_ hex: UInt32, alpha: CGFloat = 1) -> UIColor {
         UIColor(
@@ -132,7 +130,7 @@ extension View {
     func mealCardSurface(fill: Color = Theme.cardSurface) -> some View {
         background(fill)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-            .shadow(color: Theme.cardShadow, radius: 16, y: 4)
+            .shadow(color: Theme.cardShadow, radius: 8, y: 3)
     }
 
     func mealCanvas() -> some View {
@@ -165,7 +163,6 @@ struct FilterChip: View {
                 .background(isSelected ? Theme.accent : Theme.cardSurface)
                 .foregroundStyle(isSelected ? Theme.onAccent : Theme.textCharcoal)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous))
-                .shadow(color: isSelected ? Theme.accent.opacity(0.22) : Color.clear, radius: 6, y: 2)
                 .overlay {
                     RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                         .strokeBorder(
@@ -263,7 +260,6 @@ struct WarmEmptyState: View {
                 Circle()
                     .fill(Theme.cardSurface)
                     .frame(width: isCompact ? 72 : 132, height: isCompact ? 72 : 132)
-                    .shadow(color: Theme.cardShadow, radius: 16, y: 4)
                 Circle()
                     .fill(Theme.sage.opacity(0.35))
                     .frame(width: isCompact ? 40 : 76, height: isCompact ? 40 : 76)

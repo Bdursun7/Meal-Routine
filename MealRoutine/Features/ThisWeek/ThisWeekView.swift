@@ -330,9 +330,7 @@ private struct TonightDinnerCard: View {
     var isWorking: Bool
     var onReplace: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPhotoShown = false
-    @State private var hasAppeared = false
 
     private var hasRemotePhoto: Bool {
         RecipePhoto.remoteURL(from: recipe?.photoURL ?? "") != nil
@@ -416,18 +414,7 @@ private struct TonightDinnerCard: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.heroCorner, style: .continuous))
-        .shadow(color: Theme.elevatedShadow, radius: 24, y: 8)
-        .scaleEffect(reduceMotion || hasAppeared ? 1 : 0.98)
-        .onAppear {
-            guard !hasAppeared else { return }
-            if reduceMotion {
-                hasAppeared = true
-            } else {
-                withAnimation(.easeOut(duration: 0.45)) {
-                    hasAppeared = true
-                }
-            }
-        }
+        .shadow(color: Theme.elevatedShadow, radius: 12, y: 6)
         .accessibilityElement(children: .contain)
     }
 

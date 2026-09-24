@@ -163,6 +163,6 @@ private struct ReplacementChoiceRow: View {
         .padding(12)
         .background(Theme.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .shadow(color: Theme.cardShadow, radius: 16, y: 4)
+        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
     }
 }

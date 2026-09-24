@@ -200,19 +200,21 @@ struct RecipeDetailView: View {
                     .listRowBackground(Theme.bgCream)
                 if let currentRating {
                     currentRatingRow(currentRating)
-                        .listRowBackground(Theme.cardSurface)
+                        .recipeDetailRow()
                 }
             }
 
             if !recipe.displaySummary.isEmpty {
                 Section("Özet") {
                     Text(recipe.displaySummary)
+                        .recipeDetailRow()
                 }
             }
 
             if !recipe.diets.isEmpty {
                 Section("Beslenme") {
                     Text(recipe.diets.map(DietLabel.turkish).joined(separator: " · "))
+                        .recipeDetailRow()
                 }
             }
 
@@ -223,9 +225,11 @@ struct RecipeDetailView: View {
                          : "Bu akşam: \(activeServings) kişi")
                 }
                 .accessibilityLabel("Porsiyon \(activeServings) kişi")
+                .recipeDetailRow()
                 Text(portionFootnote(baseServings: recipe.baseServings))
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
+                    .recipeDetailRow()
                 Button("Porsiyonu kaydet") {
                     let saved = activeServings
                     let contextID = portionContext.contextID
@@ -246,6 +250,7 @@ struct RecipeDetailView: View {
                 .accessibilityHint(portionContext.mealUUID == nil
                     ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
                     : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
+                .recipeDetailRow()
             } header: {
                 Text("Porsiyon")
             }
@@ -253,6 +258,7 @@ struct RecipeDetailView: View {
             Section("Malzemeler") {
                 ForEach(recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }) { line in
                     ingredientRow(line, baseServings: recipe.baseServings)
+                        .recipeDetailRow()
                 }
             }
 
@@ -267,10 +273,13 @@ struct RecipeDetailView: View {
                                 .foregroundStyle(Theme.secondaryText)
                         }
                     }
+                    .recipeDetailRow()
                 }
             }
 
         }
+        .listStyle(.plain)
+        .listSectionSeparator(.hidden)
         .mealCanvas()
     }
 
@@ -365,35 +374,24 @@ struct RecipeDetailView: View {
         return "\(amounts) \(scope)"
     }
 
-    /// Photo or collage, then a cream sheet that tucks over the bottom of the hero.
-    /// The credit sits on the scrim, above the sheet, so it never shares a row with the title.
+    /// Photo, then the credit, then the title card. Nothing overlaps.
     private func recipeHero(_ recipe: Recipe) -> some View {
-        let heroHeight: CGFloat = 260
-        let overlap: CGFloat = 48
-        return ZStack(alignment: .top) {
-            RecipePhotoView(
-                urlString: recipe.photoURL,
-                author: recipe.photoAuthor,
-                license: recipe.photoLicense,
-                layout: .hero,
-                isPhotoShown: $isHeroPhotoShown
-            )
-            .frame(height: heroHeight)
-            .overlay { Theme.scrimTop.allowsHitTesting(false) }
-            .overlay { Theme.scrimBottom.allowsHitTesting(false) }
-            .overlay(alignment: .bottomLeading) {
-                heroCredit(recipe)
-                    .padding(.horizontal, Theme.screenPadding)
-                    .padding(.bottom, overlap + 20)
-            }
-            .overlay(alignment: .topTrailing) {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                RecipePhotoView(
+                    urlString: recipe.photoURL,
+                    author: recipe.photoAuthor,
+                    license: recipe.photoLicense,
+                    layout: .hero,
+                    isPhotoShown: $isHeroPhotoShown
+                )
                 favoriteHeart(isLoved: currentRating == .loved)
                     .padding(12)
             }
-
+            heroCredit(recipe)
+                .padding(.horizontal, Theme.screenPadding)
             recipeSummaryCard(recipe)
                 .padding(.horizontal, Theme.screenPadding)
-                .padding(.top, heroHeight - overlap)
         }
         .padding(.bottom, 8)
     }
@@ -405,10 +403,11 @@ struct RecipeDetailView: View {
             }
             Text(Attribution.uniTools)
         }
-        .font(.caption2)
-        .foregroundStyle(Color.white.opacity(0.85))
+        .font(.caption)
+        .foregroundStyle(Theme.secondaryText)
         .multilineTextAlignment(.leading)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
         .accessibilityElement(children: .combine)
     }
@@ -432,16 +431,7 @@ struct RecipeDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Theme.cardSurface)
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: Theme.sheetCorner,
-                bottomLeadingRadius: Theme.cardRadius,
-                bottomTrailingRadius: Theme.cardRadius,
-                topTrailingRadius: Theme.sheetCorner,
-                style: .continuous
-            )
-        )
-        .shadow(color: Theme.cardShadow, radius: 16, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 
     private func metaChip(symbol: String, text: String) -> some View {
@@ -487,5 +477,14 @@ struct RecipeDetailView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension View {
+    /// Body row on the cream page. The hero does not use this, so the photo stays full width.
+    func recipeDetailRow() -> some View {
+        listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+            .listRowBackground(Theme.cardSurface)
+            .listRowSeparator(.hidden)
     }
 }

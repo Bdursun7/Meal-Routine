@@ -13,12 +13,12 @@ struct MainTabView: View {
 
     init() {
         let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundEffect = nil
         appearance.backgroundColor = UIColor { traits in
             traits.userInterfaceStyle == .dark
-                ? UIColor(red: 28.0 / 255.0, green: 25.0 / 255.0, blue: 22.0 / 255.0, alpha: 0.88)
-                : UIColor(red: 248.0 / 255.0, green: 244.0 / 255.0, blue: 237.0 / 255.0, alpha: 0.92)
+                ? UIColor(red: 28.0 / 255.0, green: 25.0 / 255.0, blue: 22.0 / 255.0, alpha: 1)
+                : UIColor(red: 248.0 / 255.0, green: 244.0 / 255.0, blue: 237.0 / 255.0, alpha: 1)
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -40,7 +40,5 @@ struct MainTabView: View {
                 .tag(AppTab.profile)
         }
         .tint(Theme.accent)
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(Theme.bgCream.opacity(0.92), for: .tabBar)
     }
 }

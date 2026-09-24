@@ -111,6 +111,7 @@ final class ProfileViewModel {
     /// The bundled recipe catalog stays on device.
     func resetLocalData(in context: ModelContext) {
         do {
+            GroceryListService.discardRebuildCache()
             let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
             let items = try context.fetch(FetchDescriptor<GroceryItem>())
             let orphanMeals = meals.filter { $0.week == nil }

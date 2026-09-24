@@ -103,7 +103,7 @@ struct RecipePhotoView: View {
 
     private var side: CGFloat {
         switch layout {
-        case .hero: 260
+        case .hero: 220
         case .thumbnail: 64
         case .plate: 72
         case .backdrop: 180
@@ -162,8 +162,11 @@ struct RecipePhotoView: View {
             phase = .failed
             return
         }
-        let maxPixel: CGFloat = (layout == .hero || layout == .backdrop) ? 1600 : 512
-        guard let decoded = RecipePhotoDecoder.image(from: data, maxPixel: maxPixel) else {
+        let maxPixel: CGFloat = layout == .hero ? 1200 : (layout == .backdrop ? 800 : 256)
+        let decoded = await Task.detached(priority: .userInitiated) {
+            RecipePhotoDecoder.image(from: data, maxPixel: maxPixel)
+        }.value
+        guard let decoded else {
             RecipePhotoDiskCache.remove(
                 remoteURL: remoteURL,
                 directory: RecipePhotoDiskCache.defaultDirectory()
