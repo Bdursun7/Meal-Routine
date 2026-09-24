@@ -15,11 +15,7 @@ struct MainTabView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundEffect = nil
-        appearance.backgroundColor = UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 28.0 / 255.0, green: 25.0 / 255.0, blue: 22.0 / 255.0, alpha: 1)
-                : UIColor(red: 248.0 / 255.0, green: 244.0 / 255.0, blue: 237.0 / 255.0, alpha: 1)
-        }
+        appearance.backgroundColor = Theme.canvasUIColor
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
@@ -39,6 +35,6 @@ struct MainTabView: View {
                 .tabItem { Label("Profil", systemImage: selectedTab == .profile ? "person.crop.circle.fill" : "person.crop.circle") }
                 .tag(AppTab.profile)
         }
-        .tint(Theme.accent)
+        .tint(Theme.sage)
     }
 }

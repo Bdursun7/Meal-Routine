@@ -80,17 +80,17 @@ struct CookRatingPrompt: View {
                 if isCurrent {
                     Text("Mevcut")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.sage)
                 }
             }
             .foregroundStyle(Theme.ink)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(isCurrent ? Theme.accent.opacity(0.16) : Theme.cream)
+            .background(isCurrent ? Theme.sage.opacity(0.16) : Theme.cream)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(isCurrent ? Theme.accent : Color.clear, lineWidth: 1.5)
+                    .strokeBorder(isCurrent ? Theme.sage : Color.clear, lineWidth: 1.5)
             }
         }
         .buttonStyle(.plain)

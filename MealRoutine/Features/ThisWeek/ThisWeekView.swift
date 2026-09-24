@@ -160,7 +160,7 @@ struct ThisWeekView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
-            .tint(Theme.accent)
+            .tint(Theme.sage)
             .accessibilityHint("Market sekmesini açar")
         }
     }
@@ -169,7 +169,7 @@ struct ThisWeekView: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(insight.title, systemImage: "sparkles")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.sage)
             Text(insight.message)
                 .font(.body)
                 .foregroundStyle(Theme.textCharcoal)
@@ -221,10 +221,10 @@ private struct WeekMealCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meal.dayTitle)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(Theme.accent.opacity(0.15), in: Capsule())
+                        .background(Theme.accent, in: Capsule())
                     Text(meal.dateTitle)
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
@@ -282,7 +282,7 @@ private struct WeekMealCard: View {
             .font(.subheadline.weight(.semibold))
             .buttonStyle(.bordered)
             .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
-            .tint(Theme.accent)
+            .tint(Theme.sage)
             .frame(minHeight: 44)
             .disabled(isWorking)
             .accessibilityLabel("Değiştir")
@@ -336,6 +336,11 @@ private struct TonightDinnerCard: View {
         RecipePhoto.remoteURL(from: recipe?.photoURL ?? "") != nil
     }
 
+    /// White sits on the photo scrim. The orange fill needs dark green type.
+    private var heroInk: Color {
+        hasRemotePhoto ? .white : Theme.onAccent
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
                 if dynamicTypeSize.isAccessibilitySize || !hasRemotePhoto {
@@ -350,7 +355,7 @@ private struct TonightDinnerCard: View {
                     NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
                         Text("Tarifi aç")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.onAccent)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(Color.white)
                             .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
@@ -361,14 +366,14 @@ private struct TonightDinnerCard: View {
                 } second: {
                     Button("Değiştir", action: onReplace)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(heroInk)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 44)
                         .background(Color.clear)
                         .buttonStyle(.plain)
                         .overlay {
                             RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5)
+                                .strokeBorder(heroInk.opacity(0.9), lineWidth: 1.5)
                         }
                         .disabled(isWorking)
                         .accessibilityLabel("Değiştir")
@@ -421,7 +426,7 @@ private struct TonightDinnerCard: View {
     private var symbolStack: some View {
         ZStack {
             Circle()
-                .fill(Color.white.opacity(0.18))
+                .fill(Theme.onAccent.opacity(0.12))
                 .frame(width: 88, height: 88)
             Circle()
                 .fill(Theme.sage.opacity(0.55))
@@ -429,10 +434,10 @@ private struct TonightDinnerCard: View {
                 .offset(x: 28, y: -22)
             Image(systemName: "fork.knife")
                 .font(.system(size: 32, weight: .semibold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Theme.onAccent)
             Image(systemName: "leaf.fill")
                 .font(.body.weight(.bold))
-                .foregroundStyle(Color.white.opacity(0.95))
+                .foregroundStyle(Theme.onAccent.opacity(0.9))
                 .offset(x: 28, y: -22)
         }
         .accessibilityHidden(true)
@@ -442,24 +447,24 @@ private struct TonightDinnerCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.9))
+                .foregroundStyle(heroInk.opacity(0.9))
             Text(meal.recipeName)
                 .font(.title2.bold())
-                .foregroundStyle(Color.white)
+                .foregroundStyle(heroInk)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Label("\(meal.minutes) dk", systemImage: "clock")
                 Text("\(meal.servings) kişilik")
             }
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(Color.white)
+            .foregroundStyle(heroInk)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Color.white.opacity(0.16), in: Capsule())
+            .background(heroInk.opacity(0.12), in: Capsule())
             if meal.isCooked {
                 Label("Pişti", systemImage: "checkmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(heroInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

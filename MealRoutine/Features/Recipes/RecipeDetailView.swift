@@ -308,7 +308,7 @@ struct RecipeDetailView: View {
     private var savePortionButton: some View {
         Button("Porsiyonu kaydet", action: savePortionDraft)
             .buttonStyle(.bordered)
-            .tint(Theme.accent)
+            .tint(Theme.sage)
             .accessibilityHint(portionContext.mealUUID == nil
                 ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
                 : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
@@ -544,7 +544,7 @@ struct RecipeDetailView: View {
         } label: {
             Image(systemName: isLoved ? "heart.fill" : "heart")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(isLoved ? Theme.accent : Theme.textCharcoal)
+                .foregroundStyle(isLoved ? Theme.sage : Theme.textCharcoal)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -562,13 +562,13 @@ struct RecipeDetailView: View {
             HStack(spacing: 12) {
                 Label(rating.title, systemImage: rating.systemImage)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.sage)
                     .accessibilityLabel("Mevcut puan: \(rating.title)")
                 Spacer(minLength: 8)
                 Button("Puanı değiştir", action: viewModel.presentRatingChange)
                     .font(.subheadline.weight(.semibold))
                     .buttonStyle(.bordered)
-                    .tint(Theme.accent)
+                    .tint(Theme.sage)
             }
         }
         .padding(.vertical, 4)
@@ -631,7 +631,7 @@ private struct RecipeMetaChips: View {
         .foregroundStyle(Theme.textCharcoal)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Theme.accent.opacity(0.12), in: Capsule())
+        .background(Theme.sage.opacity(0.12), in: Capsule())
         .fixedSize(horizontal: true, vertical: true)
     }
 }

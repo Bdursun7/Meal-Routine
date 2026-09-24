@@ -60,7 +60,7 @@ struct OnboardingView: View {
                 bottomBar
             }
         }
-        .tint(Theme.accent)
+        .tint(Theme.sage)
         .onAppear {
             viewModel.loadChips(from: recipes)
             viewModel.trackStartIfNeeded()
@@ -95,14 +95,10 @@ struct OnboardingView: View {
     private var slogan: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 20) {
                     sloganMark
-                        .frame(maxWidth: .infinity)
-                        .frame(height: max(geo.size.height * 0.28, 88))
-                    Spacer(minLength: 8)
                     sloganLine
                         .padding(.horizontal, 24)
-                    Spacer(minLength: 32)
                 }
                 .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
@@ -116,10 +112,9 @@ struct OnboardingView: View {
         Image(uiImage: AppIconMark.image)
             .resizable()
             .interpolation(.high)
-            .scaledToFill()
-            .frame(width: 68, height: 68)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+            .scaledToFit()
+            .frame(width: 112, height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .accessibilityHidden(true)
     }
 
@@ -148,7 +143,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Image(systemName: "fork.knife")
                         .font(.system(size: heroIconSize))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.sage)
                         .accessibilityHidden(true)
                     Text("Haftan, önceden planlı.")
                         .font(.largeTitle.bold())
@@ -380,10 +375,10 @@ struct OnboardingView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("\(index)/\(OnboardingStep.progressTotal)")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.sage)
                 .accessibilityLabel("Adım \(index) / \(OnboardingStep.progressTotal)")
             ProgressView(value: Double(index), total: Double(OnboardingStep.progressTotal))
-                .tint(Theme.accent)
+                .tint(Theme.sage)
                 .accessibilityHidden(true)
         }
     }
@@ -391,7 +386,7 @@ struct OnboardingView: View {
     private func bullet(_ text: String, systemImage: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: systemImage)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.sage)
                 .frame(width: 28)
                 .accessibilityHidden(true)
             Text(text)
@@ -409,7 +404,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
                 .background(isSelected ? Theme.accent : Color(.secondarySystemFill))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .foregroundStyle(isSelected ? Theme.onAccent : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -447,7 +442,7 @@ struct OnboardingView: View {
                 .frame(minHeight: 44)
                 .padding(.horizontal, 4)
                 .buttonStyle(.bordered)
-                .tint(isSelected ? Theme.accent : .secondary)
+                .tint(isSelected ? Theme.sage : .secondary)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
@@ -468,7 +463,7 @@ struct OnboardingView: View {
 
             Button("Düzenle", action: edit)
                 .buttonStyle(.bordered)
-                .tint(Theme.accent)
+                .tint(Theme.sage)
                 .frame(minHeight: 44)
                 .accessibilityLabel("\(title), düzenle")
         }

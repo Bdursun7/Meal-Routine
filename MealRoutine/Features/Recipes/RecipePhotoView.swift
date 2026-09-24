@@ -56,12 +56,12 @@ struct RecipePhotoView: View {
                 ZStack {
                     if layout == .hero || layout == .backdrop {
                         LinearGradient(
-                            colors: [Theme.accent.opacity(0.92), Theme.accent.opacity(0.55), Theme.sage.opacity(0.85)],
+                            colors: [Theme.sage.opacity(0.95), Theme.sage.opacity(0.72)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     } else {
-                        Theme.accent.opacity(0.16)
+                        Theme.sage.opacity(0.16)
                     }
                     if let image, phase == .shown {
                         Image(uiImage: image)
@@ -119,12 +119,12 @@ struct RecipePhotoView: View {
                 .frame(width: isLarge ? 132 : 28, height: isLarge ? 132 : 28)
                 .offset(x: isLarge ? -36 : -8, y: isLarge ? 10 : 2)
             Circle()
-                .fill(Theme.sage.opacity(isLarge ? 0.55 : 0.9))
+                .fill(Theme.accent.opacity(isLarge ? 0.9 : 0.85))
                 .frame(width: isLarge ? 72 : 18, height: isLarge ? 72 : 18)
                 .offset(x: isLarge ? 48 : 8, y: isLarge ? -28 : -6)
             Image(systemName: "fork.knife")
                 .font(.system(size: isLarge ? 42 : 16, weight: .semibold))
-                .foregroundStyle(isLarge ? Color.white : Theme.accent)
+                .foregroundStyle(isLarge ? Color.white : Theme.sage)
             if isLarge {
                 Image(systemName: "leaf.fill")
                     .font(.title.weight(.semibold))
