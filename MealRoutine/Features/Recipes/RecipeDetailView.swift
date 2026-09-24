@@ -36,83 +36,112 @@ struct RecipeDetailView: View {
     }
 
     var body: some View {
+        attachAlerts(noticeBehavior(navigationChrome(detailRoot)))
+    }
+
+    @ViewBuilder
+    private var detailRoot: some View {
+        if let recipe {
+            content(recipe)
+        } else {
+            ContentUnavailableView(
+                "Tarif bulunamadı",
+                systemImage: "questionmark.circle",
+                description: Text(route.slug)
+            )
+        }
+    }
+
+    private func navigationChrome<Content: View>(_ root: Content) -> some View {
+        root
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarRole(.editor)
+            .toolbarBackground(Theme.bgCream, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(content: favoriteToolbar)
+            .overlay { ratingOverlay }
+    }
+
+    @ToolbarContentBuilder
+    private func favoriteToolbar() -> some ToolbarContent {
+        if recipe != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                favoriteHeart(isLoved: currentRating == .loved)
+            }
+        }
+    }
+
+    private var ratingOverlay: some View {
         Group {
-            if let recipe {
-                content(recipe)
-            } else {
-                ContentUnavailableView(
-                    "Tarif bulunamadı",
-                    systemImage: "questionmark.circle",
-                    description: Text(route.slug)
+            if viewModel.isShowingRatingPrompt {
+                CookRatingPrompt(
+                    currentRating: currentRating,
+                    onSelect: { rating in
+                        viewModel.saveRating(rating: rating, slug: route.slug, in: modelContext)
+                    },
+                    onCancel: viewModel.cancelRating
                 )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarRole(.editor)
-        .toolbarBackground(Theme.bgCream, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbar {
-            if recipe != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    favoriteHeart(isLoved: currentRating == .loved)
-                }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isShowingRatingPrompt)
+        .allowsHitTesting(viewModel.isShowingRatingPrompt)
+    }
+
+    private func noticeBehavior<Content: View>(_ root: Content) -> some View {
+        root
+            .sensoryFeedback(.success, trigger: viewModel.savedNotice?.id) { _, newValue in
+                newValue != nil
             }
-        }
-        .overlay {
-            Group {
-                if viewModel.isShowingRatingPrompt {
-                    CookRatingPrompt(
-                        currentRating: currentRating,
-                        onSelect: { rating in
-                            viewModel.saveRating(rating: rating, slug: route.slug, in: modelContext)
-                        },
-                        onCancel: viewModel.cancelRating
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
+            .onChange(of: viewModel.savedNotice?.id) { _, newID in
+                announceSavedNotice(newID)
             }
-            .animation(.easeInOut(duration: 0.2), value: viewModel.isShowingRatingPrompt)
-            .allowsHitTesting(viewModel.isShowingRatingPrompt)
-        }
-        .sensoryFeedback(.success, trigger: viewModel.savedNotice?.id) { _, newValue in
-            newValue != nil
-        }
-        .onChange(of: viewModel.savedNotice?.id) { _, newID in
-            guard newID != nil, let notice = viewModel.savedNotice else { return }
-            AccessibilityNotification.Announcement(notice.message).post()
-        }
-        .task(id: viewModel.savedNotice?.id) {
-            guard viewModel.savedNotice != nil else { return }
-            try? await Task.sleep(for: .seconds(3.2))
-            guard !Task.isCancelled else { return }
-            viewModel.dismissSavedNotice()
-        }
-        .onAppear {
-            Analytics.track(.recipeOpened)
-        }
-        .alert(
-            "Kaydedilemedi",
-            isPresented: alertIsPresented
-        ) {
-            Button("Tamam", role: .cancel) {}
-        } message: {
-            Text(viewModel.errorMessage ?? "")
-        }
-        .alert("Kaydedildi", isPresented: portionStatusIsPresented) {
-            Button("Tamam", role: .cancel) {}
-        } message: {
-            Text(viewModel.portionStatusMessage ?? "")
-        }
-        .onChange(of: portionContext) { _, newContext in
-            let draftMatchesWrite = portionDraft == lastWrittenServings || portionDraft == newContext.persisted
-            guard portionDraftContext == newContext.contextID,
-                  lastWrittenContext == newContext.contextID,
-                  draftMatchesWrite
-            else { return }
-            portionDraft = nil
-            portionDraftContext = nil
-        }
+            .task(id: viewModel.savedNotice?.id) {
+                await dismissSavedNoticeAfterDelay()
+            }
+            .onAppear {
+                Analytics.track(.recipeOpened)
+            }
+            .onChange(of: portionContext) { _, newContext in
+                clearPortionDraftIfSaved(newContext)
+            }
+    }
+
+    private func attachAlerts<Content: View>(_ root: Content) -> some View {
+        root
+            .alert("Kaydedilemedi", isPresented: alertIsPresented) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
+            .alert("Kaydedildi", isPresented: portionStatusIsPresented) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(viewModel.portionStatusMessage ?? "")
+            }
+    }
+
+    private func announceSavedNotice(_ newID: UUID?) {
+        guard newID != nil, let notice = viewModel.savedNotice else { return }
+        AccessibilityNotification.Announcement(notice.message).post()
+    }
+
+    private func dismissSavedNoticeAfterDelay() async {
+        guard viewModel.savedNotice != nil else { return }
+        try? await Task.sleep(for: .seconds(3.2))
+        guard !Task.isCancelled else { return }
+        viewModel.dismissSavedNotice()
+    }
+
+    private func clearPortionDraftIfSaved(_ newContext: PortionContext) {
+        let draftMatchesWrite = portionDraft == lastWrittenServings || portionDraft == newContext.persisted
+        guard portionDraftContext == newContext.contextID,
+              lastWrittenContext == newContext.contextID,
+              draftMatchesWrite
+        else { return }
+        portionDraft = nil
+        portionDraftContext = nil
     }
 
     private var householdSize: Int {
@@ -188,95 +217,128 @@ struct RecipeDetailView: View {
 
     private func recipeList(_ recipe: Recipe) -> some View {
         List {
-            Section {
-                recipeHero(recipe)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Theme.bgCream)
-                if let currentRating {
-                    currentRatingRow(currentRating)
-                        .recipeDetailRow()
-                }
-            }
-
-            if !recipe.displaySummary.isEmpty {
-                Section("Özet") {
-                    Text(recipe.displaySummary)
-                        .recipeDetailRow()
-                }
-            }
-
-            if !recipe.diets.isEmpty {
-                Section("Beslenme") {
-                    Text(recipe.diets.map(DietLabel.turkish).joined(separator: " · "))
-                        .recipeDetailRow()
-                }
-            }
-
-            Section {
-                Stepper(value: servingsBinding, in: HouseholdSizeLimits.range) {
-                    Text(portionContext.mealUUID == nil
-                         ? "Ev halkı: \(activeServings) kişi"
-                         : "Bu akşam: \(activeServings) kişi")
-                }
-                .accessibilityLabel("Porsiyon \(activeServings) kişi")
-                .recipeDetailRow()
-                Text(portionFootnote(baseServings: recipe.baseServings))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.secondaryText)
-                    .recipeDetailRow()
-                Button("Porsiyonu kaydet") {
-                    let saved = activeServings
-                    let contextID = portionContext.contextID
-                    viewModel.savePortions(
-                        servings: saved,
-                        mealUUID: portionContext.mealUUID,
-                        in: modelContext
-                    )
-                    if viewModel.errorMessage == nil {
-                        lastWrittenContext = contextID
-                        lastWrittenServings = saved
-                        portionDraftContext = contextID
-                        portionDraft = saved
-                    }
-                }
-                .buttonStyle(.bordered)
-                .tint(Theme.accent)
-                .accessibilityHint(portionContext.mealUUID == nil
-                    ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
-                    : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
-                .recipeDetailRow()
-            } header: {
-                Text("Porsiyon")
-            }
-
-            Section("Malzemeler") {
-                ForEach(recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }) { line in
-                    ingredientRow(line, baseServings: recipe.baseServings)
-                        .recipeDetailRow()
-                }
-            }
-
-            Section("Adımlar") {
-                let steps = recipe.steps.sorted { $0.sortIndex < $1.sortIndex }
-                ForEach(steps) { step in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(step.sortIndex + 1). \(step.displayText)")
-                        if let minutes = step.minutes {
-                            Text("\(minutes) dk")
-                                .font(.caption)
-                                .foregroundStyle(Theme.secondaryText)
-                        }
-                    }
-                    .recipeDetailRow()
-                }
-            }
-
+            heroSection(recipe)
+            summarySection(recipe)
+            dietSection(recipe)
+            portionSection(recipe)
+            ingredientSection(recipe)
+            stepsSection(recipe)
         }
         .listStyle(.plain)
         .listSectionSeparator(.hidden)
         .mealCanvas()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func heroSection(_ recipe: Recipe) -> some View {
+        Section {
+            recipeHero(recipe)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Theme.bgCream)
+            if let currentRating {
+                currentRatingRow(currentRating)
+                    .recipeDetailRow()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func summarySection(_ recipe: Recipe) -> some View {
+        if !recipe.displaySummary.isEmpty {
+            Section("Özet") {
+                Text(recipe.displaySummary)
+                    .recipeDetailRow()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func dietSection(_ recipe: Recipe) -> some View {
+        if !recipe.diets.isEmpty {
+            Section("Beslenme") {
+                Text(recipe.diets.map(DietLabel.turkish).joined(separator: " · "))
+                    .recipeDetailRow()
+            }
+        }
+    }
+
+    private func portionSection(_ recipe: Recipe) -> some View {
+        Section {
+            portionStepper
+            Text(portionFootnote(baseServings: recipe.baseServings))
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+                .recipeDetailRow()
+            savePortionButton
+        } header: {
+            Text("Porsiyon")
+        }
+    }
+
+    private var portionStepper: some View {
+        Stepper(value: servingsBinding, in: HouseholdSizeLimits.range) {
+            Text(portionContext.mealUUID == nil
+                 ? "Ev halkı: \(activeServings) kişi"
+                 : "Bu akşam: \(activeServings) kişi")
+        }
+        .accessibilityLabel("Porsiyon \(activeServings) kişi")
+        .recipeDetailRow()
+    }
+
+    private var savePortionButton: some View {
+        Button("Porsiyonu kaydet", action: savePortionDraft)
+            .buttonStyle(.bordered)
+            .tint(Theme.accent)
+            .accessibilityHint(portionContext.mealUUID == nil
+                ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
+                : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
+            .recipeDetailRow()
+    }
+
+    private func savePortionDraft() {
+        let saved = activeServings
+        let contextID = portionContext.contextID
+        viewModel.savePortions(
+            servings: saved,
+            mealUUID: portionContext.mealUUID,
+            in: modelContext
+        )
+        guard viewModel.errorMessage == nil else { return }
+        lastWrittenContext = contextID
+        lastWrittenServings = saved
+        portionDraftContext = contextID
+        portionDraft = saved
+    }
+
+    private func ingredientSection(_ recipe: Recipe) -> some View {
+        Section("Malzemeler") {
+            ForEach(recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }) { line in
+                ingredientRow(line, baseServings: recipe.baseServings)
+                    .recipeDetailRow()
+            }
+        }
+    }
+
+    private func stepsSection(_ recipe: Recipe) -> some View {
+        let steps = recipe.steps.sorted { $0.sortIndex < $1.sortIndex }
+        return Section("Adımlar") {
+            ForEach(steps) { step in
+                stepRow(step)
+            }
+        }
+    }
+
+    private func stepRow(_ step: RecipeStep) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(step.sortIndex + 1). \(step.displayText)")
+            if let minutes = step.minutes {
+                Text("\(minutes) dk")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .recipeDetailRow()
     }
 
     /// Docked under the list, above the tab bar. The list scrolls in the space above it.
