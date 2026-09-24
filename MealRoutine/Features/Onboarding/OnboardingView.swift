@@ -123,7 +123,7 @@ struct OnboardingView: View {
                     Text("Akşam sayısı")
                         .font(.headline)
                     Stepper(value: $viewModel.evenings, in: 1...MealRecommender.eveningCap) {
-                        Text("Akşam sayısı: \(viewModel.evenings)")
+                        Text("Akşam sayısı: \($viewModel.evenings)")
                     }
                     .frame(minHeight: 44)
                     Text("Haftada en fazla 5 akşam.")
