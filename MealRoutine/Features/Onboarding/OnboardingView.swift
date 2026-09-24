@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// First-run flow: welcome, the positioning line, then Ev, dislikes, a short taste sample, and a summary.
 /// The week is built only from “Haftamı oluştur” on the summary.
@@ -95,12 +96,9 @@ struct OnboardingView: View {
         GeometryReader { geo in
             ScrollView {
                 VStack(spacing: 0) {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(Theme.sage.opacity(colorScheme == .dark ? 0.8 : 0.9))
+                    sloganMark
                         .frame(maxWidth: .infinity)
                         .frame(height: max(geo.size.height * 0.28, 88))
-                        .accessibilityHidden(true)
                     Spacer(minLength: 8)
                     sloganLine
                         .padding(.horizontal, 24)
@@ -111,6 +109,18 @@ struct OnboardingView: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .background(sloganBackground.ignoresSafeArea())
+    }
+
+    /// Same artwork as the catalog app icon. The AppIcon set is not a named image, so `Image("AppIcon")` is empty on iOS.
+    private var sloganMark: some View {
+        Image(uiImage: AppIconMark.image)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+            .frame(width: 68, height: 68)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+            .accessibilityHidden(true)
     }
 
     private var sloganLine: some View {
@@ -466,4 +476,9 @@ struct OnboardingView: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
+}
+
+/// In-app named image of `AppIcon.appiconset`. The primary icon set cannot be loaded with `UIImage(named: "AppIcon")`.
+private enum AppIconMark {
+    static let image = UIImage(named: "AppIconMark") ?? UIImage()
 }
