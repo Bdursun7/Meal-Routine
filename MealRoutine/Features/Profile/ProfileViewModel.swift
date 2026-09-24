@@ -12,6 +12,7 @@ final class ProfileViewModel {
     var didLoad = false
     var statusMessage: String?
     var errorMessage: String?
+    var isConfirmingReset = false
     /// Last values read from the store. An untouched stepper adopts a save made elsewhere.
     private var loadedHousehold = 2
     private var loadedEvenings = 5
@@ -101,6 +102,30 @@ final class ProfileViewModel {
             _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)
             try GroceryListService.rebuild(in: context)
             statusMessage = "Bu hafta yeniden kuruldu."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Deletes household prefs, the week, the grocery list, ratings, and the exposure log.
+    /// The bundled recipe catalog stays on device.
+    func resetLocalData(in context: ModelContext) {
+        do {
+            let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
+            let items = try context.fetch(FetchDescriptor<GroceryItem>())
+            let orphanMeals = meals.filter { $0.week == nil }
+            let orphanItems = items.filter { $0.week == nil }
+            let weeks = try context.fetch(FetchDescriptor<PlanWeek>())
+            for week in weeks { context.delete(week) }
+            for meal in orphanMeals { context.delete(meal) }
+            for item in orphanItems { context.delete(item) }
+            let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
+            for entry in feedback { context.delete(entry) }
+            let storedPrefs = try context.fetch(FetchDescriptor<UserPrefs>())
+            for prefs in storedPrefs { context.delete(prefs) }
+            try context.save()
+            UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
+            didLoad = false
         } catch {
             errorMessage = error.localizedDescription
         }

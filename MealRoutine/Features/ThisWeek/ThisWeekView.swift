@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct ThisWeekView: View {
+    @Binding var selectedTab: AppTab
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [PlanWeek]
     @Query private var recipes: [Recipe]
@@ -22,6 +23,7 @@ struct ThisWeekView: View {
             householdSize: householdSize
         )
         let summary = viewModel.summary(meals: meals)
+        let featured = viewModel.featuredEvening(in: meals)
 
         NavigationStack {
             Group {
@@ -40,7 +42,13 @@ struct ThisWeekView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            summaryCard(summary)
+                            progressCard(summary)
+                            if let featured {
+                                tonightCard(featured)
+                            }
+                            Text("Haftanın akşamları")
+                                .font(.headline)
+                                .padding(.top, 4)
                             ForEach(meals) { meal in
                                 WeekMealCard(
                                     meal: meal,
@@ -81,19 +89,84 @@ struct ThisWeekView: View {
         )
     }
 
-    private func summaryCard(_ summary: WeekSummaryPresentation) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Haftalık özet")
+    private func progressCard(_ summary: WeekSummaryPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Haftalık ilerleme")
                 .font(.headline)
-            Text("\(summary.cooked)/\(summary.planned) yemek pişirildi · \(summary.loved) sevildi")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Text("\(summary.cooked)/\(summary.planned) yemek pişirildi")
+                .font(.title3.weight(.semibold))
+            ProgressView(value: Double(summary.cooked), total: Double(max(summary.planned, 1)))
+                .tint(Theme.accent)
+            if summary.loved > 0 {
+                Text("\(summary.loved) sevildi")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                selectedTab = .grocery
+            } label: {
+                Label("Market listesi", systemImage: "cart")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Theme.accent.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func tonightCard(_ meal: WeekMealPresentation) -> some View {
+        let meta = meal.difficultyTitle.isEmpty
+            ? "\(meal.minutes) dk"
+            : "\(meal.minutes) dk · \(meal.difficultyTitle)"
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(viewModel.featuredEveningTitle(for: meal))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                Spacer()
+                Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(meal.recipeName)
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(meta)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if meal.isCooked {
+                Label("Pişti", systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+            }
+            HStack(spacing: 8) {
+                NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
+                    Text("Tarifi aç")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                Button("Değiştir") {
+                    viewModel.replace(mealID: meal.id, in: modelContext)
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
+                .disabled(viewModel.isWorking)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
     }
 
 }

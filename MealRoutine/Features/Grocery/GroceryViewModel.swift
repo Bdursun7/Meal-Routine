@@ -6,9 +6,27 @@ struct GroceryRowPresentation: Identifiable, Equatable {
     var id: UUID
     var name: String
     var detail: String
+    var category: GroceryCategory
     var hasUnitConflict: Bool
     var isChecked: Bool
     var isManual: Bool
+}
+
+struct GrocerySectionPresentation: Identifiable, Equatable {
+    var category: GroceryCategory
+    var rows: [GroceryRowPresentation]
+
+    var id: String { category.rawValue }
+}
+
+struct GroceryListPresentation: Equatable {
+    var openSections: [GrocerySectionPresentation]
+    var checked: [GroceryRowPresentation]
+    var conflictCount: Int
+    var checkedCount: Int
+    var totalCount: Int
+
+    var isEmpty: Bool { totalCount == 0 }
 }
 
 @MainActor
@@ -22,7 +40,25 @@ final class GroceryViewModel {
 
     static let manualUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "toTaste"]
 
-    func rows(weeks: [PlanWeek], now: Date = .now) -> [GroceryRowPresentation] {
+    func presentation(weeks: [PlanWeek], now: Date = .now) -> GroceryListPresentation {
+        let rows = sortedRows(weeks: weeks, now: now)
+        let open = rows.filter { !$0.isChecked }
+        let checked = rows.filter(\.isChecked)
+        let sections = GroceryCategory.sectionOrder.compactMap { category -> GrocerySectionPresentation? in
+            let inAisle = open.filter { $0.category == category }
+            guard !inAisle.isEmpty else { return nil }
+            return GrocerySectionPresentation(category: category, rows: inAisle)
+        }
+        return GroceryListPresentation(
+            openSections: sections,
+            checked: checked,
+            conflictCount: Set(rows.filter(\.hasUnitConflict).map(\.name)).count,
+            checkedCount: checked.count,
+            totalCount: rows.count
+        )
+    }
+
+    private func sortedRows(weeks: [PlanWeek], now: Date) -> [GroceryRowPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
         guard let week = weeks.first(where: { WeekCalendar.isSameDay($0.weekStart, start) }) else {
             return []
@@ -33,22 +69,18 @@ final class GroceryViewModel {
                     id: item.uuid,
                     name: item.displayName,
                     detail: QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit),
+                    category: GroceryCategory.classify(ingredientId: item.ingredientId, name: item.displayName),
                     hasUnitConflict: item.hasUnitConflict,
                     isChecked: item.isChecked,
                     isManual: item.isManual
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.isChecked != rhs.isChecked { return !lhs.isChecked }
                 if lhs.hasUnitConflict != rhs.hasUnitConflict { return lhs.hasUnitConflict }
                 let order = lhs.name.localizedStandardCompare(rhs.name)
                 if order != .orderedSame { return order == .orderedAscending }
                 return lhs.detail < rhs.detail
             }
-    }
-
-    func conflictCount(in rows: [GroceryRowPresentation]) -> Int {
-        Set(rows.filter(\.hasUnitConflict).map(\.name)).count
     }
 
     func rebuild(in context: ModelContext) {

@@ -122,10 +122,19 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Akşam sayısı")
                         .font(.headline)
-                    Stepper(value: $viewModel.evenings, in: 1...MealRecommender.eveningCap) {
-                        Text("Akşam sayısı: \($viewModel.evenings)")
+                    Text("Haftada kaç akşam planlayalım?")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    FlowLayout {
+                        ForEach(EveningCountOptions.values, id: \.self) { count in
+                            selectionChip(
+                                title: EveningCountOptions.label(count),
+                                isSelected: viewModel.evenings == count
+                            ) {
+                                viewModel.evenings = count
+                            }
+                        }
                     }
-                    .frame(minHeight: 44)
                     Text("Haftada en fazla 5 akşam.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
