@@ -1,13 +1,15 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
-/// First-run flow: welcome, then Ev, dislikes, a short taste sample, and a summary.
+/// First-run flow: welcome, the positioning line, then Ev, dislikes, a short taste sample, and a summary.
 /// The week is built only from “Haftamı oluştur” on the summary.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var recipes: [Recipe]
     @State private var viewModel = OnboardingViewModel()
     @ScaledMetric(relativeTo: .largeTitle) private var heroIconSize: CGFloat = 40
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -15,6 +17,8 @@ struct OnboardingView: View {
                 switch viewModel.step {
                 case .welcome:
                     welcome
+                case .slogan:
+                    slogan
                 case .household:
                     household
                 case .dislikes:
@@ -26,10 +30,10 @@ struct OnboardingView: View {
                 }
             }
             .navigationTitle(viewModel.step.title)
-            .navigationBarTitleDisplayMode(viewModel.step == .welcome ? .inline : .large)
+            .navigationBarTitleDisplayMode(viewModel.step == .welcome || viewModel.step == .slogan ? .inline : .large)
             .toolbar(navigationVisibility, for: .navigationBar)
             .toolbar {
-                if viewModel.step != .welcome {
+                if showsSetupChrome {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             viewModel.goBack()
@@ -67,7 +71,70 @@ struct OnboardingView: View {
     }
 
     private var navigationVisibility: Visibility {
-        viewModel.step == .welcome ? .hidden : .visible
+        showsSetupChrome ? .visible : .hidden
+    }
+
+    /// Welcome and the slogan are full-bleed. Setup steps keep the back button and progress.
+    private var showsSetupChrome: Bool {
+        switch viewModel.step {
+        case .welcome, .slogan: false
+        case .household, .dislikes, .taste, .summary: true
+        }
+    }
+
+    /// Light cream. Dark uses the system background, not a lifted cream card.
+    private var sloganBackground: Color {
+        colorScheme == .dark ? Color(.systemBackground) : Theme.bgCream
+    }
+
+    private var sloganBodyColor: Color {
+        colorScheme == .dark ? .primary : Theme.textCharcoal
+    }
+
+    /// Shown once, after welcome and before Ev. Copy is locked.
+    private var slogan: some View {
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 16) {
+                    sloganMark
+                    sloganLine
+                        .padding(.horizontal, 24)
+                }
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(sloganBackground.ignoresSafeArea())
+    }
+
+    /// Same artwork as the catalog app icon. The AppIcon set is not a named image, so `Image("AppIcon")` is empty on iOS.
+    private var sloganMark: some View {
+        Image(uiImage: AppIconMark.image)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: 112, height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    private var sloganLine: some View {
+        (
+            Text("Diğer uygulamalar neler pişirebileceğini gösterir. ")
+                .font(.title2)
+                .foregroundStyle(sloganBodyColor)
+            + Text("MealRoutine")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            + Text(" ise gerçekten ne pişirmek istediğini öğrenir.")
+                .font(.title2)
+                .foregroundStyle(sloganBodyColor)
+        )
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Diğer uygulamalar neler pişirebileceğini gösterir. MealRoutine ise gerçekten ne pişirmek istediğini öğrenir.")
     }
 
     private var welcome: some View {
@@ -256,6 +323,12 @@ struct OnboardingView: View {
                     viewModel.continueForward()
                 }
                 .buttonStyle(PrimaryButtonStyle())
+            case .slogan:
+                Button("Devam") {
+                    viewModel.continueForward()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityLabel("Devam")
             case .household, .dislikes:
                 Button("Devam") {
                     viewModel.continueForward()
@@ -286,8 +359,15 @@ struct OnboardingView: View {
                 .disabled(viewModel.isSaving)
             }
         }
-        .padding(16)
-        .background(.bar)
+        .padding(.horizontal, viewModel.step == .slogan ? 24 : 16)
+        .padding(.vertical, 16)
+        .background {
+            if viewModel.step == .slogan {
+                sloganBackground.ignoresSafeArea(edges: .bottom)
+            } else {
+                Rectangle().fill(.bar)
+            }
+        }
     }
 
     private var progressHeader: some View {
@@ -391,4 +471,9 @@ struct OnboardingView: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
+}
+
+/// In-app named image of `AppIcon.appiconset`. The primary icon set cannot be loaded with `UIImage(named: "AppIcon")`.
+private enum AppIconMark {
+    static let image = UIImage(named: "AppIconMark") ?? UIImage()
 }

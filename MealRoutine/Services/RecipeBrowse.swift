@@ -138,8 +138,9 @@ enum RecipeBrowse {
 
     private static func matchesSearch(_ item: RecipeBrowseItem, _ text: String) -> Bool {
         guard !text.isEmpty else { return true }
-        return item.displayName.localizedCaseInsensitiveContains(text)
-            || item.nameEN.localizedCaseInsensitiveContains(text)
-            || item.country.localizedCaseInsensitiveContains(text)
+        if item.displayName.localizedCaseInsensitiveContains(text) { return true }
+        if item.nameEN.localizedCaseInsensitiveContains(text) { return true }
+        if item.country.localizedCaseInsensitiveContains(text) { return true }
+        return item.tags.contains { $0.localizedCaseInsensitiveContains(text) }
     }
 }

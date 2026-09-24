@@ -11,9 +11,16 @@ final class RecipeListViewModel {
     var lovedOnly = false
     var errorMessage: String?
 
-    var hasActiveFilters: Bool {
+    var hasSearchText: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var hasChipFilters: Bool {
         category != .all || cookTime != .any || lovedOnly
-            || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var hasActiveFilters: Bool {
+        hasChipFilters || hasSearchText
     }
 
     func clearFilters() {

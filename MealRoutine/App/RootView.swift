@@ -35,6 +35,9 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas.ignoresSafeArea())
+        .mealAppearance()
         .task(id: seedAttempt) {
             await seedCatalog()
         }

@@ -23,67 +23,59 @@ struct MealReplacementSheet: View {
             prefs: prefs
         )
         NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.cardGap) {
                     Text("Bunun yerine ne istersin?")
                         .font(.title3.bold())
+                        .foregroundStyle(Theme.textCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                     if !board.currentName.isEmpty {
                         Text(board.currentName)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    FlowLayout(spacing: 8) {
-                        ForEach(ReplacementChip.allCases) { chip in
-                            FilterChip(
-                                title: chip.title,
-                                isSelected: chips.contains(chip),
-                                hint: "Bu akşamın alternatiflerini süzer"
-                            ) {
-                                chips = MealReplacement.toggled(chips, chip)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(ReplacementChip.allCases) { chip in
+                                FilterChip(
+                                    title: chip.title,
+                                    isSelected: chips.contains(chip),
+                                    hint: "Bu akşamın alternatiflerini süzer"
+                                ) {
+                                    chips = MealReplacement.toggled(chips, chip)
+                                }
                             }
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
-                }
-                if board.choices.isEmpty {
-                    Section {
+                    if board.choices.isEmpty {
                         Text("Bu filtreye uyan tarif kalmadı. Çipleri gevşet.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    Section {
-                        ForEach(board.choices) { choice in
-                            Button {
-                                commit(choice.slug)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(choice.name)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text(meta(choice))
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text(choice.reason)
-                                        .font(.subheadline)
-                                        .foregroundStyle(Theme.accent)
-                                        .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(board.choices) { choice in
+                                Button {
+                                    commit(choice.slug)
+                                } label: {
+                                    ReplacementChoiceRow(choice: choice)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                .padding(.vertical, 4)
+                                .buttonStyle(.plain)
+                                .disabled(isWorking)
+                                .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
+                                .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
                             }
-                            .disabled(isWorking)
-                            .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
-                            .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
                         }
+                        .padding(.top, 4)
                     }
                 }
+                .padding(Theme.screenPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .background(Theme.bgCream)
             .navigationTitle("Değiştir")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -99,7 +91,9 @@ struct MealReplacementSheet: View {
             }
         }
         .tint(Theme.accent)
-        .presentationDetents([.large])
+        .mealAppearance()
+        .presentationDetents([.medium, .large])
+        .presentationBackground(Theme.canvas)
     }
 
     private var alertIsPresented: Binding<Bool> {
@@ -109,13 +103,6 @@ struct MealReplacementSheet: View {
                 if !isPresented { errorMessage = nil }
             }
         )
-    }
-
-    private func meta(_ choice: ReplacementChoicePresentation) -> String {
-        var parts = ["\(choice.minutes) dk"]
-        if !choice.difficultyTitle.isEmpty { parts.append(choice.difficultyTitle) }
-        if !choice.categoryTitle.isEmpty { parts.append(choice.categoryTitle) }
-        return parts.joined(separator: " · ")
     }
 
     private func commit(_ slug: String) {
@@ -129,5 +116,53 @@ struct MealReplacementSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct ReplacementChoiceRow: View {
+    var choice: ReplacementChoicePresentation
+    @State private var isPhotoShown = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            RecipePhotoView(
+                urlString: choice.photoURL,
+                author: choice.photoAuthor,
+                license: choice.photoLicense,
+                layout: .plate,
+                isPhotoShown: $isPhotoShown
+            )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(choice.name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.textCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label("\(choice.minutes) dk", systemImage: "clock")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                if !choice.reason.isEmpty {
+                    Text(choice.reason)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if isPhotoShown {
+                    RecipePhotoCreditText(
+                        author: choice.photoAuthor,
+                        license: choice.photoLicense,
+                        style: .compact
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
+        }
+        .padding(12)
+        .background(Theme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
     }
 }

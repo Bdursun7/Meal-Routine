@@ -111,6 +111,7 @@ final class ProfileViewModel {
     /// The bundled recipe catalog stays on device.
     func resetLocalData(in context: ModelContext) {
         do {
+            GroceryListService.discardRebuildCache()
             let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
             let items = try context.fetch(FetchDescriptor<GroceryItem>())
             let orphanMeals = meals.filter { $0.week == nil }
@@ -121,6 +122,8 @@ final class ProfileViewModel {
             for item in orphanItems { context.delete(item) }
             let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
             for entry in feedback { context.delete(entry) }
+            let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+            for check in checks { context.delete(check) }
             let storedPrefs = try context.fetch(FetchDescriptor<UserPrefs>())
             for prefs in storedPrefs { context.delete(prefs) }
             try context.save()

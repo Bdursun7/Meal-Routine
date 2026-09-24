@@ -14,10 +14,11 @@ struct RecipeListView: View {
         NavigationStack {
             Group {
                 if recipes.isEmpty {
-                    ContentUnavailableView(
-                        "Tarif yok",
-                        systemImage: "book.closed",
-                        description: Text("Katalog henüz yüklenmedi.")
+                    WarmEmptyState(
+                        title: "Tarifler yolda",
+                        message: "Katalog açılınca akşam yemekleri burada listelenir.",
+                        symbolName: "book.closed",
+                        accentSymbolName: "fork.knife"
                     )
                 } else {
                     List {
@@ -32,17 +33,7 @@ struct RecipeListView: View {
                         }
                         if visible.isEmpty {
                             Section {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Eşleşen tarif yok")
-                                        .font(.headline)
-                                    Text("Bu aramaya veya filtrelere uyan tarif yok.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Button("Filtreleri temizle", action: viewModel.clearFilters)
-                                        .frame(minHeight: 44)
-                                }
-                                .padding(.vertical, 8)
+                                recipeSearchEmpty
                             }
                         } else {
                             Section {
@@ -62,19 +53,49 @@ struct RecipeListView: View {
                             }
                         }
                     }
+                    .mealCanvas()
+                    .searchable(
+                        text: $viewModel.searchText,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Tarif ara"
+                    )
                 }
             }
             .navigationTitle("Tarifler")
             .navigationDestination(for: RecipeRoute.self) { route in
-                RecipeDetailView(route: route)
+                RecipeDetailView(route: route, allowsCookBar: false)
             }
-            .searchable(text: $viewModel.searchText, prompt: "Tarif ara")
             .alert("Kaydedilemedi", isPresented: alertIsPresented) {
                 Button("Tamam", role: .cancel) {}
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
         }
+    }
+
+    private var recipeSearchEmpty: some View {
+        let searching = viewModel.hasSearchText
+        let filtering = viewModel.hasChipFilters
+        let title = searching ? "Sonuç yok" : "Bu süzgeçte tarif yok"
+        let message: String
+        if searching && filtering {
+            message = "Bu arama ve süzgeçle eşleşen tarif yok."
+        } else if searching {
+            message = "Bu aramayla eşleşen tarif yok."
+        } else {
+            message = "Filtreleri temizleyince bütün katalog geri gelir."
+        }
+        let actionTitle = searching && !filtering ? "Aramayı temizle" : "Filtreleri temizle"
+        return WarmEmptyState(
+            title: title,
+            message: message,
+            symbolName: searching ? "magnifyingglass" : "line.3.horizontal.decrease.circle",
+            accentSymbolName: "book.closed",
+            actionTitle: actionTitle,
+            action: { viewModel.clearFilters() },
+            isCompact: true
+        )
+        .listRowBackground(Theme.cardSurface)
     }
 
     private var alertIsPresented: Binding<Bool> {
@@ -195,5 +216,6 @@ private struct RecipeListRow: View {
             .accessibilityHint(isLoved ? "Sevdiklerim listesinden çıkarır" : "Pişirmeden Sevdiklerime ekler")
         }
         .padding(.vertical, 4)
+        .listRowBackground(Theme.card)
     }
 }

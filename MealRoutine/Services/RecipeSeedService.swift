@@ -26,6 +26,7 @@ enum RecipeSeedService {
             catalogRecipeCount: bundled.file.recipes.count
         ) {
             try importCatalog(bundled, bundle: bundle, into: context)
+            GroceryListService.discardRebuildCache()
             logger.info("Seeded bundled recipes into SwiftData")
         }
 

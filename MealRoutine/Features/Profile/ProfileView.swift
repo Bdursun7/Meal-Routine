@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system
     @Query private var prefs: [UserPrefs]
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
@@ -29,7 +30,7 @@ struct ProfileView: View {
                     Button("Porsiyonu kaydet") {
                         viewModel.savePortions(in: modelContext)
                     }
-                    Text("Ev halkını kaydetmek bu haftanın her akşamını aynı porsiyona çeker. Tarif detayı ve market aynı sayıyı kullanır. İşaretli market satırları durur.")
+                    Text("Ev halkını kaydetmek bu haftanın her akşamını aynı porsiyona çeker. Tarif detayı ve market aynı sayıyı kullanır. Miktarı değişen satırın işareti kalkar; aynı miktar işaretli kalır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Button("Bu haftayı yeniden kur") {
@@ -79,6 +80,16 @@ struct ProfileView: View {
                 }
 
                 Section("Uygulama") {
+                    Picker("Görünüm", selection: $appearance) {
+                        ForEach(AppAppearance.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .accessibilityHint("Açık, koyu veya sistem görünümünü seçer")
+                    Text("Sistem, telefonun açık veya koyu ayarını kullanır.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     NavigationLink {
                         PrivacyView()
                     } label: {
@@ -114,6 +125,7 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("Profil")
+            .mealCanvas()
             .alert("Güncellendi", isPresented: statusIsPresented) {
                 Button("Tamam", role: .cancel) {}
             } message: {
@@ -124,10 +136,10 @@ struct ProfileView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-            .confirmationDialog(
+            // Centered system alert. confirmationDialog anchors under the nav bar on this tab.
+            .alert(
                 "Yerel veriyi sıfırla?",
-                isPresented: $viewModel.isConfirmingReset,
-                titleVisibility: .visible
+                isPresented: $viewModel.isConfirmingReset
             ) {
                 Button("Sıfırla", role: .destructive) {
                     viewModel.resetLocalData(in: modelContext)
@@ -246,7 +258,7 @@ private struct CookingHistoryView: View {
             } else {
                 List(rows, id: \.uuid) { item in
                     NavigationLink {
-                        RecipeDetailView(route: RecipeRoute(slug: item.recipeSlug))
+                        RecipeDetailView(route: RecipeRoute(slug: item.recipeSlug), allowsCookBar: false)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(recipeName(item.recipeSlug))
@@ -302,7 +314,7 @@ private struct RatedRecipesView: View {
             } else {
                 List(slugs, id: \.self) { slug in
                     NavigationLink {
-                        RecipeDetailView(route: RecipeRoute(slug: slug))
+                        RecipeDetailView(route: RecipeRoute(slug: slug), allowsCookBar: false)
                     } label: {
                         Label(recipeName(slug), systemImage: kind.systemImage)
                     }

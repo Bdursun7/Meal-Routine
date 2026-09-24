@@ -7,6 +7,10 @@ struct RecipePhotoView: View {
     enum Layout {
         case hero
         case thumbnail
+        /// Square plate for a replacement card.
+        case plate
+        /// Full-bleed photo behind a magazine card. The parent clips and credits it.
+        case backdrop
     }
 
     private enum Phase: Equatable {
@@ -44,50 +48,91 @@ struct RecipePhotoView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Color.clear
-                .frame(maxWidth: layout == .hero ? .infinity : 64)
-                .frame(width: layout == .thumbnail ? 64 : nil, height: layout == .hero ? 220 : 64)
-                .overlay {
-                    ZStack {
+        Color.clear
+            .frame(maxWidth: fillsWidth ? .infinity : side)
+            .frame(width: fillsWidth ? nil : side, height: layout == .backdrop ? nil : side)
+            .frame(minHeight: layout == .backdrop ? 180 : nil)
+            .overlay {
+                ZStack {
+                    if layout == .hero || layout == .backdrop {
+                        LinearGradient(
+                            colors: [Theme.accent.opacity(0.92), Theme.accent.opacity(0.55), Theme.sage.opacity(0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    } else {
                         Theme.accent.opacity(0.16)
-                        if let image, phase == .shown {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: layout == .hero ? 36 : 18, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
-                        }
-                        if phase == .loading, layout == .hero {
-                            ProgressView()
-                                .tint(Theme.accent)
-                                .padding(12)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        }
+                    }
+                    if let image, phase == .shown {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        placeholderMark
+                    }
+                    if phase == .loading, layout == .hero || layout == .backdrop {
+                        ProgressView()
+                            .tint(Theme.onAccent)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     }
                 }
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: layout == .hero ? 14 : 10, style: .continuous))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(accessibilityText)
-                .accessibilityAddTraits(phase == .shown ? .isImage : [])
+            }
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityAddTraits(phase == .shown ? .isImage : [])
+            .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
+            .task(id: urlString) {
+                await load()
+            }
+    }
 
-            if layout == .hero, phase == .shown {
-                RecipePhotoCreditText(author: author, license: license, style: .full)
-            }
-            if layout == .hero, phase == .missing {
-                Text("Fotoğraf yok")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+    private var fillsWidth: Bool {
+        layout == .hero || layout == .backdrop
+    }
+
+    private var cornerRadius: CGFloat {
+        switch layout {
+        case .hero, .backdrop: 0
+        case .thumbnail: 12
+        case .plate: 16
+        }
+    }
+
+    private var side: CGFloat {
+        switch layout {
+        case .hero: 220
+        case .thumbnail: 64
+        case .plate: 72
+        case .backdrop: 180
+        }
+    }
+
+    /// Stacked plate mark used when the catalog photo is missing or still loading.
+    private var placeholderMark: some View {
+        let isLarge = layout == .hero || layout == .backdrop
+        return ZStack {
+            Circle()
+                .fill(Color.white.opacity(isLarge ? 0.22 : 0.9))
+                .frame(width: isLarge ? 132 : 28, height: isLarge ? 132 : 28)
+                .offset(x: isLarge ? -36 : -8, y: isLarge ? 10 : 2)
+            Circle()
+                .fill(Theme.sage.opacity(isLarge ? 0.55 : 0.9))
+                .frame(width: isLarge ? 72 : 18, height: isLarge ? 72 : 18)
+                .offset(x: isLarge ? 48 : 8, y: isLarge ? -28 : -6)
+            Image(systemName: "fork.knife")
+                .font(.system(size: isLarge ? 42 : 16, weight: .semibold))
+                .foregroundStyle(isLarge ? Color.white : Theme.accent)
+            if isLarge {
+                Image(systemName: "leaf.fill")
+                    .font(.title.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.92))
+                    .offset(x: -58, y: -42)
             }
         }
-        .frame(maxWidth: layout == .hero ? .infinity : nil, alignment: .leading)
-        .task(id: urlString) {
-            await load()
-        }
+        .accessibilityHidden(true)
     }
 
     private var accessibilityText: String {
@@ -117,8 +162,11 @@ struct RecipePhotoView: View {
             phase = .failed
             return
         }
-        let maxPixel: CGFloat = layout == .hero ? 1600 : 256
-        guard let decoded = RecipePhotoDecoder.image(from: data, maxPixel: maxPixel) else {
+        let maxPixel: CGFloat = layout == .hero ? 1200 : (layout == .backdrop ? 800 : 256)
+        let decoded = await Task.detached(priority: .userInitiated) {
+            RecipePhotoDecoder.image(from: data, maxPixel: maxPixel)
+        }.value
+        guard let decoded else {
             RecipePhotoDiskCache.remove(
                 remoteURL: remoteURL,
                 directory: RecipePhotoDiskCache.defaultDirectory()

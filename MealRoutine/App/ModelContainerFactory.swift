@@ -10,6 +10,7 @@ enum ModelContainerFactory {
             PlanWeek.self,
             PlannedMeal.self,
             GroceryItem.self,
+            IngredientCheck.self,
             UserPrefs.self,
             RecipeFeedback.self,
             CatalogImportState.self,

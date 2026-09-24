@@ -18,7 +18,7 @@ struct CookRatingPrompt: View {
 
             promptContent
                 .frame(maxWidth: 360)
-                .background(Color(.systemBackground))
+                .background(Theme.card)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
                 .padding(.horizontal, 24)
@@ -34,7 +34,7 @@ struct CookRatingPrompt: View {
             VStack(spacing: 6) {
                 Text("Bu yemek nasıldı?")
                     .font(.title3.bold())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .focused($isTitleFocused)
@@ -83,10 +83,10 @@ struct CookRatingPrompt: View {
                         .foregroundStyle(Theme.accent)
                 }
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(Theme.ink)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(isCurrent ? Theme.accent.opacity(0.14) : Color(.secondarySystemBackground))
+            .background(isCurrent ? Theme.accent.opacity(0.16) : Theme.cream)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -109,11 +109,11 @@ struct SavedRatingToast: View {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.sage)
                     .accessibilityHidden(true)
                 Text(notice.message)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -122,12 +122,12 @@ struct SavedRatingToast: View {
             .frame(maxWidth: 340)
             .background {
                 ZStack {
-                    Capsule().fill(Color(.systemBackground))
-                    Capsule().fill(Color.green.opacity(0.16))
+                    Capsule().fill(Theme.card)
+                    Capsule().fill(Theme.sage.opacity(0.18))
                 }
             }
             .overlay {
-                Capsule().strokeBorder(Color.green.opacity(0.7), lineWidth: 1.5)
+                Capsule().strokeBorder(Theme.sage.opacity(0.7), lineWidth: 1.5)
             }
             .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
         }

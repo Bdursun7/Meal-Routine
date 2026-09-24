@@ -24,6 +24,18 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Lightweight aisle mark. Not a custom illustration.
+    var symbolName: String {
+        switch self {
+        case .produce: "carrot"
+        case .protein: "fish"
+        case .dairyAndEggs: "cup.and.saucer"
+        case .pantry: "cabinet"
+        case .spicesAndSauces: "flame"
+        case .other: "basket"
+        }
+    }
+
     static let sectionOrder: [GroceryCategory] = [
         .produce, .protein, .dairyAndEggs, .pantry, .spicesAndSauces, .other
     ]

@@ -9,6 +9,7 @@ OUT="${TMPDIR:-/tmp}/meal-portion-checks"
   "$ROOT/MealRoutine/Support/Formatters.swift" \
   "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
   "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
+  "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
   "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \
   "$ROOT/Tools/portion_scale_checks.swift"
 (cd "$ROOT" && "$OUT")
