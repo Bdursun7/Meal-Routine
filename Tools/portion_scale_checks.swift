@@ -123,22 +123,40 @@ private func checkReconcileKeepsChecks() {
 
     let plan = GroceryListReconciler.plan(
         existingAuto: [
-            AutoGroceryRow(id: checked, ingredientId: "chicken", unit: "g", isChecked: true),
+            AutoGroceryRow(id: checked, ingredientId: "chicken", unit: "g", quantity: 625, isChecked: true),
         ],
         merged: grown
     )
     check(plan.inserts.isEmpty && plan.deletes.isEmpty, "unit flip does not orphan the row \(plan)")
     check(
-        plan.updates.count == 1 && plan.updates.first?.existingID == checked && plan.updates.first?.isChecked == true,
-        "check survives g → kg"
+        plan.updates.count == 1 && plan.updates.first?.existingID == checked && plan.updates.first?.isChecked == false,
+        "a larger amount clears the check when grams become kilograms \(plan)"
+    )
+
+    let sameMass = UUID()
+    let equivalent = GroceryMerger.merge([
+        GrocerySourceLine(ingredientId: "chicken", nameTR: "Tavuk", nameEN: "", quantity: 1, unit: "kg"),
+    ])
+    let sameAmount = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: sameMass, ingredientId: "chicken", unit: "g", quantity: 1_000, isChecked: true),
+        ],
+        merged: equivalent
+    )
+    check(sameAmount.inserts.isEmpty && sameAmount.deletes.isEmpty, "equivalent mass reuses the row \(sameAmount)")
+    check(
+        sameAmount.updates.count == 1
+            && sameAmount.updates.first?.existingID == sameMass
+            && sameAmount.updates.first?.isChecked == true,
+        "check survives g → kg when the amount is the same"
     )
 
     let unchecked = UUID()
     let alsoChecked = UUID()
     let preferChecked = GroceryListReconciler.plan(
         existingAuto: [
-            AutoGroceryRow(id: unchecked, ingredientId: "chicken", unit: "g", isChecked: false),
-            AutoGroceryRow(id: alsoChecked, ingredientId: "chicken", unit: "kg", isChecked: true),
+            AutoGroceryRow(id: unchecked, ingredientId: "chicken", unit: "g", quantity: 625, isChecked: false),
+            AutoGroceryRow(id: alsoChecked, ingredientId: "chicken", unit: "kg", quantity: 1.25, isChecked: true),
         ],
         merged: grown
     )
@@ -156,11 +174,126 @@ private func checkReconcileKeepsChecks() {
     ])
     let separate = GroceryListReconciler.plan(
         existingAuto: [
-            AutoGroceryRow(id: piece, ingredientId: "onion", unit: "piece", isChecked: true),
+            AutoGroceryRow(id: piece, ingredientId: "onion", unit: "piece", quantity: 2, isChecked: true),
         ],
         merged: grams
     )
     check(separate.updates.isEmpty && separate.inserts == [0] && separate.deletes == [piece], "piece check is not applied to grams")
+}
+
+private func mergedLine(_ id: String, quantity: Double?, unit: String, name: String) -> [MergedGroceryLine] {
+    GroceryMerger.merge([
+        GrocerySourceLine(ingredientId: id, nameTR: name, nameEN: name, quantity: quantity, unit: unit),
+    ])
+}
+
+private func checkQuantityChangeClearsCheck() {
+    let tomato = UUID()
+    let three = mergedLine("tomato", quantity: 3, unit: "piece", name: "Domates")
+    let five = mergedLine("tomato", quantity: 5, unit: "piece", name: "Domates")
+    check(three.first?.quantity == 3 && five.first?.quantity == 5, "tomato rows merge as pieces")
+
+    let increased = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: tomato, ingredientId: "tomato", unit: "piece", quantity: 3, isChecked: true),
+        ],
+        merged: five
+    )
+    check(
+        increased.updates.count == 1
+            && increased.updates.first?.existingID == tomato
+            && increased.inserts.isEmpty
+            && increased.deletes.isEmpty
+            && increased.updates.first?.isChecked == false,
+        "checked tomato 3 → 5 is unchecked on the same row \(increased)"
+    )
+
+    let unchanged = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: tomato, ingredientId: "tomato", unit: "adet", quantity: 3, isChecked: true),
+        ],
+        merged: three
+    )
+    check(
+        unchanged.updates.count == 1 && unchanged.updates.first?.isChecked == true,
+        "unchanged tomato quantity stays checked"
+    )
+
+    let alreadyOpen = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: tomato, ingredientId: "tomato", unit: "piece", quantity: 3, isChecked: false),
+        ],
+        merged: five
+    )
+    check(alreadyOpen.updates.first?.isChecked == false, "an open row stays open when the amount grows")
+
+    let customSame = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(
+                id: tomato,
+                ingredientId: "tomato",
+                unit: "piece",
+                quantity: 3,
+                isChecked: true,
+                quantityIsCustom: true
+            ),
+        ],
+        merged: five
+    )
+    check(
+        customSame.updates.first?.isChecked == true && customSame.deletes.isEmpty,
+        "custom quantity 3 stays checked when the planned amount becomes 5"
+    )
+
+    check(
+        GroceryCheckState.checkedAfterQuantityEdit(
+            wasChecked: true,
+            previousQuantity: 3,
+            unit: "piece",
+            editedQuantity: 5
+        ) == false,
+        "hand-edited 3 → 5 clears the check"
+    )
+    check(
+        GroceryCheckState.checkedAfterQuantityEdit(
+            wasChecked: true,
+            previousQuantity: 3,
+            unit: "piece",
+            editedQuantity: 3
+        ),
+        "hand-edited same amount keeps the check"
+    )
+    check(
+        GroceryCheckState.keepsCheckAfterRebuild(
+            wasChecked: true,
+            storedQuantity: 3,
+            storedUnit: "piece",
+            plannedQuantity: 5,
+            plannedUnit: "piece",
+            quantityIsCustom: true
+        ),
+        "custom rebuild compares the displayed 3, not the planned 5"
+    )
+    check(
+        GroceryCheckState.keepsCheck(
+            wasChecked: true,
+            previousQuantity: 3,
+            previousUnit: "piece",
+            nextQuantity: 5,
+            nextUnit: "piece"
+        ) == false,
+        "a custom row unchecks when its displayed amount changes"
+    )
+
+    let taste = UUID()
+    let toTaste = mergedLine("salt", quantity: nil, unit: "toTaste", name: "Tuz")
+    let tastePlan = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: taste, ingredientId: "salt", unit: "damak tadına", quantity: nil, isChecked: true),
+        ],
+        merged: toTaste
+    )
+    check(tastePlan.updates.first?.isChecked == true, "unchanged to-taste row stays checked")
 }
 
 @main
@@ -170,6 +303,7 @@ struct PortionScaleChecks {
         checkScalingSemantics()
         checkPerMealGrocerySum()
         checkReconcileKeepsChecks()
+        checkQuantityChangeClearsCheck()
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)
             exit(1)

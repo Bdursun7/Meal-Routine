@@ -28,15 +28,21 @@ struct GroceryView: View {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(list.checkedCount)/\(list.totalCount) alındı")
-                                    .font(.headline)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(Theme.ink)
+                                Text(progressDetail(list))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 ProgressView(
                                     value: Double(list.checkedCount),
                                     total: Double(max(list.totalCount, 1))
                                 )
-                                .tint(Theme.accent)
+                                .tint(Theme.sage)
                                 .accessibilityLabel("\(list.checkedCount) / \(list.totalCount) ürün alındı")
                             }
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 6)
+                            .listRowBackground(Theme.card)
                         }
                         if list.conflictCount > 0 {
                             Section {
@@ -52,6 +58,7 @@ struct GroceryView: View {
                             Section(section.category.title) {
                                 ForEach(section.rows) { row in
                                     groceryRow(row)
+                                        .listRowBackground(Theme.card)
                                 }
                             }
                         }
@@ -59,6 +66,7 @@ struct GroceryView: View {
                             Section("Alındı") {
                                 ForEach(list.checked) { row in
                                     groceryRow(row, showsAisle: true)
+                                        .listRowBackground(Theme.card)
                                 }
                             }
                         }
@@ -71,6 +79,7 @@ struct GroceryView: View {
                     .refreshable {
                         viewModel.rebuild(in: modelContext)
                     }
+                    .mealCanvas()
                 }
             }
             .navigationTitle("Market")
@@ -99,6 +108,12 @@ struct GroceryView: View {
         }
     }
 
+    private func progressDetail(_ list: GroceryListPresentation) -> String {
+        let remaining = list.totalCount - list.checkedCount
+        if remaining == 0 { return "Liste tamam" }
+        return "\(remaining) ürün · \(list.openSections.count) grup kaldı"
+    }
+
     private var alertIsPresented: Binding<Bool> {
         Binding(
             get: { viewModel.errorMessage != nil },
@@ -114,9 +129,9 @@ struct GroceryView: View {
             Button {
                 viewModel.toggle(row.id, in: modelContext)
             } label: {
-                Image(systemName: row.isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(row.isChecked ? Theme.accent : Color.secondary)
+                Image(systemName: row.isChecked ? "checkmark.square.fill" : "square")
+                    .font(.title2)
+                    .foregroundStyle(row.isChecked ? Theme.sage : Color.secondary)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityHidden(true)
             }
@@ -184,6 +199,8 @@ struct GroceryView: View {
             }
         }
         .presentationDetents([.medium])
+        .presentationBackground(Theme.canvas)
+        .mealAppearance()
     }
 }
 

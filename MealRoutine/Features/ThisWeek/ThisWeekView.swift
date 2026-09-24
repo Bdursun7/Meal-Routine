@@ -10,6 +10,7 @@ struct ThisWeekView: View {
     @Query private var prefs: [UserPrefs]
     @State private var viewModel = ThisWeekViewModel()
     @State private var replacingMeal: ReplacingMeal?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var householdSize: Int {
         let stored = prefs.min { $0.createdAt < $1.createdAt }?.householdSize ?? 2
@@ -45,13 +46,20 @@ struct ThisWeekView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             progressCard(summary)
                             if let featured {
-                                tonightCard(featured)
+                                TonightDinnerCard(
+                                    meal: featured,
+                                    recipe: recipes.first { $0.slug == featured.slug },
+                                    title: viewModel.featuredEveningTitle(for: featured),
+                                    isWorking: viewModel.isWorking,
+                                    onReplace: { replacingMeal = ReplacingMeal(id: featured.id) }
+                                )
                             }
                             if let insight = viewModel.preferenceInsight(recipes: recipes, feedback: feedback) {
                                 insightCard(insight)
                             }
                             Text("Haftanın akşamları")
                                 .font(.headline)
+                                .foregroundStyle(Theme.ink)
                                 .padding(.top, 4)
                             ForEach(meals) { meal in
                                 WeekMealCard(
@@ -64,9 +72,11 @@ struct ThisWeekView: View {
                         }
                         .padding(16)
                     }
+                    .background(Theme.canvas)
                 }
             }
             .navigationTitle("Bu Hafta")
+            .background(Theme.canvas)
             .navigationDestination(for: RecipeRoute.self) { route in
                 RecipeDetailView(route: route)
             }
@@ -98,13 +108,36 @@ struct ThisWeekView: View {
     }
 
     private func progressCard(_ summary: WeekSummaryPresentation) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) {
+                    WeekProgressRing(cooked: summary.cooked, planned: summary.planned)
+                    progressCopy(summary)
+                }
+            } else {
+                HStack(alignment: .center, spacing: 16) {
+                    WeekProgressRing(cooked: summary.cooked, planned: summary.planned)
+                    progressCopy(summary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .mealCardSurface()
+        .accessibilityElement(children: .contain)
+    }
+
+    private func progressCopy(_ summary: WeekSummaryPresentation) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Haftalık ilerleme")
                 .font(.headline)
+                .foregroundStyle(Theme.ink)
             Text("\(summary.cooked)/\(summary.planned) yemek pişirildi")
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
             ProgressView(value: Double(summary.cooked), total: Double(max(summary.planned, 1)))
-                .tint(Theme.accent)
+                .tint(Theme.sage)
             if summary.loved > 0 {
                 Text("\(summary.loved) sevildi")
                     .font(.subheadline)
@@ -121,71 +154,6 @@ struct ThisWeekView: View {
             .tint(Theme.accent)
             .accessibilityHint("Market sekmesini açar")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.accent.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func tonightCard(_ meal: WeekMealPresentation) -> some View {
-        let meta = meal.difficultyTitle.isEmpty
-            ? "\(meal.minutes) dk"
-            : "\(meal.minutes) dk · \(meal.difficultyTitle)"
-        return VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(viewModel.featuredEveningTitle(for: meal))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                    Spacer()
-                    Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(meal.recipeName)
-                    .font(.title2.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(meta)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if meal.isCooked {
-                    Label("Pişti", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(viewModel.featuredEveningTitle(for: meal)). \(meal.recipeName). \(meta)")
-
-            AdaptiveActions {
-                NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
-                    Text("Tarifi aç")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .accessibilityLabel("Tarifi aç")
-                .accessibilityHint("\(meal.recipeName) tarifini açar")
-            } second: {
-                Button("Değiştir") {
-                    replacingMeal = ReplacingMeal(id: meal.id)
-                }
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .buttonStyle(.bordered)
-                .tint(Theme.accent)
-                .disabled(viewModel.isWorking)
-                .accessibilityLabel("Değiştir")
-                .accessibilityHint("Bu akşam için alternatif tarifleri açar")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .accessibilityElement(children: .contain)
     }
 
     private func insightCard(_ insight: PreferenceInsight) -> some View {
@@ -200,8 +168,7 @@ struct ThisWeekView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Theme.cream)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .mealCardSurface()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(insight.title). \(insight.message)")
     }
@@ -254,7 +221,7 @@ private struct WeekMealCard: View {
                 if meal.isCooked {
                     Label("Pişti", systemImage: "checkmark.circle.fill")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.sage)
                 }
             }
 
@@ -302,7 +269,113 @@ private struct WeekMealCard: View {
             .accessibilityHint("Bu akşam için alternatif tarifleri açar")
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .mealCardSurface()
+    }
+}
+
+private struct WeekProgressRing: View {
+    var cooked: Int
+    var planned: Int
+    @ScaledMetric(relativeTo: .headline) private var side: CGFloat = 76
+
+    private var fraction: Double {
+        guard planned > 0 else { return 0 }
+        return min(1, Double(cooked) / Double(planned))
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Theme.sage.opacity(0.22), lineWidth: 8)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(Theme.sage, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("\(cooked)/\(planned)")
+                .font(.headline)
+                .foregroundStyle(Theme.ink)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .padding(.horizontal, 6)
+        }
+        .frame(width: min(side, 112), height: min(side, 112))
+        .accessibilityHidden(true)
+    }
+}
+
+private struct TonightDinnerCard: View {
+    var meal: WeekMealPresentation
+    var recipe: Recipe?
+    var title: String
+    var isWorking: Bool
+    var onReplace: () -> Void
+    @State private var isPhotoShown = false
+
+    private var meta: String {
+        meal.difficultyTitle.isEmpty
+            ? "\(meal.minutes) dk"
+            : "\(meal.minutes) dk · \(meal.difficultyTitle)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            RecipePhotoView(
+                urlString: recipe?.photoURL ?? "",
+                author: recipe?.photoAuthor ?? "",
+                license: recipe?.photoLicense ?? "",
+                layout: .hero,
+                isPhotoShown: $isPhotoShown
+            )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    Text(meal.isToday ? meal.dayTitle : "\(meal.dayTitle) · \(meal.dateTitle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(meal.recipeName)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(meta)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if meal.isCooked {
+                    Label("Pişti", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.sage)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(title). \(meal.recipeName). \(meta)")
+
+            AdaptiveActions {
+                NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
+                    Text("Tarifi aç")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .accessibilityLabel("Tarifi aç")
+                .accessibilityHint("\(meal.recipeName) tarifini açar")
+            } second: {
+                Button("Değiştir", action: onReplace)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .buttonStyle(.bordered)
+                    .tint(Theme.accent)
+                    .disabled(isWorking)
+                    .accessibilityLabel("Değiştir")
+                    .accessibilityHint("Bu akşam için alternatif tarifleri açar")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .mealCardSurface()
+        .accessibilityElement(children: .contain)
     }
 }

@@ -62,6 +62,7 @@ struct RecipeListView: View {
                             }
                         }
                     }
+                    .mealCanvas()
                 }
             }
             .navigationTitle("Tarifler")
@@ -195,5 +196,6 @@ private struct RecipeListRow: View {
             .accessibilityHint(isLoved ? "Sevdiklerim listesinden çıkarır" : "Pişirmeden Sevdiklerime ekler")
         }
         .padding(.vertical, 4)
+        .listRowBackground(Theme.card)
     }
 }

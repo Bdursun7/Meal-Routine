@@ -25,6 +25,8 @@ struct OnboardingView: View {
                     summary
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.canvas)
             .navigationTitle(viewModel.step.title)
             .navigationBarTitleDisplayMode(viewModel.step == .welcome ? .inline : .large)
             .toolbar(navigationVisibility, for: .navigationBar)
@@ -323,8 +325,12 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
-                .background(isSelected ? Theme.accent : Color(.secondarySystemFill))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .background(isSelected ? Theme.accent : Theme.cream)
+                .foregroundStyle(isSelected ? Theme.onAccent : Theme.ink)
+                .overlay {
+                    Capsule()
+                        .strokeBorder(isSelected ? Color.clear : Theme.accent.opacity(0.35), lineWidth: 1)
+                }
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -343,8 +349,7 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .mealCardSurface()
     }
 
     private func ratingButtons(for slug: String) -> some View {
@@ -388,7 +393,6 @@ struct OnboardingView: View {
                 .accessibilityLabel("\(title), düzenle")
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .mealCardSurface()
     }
 }

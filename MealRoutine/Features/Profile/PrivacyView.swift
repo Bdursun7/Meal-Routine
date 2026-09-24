@@ -28,7 +28,7 @@ struct PrivacyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
         }
-        .background(Theme.cream.opacity(0.35))
+        .background(Theme.canvas)
         .navigationTitle("Gizlilik")
         .navigationBarTitleDisplayMode(.inline)
     }

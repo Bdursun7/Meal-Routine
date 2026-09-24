@@ -182,28 +182,34 @@ struct RecipeDetailView: View {
     private func content(_ recipe: Recipe) -> some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ZStack(alignment: .topTrailing) {
+                        RecipePhotoView(
+                            urlString: recipe.photoURL,
+                            author: recipe.photoAuthor,
+                            license: recipe.photoLicense,
+                            layout: .hero,
+                            isPhotoShown: $isHeroPhotoShown
+                        )
+                        favoriteHeart(isLoved: currentRating == .loved)
+                            .padding(8)
+                    }
                     Text(recipe.displayName)
                         .font(.title2.bold())
+                        .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("\(recipe.totalMinutes) dk · \(activeServings) kişilik")
                         .foregroundStyle(.secondary)
                     Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    RecipePhotoView(
-                        urlString: recipe.photoURL,
-                        author: recipe.photoAuthor,
-                        license: recipe.photoLicense,
-                        layout: .hero,
-                        isPhotoShown: $isHeroPhotoShown
-                    )
                 }
                 .padding(.vertical, 4)
+                .listRowBackground(Theme.card)
                 if let currentRating {
                     currentRatingRow(currentRating)
+                        .listRowBackground(Theme.card)
                 }
-                favoriteButton(isLoved: currentRating == .loved)
             }
 
             if !recipe.displaySummary.isEmpty {
@@ -243,8 +249,8 @@ struct RecipeDetailView: View {
                         portionDraft = saved
                     }
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
                 .accessibilityHint(portionContext.mealUUID == nil
                     ? "Ev halkını kaydeder, bu haftanın akşamlarını aynı sayıya çeker ve market listesini günceller"
                     : "Bu akşamın porsiyonunu kaydeder ve market listesini günceller")
@@ -276,8 +282,10 @@ struct RecipeDetailView: View {
                 Button("Bunu pişirdim") {
                     viewModel.markCooked(plannedMealUUID: route.plannedMealUUID)
                 }
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .buttonStyle(PrimaryButtonStyle())
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Theme.canvas)
+                .accessibilityHint("Pişirme puanını sorar")
             }
 
             Section("Kaynak") {
@@ -286,6 +294,7 @@ struct RecipeDetailView: View {
                     .textSelection(.enabled)
             }
         }
+        .mealCanvas()
     }
 
     private func ingredientKey(_ line: IngredientLine) -> String {
@@ -310,9 +319,9 @@ struct RecipeDetailView: View {
             }
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isChecked ? Theme.accent : Color.secondary)
+                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                    .font(.title2)
+                    .foregroundStyle(isChecked ? Theme.sage : Color.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.displayName)
@@ -346,20 +355,19 @@ struct RecipeDetailView: View {
         return "\(amounts) \(scope)"
     }
 
-    private func favoriteButton(isLoved: Bool) -> some View {
+    private func favoriteHeart(isLoved: Bool) -> some View {
         Button {
             viewModel.toggleFavorite(isLoved: isLoved, slug: route.slug, in: modelContext)
         } label: {
-            Label(
-                isLoved ? "Favorilerde" : "Favorilere ekle",
-                systemImage: isLoved ? "heart.fill" : "heart"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            Image(systemName: isLoved ? "heart.fill" : "heart")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(isLoved ? Theme.accent : Color.white)
+                .frame(width: 44, height: 44)
+                .background(Color.black.opacity(isLoved ? 0.55 : 0.38), in: Circle())
         }
-        .buttonStyle(.bordered)
-        .tint(Theme.accent)
+        .buttonStyle(.plain)
         .accessibilityLabel(isLoved ? "Favorilerde" : "Favorilere ekle")
+        .accessibilityAddTraits(isLoved ? .isSelected : [])
         .accessibilityHint(isLoved ? "Sevdiklerim listesinden çıkarır" : "Pişirmeden Sevdiklerime ekler")
     }
 

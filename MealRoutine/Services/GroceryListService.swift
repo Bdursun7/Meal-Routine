@@ -4,8 +4,10 @@ import SwiftData
 /// Rebuilds the current week's shopping list from planned meals.
 /// Each meal is scaled to its own `servings`, or to the household size when
 /// that value is missing. Lines are then merged on ingredient id plus canonical unit.
-/// Manual rows stay. A checked automatic row stays checked when the same
-/// ingredient comes back, including when grams become kilograms.
+/// Manual rows stay. A checked automatic row stays checked when the amount
+/// on screen is unchanged, including when grams and kilograms are the same
+/// mass. A changed amount clears the check. A hand-edited quantity is kept;
+/// its check clears only when that displayed amount itself changes.
 enum GroceryListService {
     @MainActor
     static func rebuild(in context: ModelContext, now: Date = .now) throws {
@@ -53,7 +55,9 @@ enum GroceryListService {
                     id: $0.uuid,
                     ingredientId: $0.ingredientId,
                     unit: $0.unit,
-                    isChecked: $0.isChecked
+                    quantity: $0.quantity,
+                    isChecked: $0.isChecked,
+                    quantityIsCustom: $0.quantityIsCustom
                 )
             },
             merged: merged
@@ -75,16 +79,19 @@ enum GroceryListService {
             )
             let nextUnit = match.quantityIsCustom ? match.unit : normalizedUnit
             let nextConflict = match.quantityIsCustom ? match.hasUnitConflict : line.hasUnitConflict
+            let nextChecked = update.isChecked
             if match.nameTR != line.nameTR
                 || match.nameEN != line.nameEN
                 || match.quantity != nextQuantity
                 || match.unit != nextUnit
-                || match.hasUnitConflict != nextConflict {
+                || match.hasUnitConflict != nextConflict
+                || match.isChecked != nextChecked {
                 match.nameTR = line.nameTR
                 match.nameEN = line.nameEN
                 match.quantity = nextQuantity
                 match.unit = nextUnit
                 match.hasUnitConflict = nextConflict
+                match.isChecked = nextChecked
                 didChange = true
             }
         }
@@ -131,11 +138,18 @@ enum GroceryListService {
         }
     }
 
-    /// Writes a new amount and keeps the stored unit, aisle, and checked state.
+    /// Writes a new amount and keeps the stored unit and aisle.
+    /// A different amount clears the check so the new figure is visible.
     @MainActor
     static func updateQuantity(_ uuid: UUID, quantity: Double, in context: ModelContext) throws {
         let items = try context.fetch(FetchDescriptor<GroceryItem>())
         guard let item = items.first(where: { $0.uuid == uuid }) else { return }
+        item.isChecked = GroceryCheckState.checkedAfterQuantityEdit(
+            wasChecked: item.isChecked,
+            previousQuantity: item.quantity,
+            unit: item.unit,
+            editedQuantity: quantity
+        )
         item.quantity = quantity
         item.quantityIsCustom = true
         try context.save()

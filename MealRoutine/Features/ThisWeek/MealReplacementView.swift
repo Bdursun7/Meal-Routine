@@ -46,6 +46,7 @@ struct MealReplacementSheet: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .listRowBackground(Theme.card)
                 }
                 if board.choices.isEmpty {
                     Section {
@@ -75,9 +76,12 @@ struct MealReplacementSheet: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                .padding(.vertical, 4)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 4)
                             }
+                            .buttonStyle(.plain)
                             .disabled(isWorking)
+                            .listRowBackground(Theme.card)
                             .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
                             .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
                         }
@@ -86,6 +90,7 @@ struct MealReplacementSheet: View {
             }
             .navigationTitle("Değiştir")
             .navigationBarTitleDisplayMode(.inline)
+            .mealCanvas()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
@@ -99,7 +104,9 @@ struct MealReplacementSheet: View {
             }
         }
         .tint(Theme.accent)
+        .mealAppearance()
         .presentationDetents([.large])
+        .presentationBackground(Theme.canvas)
     }
 
     private var alertIsPresented: Binding<Bool> {
