@@ -23,15 +23,16 @@ struct MealReplacementSheet: View {
             prefs: prefs
         )
         NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.cardGap) {
                     Text("Bunun yerine ne istersin?")
                         .font(.title3.bold())
+                        .foregroundStyle(Theme.textCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                     if !board.currentName.isEmpty {
                         Text(board.currentName)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -48,35 +49,35 @@ struct MealReplacementSheet: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    .listRowBackground(Theme.cardSurface)
-                }
-                if board.choices.isEmpty {
-                    Section {
+                    if board.choices.isEmpty {
                         Text("Bu filtreye uyan tarif kalmadı. Çipleri gevşet.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    Section {
-                        ForEach(board.choices) { choice in
-                            Button {
-                                commit(choice.slug)
-                            } label: {
-                                ReplacementChoiceRow(choice: choice)
+                            .padding(.top, 8)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(board.choices) { choice in
+                                Button {
+                                    commit(choice.slug)
+                                } label: {
+                                    ReplacementChoiceRow(choice: choice)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isWorking)
+                                .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
+                                .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
                             }
-                            .buttonStyle(.plain)
-                            .disabled(isWorking)
-                            .listRowBackground(Theme.card)
-                            .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
-                            .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
                         }
+                        .padding(.top, 4)
                     }
                 }
+                .padding(Theme.screenPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .background(Theme.bgCream)
             .navigationTitle("Değiştir")
             .navigationBarTitleDisplayMode(.inline)
-            .mealCanvas()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
@@ -91,7 +92,7 @@ struct MealReplacementSheet: View {
         }
         .tint(Theme.accent)
         .mealAppearance()
-        .presentationDetents([.large])
+        .presentationDetents([.medium, .large])
         .presentationBackground(Theme.canvas)
     }
 
@@ -123,12 +124,12 @@ private struct ReplacementChoiceRow: View {
     @State private var isPhotoShown = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             RecipePhotoView(
                 urlString: choice.photoURL,
                 author: choice.photoAuthor,
                 license: choice.photoLicense,
-                layout: .thumbnail,
+                layout: .plate,
                 isPhotoShown: $isPhotoShown
             )
             VStack(alignment: .leading, spacing: 4) {
@@ -154,7 +155,14 @@ private struct ReplacementChoiceRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(Theme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: Theme.cardShadow, radius: 16, y: 4)
     }
 }

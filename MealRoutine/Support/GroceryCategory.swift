@@ -27,10 +27,10 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
     /// Lightweight aisle mark. Not a custom illustration.
     var symbolName: String {
         switch self {
-        case .produce: "leaf"
-        case .protein: "fork.knife"
+        case .produce: "carrot"
+        case .protein: "fish"
         case .dairyAndEggs: "cup.and.saucer"
-        case .pantry: "archivebox"
+        case .pantry: "cabinet"
         case .spicesAndSauces: "flame"
         case .other: "basket"
         }

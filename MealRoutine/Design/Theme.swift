@@ -41,14 +41,41 @@ enum Theme {
     /// Success and progress only. #8FA88A. Not a primary color.
     static let sage = Color(red: 143.0 / 255.0, green: 168.0 / 255.0, blue: 138.0 / 255.0)
 
-    static let shadow = adaptive(
-        light: UIColor(white: 0, alpha: 0.06),
-        dark: UIColor(white: 0, alpha: 0.28)
+    /// Soft lift for cards. Light is black at 10%. Dark is heavier so the edge still reads.
+    static let cardShadow = adaptive(
+        light: UIColor(white: 0, alpha: 0.10),
+        dark: UIColor(white: 0, alpha: 0.42)
+    )
+    /// Tonight and other magazine cards. Light is black at 14%.
+    static let elevatedShadow = adaptive(
+        light: UIColor(white: 0, alpha: 0.14),
+        dark: UIColor(white: 0, alpha: 0.50)
+    )
+    static let shadow = cardShadow
+
+    /// Black at the top, clear by the middle. About 35% at the dark end.
+    static let scrimTop = LinearGradient(
+        colors: [Color.black.opacity(0.35), Color.clear],
+        startPoint: .top,
+        endPoint: .center
+    )
+    /// Clear through the photo, darkening to about 35% where a caption sits.
+    static let scrimBottom = LinearGradient(
+        colors: [Color.clear, Color.black.opacity(0.20), Color.black.opacity(0.55)],
+        startPoint: .top,
+        endPoint: .bottom
     )
 
     static let cardRadius: CGFloat = 22
     static let chipRadius: CGFloat = 14
     static let buttonRadius: CGFloat = 16
+    static let heroCorner: CGFloat = 24
+    static let sheetCorner: CGFloat = 28
+    static let screenPadding: CGFloat = 20
+    static let cardGap: CGFloat = 16
+    static let sectionGap: CGFloat = 28
+    /// How far a following sheet tucks over a hero.
+    static let heroOverlap: CGFloat = 24
 
     private static func ui(_ hex: UInt32, alpha: CGFloat = 1) -> UIColor {
         UIColor(
@@ -105,7 +132,7 @@ extension View {
     func mealCardSurface(fill: Color = Theme.cardSurface) -> some View {
         background(fill)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-            .shadow(color: Theme.shadow, radius: 12, y: 4)
+            .shadow(color: Theme.cardShadow, radius: 16, y: 4)
     }
 
     func mealCanvas() -> some View {
@@ -142,7 +169,7 @@ struct FilterChip: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                         .strokeBorder(
-                            isSelected ? Color.clear : Theme.accent.opacity(0.35),
+                            isSelected ? Color.clear : Theme.textCharcoal.opacity(0.16),
                             lineWidth: 1
                         )
                 }
@@ -158,6 +185,7 @@ struct FilterChip: View {
 struct ThinSageProgress: View {
     var value: Double
     var total: Double
+    var height: CGFloat = 4
 
     private var fraction: Double {
         guard total > 0 else { return 0 }
@@ -173,7 +201,7 @@ struct ThinSageProgress: View {
                     .frame(width: max(0, geo.size.width * fraction))
             }
         }
-        .frame(height: 4)
+        .frame(height: height)
         .accessibilityHidden(true)
     }
 }
@@ -196,6 +224,29 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// Rounded-square check used on recipe ingredients and market rows.
+struct MealCheckBox: View {
+    var isChecked: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(isChecked ? Theme.accent : Color.clear)
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(isChecked ? Theme.accent : Theme.secondaryText.opacity(0.85), lineWidth: 1.5)
+            }
+            .overlay {
+                if isChecked {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.onAccent)
+                }
+            }
+            .frame(width: 26, height: 26)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Illustrated empty state. Symbols stay in SF Symbols; copy stays Turkish.
 struct WarmEmptyState: View {
     var title: String
@@ -210,11 +261,12 @@ struct WarmEmptyState: View {
         VStack(spacing: isCompact ? 10 : 16) {
             ZStack {
                 Circle()
-                    .fill(Theme.accent.opacity(0.12))
-                    .frame(width: isCompact ? 72 : 112, height: isCompact ? 72 : 112)
+                    .fill(Theme.cardSurface)
+                    .frame(width: isCompact ? 72 : 132, height: isCompact ? 72 : 132)
+                    .shadow(color: Theme.cardShadow, radius: 16, y: 4)
                 Circle()
-                    .fill(Theme.sage.opacity(0.32))
-                    .frame(width: isCompact ? 40 : 68, height: isCompact ? 40 : 68)
+                    .fill(Theme.sage.opacity(0.35))
+                    .frame(width: isCompact ? 40 : 76, height: isCompact ? 40 : 76)
                     .offset(x: isCompact ? 18 : 30, y: isCompact ? 12 : 20)
                 Image(systemName: symbolName)
                     .font(.system(size: isCompact ? 26 : 36, weight: .semibold))
@@ -239,8 +291,7 @@ struct WarmEmptyState: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                    .buttonStyle(PrimaryButtonStyle())
             }
         }
         .padding(isCompact ? 8 : 28)

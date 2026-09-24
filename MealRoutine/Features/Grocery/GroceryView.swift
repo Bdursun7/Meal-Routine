@@ -62,12 +62,14 @@ struct GroceryView: View {
                         }
                         ForEach(list.openSections) { section in
                             Section {
+                                aisleHeader(section, in: list)
+                                    .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 6, trailing: 16))
+                                    .listRowBackground(Theme.bgCream)
+                                    .listRowSeparator(.hidden)
                                 ForEach(section.rows) { row in
                                     groceryRow(row)
                                         .listRowBackground(Theme.cardSurface)
                                 }
-                            } header: {
-                                aisleHeader(section, in: list)
                             }
                         }
                         if !list.checked.isEmpty {
@@ -119,15 +121,15 @@ struct GroceryView: View {
     private func aisleHeader(_ section: GrocerySectionPresentation, in list: GroceryListPresentation) -> some View {
         let done = list.checked.filter { $0.category == section.category }.count
         let total = section.rows.count + done
-        return HStack(alignment: .center, spacing: 10) {
+        let tint = section.category == .produce || section.category == .protein
+            ? Theme.accent.opacity(0.15)
+            : Theme.sage.opacity(0.22)
+        return HStack(alignment: .center, spacing: 12) {
             Image(systemName: section.category.symbolName)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(Theme.sage)
+                .foregroundStyle(section.category == .produce || section.category == .protein ? Theme.accent : Theme.sage)
                 .frame(width: 36, height: 36)
-                .background(
-                    Theme.sage.opacity(0.2),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
+                .background(tint, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
@@ -140,7 +142,7 @@ struct GroceryView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.secondaryText)
                 }
-                ThinSageProgress(value: Double(done), total: Double(max(total, 1)))
+                ThinSageProgress(value: Double(done), total: Double(max(total, 1)), height: 6)
             }
         }
         .textCase(nil)
@@ -177,21 +179,19 @@ struct GroceryView: View {
         return HStack(alignment: .top, spacing: 12) {
             Button {
                 viewModel.toggle(row.id, in: modelContext)
-            } label: {
-                Image(systemName: row.isChecked ? "checkmark.square.fill" : "square")
-                    .font(.title2)
-                    .foregroundStyle(row.isChecked ? Theme.accent : Theme.secondaryText)
+            }             label: {
+                MealCheckBox(isChecked: row.isChecked)
                     .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityHidden(true)
             }
             .buttonStyle(.borderless)
+            .sensoryFeedback(.selection, trigger: row.isChecked)
             .accessibilityLabel(groceryAccessibilityLabel(row))
             .accessibilityHint(row.isChecked ? "İşareti kaldırır" : "Alındı olarak işaretler")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
                     .strikethrough(row.isChecked)
-                    .foregroundStyle(row.isChecked ? .secondary : .primary)
+                    .foregroundStyle(row.isChecked ? Theme.secondaryText : Theme.textCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 GroceryQuantityControl(row: row, viewModel: viewModel)
                 if let remaining = row.remainingDetail, !row.isChecked {

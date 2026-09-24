@@ -49,17 +49,30 @@ struct RecipeDetailView: View {
         }
         .navigationTitle(recipe?.displayName ?? "Tarif")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: viewModel.savedNotice == nil ? 0 : 12) {
-            Group {
-                if let notice = viewModel.savedNotice {
-                    SavedRatingToast(notice: notice, onDismiss: viewModel.dismissSavedNotice)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .toolbarBackground(Theme.bgCream, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if recipe != nil {
+                VStack(spacing: 8) {
+                    if let notice = viewModel.savedNotice {
+                        SavedRatingToast(notice: notice, onDismiss: viewModel.dismissSavedNotice)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    let cooked = isCurrentMealCooked
+                    Button(cooked ? "Pişirildi" : "Bunu pişirdim") {
+                        viewModel.markCooked(plannedMealUUID: cookTarget?.uuid ?? route.plannedMealUUID)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(cooked || viewModel.isShowingRatingPrompt)
+                    .accessibilityHint(cooked ? "Bu akşam zaten pişirildi" : "Pişirme puanını sorar")
                 }
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+                .background(Theme.bgCream.opacity(0.96))
+                .animation(.easeInOut(duration: 0.2), value: viewModel.savedNotice?.id)
             }
-            .animation(.easeInOut(duration: 0.2), value: viewModel.savedNotice?.id)
         }
         .overlay {
             Group {
@@ -181,26 +194,10 @@ struct RecipeDetailView: View {
     private func content(_ recipe: Recipe) -> some View {
         List {
             Section {
-                // Photo, then the credit strip, then the title card. Keep them stacked so the title never covers the attribution.
-                VStack(alignment: .leading, spacing: 16) {
-                    ZStack(alignment: .topTrailing) {
-                        RecipePhotoView(
-                            urlString: recipe.photoURL,
-                            author: recipe.photoAuthor,
-                            license: recipe.photoLicense,
-                            layout: .hero,
-                            isPhotoShown: $isHeroPhotoShown
-                        )
-                        favoriteHeart(isLoved: currentRating == .loved)
-                            .padding(12)
-                    }
-                    recipeSummaryCard(recipe)
-                        .padding(.horizontal, 16)
-                }
-                .padding(.bottom, 8)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Theme.bgCream)
+                recipeHero(recipe)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Theme.bgCream)
                 if let currentRating {
                     currentRatingRow(currentRating)
                         .listRowBackground(Theme.cardSurface)
@@ -273,23 +270,6 @@ struct RecipeDetailView: View {
                 }
             }
 
-            Section {
-                let cooked = isCurrentMealCooked
-                Button(cooked ? "Pişirildi" : "Bunu pişirdim") {
-                    viewModel.markCooked(plannedMealUUID: cookTarget?.uuid ?? route.plannedMealUUID)
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(cooked || viewModel.isShowingRatingPrompt)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowBackground(Theme.canvas)
-                .accessibilityHint(cooked ? "Bu akşam zaten pişirildi" : "Pişirme puanını sorar")
-            }
-
-            Section("Kaynak") {
-                Text(Attribution.uniTools)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-            }
         }
         .mealCanvas()
     }
@@ -350,10 +330,8 @@ struct RecipeDetailView: View {
             )
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-                    .font(.title2)
-                    .foregroundStyle(isChecked ? Theme.accent : Theme.secondaryText)
-                    .accessibilityHidden(true)
+                MealCheckBox(isChecked: isChecked)
+                    .frame(minWidth: 44, minHeight: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.displayName)
                         .strikethrough(isChecked)
@@ -372,6 +350,7 @@ struct RecipeDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
+        .sensoryFeedback(.selection, trigger: isChecked)
         .accessibilityLabel("\(line.displayName), \(amount)")
         .accessibilityAddTraits(isChecked ? .isSelected : [])
         .accessibilityHint(isChecked ? "İşareti kaldırır" : "Malzemeyi işaretler")
@@ -386,17 +365,66 @@ struct RecipeDetailView: View {
         return "\(amounts) \(scope)"
     }
 
+    /// Photo or collage, then a cream sheet that tucks over the bottom of the hero.
+    /// The credit sits on the scrim, above the sheet, so it never shares a row with the title.
+    private func recipeHero(_ recipe: Recipe) -> some View {
+        let heroHeight: CGFloat = 260
+        let overlap: CGFloat = 48
+        return ZStack(alignment: .top) {
+            RecipePhotoView(
+                urlString: recipe.photoURL,
+                author: recipe.photoAuthor,
+                license: recipe.photoLicense,
+                layout: .hero,
+                isPhotoShown: $isHeroPhotoShown
+            )
+            .frame(height: heroHeight)
+            .overlay { Theme.scrimTop.allowsHitTesting(false) }
+            .overlay { Theme.scrimBottom.allowsHitTesting(false) }
+            .overlay(alignment: .bottomLeading) {
+                heroCredit(recipe)
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.bottom, overlap + 20)
+            }
+            .overlay(alignment: .topTrailing) {
+                favoriteHeart(isLoved: currentRating == .loved)
+                    .padding(12)
+            }
+
+            recipeSummaryCard(recipe)
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.top, heroHeight - overlap)
+        }
+        .padding(.bottom, 8)
+    }
+
+    private func heroCredit(_ recipe: Recipe) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if isHeroPhotoShown, let credit = RecipePhoto.creditLine(author: recipe.photoAuthor, license: recipe.photoLicense) {
+                Text("Fotoğraf: \(credit)")
+            }
+            Text(Attribution.uniTools)
+        }
+        .font(.caption2)
+        .foregroundStyle(Color.white.opacity(0.85))
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
+        .accessibilityElement(children: .combine)
+    }
+
     private func recipeSummaryCard(_ recipe: Recipe) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(recipe.displayName)
-                .font(.title2.weight(.semibold))
+                .font(.title2.bold())
                 .foregroundStyle(Theme.textCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 metaChip(symbol: "clock", text: "\(recipe.totalMinutes) dk")
                 metaChip(symbol: "person.2", text: "\(activeServings) kişilik")
+                metaChip(symbol: "chart.bar", text: DifficultyLabel.turkish(recipe.difficulty))
             }
-            Text("\(DifficultyLabel.turkish(recipe.difficulty)) · \(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
+            Text("\(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -404,8 +432,16 @@ struct RecipeDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Theme.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-        .shadow(color: Theme.shadow, radius: 12, y: 4)
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: Theme.sheetCorner,
+                bottomLeadingRadius: Theme.cardRadius,
+                bottomTrailingRadius: Theme.cardRadius,
+                topTrailingRadius: Theme.sheetCorner,
+                style: .continuous
+            )
+        )
+        .shadow(color: Theme.cardShadow, radius: 16, y: 4)
     }
 
     private func metaChip(symbol: String, text: String) -> some View {
