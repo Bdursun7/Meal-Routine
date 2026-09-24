@@ -96,6 +96,19 @@ enum HouseholdSizeLimits {
     }
 }
 
+/// Evenings planned per week. The stored range is 1...5, matching `MealRecommender.eveningCap`.
+enum EveningCountOptions {
+    static let minimum = 1
+    static let maximum = 5
+    static var values: [Int] { Array(minimum...maximum) }
+
+    /// Chip and picker label. Always a Turkish phrase, never a raw count or type dump.
+    static func label(_ count: Int) -> String {
+        let value = min(max(count, minimum), maximum)
+        return "\(value) akşam"
+    }
+}
+
 /// Max cook time choices. Default is 60. Values outside the list resolve to that default.
 enum CookTimeOptions {
     static let minutes = [30, 45, 60, 90]

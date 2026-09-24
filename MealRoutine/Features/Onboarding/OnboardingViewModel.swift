@@ -202,7 +202,7 @@ final class OnboardingViewModel {
 
     var householdSummary: String {
         let people = householdSize == 1 ? "1 kişi" : "\(householdSize) kişi"
-        return "\(people) · \(evenings) akşam · \(CookTimeOptions.label(maxCookMinutes))"
+        return "\(people) · \(EveningCountOptions.label(evenings)) · \(CookTimeOptions.label(maxCookMinutes))"
     }
 
     var dislikeSummary: String {
