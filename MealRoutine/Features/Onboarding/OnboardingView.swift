@@ -95,7 +95,7 @@ struct OnboardingView: View {
     private var slogan: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     sloganMark
                     sloganLine
                         .padding(.horizontal, 24)

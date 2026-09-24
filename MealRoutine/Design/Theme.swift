@@ -2,50 +2,47 @@ import SwiftUI
 import UIKit
 
 /// Cream ground, muted-green symbols, warm-orange emphasis, dark-green text.
-/// Measured from the palette: #F2E8D9, #45604C, #E89758, #29342F.
-/// Dark mode uses the system background. The symbol green is lifted so it stays readable.
+/// Locked: #F5EEE6, #5D6D55, #E7A966, #343D36.
+/// Dark mode keeps those accents and uses the system background.
 enum Theme {
-    /// Vurgu. #E89758. Button fills, selected chips, and the MealRoutine word.
+    /// Vurgu. #E7A966. Primary button fills, selected chips, and the MealRoutine word.
     /// Too light for small type on cream; those labels use `sage` or `textCharcoal`.
-    static let accent = Color(uiColor: ui(0xE89758))
+    static let accent = Color(uiColor: ui(0xE7A966))
     static let primary = accent
 
-    /// Kontrast on the orange fill. #29342F in both modes.
-    static let onAccent = Color(uiColor: ui(0x29342F))
+    /// Kontrast on the orange fill. #343D36 in both modes.
+    static let onAccent = Color(uiColor: ui(0x343D36))
 
-    /// Ana zemin. #F2E8D9 in light. System background in dark.
+    /// Ana zemin. #F5EEE6 in light. System background in dark.
     static let canvasUIColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? .systemBackground : ui(0xF2E8D9)
+        traits.userInterfaceStyle == .dark ? .systemBackground : ui(0xF5EEE6)
     }
     static let bgCream = Color(uiColor: canvasUIColor)
     static let canvas = bgCream
     static let cream = bgCream
 
-    /// Lifted cream in light. Elevated system surface in dark.
+    /// Same cream in light. Elevated system surface in dark.
     static let cardUIColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? .secondarySystemBackground : ui(0xFFF8EF)
+        traits.userInterfaceStyle == .dark ? .secondarySystemBackground : ui(0xF5EEE6)
     }
     static let cardSurface = Color(uiColor: cardUIColor)
     static let card = cardSurface
 
-    /// Kontrast. #29342F in light. System label in dark.
+    /// Kontrast. #343D36 in light. System label in dark.
     static let textCharcoal = adaptive(
-        light: ui(0x29342F),
+        light: ui(0x343D36),
         dark: .label
     )
     static let ink = textCharcoal
 
-    /// Dark green at 72% on cream, which stays above 4.5:1. System secondary in dark.
+    /// Dark green at 73% on cream, which stays above 4.5:1. System secondary in dark.
     static let secondaryText = adaptive(
-        light: ui(0x29342F, alpha: 0.72),
+        light: ui(0x343D36, alpha: 0.73),
         dark: .secondaryLabel
     )
 
-    /// Ana sembol. #45604C in light. #7D9082 in dark, the same hue lifted for contrast.
-    static let sage = adaptive(
-        light: ui(0x45604C),
-        dark: ui(0x7D9082)
-    )
+    /// Ana sembol. #5D6D55. Icon stroke, selected tab, and progress.
+    static let sage = Color(uiColor: ui(0x5D6D55))
 
     /// Soft lift for cards. Light is black at 10%. Dark is heavier so the edge still reads.
     static let cardShadow = adaptive(
