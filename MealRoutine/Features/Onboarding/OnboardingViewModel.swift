@@ -33,12 +33,14 @@ enum OnboardingStep: Int, Equatable {
     case dislikes = 2
     case taste = 3
     case summary = 4
+    /// First-run only, between welcome and Ev. Not part of the 1–4 progress count.
+    case slogan = 5
 
     static let progressTotal = 4
 
     var title: String {
         switch self {
-        case .welcome: ""
+        case .welcome, .slogan: ""
         case .household: "Ev"
         case .dislikes: "Sevmediğin malzemeler"
         case .taste: "Tat"
@@ -46,7 +48,12 @@ enum OnboardingStep: Int, Equatable {
         }
     }
 
-    var showsProgress: Bool { self != .welcome }
+    var showsProgress: Bool {
+        switch self {
+        case .welcome, .slogan: false
+        case .household, .dislikes, .taste, .summary: true
+        }
+    }
 }
 
 /// Collects household prefs, optional dislikes, and an optional taste sample.
@@ -172,7 +179,8 @@ final class OnboardingViewModel {
             return
         }
         switch step {
-        case .welcome: step = .household
+        case .welcome: step = .slogan
+        case .slogan: step = .household
         case .household: step = .dislikes
         case .dislikes: step = .taste
         case .taste: step = .summary
@@ -194,7 +202,8 @@ final class OnboardingViewModel {
         }
         switch step {
         case .welcome: break
-        case .household: step = .welcome
+        case .slogan: step = .welcome
+        case .household: step = .slogan
         case .dislikes: step = .household
         case .taste: step = .dislikes
         case .summary: step = .taste

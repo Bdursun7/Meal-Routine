@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// First-run flow: welcome, then Ev, dislikes, a short taste sample, and a summary.
+/// First-run flow: welcome, the positioning line, then Ev, dislikes, a short taste sample, and a summary.
 /// The week is built only from “Haftamı oluştur” on the summary.
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +15,8 @@ struct OnboardingView: View {
                 switch viewModel.step {
                 case .welcome:
                     welcome
+                case .slogan:
+                    slogan
                 case .household:
                     household
                 case .dislikes:
@@ -26,7 +28,7 @@ struct OnboardingView: View {
                 }
             }
             .navigationTitle(viewModel.step.title)
-            .navigationBarTitleDisplayMode(viewModel.step == .welcome ? .inline : .large)
+            .navigationBarTitleDisplayMode(viewModel.step == .welcome || viewModel.step == .slogan ? .inline : .large)
             .toolbar(navigationVisibility, for: .navigationBar)
             .toolbar {
                 if viewModel.step != .welcome {
@@ -68,6 +70,38 @@ struct OnboardingView: View {
 
     private var navigationVisibility: Visibility {
         viewModel.step == .welcome ? .hidden : .visible
+    }
+
+    /// Shown once, after welcome and before Ev. Copy is locked.
+    private var slogan: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.sage.opacity(0.35))
+                        .frame(width: 88, height: 88)
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                }
+                .accessibilityHidden(true)
+
+                (
+                    Text("Diğer uygulamalar neler pişirebileceğini gösterir. ").foregroundStyle(Theme.textCharcoal)
+                    + Text("MealRoutine").fontWeight(.semibold).foregroundStyle(Theme.accent)
+                    + Text(" ise gerçekten ne pişirmek istediğini öğrenir.").foregroundStyle(Theme.textCharcoal)
+                )
+                .font(.title2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Diğer uygulamalar neler pişirebileceğini gösterir. MealRoutine ise gerçekten ne pişirmek istediğini öğrenir.")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.screenPadding)
+            .padding(.top, 36)
+            .padding(.bottom, 24)
+        }
+        .background(Theme.bgCream)
     }
 
     private var welcome: some View {
@@ -256,6 +290,12 @@ struct OnboardingView: View {
                     viewModel.continueForward()
                 }
                 .buttonStyle(PrimaryButtonStyle())
+            case .slogan:
+                Button("Devam") {
+                    viewModel.continueForward()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityLabel("Devam")
             case .household, .dislikes:
                 Button("Devam") {
                     viewModel.continueForward()
