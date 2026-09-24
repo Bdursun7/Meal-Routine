@@ -333,7 +333,7 @@ enum GroceryListService {
         checked: Bool,
         in context: ModelContext
     ) throws {
-        guard let week = item.week ?? (try WeekPlanService.currentWeek(in: context)) else { return }
+        guard let week = try item.week ?? WeekPlanService.currentWeek(in: context) else { return }
         guard let prefs = try UserPrefsStore.existing(in: context) else { return }
         let recipes = try context.fetch(FetchDescriptor<Recipe>())
         var bySlug: [String: Recipe] = [:]
