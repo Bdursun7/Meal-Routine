@@ -329,9 +329,22 @@ private func checkDiscoveryAndReplacement() {
         preferences: prefs()
     )
     let slugs = sections.flatMap { section in section.items.map { item in item.slug } }
+    check(sections.isEmpty, "no history hides personalized discovery, got \(sections.map(\.title))")
     check(!slugs.contains("asla"), "discovery hides never again")
-    check(sections.allSatisfy { $0.items.count <= DiscoverySections.sectionLimit }, "sections stay capped")
-    check(!sections.contains { $0.id == "different" }, "no history hides try-something-different")
+    check(!sections.contains { $0.id == "recommended" }, "no history hides Sana uygun")
+    check(!sections.contains { $0.title.contains("Rutinin") }, "cold start does not claim a routine")
+
+    var cookedEgg = MealMemorySnapshot(recipeID: "yumurta", timesCooked: 1)
+    cookedEgg.confidence = .low
+    let withHistory = DiscoverySections.make(
+        candidates: [never, egg],
+        memories: ["yumurta": cookedEgg],
+        preferences: prefs()
+    )
+    check(withHistory.contains { $0.id == "recommended" }, "history shows Sana uygun")
+    check(withHistory.first { $0.id == "quick" }?.title == "Hızlı tarifler", "quick section stays factual")
+    check(withHistory.allSatisfy { $0.items.count <= DiscoverySections.sectionLimit }, "sections stay capped")
+    check(!withHistory.flatMap { $0.items.map(\.slug) }.contains("asla"), "history still hides never again")
 
     let current = candidate("tavuk", minutes: 50, protein: "poultry", ingredients: ["chicken"])
     let fresh = candidate("yeni", minutes: 30, cuisine: "GR", protein: "legume")

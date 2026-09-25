@@ -24,35 +24,43 @@ struct MealMemoryView: View {
                         .font(.body)
                         .foregroundStyle(Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            nameSection("Favorilerin", rows: summary.favoriteNames, empty: "Sevdiğin tarif burada durur.")
-            nameSection("En çok pişirilenler", rows: summary.mostCooked, empty: "Pişirdikçe sayı artar.")
-            nameSection("Son sevilenler", rows: summary.recentLoved, empty: "Sevdim dediğin tarifler burada.")
-            Section("Örüntüler") {
-                if summary.patterns.isEmpty {
-                    Text("En az üç kayıt olmadan kesin bir örüntü göstermiyoruz.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ForEach(summary.patterns) { pattern in
-                        MealPatternCard(pattern: pattern) {
-                            viewModel.dismiss(pattern.id, in: modelContext)
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                        .listRowBackground(Color.clear)
+                    NavigationLink("Hafıza günlüğü") {
+                        MealHistoryView()
                     }
                 }
+            } else {
+                nameSection("Favorilerin", rows: summary.favoriteNames)
+                nameSection("En çok pişirilenler", rows: summary.mostCooked)
+                nameSection("Son sevilenler", rows: summary.recentLoved)
+                if summary.patterns.isEmpty {
+                    Section("Örüntüler") {
+                        Text("En az üç kayıt olmadan kesin bir örüntü göstermiyoruz.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Section("Örüntüler") {
+                        ForEach(summary.patterns) { pattern in
+                            MealPatternCard(pattern: pattern) {
+                                viewModel.dismiss(pattern.id, in: modelContext)
+                            }
+                            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+                nameSection("Bir daha asla", rows: summary.neverAgain)
+                nameSection("Kaçındığın malzemeler", rows: summary.avoidedIngredients)
+                nameSection("Süresi ağır gelenler", rows: summary.timeConcerns)
+                nameSection("Denediğin yeni tarifler", rows: summary.explored)
+                nameSection("İlk kez giren kategoriler", rows: summary.firstCategories)
             }
-            nameSection("Bir daha asla", rows: summary.neverAgain, empty: "Bu liste boş.")
-            nameSection("Kaçındığın malzemeler", rows: summary.avoidedIngredients, empty: "Kurulumda malzeme seçmedin.")
-            nameSection("Süresi ağır gelenler", rows: summary.timeConcerns, empty: "Süre notu yok.")
-            nameSection("Denediğin yeni tarifler", rows: summary.explored, empty: "Yeni bir tarif pişirince burada durur.")
-            nameSection("İlk kez giren kategoriler", rows: summary.firstCategories, empty: "Henüz yeni bir kategori yok.")
             Section {
-                NavigationLink("Hafıza günlüğü") {
-                    MealHistoryView()
+                if summary.hasHistory {
+                    NavigationLink("Hafıza günlüğü") {
+                        MealHistoryView()
+                    }
                 }
                 Button("Yemek hafızasını sıfırla", role: .destructive) {
                     viewModel.isConfirmingReset = true
@@ -92,12 +100,9 @@ struct MealMemoryView: View {
     }
 
     @ViewBuilder
-    private func nameSection(_ title: String, rows: [String], empty: String) -> some View {
-        Section(title) {
-            if rows.isEmpty {
-                Text(empty)
-                    .foregroundStyle(Theme.secondaryText)
-            } else {
+    private func nameSection(_ title: String, rows: [String]) -> some View {
+        if !rows.isEmpty {
+            Section(title) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     Text(row)
                         .foregroundStyle(Theme.textCharcoal)

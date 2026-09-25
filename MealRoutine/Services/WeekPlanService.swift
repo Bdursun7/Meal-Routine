@@ -22,7 +22,7 @@ struct PlanRequest: Sendable {
     var dislikedIngredientIds: Set<String>
 }
 
-/// Builds and edits the current Monday-start week with `MealRecommender`.
+/// Builds and edits the current Monday-start week with `PersonalizedScoringService`.
 enum WeekPlanService {
     @MainActor
     static func currentWeek(in context: ModelContext, now: Date = .now) throws -> PlanWeek? {

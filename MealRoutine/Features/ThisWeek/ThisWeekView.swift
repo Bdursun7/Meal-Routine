@@ -296,13 +296,7 @@ private struct WeekMealCard: View {
                 }
                 Spacer(minLength: 8)
                 if let badge = meal.badgeTitle {
-                    Text(badge)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(badge == FamiliarityBadge.new.title ? Theme.accent : Theme.sage)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Theme.cardSurface, in: Capsule())
-                        .accessibilityLabel(badge)
+                    FamiliarityBadgeLabel(title: badge)
                 }
                 if meal.isCooked {
                     Image(systemName: "checkmark.circle.fill")
@@ -556,9 +550,7 @@ private struct TonightDinnerCard: View {
             .padding(.vertical, 5)
             .background(Color.white.opacity(0.16), in: Capsule())
             if let badge = meal.badgeTitle {
-                Text(badge)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.white)
+                FamiliarityBadgeLabel(title: badge, onDarkBackground: true)
             }
             if !meal.reason.isEmpty {
                 Text(meal.reason)

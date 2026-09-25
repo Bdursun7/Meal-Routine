@@ -16,14 +16,19 @@ struct RecommendationReasonView: View {
 
 struct FamiliarityBadgeLabel: View {
     var title: String
+    /// Hero photos need a solid capsule. Cream cards use a light tint of the same color.
+    var onDarkBackground = false
+
+    private var isNew: Bool { title == FamiliarityBadge.new.title }
+    private var tint: Color { isNew ? Theme.accent : Theme.sage }
 
     var body: some View {
         Text(title)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(title == FamiliarityBadge.new.title ? Theme.accent : Theme.sage)
+            .foregroundStyle(onDarkBackground ? Color.white : tint)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Theme.accent.opacity(0.12), in: Capsule())
+            .background(onDarkBackground ? tint : tint.opacity(0.18), in: Capsule())
             .accessibilityLabel(title)
     }
 }

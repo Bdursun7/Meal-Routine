@@ -59,6 +59,7 @@ enum DiscoverySections {
             return lhs.slug < rhs.slug
         }
         let hasHistory = taste.dataPointCount > 0
+        guard hasHistory else { return [] }
         var sections: [DiscoverySection] = []
 
         let recommended = ranked.prefix(sectionLimit).map {
@@ -95,7 +96,7 @@ enum DiscoverySections {
             .prefix(sectionLimit)
             .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory) }
         if !quick.isEmpty {
-            sections.append(DiscoverySection(id: "quick", title: "Rutinin için hızlılar", items: Array(quick)))
+            sections.append(DiscoverySection(id: "quick", title: "Hızlı tarifler", items: Array(quick)))
         }
 
         let favorites = ranked.filter { candidate in
@@ -122,7 +123,7 @@ enum DiscoverySections {
             memory: memories[candidate.slug],
             profile: taste,
             catalog: candidates
-        ) ?? "Süre sınırına uyar"
+        ) ?? ""
         return DiscoveryItem(
             slug: candidate.slug,
             reason: reason,
