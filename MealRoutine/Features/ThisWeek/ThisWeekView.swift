@@ -180,7 +180,7 @@ struct ThisWeekView: View {
 
     private func memoryPattern(_ prefs: UserPrefs?) -> MealPattern? {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let catalog = CatalogIndexCache.warm(recipes: recipes, ratings: ratings).candidates
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let dismissed = Set(prefs?.dismissedPatternIDs ?? [])
         return MealPatternService.patterns(memories: map, candidates: catalog, dismissed: dismissed).first

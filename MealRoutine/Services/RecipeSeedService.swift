@@ -11,7 +11,7 @@ private let logger = Logger(subsystem: "com.mealroutine.app", category: "seed")
 /// repaired and the current week's grocery list is rebuilt.
 enum RecipeSeedService {
     @MainActor
-    static func seedIfNeeded(context: ModelContext, bundle: Bundle = .main, now: Date = .now) throws {
+    static func seedIfNeeded(context: ModelContext, bundle: Bundle = .main, now: Date = .now) async throws {
         let bundled = try RecipeCatalogLoader.loadBundled(bundle: bundle)
         guard bundled.file.schemaVersion == 1 else {
             throw CatalogError.unsupportedSchema(bundled.file.schemaVersion)
@@ -25,7 +25,7 @@ enum RecipeSeedService {
             existingRecipeCount: existingCount,
             catalogRecipeCount: bundled.file.recipes.count
         ) {
-            try importCatalog(bundled, bundle: bundle, into: context)
+            try await importCatalog(bundled, bundle: bundle, into: context)
             GroceryListService.discardRebuildCache()
             logger.info("Seeded bundled recipes into SwiftData")
         }
@@ -44,22 +44,29 @@ enum RecipeSeedService {
         _ bundled: BundledCatalog,
         bundle: Bundle,
         into context: ModelContext
-    ) throws {
+    ) async throws {
         // Save deletes before inserting the same slugs. One save can fail the unique
         // constraint on Recipe.slug when new rows collide with rows still queued for
         // deletion. A crash after that delete leaves a short store; shouldSkipImport
         // refuses a matching fingerprint until every catalog recipe is present again.
+        CatalogIndexCache.invalidate()
         let staleRecipes = try context.fetch(FetchDescriptor<Recipe>())
         if !staleRecipes.isEmpty {
-            for recipe in staleRecipes {
+            for (index, recipe) in staleRecipes.enumerated() {
                 context.delete(recipe)
+                if index % 40 == 39 {
+                    await Task.yield()
+                }
             }
             try context.save()
         }
 
         let aliases = RecipeCatalogLoader.loadAliases(bundle: bundle)
-        for dto in bundled.file.recipes {
+        for (index, dto) in bundled.file.recipes.enumerated() {
             insert(dto, aliases: aliases, into: context)
+            if index % 25 == 24 {
+                await Task.yield()
+            }
         }
         try writeFingerprint(bundled.fingerprint, in: context)
         try context.save()

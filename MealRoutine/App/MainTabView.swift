@@ -11,7 +11,7 @@ enum AppTab: Hashable {
 struct MainTabView: View {
     @State private var selectedTab: AppTab = .week
 
-    init() {
+    private static let configureTabBar: Void = {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundEffect = nil
@@ -22,6 +22,10 @@ struct MainTabView: View {
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+    }()
+
+    init() {
+        _ = Self.configureTabBar
     }
 
     var body: some View {

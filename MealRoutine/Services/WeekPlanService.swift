@@ -436,3 +436,109 @@ enum WeekPlanService {
         }
     }
 }
+
+/// One pass over the catalog's ingredient graph, reused by every tab.
+///
+/// `TabView` keeps all four roots alive, and each of them used to call
+/// `pickerCandidates` from `body`. That faults every recipe's ingredients on the
+/// main actor during the tab animation. Ingredients are replaced only when the
+/// bundled catalog is re-imported, so the index is keyed by recipe identity and
+/// the stored fields the ranker reads. A later body pass with the same key does
+/// not touch the relationship again.
+struct CatalogIndex: Equatable, Sendable {
+    var key: Int
+    var candidates: [PickerCandidate]
+    var displayNames: [String: String]
+    var ingredientNames: [String: String]
+}
+
+@MainActor
+enum CatalogIndexCache {
+    private struct Base {
+        var key: Int
+        var candidates: [PickerCandidate]
+        var displayNames: [String: String]
+        var ingredientNames: [String: String]
+    }
+
+    private static var base: Base?
+
+    static func invalidate() {
+        base = nil
+    }
+
+    /// Builds the index while the launch spinner is up, before the first tab frame.
+    static func warm(in context: ModelContext) throws {
+        let recipes = try context.fetch(FetchDescriptor<Recipe>())
+        let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
+        _ = warm(recipes: recipes, ratings: FeedbackIndex.latestRatings(in: feedback))
+    }
+
+    static func warm(recipes: [Recipe], ratings: [String: MealRating]) -> CatalogIndex {
+        let key = recipeKey(recipes)
+        if base?.key != key {
+            let unrated = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
+            var displayNames: [String: String] = [:]
+            var ingredientNames: [String: String] = [:]
+            displayNames.reserveCapacity(recipes.count)
+            for recipe in recipes {
+                displayNames[recipe.slug] = recipe.displayName
+                for line in recipe.ingredients where ingredientNames[line.ingredientId] == nil {
+                    ingredientNames[line.ingredientId] = line.displayName
+                }
+            }
+            base = Base(
+                key: key,
+                candidates: unrated,
+                displayNames: displayNames,
+                ingredientNames: ingredientNames
+            )
+        }
+        guard let base else {
+            return CatalogIndex(key: key, candidates: [], displayNames: [:], ingredientNames: [:])
+        }
+        return overlay(base, ratings: ratings)
+    }
+
+    /// The index already built by a screen that has the full catalog.
+    /// Detail screens fetch one recipe and must not replace this with that row.
+    static func current(ratings: [String: MealRating]) -> CatalogIndex? {
+        guard let base else { return nil }
+        return overlay(base, ratings: ratings)
+    }
+
+    private static func overlay(_ base: Base, ratings: [String: MealRating]) -> CatalogIndex {
+        let candidates = base.candidates.map { candidate in
+            var copy = candidate
+            copy.rating = ratings[candidate.slug]
+            return copy
+        }
+        return CatalogIndex(
+            key: base.key,
+            candidates: candidates,
+            displayNames: base.displayNames,
+            ingredientNames: base.ingredientNames
+        )
+    }
+
+    private static func recipeKey(_ recipes: [Recipe]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(recipes.count)
+        for recipe in recipes {
+            hasher.combine(recipe.persistentModelID)
+            hasher.combine(recipe.slug)
+            hasher.combine(recipe.nameTR)
+            hasher.combine(recipe.nameEN)
+            hasher.combine(recipe.nativeName)
+            hasher.combine(recipe.totalMinutes)
+            hasher.combine(recipe.trDogfoodScore)
+            hasher.combine(recipe.country)
+            hasher.combine(recipe.category)
+            hasher.combine(recipe.unitoolsCategory)
+            hasher.combine(recipe.difficulty)
+            hasher.combine(recipe.tags)
+            hasher.combine(recipe.diets)
+        }
+        return hasher.finalize()
+    }
+}

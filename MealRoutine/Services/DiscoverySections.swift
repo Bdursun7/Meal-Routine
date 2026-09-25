@@ -25,6 +25,10 @@ enum DiscoverySections {
         now: Date = .now
     ) -> [DiscoverySection] {
         let taste = PersonalizedScoringService.profile(memories: memories, candidates: candidates)
+        // No history means no rails. Score each recipe once after that check.
+        // Doing it inside `sorted` rebuilds the taste profile on every comparison.
+        guard taste.dataPointCount > 0 else { return [] }
+        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let eligible = candidates.filter { candidate in
             PersonalizedScoringService.isEligible(
                 candidate,
@@ -36,44 +40,38 @@ enum DiscoverySections {
                 now: now
             )
         }
-        let ranked = eligible.sorted { lhs, rhs in
-            let left = PersonalizedScoringService.score(
-                lhs,
-                memories: memories,
-                candidates: candidates,
-                preferences: preferences,
-                anchors: [],
-                dayOffset: 0,
-                now: now
-            ).final
-            let right = PersonalizedScoringService.score(
-                rhs,
-                memories: memories,
-                candidates: candidates,
-                preferences: preferences,
-                anchors: [],
-                dayOffset: 0,
-                now: now
-            ).final
-            if left != right { return left > right }
-            return lhs.slug < rhs.slug
+        let ranked = eligible.map { candidate in
+            (
+                candidate,
+                PersonalizedScoringService.listRank(
+                    candidate,
+                    memory: memories[candidate.slug],
+                    taste: taste,
+                    catalogBySlug: bySlug,
+                    preferences: preferences,
+                    now: now
+                )
+            )
         }
-        let hasHistory = taste.dataPointCount > 0
-        guard hasHistory else { return [] }
+        .sorted { lhs, rhs in
+            if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+            return lhs.0.slug < rhs.0.slug
+        }
+        .map(\.0)
         var sections: [DiscoverySection] = []
 
         let recommended = ranked.prefix(sectionLimit).map {
-            item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory)
+            item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true)
         }
         if !recommended.isEmpty {
             sections.append(DiscoverySection(id: "recommended", title: "Sana uygun", items: Array(recommended)))
         }
 
         let similar = ranked.filter { candidate in
-            !taste.lovedSlugs.contains(candidate.slug) && sharesLovedShape(candidate, taste: taste, candidates: candidates)
+            !taste.lovedSlugs.contains(candidate.slug) && sharesLovedShape(candidate, taste: taste, bySlug: bySlug)
         }
         .prefix(sectionLimit)
-        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory) }
+        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
         if !similar.isEmpty {
             sections.append(DiscoverySection(id: "similar", title: "Sevdiklerine benzer", items: Array(similar)))
         }
@@ -86,7 +84,7 @@ enum DiscoverySections {
                     && !taste.triedCategories.contains(category)
             }
             .prefix(sectionLimit)
-            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory) }
+            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
             if !different.isEmpty {
                 sections.append(DiscoverySection(id: "different", title: "Farklı bir şey dene", items: Array(different)))
             }
@@ -94,7 +92,7 @@ enum DiscoverySections {
 
         let quick = ranked.filter { $0.totalMinutes <= 30 }
             .prefix(sectionLimit)
-            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory) }
+            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
         if !quick.isEmpty {
             sections.append(DiscoverySection(id: "quick", title: "Hızlı tarifler", items: Array(quick)))
         }
@@ -104,7 +102,7 @@ enum DiscoverySections {
             return candidate.rating == .loved || memory?.isFavorite == true || (memory?.timesCooked ?? 0) >= 2
         }
         .prefix(sectionLimit)
-        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: hasHistory) }
+        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
         if !favorites.isEmpty {
             sections.append(DiscoverySection(id: "favorites", title: "Eski favorilerin", items: Array(favorites)))
         }
@@ -134,9 +132,8 @@ enum DiscoverySections {
     private static func sharesLovedShape(
         _ candidate: PickerCandidate,
         taste: TasteProfile,
-        candidates: [PickerCandidate]
+        bySlug: [String: PickerCandidate]
     ) -> Bool {
-        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         for slug in taste.lovedSlugs {
             guard let other = bySlug[slug] else { continue }
             if !candidate.protein.isEmpty, candidate.protein == other.protein { return true }

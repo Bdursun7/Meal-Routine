@@ -342,6 +342,43 @@ private func checkDiscoveryAndReplacement() {
         preferences: prefs()
     )
     check(withHistory.contains { $0.id == "recommended" }, "history shows Sana uygun")
+    let rankNow = Date(timeIntervalSince1970: 1_700_000_000)
+    let rankPrefs = prefs()
+    var rankRows: [PickerCandidate] = []
+    for index in 0..<8 {
+        rankRows.append(candidate("r\(index)", score: 20 + index * 5, minutes: 50, protein: "tofu"))
+    }
+    var rankMemory = MealMemorySnapshot(recipeID: "r0", timesCooked: 1)
+    rankMemory.confidence = .low
+    let rankMemories = ["r0": rankMemory]
+    let rankedSections = DiscoverySections.make(
+        candidates: rankRows,
+        memories: rankMemories,
+        preferences: rankPrefs,
+        now: rankNow
+    )
+    let recommended = rankedSections.first { $0.id == "recommended" }?.items.map(\.slug) ?? []
+    let expected = rankRows.map { item in
+        (
+            item.slug,
+            PersonalizedScoringService.score(
+                item,
+                memories: rankMemories,
+                candidates: rankRows,
+                preferences: rankPrefs,
+                anchors: [],
+                dayOffset: 0,
+                now: rankNow
+            ).final
+        )
+    }
+    .sorted { lhs, rhs in
+        if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+        return lhs.0 < rhs.0
+    }
+    .prefix(DiscoverySections.sectionLimit)
+    .map(\.0)
+    check(recommended == Array(expected), "discovery rank matches one score per recipe, got \(recommended)")
     check(withHistory.first { $0.id == "quick" }?.title == "Hızlı tarifler", "quick section stays factual")
     check(withHistory.allSatisfy { $0.items.count <= DiscoverySections.sectionLimit }, "sections stay capped")
     check(!withHistory.flatMap { $0.items.map(\.slug) }.contains("asla"), "history still hides never again")

@@ -1,6 +1,13 @@
 import SwiftData
 import SwiftUI
 
+/// A neighbor from the warmed catalog index. Detail fetches only its own recipe.
+private struct SimilarRecipeLink: Identifiable {
+    var slug: String
+    var name: String
+    var id: String { slug }
+}
+
 /// Who the portion stepper on recipe detail writes to.
 private struct PortionContext: Equatable {
     var contextID: String
@@ -20,6 +27,14 @@ struct RecipeDetailView: View {
     let route: RecipeRoute
     /// Only Bu Hafta passes true. Tarifler and Profil leave this false, so the cook bar is never built.
     var allowsCookBar = false
+
+    init(route: RecipeRoute, allowsCookBar: Bool = false) {
+        self.route = route
+        self.allowsCookBar = allowsCookBar
+        let slug = route.slug
+        _recipes = Query(filter: #Predicate<Recipe> { $0.slug == slug })
+    }
+
     @State private var viewModel = RecipeDetailViewModel()
     /// Unsaved stepper value. Nil follows the stored count for this context.
     @State private var portionDraft: Int?
@@ -321,9 +336,9 @@ struct RecipeDetailView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.secondaryText)
                         .recipeDetailRow()
-                    ForEach(similar, id: \.slug) { item in
+                    ForEach(similar) { item in
                         NavigationLink(value: RecipeRoute(slug: item.slug)) {
-                            Text(item.displayName)
+                            Text(item.name)
                                 .foregroundStyle(Theme.textCharcoal)
                         }
                         .recipeDetailRow()
@@ -335,7 +350,8 @@ struct RecipeDetailView: View {
 
     private func fitReason(_ recipe: Recipe) -> String? {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        guard let index = CatalogIndexCache.current(ratings: ratings) else { return nil }
+        let catalog = index.candidates
         guard let candidate = catalog.first(where: { $0.slug == recipe.slug }) else { return nil }
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let taste = PersonalizedScoringService.profile(memories: map, candidates: catalog)
@@ -348,13 +364,14 @@ struct RecipeDetailView: View {
         )
     }
 
-    private func similarRecipes(to recipe: Recipe) -> [Recipe] {
+    private func similarRecipes(to recipe: Recipe) -> [SimilarRecipeLink] {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        guard let index = CatalogIndexCache.current(ratings: ratings) else { return [] }
+        let catalog = index.candidates
         guard let current = catalog.first(where: { $0.slug == recipe.slug }) else { return [] }
         let disliked = Set(prefs.min { $0.createdAt < $1.createdAt }?.dislikedIngredientIds ?? [])
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
-        let matches = catalog.filter { candidate in
+        return catalog.filter { candidate in
             candidate.slug != current.slug
                 && candidate.rating != .never
                 && map[candidate.slug]?.neverAgain != true
@@ -363,7 +380,9 @@ struct RecipeDetailView: View {
         }
         .sorted { $0.slug < $1.slug }
         .prefix(4)
-        return matches.compactMap { item in recipes.first { $0.slug == item.slug } }
+        .map { item in
+            SimilarRecipeLink(slug: item.slug, name: index.displayNames[item.slug] ?? item.slug)
+        }
     }
 
     private func sharesKitchen(_ lhs: PickerCandidate, _ rhs: PickerCandidate) -> Bool {

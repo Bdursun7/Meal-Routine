@@ -29,10 +29,10 @@ final class MealMemoryViewModel {
         prefs: UserPrefs?
     ) -> MealMemorySummary {
         let names = Dictionary(recipes.map { ($0.slug, $0.displayName) }, uniquingKeysWith: { first, _ in first })
-        let catalog = WeekPlanService.pickerCandidates(
-            from: recipes,
+        let catalog = CatalogIndexCache.warm(
+            recipes: recipes,
             ratings: FeedbackIndex.latestRatings(in: feedback)
-        )
+        ).candidates
         let bySlug = Dictionary(catalog.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let snapshots = memories.map(\.snapshot)
         let map = Dictionary(snapshots.map { ($0.recipeID, $0) }, uniquingKeysWith: { first, _ in first })

@@ -110,6 +110,15 @@ struct RecipePhotoView: View {
         }
     }
 
+    /// Commons width to download. Decode still clamps to the on-screen size.
+    private var fetchMaxPixel: Int {
+        switch layout {
+        case .hero: RecipePhoto.heroMaxPixel
+        case .backdrop: RecipePhoto.backdropMaxPixel
+        case .thumbnail, .plate: RecipePhoto.thumbnailMaxPixel
+        }
+    }
+
     /// Stacked plate mark used when the catalog photo is missing or still loading.
     private var placeholderMark: some View {
         let isLarge = layout == .hero || layout == .backdrop
@@ -156,14 +165,14 @@ struct RecipePhotoView: View {
             return
         }
         phase = .loading
-        let data = await RecipePhotoLoader.load(remoteURL: remoteURL)
+        let data = await RecipePhotoLoader.load(remoteURL: remoteURL, maxPixel: fetchMaxPixel)
         guard !Task.isCancelled else { return }
         guard let data else {
             phase = .failed
             return
         }
         let maxPixel: CGFloat = layout == .hero ? 1200 : (layout == .backdrop ? 800 : 256)
-        let decoded = await Task.detached(priority: .userInitiated) {
+        let decoded = await Task.detached(priority: .utility) {
             RecipePhotoDecoder.image(from: data, maxPixel: maxPixel)
         }.value
         guard let decoded else {

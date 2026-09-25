@@ -55,7 +55,7 @@ final class ThisWeekViewModel {
         feedback: [RecipeFeedback],
         now: Date = .now
     ) -> PreferenceInsight? {
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
+        let catalog = CatalogIndexCache.warm(recipes: recipes, ratings: [:]).candidates
         let proteinBySlug = Dictionary(uniqueKeysWithValues: catalog.map { ($0.slug, $0.protein) })
         var latest: [String: (date: Date, rating: MealRating)] = [:]
         for item in feedback {
@@ -98,7 +98,7 @@ final class ThisWeekViewModel {
         }
         let names = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let catalog = CatalogIndexCache.warm(recipes: recipes, ratings: ratings).candidates
         let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let taste = PersonalizedScoringService.profile(memories: memoryMap, candidates: catalog)
         let hasHistory = taste.dataPointCount > 0
@@ -211,6 +211,7 @@ struct ReplacementBoard: Equatable {
 }
 
 enum ReplacementPresenter {
+    @MainActor
     static func board(
         mealID: UUID,
         chips: Set<ReplacementChip>,
@@ -227,7 +228,8 @@ enum ReplacementPresenter {
             return ReplacementBoard(currentName: "", choices: [])
         }
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
+        let catalog = index.candidates
         let bySlug = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let currentName = bySlug[meal.recipeSlug]?.displayName ?? meal.recipeSlug
         guard let current = catalog.first(where: { $0.slug == meal.recipeSlug }) else {
