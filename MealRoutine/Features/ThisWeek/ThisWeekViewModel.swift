@@ -90,7 +90,6 @@ final class ThisWeekViewModel {
         feedback: [RecipeFeedback],
         householdSize: Int,
         memories: [MealMemory] = [],
-        prefs: UserPrefs? = nil,
         now: Date = .now
     ) -> [WeekMealPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
@@ -101,10 +100,6 @@ final class ThisWeekViewModel {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
         let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
         let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
-        let storedPrefs = prefs
-        let planning = storedPrefs?.planningPreferences ?? PlanningPreferences.standard(
-            maxCookMinutes: CookTimeOptions.defaultMinutes
-        )
         let taste = PersonalizedScoringService.profile(memories: memoryMap, candidates: catalog)
         let hasHistory = taste.dataPointCount > 0
         return week.meals

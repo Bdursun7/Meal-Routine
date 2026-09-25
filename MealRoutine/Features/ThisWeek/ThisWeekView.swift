@@ -25,8 +25,7 @@ struct ThisWeekView: View {
             recipes: recipes,
             feedback: feedback,
             householdSize: householdSize,
-            memories: memories,
-            prefs: storedPrefs
+            memories: memories
         )
         let planExplanation = viewModel.explanation(weeks: weeks)
         let summary = viewModel.summary(meals: meals)
