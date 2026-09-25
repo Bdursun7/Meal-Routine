@@ -54,6 +54,68 @@ struct ProfileView: View {
                     }
                 }
 
+                Section("Yemek hafızan") {
+                    NavigationLink {
+                        MealMemoryView()
+                    } label: {
+                        Text("Yemek hafızan")
+                    }
+                    .accessibilityHint("Favorileri, örüntüleri ve kaçınılanları açar")
+                    Text("Pişirdiklerin ve puanların bir sonraki planı etkiler. Açık hafta kendiliğinden silinmez.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Sonraki plan") {
+                    Picker("Keşif", selection: $viewModel.discovery) {
+                        ForEach(DiscoveryLevel.allCases) { level in
+                            Text(level.title).tag(level)
+                        }
+                    }
+                    Text(viewModel.discovery.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Picker("Tekrar", selection: $viewModel.repetition) {
+                        ForEach(RepeatPreference.allCases) { level in
+                            Text(level.title).tag(level)
+                        }
+                    }
+                    Text(viewModel.repetition.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Picker("Zorluk", selection: $viewModel.difficultyPreference) {
+                        ForEach(DifficultyPreference.allCases) { level in
+                            Text(level.title).tag(level)
+                        }
+                    }
+                    Text(viewModel.difficultyPreference.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Picker("Hafta içi", selection: $viewModel.weekdayStyle) {
+                        ForEach(WeekdayStyle.allCases) { level in
+                            Text(level.title).tag(level)
+                        }
+                    }
+                    Text(viewModel.weekdayStyle.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("Bu ayarlar bir sonraki plan kurulumunda kullanılır. Bu haftanın yemekleri kendiliğinden silinmez.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: viewModel.discovery) { _, _ in
+                    viewModel.savePlanning(in: modelContext)
+                }
+                .onChange(of: viewModel.repetition) { _, _ in
+                    viewModel.savePlanning(in: modelContext)
+                }
+                .onChange(of: viewModel.difficultyPreference) { _, _ in
+                    viewModel.savePlanning(in: modelContext)
+                }
+                .onChange(of: viewModel.weekdayStyle) { _, _ in
+                    viewModel.savePlanning(in: modelContext)
+                }
+
                 Section("Pişirme ve puanlar") {
                     NavigationLink {
                         CookingHistoryView()
@@ -74,7 +136,7 @@ struct ProfileView: View {
 
                 Section("Katalog") {
                     Text("\(recipes.count) akşam tarifi yerelde yüklü.")
-                    Text("Öneri motoru süreye, sevmediğin malzemeye, son yemeklere ve haftanın çeşitliliğine bakar. Hesap, reklam ve yapay zeka yok.")
+                    Text("Öneri motoru süreye, sevmediğin malzemeye, yemek hafızana ve haftanın çeşitliliğine bakar. Hesap, reklam ve yapay zeka yok.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -99,7 +161,7 @@ struct ProfileView: View {
                     Button("Yerel veriyi sıfırla", role: .destructive) {
                         viewModel.isConfirmingReset = true
                     }
-                    Text("Tercihler, haftalık plan, market listesi, pişirme geçmişi ve puanlar silinir. Tarif kataloğu kalır.")
+                    Text("Tercihler, haftalık plan, market listesi, yemek hafızası ve puanlar silinir. Tarif kataloğu kalır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -176,8 +238,8 @@ struct ProfileView: View {
     }
 
     private var appVersion: String {
-        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2"
         return "\(short) (\(build))"
     }
 

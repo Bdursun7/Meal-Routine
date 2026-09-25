@@ -15,6 +15,7 @@ struct RecipeDetailView: View {
     @Query private var prefs: [UserPrefs]
     @Query private var plannedMeals: [PlannedMeal]
     @Query private var ingredientChecks: [IngredientCheck]
+    @Query private var memories: [MealMemory]
 
     let route: RecipeRoute
     /// Only Bu Hafta passes true. Tarifler and Profil leave this false, so the cook bar is never built.
@@ -79,8 +80,13 @@ struct RecipeDetailView: View {
             if viewModel.isShowingRatingPrompt {
                 CookRatingPrompt(
                     currentRating: currentRating,
-                    onSelect: { rating in
-                        viewModel.saveRating(rating: rating, slug: route.slug, in: modelContext)
+                    onSave: { rating, reasons in
+                        viewModel.saveRating(
+                            rating: rating,
+                            reasons: reasons,
+                            slug: route.slug,
+                            in: modelContext
+                        )
                     },
                     onCancel: viewModel.cancelRating
                 )
@@ -238,6 +244,7 @@ struct RecipeDetailView: View {
         List {
             heroSection(recipe)
             summarySection(recipe)
+            memorySection(recipe)
             dietSection(recipe)
             portionSection(recipe)
             ingredientSection(recipe)
@@ -270,6 +277,104 @@ struct RecipeDetailView: View {
                     .recipeDetailRow()
             }
         }
+    }
+
+    @ViewBuilder
+    private func memorySection(_ recipe: Recipe) -> some View {
+        let snapshot = memories.first { $0.recipeSlug == recipe.slug }?.snapshot
+        let cooked = snapshot?.timesCooked ?? 0
+        let reason = fitReason(recipe)
+        let hasSignal = cooked > 0 || snapshot?.lastCookedAt != nil || reason != nil
+        let similar = hasSignal ? similarRecipes(to: recipe) : []
+        if !hasSignal {
+            EmptyView()
+        } else {
+            Section("Yemek hafızan") {
+                if cooked > 0 {
+                    Text(cooked == 1 ? "1 kez pişirdin" : "\(cooked) kez pişirdin")
+                        .recipeDetailRow()
+                }
+                if let last = snapshot?.lastCookedAt {
+                    Text("Son pişirme: \(memoryDate(last))")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.secondaryText)
+                        .recipeDetailRow()
+                }
+                if let reason {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Neden uyuyor")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.secondaryText)
+                        Text(reason)
+                            .foregroundStyle(Theme.textCharcoal)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .recipeDetailRow()
+                }
+                if !similar.isEmpty {
+                    Text("Benzer tarifler")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                        .recipeDetailRow()
+                    ForEach(similar, id: \.slug) { item in
+                        NavigationLink(value: RecipeRoute(slug: item.slug)) {
+                            Text(item.displayName)
+                                .foregroundStyle(Theme.textCharcoal)
+                        }
+                        .recipeDetailRow()
+                    }
+                }
+            }
+        }
+    }
+
+    private func fitReason(_ recipe: Recipe) -> String? {
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        guard let candidate = catalog.first(where: { $0.slug == recipe.slug }) else { return nil }
+        let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let taste = PersonalizedScoringService.profile(memories: map, candidates: catalog)
+        guard taste.dataPointCount > 0 else { return nil }
+        return RecommendationReasonService.personalReason(
+            for: candidate,
+            memory: map[recipe.slug],
+            profile: taste,
+            catalog: catalog
+        )
+    }
+
+    private func similarRecipes(to recipe: Recipe) -> [Recipe] {
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        guard let current = catalog.first(where: { $0.slug == recipe.slug }) else { return [] }
+        let disliked = Set(prefs.min { $0.createdAt < $1.createdAt }?.dislikedIngredientIds ?? [])
+        let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let matches = catalog.filter { candidate in
+            candidate.slug != current.slug
+                && candidate.rating != .never
+                && map[candidate.slug]?.neverAgain != true
+                && candidate.ingredientIds.isDisjoint(with: disliked)
+                && sharesKitchen(candidate, current)
+        }
+        .sorted { $0.slug < $1.slug }
+        .prefix(4)
+        return matches.compactMap { item in recipes.first { $0.slug == item.slug } }
+    }
+
+    private func sharesKitchen(_ lhs: PickerCandidate, _ rhs: PickerCandidate) -> Bool {
+        if !lhs.protein.isEmpty, lhs.protein == rhs.protein { return true }
+        let left = lhs.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = rhs.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !left.isEmpty, left.caseInsensitiveCompare(right) == .orderedSame { return true }
+        return !lhs.tags.isEmpty && !lhs.tags.isDisjoint(with: rhs.tags)
+    }
+
+    private func memoryDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
     }
 
     @ViewBuilder

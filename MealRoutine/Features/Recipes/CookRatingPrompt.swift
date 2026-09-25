@@ -3,10 +3,12 @@ import SwiftUI
 /// Centered rating prompt. Replaces the system confirmation dialog, which anchored too high.
 struct CookRatingPrompt: View {
     var currentRating: MealRating?
-    var onSelect: (MealRating) -> Void
+    var onSave: (MealRating, [FeedbackReason]) -> Void
     var onCancel: () -> Void
 
     @FocusState private var isTitleFocused: Bool
+    @State private var selected: MealRating?
+    @State private var reasons: Set<FeedbackReason> = []
 
     var body: some View {
         ZStack {
@@ -26,10 +28,20 @@ struct CookRatingPrompt: View {
                 .accessibilityAction(.escape, onCancel)
         }
         .accessibilityAddTraits(.isModal)
-        .onAppear { isTitleFocused = true }
+        .onAppear {
+            isTitleFocused = true
+            if selected == nil { selected = currentRating }
+        }
     }
 
     private var promptContent: some View {
+        ScrollView {
+            promptStack
+        }
+        .frame(maxHeight: 560)
+    }
+
+    private var promptStack: some View {
         VStack(spacing: 16) {
             VStack(spacing: 6) {
                 Text("Bu yemek nasıldı?")
@@ -53,6 +65,40 @@ struct CookRatingPrompt: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("İstersen bir not ekle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.secondaryText)
+                FlowLayout(spacing: 8) {
+                    ForEach(FeedbackReason.allCases) { reason in
+                        FilterChip(
+                            title: reason.title,
+                            isSelected: reasons.contains(reason),
+                            hint: "İsteğe bağlı not"
+                        ) {
+                            if reasons.contains(reason) {
+                                reasons.remove(reason)
+                            } else {
+                                reasons.insert(reason)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("Kaydet") {
+                guard let selected else { return }
+                onSave(selected, FeedbackReason.allCases.filter { reasons.contains($0) })
+            }
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Theme.onAccent)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(selected == nil ? Theme.accent.opacity(0.35) : Theme.accent)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
+            .disabled(selected == nil)
+            .accessibilityHint("Puanı ve seçili notları kaydeder")
+
             Button("Vazgeç", action: onCancel)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -63,9 +109,9 @@ struct CookRatingPrompt: View {
     }
 
     private func ratingButton(_ rating: MealRating) -> some View {
-        let isCurrent = currentRating == rating
+        let isCurrent = selected == rating
         return Button {
-            onSelect(rating)
+            selected = rating
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: rating.systemImage)

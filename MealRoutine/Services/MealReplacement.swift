@@ -3,10 +3,13 @@ import Foundation
 /// Quick filters on the single-evening replace sheet.
 enum ReplacementChip: String, CaseIterable, Identifiable, Sendable {
     case faster
+    case similarLoved
     case different
+    case loved
+    case tryNew
     case noChicken
     case vegetarian
-    case loved
+    case usual
     case surprise
 
     var id: String { rawValue }
@@ -14,13 +17,24 @@ enum ReplacementChip: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .faster: "Daha hızlı"
-        case .different: "Farklı bir şey"
+        case .similarLoved: "Sevdiğime benzer"
+        case .different: "Tamamen farklı"
+        case .loved: "Bir favori kullan"
+        case .tryNew: "Yeni bir tarif"
         case .noChicken: "Tavuksuz"
         case .vegetarian: "Vejetaryen"
-        case .loved: "Sevdiklerimden"
+        case .usual: "Alıştığım gibi"
         case .surprise: "Sürpriz"
         }
     }
+}
+
+/// Optional meal-memory context. Empty keeps the V1 ranker so existing checks stay put.
+struct ReplacementMemory: Equatable, Sendable {
+    var memories: [String: MealMemorySnapshot] = [:]
+    var preferences: PlanningPreferences?
+    var dayOffset: Int = 0
+    var now: Date = .now
 }
 
 struct ReplacementChoice: Equatable, Sendable, Identifiable {
@@ -58,31 +72,54 @@ enum MealReplacement {
         maxCookMinutes: Int,
         dislikedIngredientIds: Set<String>,
         activeChips: Set<ReplacementChip>,
-        anchors: [PickerCandidate] = []
+        anchors: [PickerCandidate] = [],
+        memory: ReplacementMemory = ReplacementMemory()
     ) -> [ReplacementChoice] {
         var blocked = blockedSlugs
         blocked.insert(current.slug)
+        let preferences = memory.preferences ?? PlanningPreferences.standard(
+            maxCookMinutes: maxCookMinutes,
+            dislikedIngredientIds: dislikedIngredientIds
+        )
+        let useMemory = memory.preferences != nil || !memory.memories.isEmpty
         let eligible = catalog.filter { candidate in
-            MealRecommender.passesFilters(
+            let passes = useMemory
+                ? PersonalizedScoringService.isEligible(
+                    candidate,
+                    preferences: preferences,
+                    memory: memory.memories[candidate.slug],
+                    blockedSlugs: blocked,
+                    enforceLovedGap: !activeChips.contains(.loved),
+                    enforceDifficulty: true,
+                    now: memory.now
+                )
+                : MealRecommender.passesFilters(
+                    candidate,
+                    maxCookMinutes: maxCookMinutes,
+                    dislikedIngredientIds: dislikedIngredientIds,
+                    blockedSlugs: blocked
+                )
+            return passes && matches(
                 candidate,
-                maxCookMinutes: maxCookMinutes,
-                dislikedIngredientIds: dislikedIngredientIds,
-                blockedSlugs: blocked
-            ) && matches(candidate, current: current, chips: activeChips)
+                current: current,
+                chips: activeChips,
+                catalog: catalog,
+                memory: memory
+            )
         }
         let ranked = eligible.sorted { lhs, rhs in
-            let left = MealRecommender.breakdown(for: lhs, anchoredMeals: anchors).total
-            let right = MealRecommender.breakdown(for: rhs, anchoredMeals: anchors).total
+            let left = rank(lhs, anchors: anchors, memory: memory, preferences: preferences, catalog: catalog, useMemory: useMemory)
+            let right = rank(rhs, anchors: anchors, memory: memory, preferences: preferences, catalog: catalog, useMemory: useMemory)
             if left != right { return left > right }
             return lhs.slug < rhs.slug
         }
         guard !ranked.isEmpty else { return [] }
         if activeChips.contains(.surprise) {
             let pick = surprisePick(in: ranked, currentSlug: current.slug)
-            return [choice(for: pick, current: current, maxCookMinutes: maxCookMinutes, chips: activeChips)]
+            return [choice(for: pick, current: current, maxCookMinutes: maxCookMinutes, chips: activeChips, memory: memory, catalog: catalog)]
         }
         return ranked.prefix(listLimit).map {
-            choice(for: $0, current: current, maxCookMinutes: maxCookMinutes, chips: activeChips)
+            choice(for: $0, current: current, maxCookMinutes: maxCookMinutes, chips: activeChips, memory: memory, catalog: catalog)
         }
     }
 
@@ -117,8 +154,17 @@ enum MealReplacement {
         if chips.contains(.faster), candidate.totalMinutes < current.totalMinutes {
             return "Daha kısa sürer"
         }
-        if candidate.rating == .loved {
+        if candidate.rating == .loved || chips.contains(.loved) {
             return "Sevdiğin bir yemeğe benziyor"
+        }
+        if chips.contains(.similarLoved) {
+            return "Sevdiğin bir tarife benziyor"
+        }
+        if chips.contains(.tryNew) {
+            return "Henüz denemediğin bir tarif"
+        }
+        if chips.contains(.usual) {
+            return "Alışık olduğun tarza yakın"
         }
         if !current.protein.isEmpty, candidate.protein != current.protein {
             return "Çeşit için farklı bir protein"
@@ -132,7 +178,9 @@ enum MealReplacement {
     private static func matches(
         _ candidate: PickerCandidate,
         current: PickerCandidate,
-        chips: Set<ReplacementChip>
+        chips: Set<ReplacementChip>,
+        catalog: [PickerCandidate],
+        memory: ReplacementMemory
     ) -> Bool {
         if chips.contains(.surprise) { return true }
         if chips.contains(.faster), candidate.totalMinutes >= current.totalMinutes {
@@ -147,10 +195,82 @@ enum MealReplacement {
         if chips.contains(.vegetarian), !isVegetarian(candidate) {
             return false
         }
-        if chips.contains(.loved), candidate.rating != .loved {
+        if chips.contains(.loved), candidate.rating != .loved, memory.memories[candidate.slug]?.isFavorite != true {
+            return false
+        }
+        if chips.contains(.similarLoved), !isSimilarToLoved(candidate, catalog: catalog, memory: memory) {
+            return false
+        }
+        if chips.contains(.tryNew), !isUntouched(candidate, memory: memory) {
+            return false
+        }
+        if chips.contains(.usual), !isUsual(candidate, catalog: catalog, memory: memory) {
             return false
         }
         return true
+    }
+
+    private static func rank(
+        _ candidate: PickerCandidate,
+        anchors: [PickerCandidate],
+        memory: ReplacementMemory,
+        preferences: PlanningPreferences,
+        catalog: [PickerCandidate],
+        useMemory: Bool
+    ) -> Int {
+        guard useMemory else {
+            return MealRecommender.breakdown(for: candidate, anchoredMeals: anchors).total
+        }
+        return PersonalizedScoringService.score(
+            candidate,
+            memories: memory.memories,
+            candidates: catalog,
+            preferences: preferences,
+            anchors: anchors,
+            dayOffset: memory.dayOffset,
+            now: memory.now
+        ).final
+    }
+
+    private static func isSimilarToLoved(
+        _ candidate: PickerCandidate,
+        catalog: [PickerCandidate],
+        memory: ReplacementMemory
+    ) -> Bool {
+        let loved = catalog.filter { other in
+            other.rating == .loved || (memory.memories[other.slug]?.lovedCount ?? 0) > 0
+        }
+        if loved.isEmpty { return candidate.rating == .loved }
+        return loved.contains { other in
+            other.slug != candidate.slug && sharesShape(candidate, other)
+        }
+    }
+
+    private static func isUntouched(_ candidate: PickerCandidate, memory: ReplacementMemory) -> Bool {
+        if candidate.rating != nil { return false }
+        return RecommendationReasonService.isNew(memory.memories[candidate.slug])
+    }
+
+    private static func isUsual(
+        _ candidate: PickerCandidate,
+        catalog: [PickerCandidate],
+        memory: ReplacementMemory
+    ) -> Bool {
+        let taste = PersonalizedScoringService.profile(memories: memory.memories, candidates: catalog)
+        let established = !taste.lovedProteins.isEmpty || !taste.lovedCategories.isEmpty || !taste.lovedSlugs.isEmpty
+        if !established { return true }
+        if candidate.rating == .loved || taste.lovedSlugs.contains(candidate.slug) { return true }
+        if !candidate.protein.isEmpty, taste.lovedProteins.contains(candidate.protein) { return true }
+        let category = candidate.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return taste.lovedCategories.contains(category)
+    }
+
+    private static func sharesShape(_ lhs: PickerCandidate, _ rhs: PickerCandidate) -> Bool {
+        if !lhs.protein.isEmpty, lhs.protein == rhs.protein { return true }
+        let left = lhs.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = rhs.category.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !left.isEmpty, left.caseInsensitiveCompare(right) == .orderedSame { return true }
+        return !lhs.tags.isEmpty && !lhs.tags.isDisjoint(with: rhs.tags)
     }
 
     private static func surprisePick(in ranked: [PickerCandidate], currentSlug: String) -> PickerCandidate {
@@ -174,12 +294,28 @@ enum MealReplacement {
         for candidate: PickerCandidate,
         current: PickerCandidate,
         maxCookMinutes: Int,
-        chips: Set<ReplacementChip>
+        chips: Set<ReplacementChip>,
+        memory: ReplacementMemory,
+        catalog: [PickerCandidate]
     ) -> ReplacementChoice {
-        ReplacementChoice(
+        var text = reason(for: candidate, current: current, maxCookMinutes: maxCookMinutes, chips: chips)
+        if memory.preferences != nil || !memory.memories.isEmpty,
+           !chips.contains(.surprise),
+           !chips.contains(.faster) {
+            let taste = PersonalizedScoringService.profile(memories: memory.memories, candidates: catalog)
+            if let personal = RecommendationReasonService.personalReason(
+                for: candidate,
+                memory: memory.memories[candidate.slug],
+                profile: taste,
+                catalog: catalog
+            ) {
+                text = personal
+            }
+        }
+        return ReplacementChoice(
             slug: candidate.slug,
             minutes: candidate.totalMinutes,
-            reason: reason(for: candidate, current: current, maxCookMinutes: maxCookMinutes, chips: chips)
+            reason: text
         )
     }
 

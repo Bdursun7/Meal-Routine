@@ -13,6 +13,8 @@ final class PlannedMeal {
     /// New weeks copy the household size. Profile “Porsiyonu kaydet” copies it again.
     var servings: Int
     var cookedAt: Date?
+    /// Set when the household skips the evening. The recipe and grocery list stay.
+    var skippedAt: Date? = nil
     var week: PlanWeek? = nil
 
     init(

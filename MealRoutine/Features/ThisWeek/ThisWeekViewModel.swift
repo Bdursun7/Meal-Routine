@@ -14,6 +14,9 @@ struct WeekMealPresentation: Identifiable, Equatable {
     var isToday: Bool
     var rating: MealRating?
     var slug: String
+    var reason: String = ""
+    var badgeTitle: String?
+    var isSkipped: Bool = false
 }
 
 struct WeekSummaryPresentation: Equatable {
@@ -70,11 +73,18 @@ final class ThisWeekViewModel {
         )
     }
 
+    func explanation(weeks: [PlanWeek], now: Date = .now) -> String {
+        let start = WeekCalendar.weekStart(containing: now)
+        return weeks.first { WeekCalendar.isSameDay($0.weekStart, start) }?.explanation ?? ""
+    }
+
     func meals(
         weeks: [PlanWeek],
         recipes: [Recipe],
         feedback: [RecipeFeedback],
         householdSize: Int,
+        memories: [MealMemory] = [],
+        prefs: UserPrefs? = nil,
         now: Date = .now
     ) -> [WeekMealPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
@@ -83,11 +93,30 @@ final class ThisWeekViewModel {
         }
         let names = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let storedPrefs = prefs
+        let planning = storedPrefs?.planningPreferences ?? PlanningPreferences.standard(
+            maxCookMinutes: CookTimeOptions.defaultMinutes
+        )
+        let taste = PersonalizedScoringService.profile(memories: memoryMap, candidates: catalog)
+        let hasHistory = taste.dataPointCount > 0
         return week.meals
             .sorted { $0.dayOffset < $1.dayOffset }
             .map { meal in
                 let recipe = names[meal.recipeSlug]
                 let date = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
+                let candidate = catalog.first { $0.slug == meal.recipeSlug }
+                let memory = memoryMap[meal.recipeSlug]
+                let reason = candidate.flatMap {
+                    RecommendationReasonService.personalReason(
+                        for: $0,
+                        memory: memory,
+                        profile: taste,
+                        catalog: catalog
+                    )
+                } ?? ""
+                let badge = RecommendationReasonService.badge(for: memory, hasHistory: hasHistory)
                 return WeekMealPresentation(
                     id: meal.uuid,
                     dayTitle: WeekCalendar.dayTitle(offset: meal.dayOffset),
@@ -102,7 +131,10 @@ final class ThisWeekViewModel {
                     isCooked: meal.cookedAt != nil,
                     isToday: WeekCalendar.isSameDay(date, now),
                     rating: ratings[meal.recipeSlug],
-                    slug: meal.recipeSlug
+                    slug: meal.recipeSlug,
+                    reason: reason,
+                    badgeTitle: badge?.title,
+                    isSkipped: meal.skippedAt != nil && meal.cookedAt == nil
                 )
             }
     }
@@ -111,6 +143,29 @@ final class ThisWeekViewModel {
         do {
             _ = try WeekPlanService.ensureCurrentWeek(in: context)
             try GroceryListService.rebuild(in: context)
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    func skip(uuid: UUID, in context: ModelContext) {
+        guard !isWorking else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try WeekPlanService.markSkipped(uuid: uuid, in: context)
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    func dismissPattern(_ id: String, in context: ModelContext) {
+        do {
+            guard let prefs = try UserPrefsStore.existing(in: context) else { return }
+            if !prefs.dismissedPatternIDs.contains(id) {
+                prefs.dismissedPatternIDs.append(id)
+            }
+            try context.save()
         } catch {
             alertMessage = error.localizedDescription
         }
@@ -162,6 +217,7 @@ enum ReplacementPresenter {
         recipes: [Recipe],
         feedback: [RecipeFeedback],
         prefs: [UserPrefs],
+        memories: [MealMemory] = [],
         now: Date = .now
     ) -> ReplacementBoard {
         let start = WeekCalendar.weekStart(containing: now)
@@ -179,6 +235,7 @@ enum ReplacementPresenter {
         let blocked = Set(week.meals.map(\.recipeSlug))
         let anchors = catalog.filter { blocked.contains($0.slug) }
         let stored = prefs.min { $0.createdAt < $1.createdAt }
+        let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let picked = MealReplacement.choices(
             catalog: catalog,
             current: current,
@@ -186,7 +243,13 @@ enum ReplacementPresenter {
             maxCookMinutes: CookTimeOptions.resolved(stored?.maxCookMinutes ?? CookTimeOptions.defaultMinutes),
             dislikedIngredientIds: Set(stored?.dislikedIngredientIds ?? []),
             activeChips: chips,
-            anchors: anchors
+            anchors: anchors,
+            memory: ReplacementMemory(
+                memories: memoryMap,
+                preferences: stored?.planningPreferences,
+                dayOffset: meal.dayOffset,
+                now: now
+            )
         )
         let choices = picked.map { choice in
             let recipe = bySlug[choice.slug]
