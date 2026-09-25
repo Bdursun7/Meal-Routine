@@ -4,6 +4,7 @@ import Foundation
 enum TestFixtures {
     static let now = Date(timeIntervalSince1970: 1_700_000_000)
 
+    /// Labeled arguments must follow this order. `score` comes before `minutes`.
     static func candidate(
         _ slug: String,
         score: Int = 60,

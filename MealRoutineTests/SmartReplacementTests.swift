@@ -34,7 +34,7 @@ final class SmartReplacementTests: XCTestCase {
 
     func testNeverAgainStaysOutOfReplacement() {
         let current = TestFixtures.candidate("aksam", minutes: 50, protein: "legume")
-        let banned = TestFixtures.candidate("asla", minutes: 15, score: 99, protein: "tofu", rating: .never)
+        let banned = TestFixtures.candidate("asla", score: 99, minutes: 15, protein: "tofu", rating: .never)
         let hidden = TestFixtures.candidate("gizli", minutes: 15, protein: "egg")
         var memory = MealMemorySnapshot(recipeID: "gizli")
         memory.neverAgain = true
