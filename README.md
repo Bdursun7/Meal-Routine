@@ -26,13 +26,13 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 ## Recipe data
 
-Bundled catalog: `MealRoutine/Recipes/recipes.v1.json` (225 dinners: 125 UniTools + 100 MealRoutine originals).
+Bundled catalog: `MealRoutine/Recipes/recipes.v1.json` (325 dinners: 125 UniTools + 200 MealRoutine originals).
 
 Turkish ingredient alias reference: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
 UniTools rows stay UniTools World Recipes, CC BY-SA 4.0. Do not scrape commercial recipe sites into those rows. Dataset derivatives of the UniTools rows stay CC BY-SA 4.0. App code may stay under its own license. UniTools photo files stay on UniTools URLs with the catalog's own author and license; they are not replaced with other images.
 
-The original Turkish evening pack is MealRoutine text. Those rows use `source.provider` `mealroutine`, not CC BY-SA, and they ship without photos. Recipe detail shows their own credit. The fork-and-knife placeholder covers a missing photo. Adding them changes the catalog file bytes, so the import fingerprint (`schemaVersion` plus FNV-1a) changes and the next launch re-imports. `schemaVersion` stays 1.
+The original Turkish evening pack is MealRoutine text. Those rows use `source.provider` `mealroutine` and license `MealRoutine original`, not CC BY-SA. Recipe detail shows that credit, and a separate photo line (`author · license`) when a photo is on screen. Some originals, and some UniTools rows that had no picture, use an HTTPS `upload.wikimedia.org` file under CC0, CC BY, or CC BY-SA. The fork-and-knife placeholder covers a row that still has no photo. UniTools photo URLs that were already in the catalog are unchanged. Adding recipes or photos changes the catalog file bytes, so the import fingerprint (`schemaVersion` plus FNV-1a) changes and the next launch re-imports. `schemaVersion` stays 1.
 
 `Recipe.photoURL`, `photoAuthor`, and `photoLicense` are already on the SwiftData model. Seed copies `photo.url`, `photo.author`, and `photo.license`, or empty strings when `photo` is null. The catalog file bytes are the import fingerprint, and showing photos does not add model fields, so no SwiftData migration is required. An install that already seeded this catalog already has the photo strings.
 
@@ -68,13 +68,13 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 
 ## Tarif verisi
 
-Paket: `MealRoutine/Recipes/recipes.v1.json` (225 akşam yemeği: 125 UniTools + 100 MealRoutine özgün).
+Paket: `MealRoutine/Recipes/recipes.v1.json` (325 akşam yemeği: 125 UniTools + 200 MealRoutine özgün).
 
 Türkçe malzeme eşanlamlıları: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
 UniTools satırları UniTools World Recipes, CC BY-SA 4.0 olarak durur. Bu satırlara ticari tarif sitesi kazınmaz. UniTools türevleri CC BY-SA 4.0 kalır. Uygulama kodu kendi lisansında durabilir. UniTools fotoğrafları kendi adresinde kalır; yazar ve lisans katalogdaki `photo` alanıdır.
 
-Özgün Türkçe akşam paketi MealRoutine metnidir. `source.provider` değeri `mealroutine` olur, CC BY-SA taşımaz, fotoğrafsız gelir. Tarif detayı kendi kredisini gösterir. Fotoğraf yoksa çatal-bıçak yer tutucusu kalır. Eklenen tarifler dosya baytını değiştirdiği için içe aktarma parmak izi (`schemaVersion` + FNV-1a) değişir ve sonraki açılış kataloğu yeniden alır. `schemaVersion` 1 olarak kalır.
+Özgün Türkçe akşam paketi MealRoutine metnidir. `source.provider` değeri `mealroutine`, lisans `MealRoutine original` olur; CC BY-SA taşımaz. Tarif detayı bu krediyi gösterir. Fotoğraf varsa altında ayrıca `yazar · lisans` satırı durur. Bazı özgün satırlar ve fotoğrafı olmayan bazı UniTools satırları `upload.wikimedia.org` üzerinde CC0, CC BY veya CC BY-SA bir dosya kullanır. Eşleşen açık lisanslı kare yoksa çatal-bıçak yer tutucusu kalır. Katalogda zaten duran UniTools fotoğraf adresleri değişmedi. Eklenen tarif veya fotoğraf dosya baytını değiştirdiği için içe aktarma parmak izi (`schemaVersion` + FNV-1a) değişir ve sonraki açılış kataloğu yeniden alır. `schemaVersion` 1 olarak kalır.
 
 `Recipe.photoURL`, `photoAuthor` ve `photoLicense` SwiftData modelinde zaten var. Seed, `photo.url`, `photo.author` ve `photo.license` değerlerini yazar; `photo` yoksa boş metin kalır. İçe aktarma parmak izi katalog dosyasının baytlarıdır. Fotoğraf göstermek modele yeni alan eklemez, SwiftData göçü gerekmez. Bu kataloğu daha önce alan kurulumda fotoğraf metinleri zaten durur.
 

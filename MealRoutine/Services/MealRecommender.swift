@@ -285,6 +285,7 @@ enum MealRecommender {
         "lentils": "legume",
         "chickpeas": "legume",
         "beans": "legume",
+        "broadbeans": "legume",
         "butterbeans": "legume",
         "soybeans": "legume",
         "moongdal": "legume",

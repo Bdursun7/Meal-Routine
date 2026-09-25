@@ -244,11 +244,11 @@ private func checkCatalog() throws {
     print("fully resolved ids (\(resolved.count)): \(resolved.joined(separator: ", "))")
     print("partially merged ids (\(partial.count)): \(partial.joined(separator: ", "))")
 
-    check(file.recipes.count == 225, "catalog recipe count \(file.recipes.count)")
+    check(file.recipes.count == 325, "catalog recipe count \(file.recipes.count)")
     check(beforeIDs.count == 55, "before count \(beforeIDs.count)")
     check(afterIDs.count == 50, "after count \(afterIDs.count)")
-    check(rowsBefore == 397, "rows before \(rowsBefore)")
-    check(rowsAfter == 386, "rows after \(rowsAfter)")
+    check(rowsBefore == 399, "rows before \(rowsBefore)")
+    check(rowsAfter == 388, "rows after \(rowsAfter)")
     check(resolved == ["beef", "chicken", "lamb", "spinach", "stock"], "resolved \(resolved)")
     check(
         partial == ["fish", "oil", "onion", "potato", "tomato", "tomatoes"],
@@ -257,7 +257,7 @@ private func checkCatalog() throws {
 
     let chicken = GroceryMerger.merge(linesByID["chicken"] ?? [])
     check(chicken.count == 1 && chicken[0].unit == "kg" && !chicken[0].hasUnitConflict, "catalog chicken \(chicken)")
-    close(chicken.first?.quantity, 21.85, "catalog chicken kilograms")
+    close(chicken.first?.quantity, 28.65, "catalog chicken kilograms")
 
     let stock = GroceryMerger.merge(linesByID["stock"] ?? [])
     check(stock.count == 1 && stock[0].unit == "l", "catalog stock \(stock)")

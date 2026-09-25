@@ -92,7 +92,7 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         "pumpkin", "radish", "redcabbage", "rocket", "rosemary", "scallion",
         "scotchbonnet", "shallot", "shallots", "spinach", "spring", "springonion",
         "sweetpotato", "tarragon", "tomato", "tomatoes", "vegetables", "watermelon",
-        "artichoke", "cauliflower", "grapeleaves", "okra",
+        "artichoke", "broadbeans", "cauliflower", "chard", "grapeleaves", "okra",
     ]
 
     private static let proteinIDs: Set<String> = [

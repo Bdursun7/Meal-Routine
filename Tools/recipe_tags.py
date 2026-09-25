@@ -142,8 +142,18 @@ BREAD_SLUGS = frozenset({
     "peynirli-gozleme",
     "kiymali-gozleme",
     "patatesli-gozleme",
+    "ispanakli-gozleme",
+    "kasarli-gozleme",
+    "otlu-gozleme",
+    "etli-ekmek",
+    "karadeniz-pidesi",
+    "yumurtali-pide",
+    "kiymali-yumurtali-pide",
+    "cig-borek",
+    "hamsili-ekmek",
     # Lavash or bread is the plate; the dough is not a separate bread id on döner.
     "ev-usulu-tavuk-doner",
+    "ev-usulu-et-doner",
 })
 
 # Single skillet or pot, where the summary never says "one pan".
