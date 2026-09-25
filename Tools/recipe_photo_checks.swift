@@ -18,7 +18,7 @@ private func check(_ condition: @autoclosure () -> Bool, _ message: String) {
 private func checkCatalog() throws {
     let data = try Data(contentsOf: URL(fileURLWithPath: "MealRoutine/Recipes/recipes.v1.json"))
     let file = try JSONDecoder().decode(RecipeCatalogFile.self, from: data)
-    check(file.recipes.count == 125, "catalog recipe count \(file.recipes.count)")
+    check(file.recipes.count == 225, "catalog recipe count \(file.recipes.count)")
 
     var withPhoto: [String] = []
     var withoutPhoto: [String] = []
@@ -48,10 +48,10 @@ private func checkCatalog() throws {
     }
 
     check(withPhoto.count == 103, "photos \(withPhoto.count), expected 103")
-    check(withoutPhoto.count == 22, "without photos \(withoutPhoto.count), expected 22")
+    check(withoutPhoto.count == 122, "without photos \(withoutPhoto.count), expected 122")
     check(withPhoto.contains("menemen"), "menemen has a photo")
     check(withoutPhoto.contains("ojja-merguez"), "ojja-merguez has no photo")
-    if withPhoto.count != 103 || withoutPhoto.count != 22 {
+    if withPhoto.count != 103 || withoutPhoto.count != 122 {
         fputs("without photo: \(withoutPhoto.joined(separator: ", "))\n", stderr)
     }
 

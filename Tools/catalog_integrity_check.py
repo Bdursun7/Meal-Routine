@@ -75,10 +75,27 @@ def _blank(value: object) -> bool:
 def require_turkish(catalog: dict) -> tuple[int, int, int]:
     """Fail when a summary, step, or displayed ingredient note has no Turkish text.
 
-    English source strings must stay. They are the CC BY-SA original.
+    UniTools rows keep their English source for CC BY-SA. MealRoutine originals
+    are bilingual too, and they must not claim that license.
     """
     recipes = catalog.get("recipes")
-    expect(isinstance(recipes, list) and len(recipes) == 125, "catalog has 125 recipes")
+    expect(isinstance(recipes, list) and len(recipes) == 225, "catalog has 225 recipes")
+    unitools = [recipe for recipe in recipes if (recipe.get("source") or {}).get("provider") == "unitools"]
+    original = [recipe for recipe in recipes if (recipe.get("source") or {}).get("provider") == "mealroutine"]
+    expect(len(unitools) == 125, f"UniTools rows stay at 125, got {len(unitools)}")
+    expect(len(original) == 100, f"original pack is 100, got {len(original)}")
+    for recipe in unitools:
+        source = recipe.get("source") or {}
+        recipe_id = recipe.get("id", "?")
+        expect(source.get("license") == "CC BY-SA 4.0", f"{recipe_id} UniTools license")
+        expect("UniTools" in (source.get("attribution") or ""), f"{recipe_id} UniTools attribution")
+    for recipe in original:
+        source = recipe.get("source") or {}
+        recipe_id = recipe.get("id", "?")
+        expect("CC BY-SA" not in (source.get("license") or ""), f"{recipe_id} must not claim CC BY-SA")
+        expect("UniTools" not in (source.get("attribution") or ""), f"{recipe_id} must not claim UniTools")
+        expect(recipe.get("photo") is None, f"{recipe_id} photo should stay deferred")
+        expect(recipe.get("country") == "TR", f"{recipe_id} country")
     summary_count = 0
     step_count = 0
     note_count = 0
@@ -228,7 +245,7 @@ def main() -> None:
         for tag in actual:
             expect(tag in ALLOWLIST, f"{recipe_id} tag {tag} is not in the allowlist")
         tagged += 1
-    expect(tagged == 125, "every recipe was tag-checked")
+    expect(tagged == 225, "every recipe was tag-checked")
     swift = (root / "Tools/meal_recommender_checks.swift").read_text()
     for tag in ALLOWLIST:
         expect(f'"{tag}"' in swift, f"recommender checks allowlist missing {tag}")

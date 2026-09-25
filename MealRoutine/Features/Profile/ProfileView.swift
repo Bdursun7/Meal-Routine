@@ -176,6 +176,7 @@ struct ProfileView: View {
                     Link("theunitools.com/en/data", destination: Attribution.landingURL)
                     Link("CC BY-SA 4.0", destination: Attribution.licenseURL)
                     Text("Özet ve adımlar, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin katalogda durur.")
+                    Text("Özgün MealRoutine tarifleri ayrıca yazılmıştır. Bu satırlar UniTools lisansı taşımaz ve fotoğrafsızdır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text("Tarif fotoğrafları katalogdaki yazar ve lisansla gösterilir. Açılmış bir fotoğraf cihazda kalır. Fotoğraf yoksa veya henüz indirilmediyse çatal-bıçak görseli durur. Hafta, market ve pişirme fotoğrafsız da çalışır.")

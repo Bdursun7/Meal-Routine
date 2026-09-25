@@ -131,7 +131,20 @@ BREAD_IDS = frozenset(
     }
 )
 # Dough dishes whose flour never shows up as a bread ingredient id.
-BREAD_SLUGS = frozenset({"fondue-moitie-moitie", "lahmacun", "pizza-margherita"})
+BREAD_SLUGS = frozenset({
+    "fondue-moitie-moitie",
+    "lahmacun",
+    "pizza-margherita",
+    # Turkish flatbreads whose dough is flour, not a bread ingredient id.
+    "kiymali-pide",
+    "kusbasili-pide",
+    "kasarli-pide",
+    "peynirli-gozleme",
+    "kiymali-gozleme",
+    "patatesli-gozleme",
+    # Lavash or bread is the plate; the dough is not a separate bread id on döner.
+    "ev-usulu-tavuk-doner",
+})
 
 # Single skillet or pot, where the summary never says "one pan".
 # Stir-fries, risotto, paella, khichuri, and the two Italian pan pastas are rules.
