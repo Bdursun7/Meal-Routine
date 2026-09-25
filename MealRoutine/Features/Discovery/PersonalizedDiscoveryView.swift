@@ -10,7 +10,7 @@ struct PersonalizedDiscoveryView: View {
             Section(section.title) {
                 ForEach(section.items) { item in
                     if let recipe = recipe(item.slug) {
-                        NavigationLink(value: RecipeRoute(slug: item.slug)) {
+                        NavigationLink(value: RecipeRoute(slug: item.slug, discoverySectionID: section.id)) {
                             RecommendationCard(
                                 name: recipe.displayName,
                                 minutes: recipe.totalMinutes,
@@ -20,14 +20,10 @@ struct PersonalizedDiscoveryView: View {
                                 photoAuthor: recipe.photoAuthor,
                                 photoLicense: recipe.photoLicense
                             )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .accessibilityHint("Tarif detayını açar")
-                        .simultaneousGesture(TapGesture().onEnded {
-                            Analytics.track(
-                                .personalizedRecommendationSelected,
-                                properties: ["section": section.id]
-                            )
-                        })
                     }
                 }
             }

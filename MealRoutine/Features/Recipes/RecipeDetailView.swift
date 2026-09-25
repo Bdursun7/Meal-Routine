@@ -111,6 +111,7 @@ struct RecipeDetailView: View {
             .onAppear {
                 Analytics.track(.recipeOpened)
             }
+            .modifier(DiscoverySelectionTracker(sectionID: route.discoverySectionID))
             .onChange(of: portionContext) { _, newContext in
                 clearPortionDraftIfSaved(newContext)
             }
@@ -738,6 +739,23 @@ private struct RecipeMetaChips: View {
         .padding(.vertical, 6)
         .background(Theme.accent.opacity(0.12), in: Capsule())
         .fixedSize(horizontal: true, vertical: true)
+    }
+}
+
+/// Fires once per detail appearance. A row gesture would shrink the list hit target.
+private struct DiscoverySelectionTracker: ViewModifier {
+    var sectionID: String?
+    @State private var didTrack = false
+
+    func body(content: Content) -> some View {
+        content.onAppear {
+            guard let sectionID, !didTrack else { return }
+            didTrack = true
+            Analytics.track(
+                .personalizedRecommendationSelected,
+                properties: ["section": sectionID]
+            )
+        }
     }
 }
 

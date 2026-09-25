@@ -282,78 +282,83 @@ private struct WeekMealCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(meal.dayTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Theme.accent.opacity(0.15), in: Capsule())
-                    Text(meal.dateTitle)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                Spacer(minLength: 8)
-                if let badge = meal.badgeTitle {
-                    FamiliarityBadgeLabel(title: badge)
-                }
-                if meal.isCooked {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(Theme.sage)
-                        .accessibilityLabel("Pişti")
-                }
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.secondaryText)
-                    .accessibilityHidden(true)
-            }
-
             NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
-                HStack(alignment: .top, spacing: 12) {
-                    RecipePhotoView(
-                        urlString: recipe?.photoURL ?? "",
-                        author: recipe?.photoAuthor ?? "",
-                        license: recipe?.photoLicense ?? "",
-                        layout: .thumbnail,
-                        isPhotoShown: $isPhotoShown
-                    )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(meal.recipeName)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Theme.textCharcoal)
-                        Text("\(meal.minutes) dk · \(meal.servings) kişilik")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.secondaryText)
-                        if let rating = meal.rating {
-                            Label(rating.title, systemImage: rating.systemImage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if !meal.reason.isEmpty {
-                            Text(meal.reason)
-                                .font(.footnote)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(meal.dayTitle)
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Theme.accent)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if meal.isSkipped {
-                            Text("Atlandı")
-                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Theme.accent.opacity(0.15), in: Capsule())
+                            Text(meal.dateTitle)
+                                .font(.footnote)
                                 .foregroundStyle(Theme.secondaryText)
                         }
-                        if isPhotoShown {
-                            RecipePhotoCreditText(
-                                author: recipe?.photoAuthor ?? "",
-                                license: recipe?.photoLicense ?? "",
-                                style: .compact
-                            )
+                        Spacer(minLength: 8)
+                        if let badge = meal.badgeTitle {
+                            FamiliarityBadgeLabel(title: badge)
                         }
+                        if meal.isCooked {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(Theme.sage)
+                                .accessibilityLabel("Pişti")
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.secondaryText)
+                            .accessibilityHidden(true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(alignment: .top, spacing: 12) {
+                        RecipePhotoView(
+                            urlString: recipe?.photoURL ?? "",
+                            author: recipe?.photoAuthor ?? "",
+                            license: recipe?.photoLicense ?? "",
+                            layout: .thumbnail,
+                            isPhotoShown: $isPhotoShown
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(meal.recipeName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Theme.textCharcoal)
+                            Text("\(meal.minutes) dk · \(meal.servings) kişilik")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryText)
+                            if let rating = meal.rating {
+                                Label(rating.title, systemImage: rating.systemImage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !meal.reason.isEmpty {
+                                Text(meal.reason)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.accent)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if meal.isSkipped {
+                                Text("Atlandı")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.secondaryText)
+                            }
+                            if isPhotoShown {
+                                RecipePhotoCreditText(
+                                    author: recipe?.photoAuthor ?? "",
+                                    license: recipe?.photoLicense ?? "",
+                                    style: .compact
+                                )
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Tarif detayını açar")
 
             AdaptiveActions {
                 Button("Değiştir") {

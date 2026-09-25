@@ -222,8 +222,10 @@ private struct RecipeListRow: View {
                             )
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 2)
                 }
+                .contentShape(Rectangle())
             }
             .accessibilityHint("Tarif detayını açar")
 
