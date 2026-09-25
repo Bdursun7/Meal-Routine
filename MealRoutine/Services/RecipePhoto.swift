@@ -26,12 +26,23 @@ enum RecipePhoto {
         return parts.joined(separator: " · ")
     }
 
-    /// HTTPS URL from the catalog photo field. HTTP and empty strings stay placeholders.
+    /// Hosts the catalog may load a photo from. UniTools JPEGs stay on their own host.
+    /// Open-license fills use a direct `upload.wikimedia.org` file or thumbnail.
+    static let allowedHosts: Set<String> = [
+        "theunitools.com",
+        "upload.wikimedia.org",
+    ]
+
+    /// HTTPS URL from the catalog photo field.
+    /// HTTP, empty strings, credentials, and hosts outside `allowedHosts` stay placeholders.
     static func remoteURL(from string: String) -> URL? {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return nil }
-        guard url.scheme?.lowercased() == "https", url.host?.isEmpty == false else { return nil }
+        guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased(), !host.isEmpty else {
+            return nil
+        }
         guard url.user == nil, url.password == nil else { return nil }
+        guard allowedHosts.contains(host) else { return nil }
         return url
     }
 

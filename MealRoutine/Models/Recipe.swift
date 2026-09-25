@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// A dinner from the bundled UniTools catalog.
+/// A dinner from the bundled catalog. UniTools rows and MealRoutine originals share this model.
 @Model
 final class Recipe {
     @Attribute(.unique) var slug: String

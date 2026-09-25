@@ -92,6 +92,7 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         "pumpkin", "radish", "redcabbage", "rocket", "rosemary", "scallion",
         "scotchbonnet", "shallot", "shallots", "spinach", "spring", "springonion",
         "sweetpotato", "tarragon", "tomato", "tomatoes", "vegetables", "watermelon",
+        "artichoke", "broadbeans", "cauliflower", "chard", "grapeleaves", "okra",
     ]
 
     private static let proteinIDs: Set<String> = [
@@ -100,7 +101,8 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         "fish", "guanciale", "ham", "hilsa", "lamb", "leanbeef",
         "merguez", "mussels", "pork", "porkbelly", "prawns", "prosciutto",
         "rabbit", "ribs", "salmon", "salmonbones", "sardines", "sausage",
-        "tofu", "trout", "tuna", "veal"
+        "tofu", "trout", "tuna", "veal",
+        "anchovy", "liver", "mackerel", "pastirma", "seabass", "sucuk", "tripe",
     ]
 
     private static let dairyAndEggsIDs: Set<String> = [
@@ -123,6 +125,7 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         "peanuts", "pide", "pinenuts", "pita", "prunes", "raisins",
         "rice", "ricenoodles", "roti", "ryebread", "sesameoil", "sesameseeds",
         "soda", "somun", "soybeans", "spaghetti", "starch", "stock",
+        "borlotti", "semolina", "tarhana", "vermicelli",
         "stockcube", "sugar", "sunfloweroil", "tahini", "tortillas", "wakame",
         "walnuts", "yeast"
     ]

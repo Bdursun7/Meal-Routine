@@ -614,7 +614,7 @@ struct RecipeDetailView: View {
             if isHeroPhotoShown, let credit = RecipePhoto.creditLine(author: recipe.photoAuthor, license: recipe.photoLicense) {
                 Text("Fotoğraf: \(credit)")
             }
-            Text(Attribution.uniTools)
+            Text(Attribution.recipeLine(provider: recipe.sourceProvider, attribution: recipe.sourceAttribution))
         }
         .font(.caption)
         .foregroundStyle(Theme.secondaryText)

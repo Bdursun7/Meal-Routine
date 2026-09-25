@@ -18,7 +18,7 @@ private func check(_ condition: @autoclosure () -> Bool, _ message: String) {
 private func checkCatalog() throws {
     let data = try Data(contentsOf: URL(fileURLWithPath: "MealRoutine/Recipes/recipes.v1.json"))
     let file = try JSONDecoder().decode(RecipeCatalogFile.self, from: data)
-    check(file.recipes.count == 125, "catalog recipe count \(file.recipes.count)")
+    check(file.recipes.count == 325, "catalog recipe count \(file.recipes.count)")
 
     var withPhoto: [String] = []
     var withoutPhoto: [String] = []
@@ -41,17 +41,19 @@ private func checkCatalog() throws {
             continue
         }
         check(remote.scheme == "https", "\(recipe.id) scheme")
-        check(remote.host == "theunitools.com", "\(recipe.id) host \(remote.host ?? "")")
+        let host = remote.host?.lowercased() ?? ""
+        check(RecipePhoto.allowedHosts.contains(host), "\(recipe.id) host \(host)")
         let credit = RecipePhoto.creditLine(author: stored.author, license: stored.license)
         check(credit == "\(stored.author) · \(stored.license)", "\(recipe.id) credit rewrote catalog text")
         withPhoto.append(recipe.id)
     }
 
-    check(withPhoto.count == 103, "photos \(withPhoto.count), expected 103")
-    check(withoutPhoto.count == 22, "without photos \(withoutPhoto.count), expected 22")
+    check(withPhoto.count == 195, "photos \(withPhoto.count), expected 195")
+    check(withoutPhoto.count == 130, "without photos \(withoutPhoto.count), expected 130")
     check(withPhoto.contains("menemen"), "menemen has a photo")
-    check(withoutPhoto.contains("ojja-merguez"), "ojja-merguez has no photo")
-    if withPhoto.count != 103 || withoutPhoto.count != 22 {
+    check(withPhoto.contains("ojja-merguez"), "ojja-merguez has an open-license photo")
+    check(withoutPhoto.contains("galayet-bandora"), "galayet-bandora stays without a matched photo")
+    if withPhoto.count != 195 || withoutPhoto.count != 130 {
         fputs("without photo: \(withoutPhoto.joined(separator: ", "))\n", stderr)
     }
 
@@ -99,6 +101,12 @@ private func checkURLPolicy() {
     )
     let trimmed = RecipePhoto.remoteURL(from: " https://theunitools.com/recipes/menemen.jpg ")
     check(trimmed?.absoluteString == "https://theunitools.com/recipes/menemen.jpg", "trimmed https")
+    let commons = RecipePhoto.remoteURL(
+        from: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Example.jpg/960px-Example.jpg"
+    )
+    check(commons?.host == "upload.wikimedia.org", "wikimedia upload host allowed")
+    check(RecipePhoto.remoteURL(from: "https://example.com/a.jpg") == nil, "unknown host rejected")
+    check(RecipePhoto.remoteURL(from: "https://thumb.wikimedia.org/a.jpg") == nil, "thumb CDN host rejected")
 }
 
 private func checkImageSniff() {
@@ -248,6 +256,6 @@ struct RecipePhotoCheckMain {
             fputs("\(failures) failed\n", stderr)
             exit(EXIT_FAILURE)
         }
-        print("recipe photos: 103 with, 22 without")
+        print("recipe photos: 195 with, 130 without")
     }
 }

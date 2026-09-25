@@ -75,10 +75,35 @@ def _blank(value: object) -> bool:
 def require_turkish(catalog: dict) -> tuple[int, int, int]:
     """Fail when a summary, step, or displayed ingredient note has no Turkish text.
 
-    English source strings must stay. They are the CC BY-SA original.
+    UniTools rows keep their English source for CC BY-SA. MealRoutine originals
+    are bilingual too, and they must not claim that license.
     """
     recipes = catalog.get("recipes")
-    expect(isinstance(recipes, list) and len(recipes) == 125, "catalog has 125 recipes")
+    expect(isinstance(recipes, list) and len(recipes) == 325, "catalog has 325 recipes")
+    unitools = [recipe for recipe in recipes if (recipe.get("source") or {}).get("provider") == "unitools"]
+    original = [recipe for recipe in recipes if (recipe.get("source") or {}).get("provider") == "mealroutine"]
+    expect(len(unitools) == 125, f"UniTools rows stay at 125, got {len(unitools)}")
+    expect(len(original) == 200, f"original pack is 200, got {len(original)}")
+    for recipe in unitools:
+        source = recipe.get("source") or {}
+        recipe_id = recipe.get("id", "?")
+        expect(source.get("license") == "CC BY-SA 4.0", f"{recipe_id} UniTools license")
+        expect("UniTools" in (source.get("attribution") or ""), f"{recipe_id} UniTools attribution")
+    for recipe in original:
+        source = recipe.get("source") or {}
+        recipe_id = recipe.get("id", "?")
+        expect("CC BY-SA" not in (source.get("license") or ""), f"{recipe_id} must not claim CC BY-SA")
+        expect("UniTools" not in (source.get("attribution") or ""), f"{recipe_id} must not claim UniTools")
+        expect(recipe.get("country") == "TR", f"{recipe_id} country")
+        photo = recipe.get("photo")
+        if photo is not None:
+            url = photo.get("url") or ""
+            expect(url.startswith("https://upload.wikimedia.org/"), f"{recipe_id} photo host")
+            expect("theunitools.com" not in url, f"{recipe_id} photo must not use UniTools")
+            license_name = photo.get("license") or ""
+            expect(license_name.startswith("CC0") or license_name.startswith("CC BY"), f"{recipe_id} photo license {license_name}")
+            expect("NC" not in license_name and "ND" not in license_name, f"{recipe_id} photo license")
+            expect((photo.get("author") or "").strip(), f"{recipe_id} photo author")
     summary_count = 0
     step_count = 0
     note_count = 0
@@ -228,7 +253,7 @@ def main() -> None:
         for tag in actual:
             expect(tag in ALLOWLIST, f"{recipe_id} tag {tag} is not in the allowlist")
         tagged += 1
-    expect(tagged == 125, "every recipe was tag-checked")
+    expect(tagged == 325, "every recipe was tag-checked")
     swift = (root / "Tools/meal_recommender_checks.swift").read_text()
     for tag in ALLOWLIST:
         expect(f'"{tag}"' in swift, f"recommender checks allowlist missing {tag}")

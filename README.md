@@ -21,16 +21,18 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - Tabs: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - This week is filled by a deterministic recommender: cook time, disliked ingredients, and Never-again are hard filters; the curated score and Loved still boost; meals cooked or planned in the last 21 days rank lower; the same week avoids repeating cuisine, course, protein, and tags. No LLM.
 - Grocery list merges UniTools ingredient `id`s. Equivalent unit spellings sum together, and grams convert with kilograms (millilitres with litres). Incompatible units stay on separate rows and are flagged. Each evening scales from the recipe base to that meal’s servings (1–8). The default is the household size. Recipe detail shows the same scaled amounts. **Porsiyonu kaydet** on Profile locks the household onto every evening; on a planned meal it locks that evening only.
-- Summaries and cooking steps are Turkish localizations of the UniTools text. English source strings stay in the catalog for CC BY-SA attribution. Names and the rest of the UI are Turkish.
+- UniTools summaries and cooking steps are Turkish localizations of the UniTools text. English source strings stay on those rows for CC BY-SA attribution. MealRoutine original dinners are separate bilingual text and do not use that license. Names and the rest of the UI are Turkish.
 - No ads, paywall, or LLM calls. When a catalog `photo` URL is HTTPS, recipe detail shows it under the title and the week and recipe lists show a fixed thumbnail. The catalog author and license are shown with the image. The file is cached on disk after the first successful fetch. A fork-and-knife placeholder is used when the recipe has no photo, or when the image is not cached and cannot be fetched. Planning, the grocery list, and cooking do not wait on the network.
 
 ## Recipe data
 
-Bundled catalog: `MealRoutine/Recipes/recipes.v1.json` (125 dinners).
+Bundled catalog: `MealRoutine/Recipes/recipes.v1.json` (325 dinners: 125 UniTools + 200 MealRoutine originals).
 
 Turkish ingredient alias reference: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
-Source: UniTools World Recipes, CC BY-SA 4.0. Do not scrape commercial recipe sites, and do not invent recipes. Dataset derivatives stay CC BY-SA 4.0. App code may stay under its own license. Photo files stay on UniTools URLs with the catalog's own author and license; they are not replaced with other images.
+UniTools rows stay UniTools World Recipes, CC BY-SA 4.0. Do not scrape commercial recipe sites into those rows. Dataset derivatives of the UniTools rows stay CC BY-SA 4.0. App code may stay under its own license. UniTools photo files stay on UniTools URLs with the catalog's own author and license; they are not replaced with other images.
+
+The original Turkish evening pack is MealRoutine text. Those rows use `source.provider` `mealroutine` and license `MealRoutine original`, not CC BY-SA. Recipe detail shows that credit, and a separate photo line (`author · license`) when a photo is on screen. Some originals, and some UniTools rows that had no picture, use an HTTPS `upload.wikimedia.org` file under CC0, CC BY, or CC BY-SA. The fork-and-knife placeholder covers a row that still has no photo. UniTools photo URLs that were already in the catalog are unchanged. Adding recipes or photos changes the catalog file bytes, so the import fingerprint (`schemaVersion` plus FNV-1a) changes and the next launch re-imports. `schemaVersion` stays 1.
 
 `Recipe.photoURL`, `photoAuthor`, and `photoLicense` are already on the SwiftData model. Seed copies `photo.url`, `photo.author`, and `photo.license`, or empty strings when `photo` is null. The catalog file bytes are the import fingerprint, and showing photos does not add model fields, so no SwiftData migration is required. An install that already seeded this catalog already has the photo strings.
 
@@ -61,16 +63,18 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 - Sekmeler: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - Hafta, deterministik bir öneri motoruyla dolar: süre, sevmediğin malzeme ve “bir daha asla” elenir; kürasyon skoru ve Sevdim hâlâ yükseltir; son 21 günde pişen veya planlanan tarif geride kalır; aynı hafta mutfak, tür, protein ve etiketi tekrarlamamaya çalışır. LLM yok.
 - Market listesi, UniTools malzeme `id` değerlerini toplar. Eş anlamlı birimler birleşir; gram ile kilogram ve mililitre ile litre çevrilir. Uyumsuz birimler ayrı satırda kalır ve işaretlenir. Her akşam, tarif tabanından o akşamın porsiyonuna ölçeklenir (1–8). Varsayılan ev halkıdır. Tarif detayı aynı ölçekli miktarı gösterir. Profil’de **Porsiyonu kaydet** ev halkını bütün akşamlara yazar; planlı bir akşamda yalnız o akşamı kilitler.
-- Özet ve pişirme adımları, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin CC BY-SA atfı için katalogda durur. İsimler ve arayüzün geri kalanı Türkçe.
+- UniTools satırlarında özet ve pişirme adımları, kaynak metnin Türkçe yerelleştirmesidir. İngilizce kaynak CC BY-SA atfı için o satırlarda durur. MealRoutine özgün akşam tarifleri ayrı iki dilli metindir ve bu lisansı taşımaz. İsimler ve arayüzün geri kalanı Türkçe.
 - Reklam, ödeme duvarı ve LLM yok. Katalogdaki `photo` adresi HTTPS ise tarif detayında başlığın altında, hafta ve tarif listesinde sabit bir küçük görsel olarak gösterilir. Yazar ve lisans katalogdaki metindir. İlk başarılı indirme önbelleğe yazılır. Fotoğraf yoksa veya önbellekte olmayıp indirilemiyorsa çatal-bıçak yer tutucusu kalır. Hafta, market ve pişirme ağı beklemez.
 
 ## Tarif verisi
 
-Paket: `MealRoutine/Recipes/recipes.v1.json` (125 akşam yemeği).
+Paket: `MealRoutine/Recipes/recipes.v1.json` (325 akşam yemeği: 125 UniTools + 200 MealRoutine özgün).
 
 Türkçe malzeme eşanlamlıları: `MealRoutine/Recipes/ingredient-aliases.tr.json`.
 
-Kaynak: UniTools World Recipes, CC BY-SA 4.0. Ticari tarif sitelerini kazıma ve tarif uydurma yok. Veri setinin türevleri CC BY-SA 4.0 olarak kalır. Uygulama kodu kendi lisansında durabilir. Fotoğraflar UniTools adresinde kalır; yazar ve lisans katalogdaki `photo` alanıdır, başka görselle değiştirilmez.
+UniTools satırları UniTools World Recipes, CC BY-SA 4.0 olarak durur. Bu satırlara ticari tarif sitesi kazınmaz. UniTools türevleri CC BY-SA 4.0 kalır. Uygulama kodu kendi lisansında durabilir. UniTools fotoğrafları kendi adresinde kalır; yazar ve lisans katalogdaki `photo` alanıdır.
+
+Özgün Türkçe akşam paketi MealRoutine metnidir. `source.provider` değeri `mealroutine`, lisans `MealRoutine original` olur; CC BY-SA taşımaz. Tarif detayı bu krediyi gösterir. Fotoğraf varsa altında ayrıca `yazar · lisans` satırı durur. Bazı özgün satırlar ve fotoğrafı olmayan bazı UniTools satırları `upload.wikimedia.org` üzerinde CC0, CC BY veya CC BY-SA bir dosya kullanır. Eşleşen açık lisanslı kare yoksa çatal-bıçak yer tutucusu kalır. Katalogda zaten duran UniTools fotoğraf adresleri değişmedi. Eklenen tarif veya fotoğraf dosya baytını değiştirdiği için içe aktarma parmak izi (`schemaVersion` + FNV-1a) değişir ve sonraki açılış kataloğu yeniden alır. `schemaVersion` 1 olarak kalır.
 
 `Recipe.photoURL`, `photoAuthor` ve `photoLicense` SwiftData modelinde zaten var. Seed, `photo.url`, `photo.author` ve `photo.license` değerlerini yazar; `photo` yoksa boş metin kalır. İçe aktarma parmak izi katalog dosyasının baytlarıdır. Fotoğraf göstermek modele yeni alan eklemez, SwiftData göçü gerekmez. Bu kataloğu daha önce alan kurulumda fotoğraf metinleri zaten durur.
 

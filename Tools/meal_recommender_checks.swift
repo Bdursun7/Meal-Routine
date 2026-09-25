@@ -396,7 +396,7 @@ private func checkBundledCatalog() throws {
         .appendingPathComponent("MealRoutine/Recipes/recipes.v1.json")
     let data = try Data(contentsOf: url)
     let file = try JSONDecoder().decode(RecipeCatalogFile.self, from: data)
-    check(file.recipes.count == 125, "catalog count \(file.recipes.count)")
+    check(file.recipes.count == 325, "catalog count \(file.recipes.count)")
     for dto in file.recipes {
         let tags = dto.tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         check((1...5).contains(tags.count), "\(dto.id) should have 1 to 5 tags, got \(dto.tags)")
@@ -496,7 +496,7 @@ private func checkBundledCatalog() throws {
         "fresh 60-minute catalog week, got \(week)"
     )
     check(
-        rebuilt == ["iskender-kebab", "tarator", "dal-tadka", "moules-marinieres", "joojeh-kabab"],
+        rebuilt == ["izgara-kofte", "yayla-corbasi", "tabbouleh", "moules-marinieres", "imam-bayildi"],
         "catalog rebuild after planning that week, got \(rebuilt)"
     )
     let rebuiltMeals = rebuilt.compactMap { bySlug[$0] }
