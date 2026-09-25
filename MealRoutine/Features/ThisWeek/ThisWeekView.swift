@@ -211,10 +211,10 @@ struct ThisWeekView: View {
 
     private func memoryPattern(_ prefs: UserPrefs?) -> MealPattern? {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = CatalogIndexCache.warm(recipes: recipes, ratings: ratings).candidates
+        let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let dismissed = Set(prefs?.dismissedPatternIDs ?? [])
-        return MealPatternService.patterns(memories: map, candidates: catalog, dismissed: dismissed).first
+        return MealPatternService.patterns(memories: map, bySlug: index.bySlug, dismissed: dismissed).first
     }
 
     private func explanationCard(_ text: String) -> some View {

@@ -10,7 +10,16 @@ enum PersonalizedScoringService {
         memories: [String: MealMemorySnapshot],
         candidates: [PickerCandidate]
     ) -> TasteProfile {
-        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        profile(
+            memories: memories,
+            bySlug: Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        )
+    }
+
+    static func profile(
+        memories: [String: MealMemorySnapshot],
+        bySlug: [String: PickerCandidate]
+    ) -> TasteProfile {
         var categoryLoves: [String: Int] = [:]
         var proteinLoves: [String: Int] = [:]
         var cuisineLoves: [String: Int] = [:]
@@ -166,6 +175,8 @@ enum PersonalizedScoringService {
         taste: TasteProfile,
         catalogBySlug: [String: PickerCandidate],
         preferences: PlanningPreferences,
+        anchors: [PickerCandidate] = [],
+        dayOffset: Int = 0,
         now: Date
     ) -> Int {
         score(
@@ -174,8 +185,8 @@ enum PersonalizedScoringService {
             taste: taste,
             catalogBySlug: catalogBySlug,
             preferences: preferences,
-            anchors: [],
-            dayOffset: 0,
+            anchors: anchors,
+            dayOffset: dayOffset,
             now: now
         ).final
     }

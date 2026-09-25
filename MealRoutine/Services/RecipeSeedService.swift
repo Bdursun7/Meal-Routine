@@ -64,7 +64,8 @@ enum RecipeSeedService {
         let aliases = RecipeCatalogLoader.loadAliases(bundle: bundle)
         for (index, dto) in bundled.file.recipes.enumerated() {
             insert(dto, aliases: aliases, into: context)
-            if index % 25 == 24 {
+            if index % 40 == 39 {
+                try context.save()
                 await Task.yield()
             }
         }

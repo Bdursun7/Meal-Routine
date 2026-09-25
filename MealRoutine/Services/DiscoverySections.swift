@@ -61,7 +61,7 @@ enum DiscoverySections {
         var sections: [DiscoverySection] = []
 
         let recommended = ranked.prefix(sectionLimit).map {
-            item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true)
+            item($0, memories: memories, taste: taste, bySlug: bySlug, hasHistory: true)
         }
         if !recommended.isEmpty {
             sections.append(DiscoverySection(id: "recommended", title: "Sana uygun", items: Array(recommended)))
@@ -71,7 +71,7 @@ enum DiscoverySections {
             !taste.lovedSlugs.contains(candidate.slug) && sharesLovedShape(candidate, taste: taste, bySlug: bySlug)
         }
         .prefix(sectionLimit)
-        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
+        .map { item($0, memories: memories, taste: taste, bySlug: bySlug, hasHistory: true) }
         if !similar.isEmpty {
             sections.append(DiscoverySection(id: "similar", title: "Sevdiklerine benzer", items: Array(similar)))
         }
@@ -84,7 +84,7 @@ enum DiscoverySections {
                     && !taste.triedCategories.contains(category)
             }
             .prefix(sectionLimit)
-            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
+            .map { item($0, memories: memories, taste: taste, bySlug: bySlug, hasHistory: true) }
             if !different.isEmpty {
                 sections.append(DiscoverySection(id: "different", title: "Farklı bir şey dene", items: Array(different)))
             }
@@ -92,7 +92,7 @@ enum DiscoverySections {
 
         let quick = ranked.filter { $0.totalMinutes <= 30 }
             .prefix(sectionLimit)
-            .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
+            .map { item($0, memories: memories, taste: taste, bySlug: bySlug, hasHistory: true) }
         if !quick.isEmpty {
             sections.append(DiscoverySection(id: "quick", title: "Hızlı tarifler", items: Array(quick)))
         }
@@ -102,7 +102,7 @@ enum DiscoverySections {
             return candidate.rating == .loved || memory?.isFavorite == true || (memory?.timesCooked ?? 0) >= 2
         }
         .prefix(sectionLimit)
-        .map { item($0, memories: memories, taste: taste, candidates: candidates, hasHistory: true) }
+        .map { item($0, memories: memories, taste: taste, bySlug: bySlug, hasHistory: true) }
         if !favorites.isEmpty {
             sections.append(DiscoverySection(id: "favorites", title: "Eski favorilerin", items: Array(favorites)))
         }
@@ -113,14 +113,14 @@ enum DiscoverySections {
         _ candidate: PickerCandidate,
         memories: [String: MealMemorySnapshot],
         taste: TasteProfile,
-        candidates: [PickerCandidate],
+        bySlug: [String: PickerCandidate],
         hasHistory: Bool
     ) -> DiscoveryItem {
         let reason = RecommendationReasonService.personalReason(
             for: candidate,
             memory: memories[candidate.slug],
             profile: taste,
-            catalog: candidates
+            catalogBySlug: bySlug
         ) ?? ""
         return DiscoveryItem(
             slug: candidate.slug,

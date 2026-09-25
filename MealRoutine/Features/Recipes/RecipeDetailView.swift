@@ -33,6 +33,10 @@ struct RecipeDetailView: View {
         self.allowsCookBar = allowsCookBar
         let slug = route.slug
         _recipes = Query(filter: #Predicate<Recipe> { $0.slug == slug })
+        _feedback = Query(filter: #Predicate<RecipeFeedback> { $0.recipeSlug == slug })
+        _plannedMeals = Query(filter: #Predicate<PlannedMeal> { $0.recipeSlug == slug })
+        _ingredientChecks = Query(filter: #Predicate<IngredientCheck> { $0.recipeSlug == slug })
+        _memories = Query(filter: #Predicate<MealMemory> { $0.recipeSlug == slug })
     }
 
     @State private var viewModel = RecipeDetailViewModel()
@@ -43,6 +47,9 @@ struct RecipeDetailView: View {
     @State private var lastWrittenServings: Int?
     @State private var lastWrittenContext: String?
     @State private var isHeroPhotoShown = false
+    /// Filled after the push animation. Computing these in `body` scans the catalog on the transition.
+    @State private var memoryFit: String?
+    @State private var similarLinks: [SimilarRecipeLink] = []
 
     private var recipe: Recipe? {
         recipes.first { $0.slug == route.slug }
@@ -125,6 +132,13 @@ struct RecipeDetailView: View {
             }
             .onAppear {
                 Analytics.track(.recipeOpened)
+            }
+            .task(id: recipe?.slug) {
+                guard let recipe else { return }
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                memoryFit = fitReason(recipe)
+                similarLinks = similarRecipes(to: recipe)
             }
             .modifier(DiscoverySelectionTracker(sectionID: route.discoverySectionID))
             .onChange(of: portionContext) { _, newContext in
@@ -303,9 +317,9 @@ struct RecipeDetailView: View {
     private func memorySection(_ recipe: Recipe) -> some View {
         let snapshot = memories.first { $0.recipeSlug == recipe.slug }?.snapshot
         let cooked = snapshot?.timesCooked ?? 0
-        let reason = fitReason(recipe)
+        let reason = memoryFit
         let hasSignal = cooked > 0 || snapshot?.lastCookedAt != nil || reason != nil
-        let similar = hasSignal ? similarRecipes(to: recipe) : []
+        let similar = hasSignal ? similarLinks : []
         if !hasSignal {
             EmptyView()
         } else {
@@ -349,26 +363,23 @@ struct RecipeDetailView: View {
     }
 
     private func fitReason(_ recipe: Recipe) -> String? {
-        let ratings = FeedbackIndex.latestRatings(in: feedback)
-        guard let index = CatalogIndexCache.current(ratings: ratings) else { return nil }
-        let catalog = index.candidates
-        guard let candidate = catalog.first(where: { $0.slug == recipe.slug }) else { return nil }
+        guard let index = CatalogIndexCache.cachedIndex() else { return nil }
+        guard let candidate = index.bySlug[recipe.slug] else { return nil }
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
-        let taste = PersonalizedScoringService.profile(memories: map, candidates: catalog)
+        let taste = PersonalizedScoringService.profile(memories: map, bySlug: index.bySlug)
         guard taste.dataPointCount > 0 else { return nil }
         return RecommendationReasonService.personalReason(
             for: candidate,
             memory: map[recipe.slug],
             profile: taste,
-            catalog: catalog
+            catalogBySlug: index.bySlug
         )
     }
 
     private func similarRecipes(to recipe: Recipe) -> [SimilarRecipeLink] {
-        let ratings = FeedbackIndex.latestRatings(in: feedback)
-        guard let index = CatalogIndexCache.current(ratings: ratings) else { return [] }
+        guard let index = CatalogIndexCache.cachedIndex() else { return [] }
+        guard let current = index.bySlug[recipe.slug] else { return [] }
         let catalog = index.candidates
-        guard let current = catalog.first(where: { $0.slug == recipe.slug }) else { return [] }
         let disliked = Set(prefs.min { $0.createdAt < $1.createdAt }?.dislikedIngredientIds ?? [])
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         return catalog.filter { candidate in

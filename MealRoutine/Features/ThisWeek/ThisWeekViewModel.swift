@@ -37,6 +37,9 @@ final class ThisWeekViewModel {
     var alertMessage: String?
     var isWorking = false
 
+    @ObservationIgnored private var cachedMealsKey: Int?
+    @ObservationIgnored private var cachedMeals: [WeekMealPresentation] = []
+
     /// Today's planned evening, or the next uncooked slot when today is not on the plan.
     func featuredEvening(in meals: [WeekMealPresentation]) -> WeekMealPresentation? {
         if let today = meals.first(where: \.isToday) { return today }
@@ -96,25 +99,37 @@ final class ThisWeekViewModel {
         guard let week = weeks.first(where: { WeekCalendar.isSameDay($0.weekStart, start) }) else {
             return []
         }
-        let names = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = CatalogIndexCache.warm(recipes: recipes, ratings: ratings).candidates
+        let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
+        let key = mealsCacheKey(
+            week: week,
+            ratings: ratings,
+            indexKey: index.key,
+            householdSize: householdSize,
+            memories: memories,
+            now: now
+        )
+        if key == cachedMealsKey {
+            return cachedMeals
+        }
+        let names = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        let bySlug = index.bySlug
         let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
-        let taste = PersonalizedScoringService.profile(memories: memoryMap, candidates: catalog)
+        let taste = PersonalizedScoringService.profile(memories: memoryMap, bySlug: bySlug)
         let hasHistory = taste.dataPointCount > 0
-        return week.meals
+        let built = week.meals
             .sorted { $0.dayOffset < $1.dayOffset }
             .map { meal in
                 let recipe = names[meal.recipeSlug]
                 let date = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
-                let candidate = catalog.first { $0.slug == meal.recipeSlug }
+                let candidate = bySlug[meal.recipeSlug]
                 let memory = memoryMap[meal.recipeSlug]
                 let reason = candidate.flatMap {
                     RecommendationReasonService.personalReason(
                         for: $0,
                         memory: memory,
                         profile: taste,
-                        catalog: catalog
+                        catalogBySlug: bySlug
                     )
                 } ?? ""
                 let badge = RecommendationReasonService.badge(for: memory, hasHistory: hasHistory)
@@ -138,6 +153,49 @@ final class ThisWeekViewModel {
                     isSkipped: SkipControl.recordsAsSkipped(skippedAt: meal.skippedAt, cookedAt: meal.cookedAt)
                 )
             }
+        cachedMealsKey = key
+        cachedMeals = built
+        return built
+    }
+
+    private func mealsCacheKey(
+        week: PlanWeek,
+        ratings: [String: MealRating],
+        indexKey: Int,
+        householdSize: Int,
+        memories: [MealMemory],
+        now: Date
+    ) -> Int {
+        var hasher = Hasher()
+        hasher.combine(indexKey)
+        hasher.combine(householdSize)
+        hasher.combine(Calendar.current.startOfDay(for: now).timeIntervalSinceReferenceDate)
+        hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
+        hasher.combine(week.explanation)
+        for meal in week.meals {
+            hasher.combine(meal.uuid)
+            hasher.combine(meal.recipeSlug)
+            hasher.combine(meal.dayOffset)
+            hasher.combine(meal.servings)
+            hasher.combine(meal.cookedAt?.timeIntervalSinceReferenceDate ?? -1)
+            hasher.combine(meal.skippedAt?.timeIntervalSinceReferenceDate ?? -1)
+        }
+        for (slug, rating) in ratings.sorted(by: { $0.key < $1.key }) {
+            hasher.combine(slug)
+            hasher.combine(rating.rawValue)
+        }
+        for memory in memories {
+            let snapshot = memory.snapshot
+            hasher.combine(snapshot.recipeID)
+            hasher.combine(snapshot.timesCooked)
+            hasher.combine(snapshot.lovedCount)
+            hasher.combine(snapshot.okayCount)
+            hasher.combine(snapshot.latestRating?.rawValue)
+            hasher.combine(snapshot.isFavorite)
+            hasher.combine(snapshot.neverAgain)
+            hasher.combine(snapshot.wouldMakeAgainCount)
+        }
+        return hasher.finalize()
     }
 
     func ensureWeek(in context: ModelContext) {
@@ -229,12 +287,12 @@ enum ReplacementPresenter {
         }
         let ratings = FeedbackIndex.latestRatings(in: feedback)
         let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
-        let catalog = index.candidates
         let bySlug = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
-        let currentName = bySlug[meal.recipeSlug]?.displayName ?? meal.recipeSlug
-        guard let current = catalog.first(where: { $0.slug == meal.recipeSlug }) else {
+        let currentName = index.displayNames[meal.recipeSlug] ?? meal.recipeSlug
+        guard let current = index.bySlug[meal.recipeSlug] else {
             return ReplacementBoard(currentName: currentName, choices: [])
         }
+        let catalog = index.candidates
         let blocked = Set(week.meals.map(\.recipeSlug))
         let anchors = catalog.filter { blocked.contains($0.slug) }
         let stored = prefs.min { $0.createdAt < $1.createdAt }
