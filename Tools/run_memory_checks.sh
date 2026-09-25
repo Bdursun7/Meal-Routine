@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Compiles the Foundation-only V2 memory and scoring checks. No Xcode.
+# The hosted suite on a Mac:
+# xcodebuild test -project MealRoutine.xcodeproj -scheme MealRoutine -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' -only-testing:MealRoutineTests
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SWIFTC="${SWIFTC:-swiftc}"

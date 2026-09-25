@@ -54,10 +54,21 @@ final class PresentationRuleTests: XCTestCase {
         XCTAssertTrue(SkipControl.usesFilledAccent(selected))
         XCTAssertEqual(SkipControl.title(isSkipped: true), "Atlandı")
 
-        XCTAssertEqual(
-            SkipControl.appearance(isSkipped: true, isCooked: true, isWorking: false),
-            .unavailable
-        )
+        XCTAssertTrue(SkipControl.showsAffordance(isCooked: false))
+        XCTAssertFalse(SkipControl.showsAffordance(isCooked: true))
+        XCTAssertFalse(SkipControl.recordsAsSkipped(skippedAt: TestFixtures.now, cookedAt: TestFixtures.now))
+
+        let cooked = meal(isCooked: true, isSkipped: true)
+        XCTAssertFalse(cooked.showsSkip)
+        XCTAssertFalse(cooked.showsSkippedChrome)
+
+        let skipped = meal(isCooked: false, isSkipped: true)
+        XCTAssertTrue(skipped.showsSkip)
+        XCTAssertTrue(skipped.showsSkippedChrome)
+
+        let idle = meal(isCooked: false, isSkipped: false)
+        XCTAssertTrue(idle.showsSkip)
+        XCTAssertFalse(idle.showsSkippedChrome)
         XCTAssertEqual(
             SkipControl.appearance(isSkipped: false, isCooked: false, isWorking: true),
             .unavailable
@@ -101,6 +112,23 @@ final class PresentationRuleTests: XCTestCase {
                 mealWeekStart: lastWeek,
                 now: now
             )
+        )
+    }
+
+    private func meal(isCooked: Bool, isSkipped: Bool) -> WeekMealPresentation {
+        WeekMealPresentation(
+            id: UUID(),
+            dayTitle: "Pazartesi",
+            dateTitle: "Bugün",
+            recipeName: "Pilav",
+            minutes: 30,
+            difficultyTitle: "Kolay",
+            servings: 2,
+            isCooked: isCooked,
+            isToday: true,
+            rating: nil,
+            slug: "pilav",
+            isSkipped: isSkipped
         )
     }
 }

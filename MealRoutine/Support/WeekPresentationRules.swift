@@ -11,11 +11,24 @@ enum SkipControlAppearance: Equatable, Sendable {
 }
 
 enum SkipControl {
+    /// Cooked evenings do not offer skip. A later cook also clears any stored skip.
+    static func showsAffordance(isCooked: Bool) -> Bool {
+        !isCooked
+    }
+
+    /// Skip is visible only while the meal stays uncooked.
+    static func recordsAsSkipped(skippedAt: Date?, cookedAt: Date?) -> Bool {
+        skippedAt != nil && cookedAt == nil
+    }
+
     static func appearance(isSkipped: Bool, isCooked: Bool, isWorking: Bool) -> SkipControlAppearance {
-        if isSkipped && !isCooked {
+        if isCooked {
+            return .unavailable
+        }
+        if isSkipped {
             return .selected
         }
-        if isCooked || isWorking {
+        if isWorking {
             return .unavailable
         }
         return .idle

@@ -338,7 +338,7 @@ private struct WeekMealCard: View {
                                     .foregroundStyle(Theme.accent)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            if meal.isSkipped {
+                            if meal.showsSkippedChrome {
                                 Text(SkipControl.title(isSkipped: true))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(Theme.onAccent)
@@ -363,61 +363,73 @@ private struct WeekMealCard: View {
             .buttonStyle(.plain)
             .accessibilityHint("Tarif detayını açar")
 
-            AdaptiveActions {
-                Button("Değiştir") {
-                    onReplace()
+            if meal.showsSkip {
+                AdaptiveActions {
+                    replaceButton
+                } second: {
+                    skipButton
                 }
-                .font(.subheadline.weight(.semibold))
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
-                .tint(Theme.accent)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .disabled(isWorking)
-                .accessibilityLabel("Değiştir")
-                .accessibilityHint("Bu akşam için alternatif tarifleri açar")
-            } second: {
-                let skip = SkipControl.appearance(
-                    isSkipped: meal.isSkipped,
-                    isCooked: meal.isCooked,
-                    isWorking: isWorking
-                )
-                let filled = SkipControl.usesFilledAccent(skip)
-                Button(action: onSkip) {
-                    Text(SkipControl.title(isSkipped: meal.isSkipped))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(filled ? Theme.onAccent : Theme.accent)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(
-                            filled ? Theme.accent : Color.clear,
-                            in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-                        )
-                        .overlay {
-                            if !filled {
-                                RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-                                    .strokeBorder(Theme.accent, lineWidth: 1.5)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .disabled(skip == .unavailable)
-                .allowsHitTesting(skip == .idle)
-                .accessibilityLabel(SkipControl.title(isSkipped: meal.isSkipped))
-                .accessibilityHint(
-                    skip == .selected
-                        ? "Bu akşam atlandı. Tarif ve market listesi duruyor"
-                        : "Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar"
-                )
-                .accessibilityAddTraits(skip == .selected ? .isSelected : [])
+            } else {
+                replaceButton
             }
         }
         .padding(16)
         .mealCardSurface()
         .overlay {
-            if meal.isSkipped {
+            if meal.showsSkippedChrome {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder(Theme.accent, lineWidth: 2)
             }
         }
+    }
+
+    private var replaceButton: some View {
+        Button("Değiştir") {
+            onReplace()
+        }
+        .font(.subheadline.weight(.semibold))
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
+        .tint(Theme.accent)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .disabled(isWorking)
+        .accessibilityLabel("Değiştir")
+        .accessibilityHint("Bu akşam için alternatif tarifleri açar")
+    }
+
+    private var skipButton: some View {
+        let skip = SkipControl.appearance(
+            isSkipped: meal.isSkipped,
+            isCooked: meal.isCooked,
+            isWorking: isWorking
+        )
+        let filled = SkipControl.usesFilledAccent(skip)
+        return Button(action: onSkip) {
+            Text(SkipControl.title(isSkipped: meal.isSkipped))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(filled ? Theme.onAccent : Theme.accent)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    filled ? Theme.accent : Color.clear,
+                    in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                )
+                .overlay {
+                    if !filled {
+                        RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                            .strokeBorder(Theme.accent, lineWidth: 1.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(skip == .unavailable)
+        .allowsHitTesting(skip == .idle)
+        .accessibilityLabel(SkipControl.title(isSkipped: meal.isSkipped))
+        .accessibilityHint(
+            skip == .selected
+                ? "Bu akşam atlandı. Tarif ve market listesi duruyor"
+                : "Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar"
+        )
+        .accessibilityAddTraits(skip == .selected ? .isSelected : [])
     }
 }
 
@@ -598,7 +610,7 @@ private struct TonightDinnerCard: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.white)
             }
-            if meal.isSkipped {
+            if meal.showsSkippedChrome {
                 Text(SkipControl.title(isSkipped: true))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent)
@@ -610,7 +622,7 @@ private struct TonightDinnerCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik\(meal.isSkipped ? ". Atlandı" : "")"
+            "\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik\(meal.showsSkippedChrome ? ". Atlandı" : "")"
         )
     }
 }

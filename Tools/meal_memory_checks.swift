@@ -425,9 +425,18 @@ private func checkPresentation() {
         "skipped meal uses the selected treatment"
     )
     check(SkipControl.usesFilledAccent(.selected) && !SkipControl.usesFilledAccent(.idle), "only the skipped control is filled")
+    check(SkipControl.showsAffordance(isCooked: false), "an uncooked meal still offers skip")
+    check(!SkipControl.showsAffordance(isCooked: true), "a cooked meal hides skip")
     check(
-        SkipControl.appearance(isSkipped: false, isCooked: true, isWorking: false) == .unavailable,
-        "a cooked meal does not look like an active skip"
+        SkipControl.recordsAsSkipped(skippedAt: Date(timeIntervalSince1970: 1_700_000_000), cookedAt: nil),
+        "a skip stays visible until the meal is cooked"
+    )
+    check(
+        !SkipControl.recordsAsSkipped(
+            skippedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            cookedAt: Date(timeIntervalSince1970: 1_700_003_600)
+        ),
+        "cooking clears the skipped state"
     )
 
     let now = Date(timeIntervalSince1970: 1_700_000_000)

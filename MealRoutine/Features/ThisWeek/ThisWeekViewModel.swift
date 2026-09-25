@@ -17,6 +17,12 @@ struct WeekMealPresentation: Identifiable, Equatable {
     var reason: String = ""
     var badgeTitle: String?
     var isSkipped: Bool = false
+
+    /// Cooked meals do not offer Atladım. Cook wins if both flags were set.
+    var showsSkip: Bool { SkipControl.showsAffordance(isCooked: isCooked) }
+
+    /// Skipped chrome stays off once the meal is cooked.
+    var showsSkippedChrome: Bool { isSkipped && showsSkip }
 }
 
 struct WeekSummaryPresentation: Equatable {
@@ -134,7 +140,7 @@ final class ThisWeekViewModel {
                     slug: meal.recipeSlug,
                     reason: reason,
                     badgeTitle: badge?.title,
-                    isSkipped: meal.skippedAt != nil && meal.cookedAt == nil
+                    isSkipped: SkipControl.recordsAsSkipped(skippedAt: meal.skippedAt, cookedAt: meal.cookedAt)
                 )
             }
     }

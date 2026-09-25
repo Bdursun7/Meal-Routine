@@ -96,6 +96,26 @@ final class MealMemoryStoreTests: XCTestCase {
 
         XCTAssertNil(meal.skippedAt)
         XCTAssertNil(try MealMemoryService.snapshots(in: context)["corba"])
+        XCTAssertFalse(SkipControl.showsAffordance(isCooked: true))
+    }
+
+    func testCookingClearsAnEarlierSkip() throws {
+        let context = container.mainContext
+        let meal = PlannedMeal(dayOffset: 2, recipeSlug: "pilav", servings: 2)
+        context.insert(meal)
+        try context.save()
+
+        try WeekPlanService.markSkipped(uuid: meal.uuid, in: context, at: TestFixtures.now)
+        XCTAssertNotNil(meal.skippedAt)
+        XCTAssertTrue(SkipControl.recordsAsSkipped(skippedAt: meal.skippedAt, cookedAt: meal.cookedAt))
+
+        let cookedAt = TestFixtures.now.addingTimeInterval(3_600)
+        try WeekPlanService.markCooked(uuid: meal.uuid, in: context, at: cookedAt)
+
+        XCTAssertEqual(meal.cookedAt, cookedAt)
+        XCTAssertNil(meal.skippedAt)
+        XCTAssertFalse(SkipControl.recordsAsSkipped(skippedAt: meal.skippedAt, cookedAt: meal.cookedAt))
+        XCTAssertFalse(SkipControl.showsAffordance(isCooked: meal.cookedAt != nil))
     }
 
     func testResetClearsMemoryAndKeepsOnboardingPrefs() throws {
