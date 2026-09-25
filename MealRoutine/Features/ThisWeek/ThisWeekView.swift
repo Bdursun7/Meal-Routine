@@ -341,7 +341,10 @@ private struct WeekMealCard: View {
                             if meal.isSkipped {
                                 Text("Atlandı")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(Theme.secondaryText)
+                                    .foregroundStyle(Theme.onAccent)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Theme.accent, in: Capsule())
                             }
                             if isPhotoShown {
                                 RecipePhotoCreditText(
@@ -373,21 +376,42 @@ private struct WeekMealCard: View {
                 .accessibilityLabel("Değiştir")
                 .accessibilityHint("Bu akşam için alternatif tarifleri açar")
             } second: {
-                Button(meal.isSkipped ? "Atlandı" : "Atladım") {
-                    onSkip()
+                Button(action: onSkip) {
+                    Text(meal.isSkipped ? "Atlandı" : "Atladım")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(meal.isSkipped ? Theme.onAccent : Theme.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            meal.isSkipped ? Theme.accent : Color.clear,
+                            in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                        )
+                        .overlay {
+                            if !meal.isSkipped {
+                                RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                                    .strokeBorder(Theme.accent, lineWidth: 1.5)
+                            }
+                        }
                 }
-                .font(.subheadline.weight(.semibold))
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
-                .tint(Theme.secondaryText)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .disabled(isWorking || meal.isCooked || meal.isSkipped)
+                .buttonStyle(.plain)
+                .disabled(isWorking || meal.isCooked)
+                .allowsHitTesting(!meal.isSkipped)
                 .accessibilityLabel(meal.isSkipped ? "Atlandı" : "Atladım")
-                .accessibilityHint("Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar")
+                .accessibilityHint(
+                    meal.isSkipped
+                        ? "Bu akşam atlandı. Tarif ve market listesi duruyor"
+                        : "Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar"
+                )
+                .accessibilityAddTraits(meal.isSkipped ? .isSelected : [])
             }
         }
         .padding(16)
         .mealCardSurface()
+        .overlay {
+            if meal.isSkipped {
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+            }
+        }
     }
 }
 
@@ -568,9 +592,19 @@ private struct TonightDinnerCard: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.white)
             }
+            if meal.isSkipped {
+                Text("Atlandı")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white, in: Capsule())
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik")
+        .accessibilityLabel(
+            "\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik\(meal.isSkipped ? ". Atlandı" : "")"
+        )
     }
 }
