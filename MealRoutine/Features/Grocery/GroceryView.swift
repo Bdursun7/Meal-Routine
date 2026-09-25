@@ -2,16 +2,63 @@ import SwiftData
 import SwiftUI
 
 struct GroceryView: View {
+    var isTabSelected: Bool
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [PlanWeek]
     @State private var viewModel = GroceryViewModel()
+    @State private var showsMarket = false
 
     var body: some View {
         @Bindable var viewModel = self.viewModel
+        NavigationStack {
+            Group {
+                if isTabSelected && showsMarket {
+                    selectedMarket
+                } else {
+                    Theme.canvas
+                }
+            }
+            .navigationTitle("Market")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        viewModel.isPresentingAdd = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Elle malzeme ekle")
+                    .disabled(!isTabSelected)
+                }
+            }
+            .sheet(isPresented: $viewModel.isPresentingAdd) {
+                addSheet
+            }
+            .alert("Market listesi güncellenemedi", isPresented: alertIsPresented) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
+        }
+        .task(id: isTabSelected) {
+            if !isTabSelected {
+                showsMarket = false
+                return
+            }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            showsMarket = true
+            try? await Task.sleep(for: TabSwitchTiming.settle)
+            guard !Task.isCancelled else { return }
+            viewModel.rebuild(in: modelContext)
+            Analytics.track(.groceryOpened)
+        }
+    }
+
+    private var selectedMarket: some View {
+        @Bindable var viewModel = self.viewModel
         let fullList = viewModel.presentation(weeks: weeks)
         let list = viewModel.applyingSearch(to: fullList)
-        NavigationStack {
-            List {
+        List {
                 if fullList.isEmpty {
                     Section {
                         WarmEmptyState(
@@ -43,35 +90,11 @@ struct GroceryView: View {
                 viewModel.rebuild(in: modelContext)
             }
             .mealCanvas()
-            .navigationTitle("Market")
             .searchable(
                 text: $viewModel.searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Malzeme ara"
             )
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        viewModel.isPresentingAdd = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Elle malzeme ekle")
-                }
-            }
-            .sheet(isPresented: $viewModel.isPresentingAdd) {
-                addSheet
-            }
-            .alert("Market listesi güncellenemedi", isPresented: alertIsPresented) {
-                Button("Tamam", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
-        }
-        .onAppear {
-            viewModel.rebuild(in: modelContext)
-            Analytics.track(.groceryOpened)
-        }
     }
 
     @ViewBuilder

@@ -8,6 +8,7 @@ struct RecommendationCard: View {
     var photoURL: String
     var photoAuthor: String
     var photoLicense: String
+    var loadsPhoto: Bool = true
 
     @State private var isPhotoShown = false
 
@@ -18,6 +19,7 @@ struct RecommendationCard: View {
                 author: photoAuthor,
                 license: photoLicense,
                 layout: .thumbnail,
+                loadsPhoto: loadsPhoto,
                 isPhotoShown: $isPhotoShown
             )
             VStack(alignment: .leading, spacing: 4) {

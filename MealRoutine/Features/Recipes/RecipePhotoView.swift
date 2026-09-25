@@ -26,6 +26,9 @@ struct RecipePhotoView: View {
     var author: String
     var license: String
     var layout: Layout
+    /// False while a tab switch is in flight. The row stays a placeholder and
+    /// does not start a fetch that would finish on the main actor mid-animation.
+    var loadsPhoto: Bool
     @Binding var isPhotoShown: Bool
 
     @State private var image: UIImage?
@@ -36,12 +39,14 @@ struct RecipePhotoView: View {
         author: String,
         license: String,
         layout: Layout,
+        loadsPhoto: Bool = true,
         isPhotoShown: Binding<Bool>
     ) {
         self.urlString = urlString
         self.author = author
         self.license = license
         self.layout = layout
+        self.loadsPhoto = loadsPhoto
         _isPhotoShown = isPhotoShown
         let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
         _phase = State(initialValue: hasRemotePhoto ? .loading : .missing)
@@ -84,7 +89,8 @@ struct RecipePhotoView: View {
             .accessibilityLabel(accessibilityText)
             .accessibilityAddTraits(phase == .shown ? .isImage : [])
             .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
-            .task(id: urlString) {
+            .task(id: loadsPhoto ? urlString : "") {
+                guard loadsPhoto else { return }
                 await load()
             }
     }
@@ -107,6 +113,15 @@ struct RecipePhotoView: View {
         case .thumbnail: 64
         case .plate: 72
         case .backdrop: 180
+        }
+    }
+
+    /// Commons width to download. Decode still clamps to the on-screen size.
+    private var fetchMaxPixel: Int {
+        switch layout {
+        case .hero: RecipePhoto.heroMaxPixel
+        case .backdrop: RecipePhoto.backdropMaxPixel
+        case .thumbnail, .plate: RecipePhoto.thumbnailMaxPixel
         }
     }
 
@@ -149,23 +164,24 @@ struct RecipePhotoView: View {
     }
 
     private func load() async {
-        image = nil
-        isPhotoShown = false
         guard let remoteURL = RecipePhoto.remoteURL(from: urlString) else {
+            image = nil
+            isPhotoShown = false
             phase = .missing
             return
         }
-        phase = .loading
-        let data = await RecipePhotoLoader.load(remoteURL: remoteURL)
+        if image == nil {
+            phase = .loading
+        }
+        let data = await RecipePhotoLoader.load(remoteURL: remoteURL, maxPixel: fetchMaxPixel)
         guard !Task.isCancelled else { return }
         guard let data else {
             phase = .failed
             return
         }
-        let maxPixel: CGFloat = layout == .hero ? 1200 : (layout == .backdrop ? 800 : 256)
-        let decoded = await Task.detached(priority: .userInitiated) {
-            RecipePhotoDecoder.image(from: data, maxPixel: maxPixel)
-        }.value
+        let maxPixel = CGFloat(fetchMaxPixel)
+        let decoded = await RecipePhotoDecodeGate.shared.image(from: data, maxPixel: maxPixel)
+        guard !Task.isCancelled else { return }
         guard let decoded else {
             RecipePhotoDiskCache.remove(
                 remoteURL: remoteURL,
@@ -232,6 +248,53 @@ struct RecipePhotoCreditText: View {
 
     private func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Two decodes at a time. A list of visible rows used to decode every thumbnail
+/// at once and then assign each bitmap on the main actor during the transition.
+private actor RecipePhotoDecodeGate {
+    static let shared = RecipePhotoDecodeGate(limit: 2)
+
+    private let limit: Int
+    private var inFlight = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) {
+        self.limit = max(limit, 1)
+    }
+
+    func image(from data: Data, maxPixel: CGFloat) async -> UIImage? {
+        guard await acquire() else { return nil }
+        let decoded = await Task.detached(priority: .utility) {
+            RecipePhotoDecoder.image(from: data, maxPixel: maxPixel)
+        }.value
+        release()
+        return decoded
+    }
+
+    private func acquire() async -> Bool {
+        if Task.isCancelled { return false }
+        if inFlight < limit {
+            inFlight += 1
+            return true
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+        if Task.isCancelled {
+            release()
+            return false
+        }
+        return true
+    }
+
+    private func release() {
+        if !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        } else {
+            inFlight -= 1
+        }
     }
 }
 

@@ -94,20 +94,11 @@ final class ProfileViewModel {
     }
 
     func dislikedNames(in recipes: [Recipe]) -> [String] {
-        var names: [String: String] = [:]
-        for recipe in recipes {
-            for line in recipe.ingredients where names[line.ingredientId] == nil {
-                if let group = DislikeChipMerge.group(containing: line.ingredientId) {
-                    names[line.ingredientId] = group.name
-                } else {
-                    names[line.ingredientId] = line.displayName
-                }
-            }
-        }
+        let stored = CatalogIndexCache.warm(recipes: recipes, ratings: [:]).ingredientNames
         var seen: Set<String> = []
         var labels: [String] = []
         for id in dislikedIDs {
-            let label = names[id] ?? DislikeChipMerge.group(containing: id)?.name ?? id
+            let label = DislikeChipMerge.group(containing: id)?.name ?? stored[id] ?? id
             if seen.insert(label).inserted {
                 labels.append(label)
             }

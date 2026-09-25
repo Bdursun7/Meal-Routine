@@ -2,7 +2,8 @@ import SwiftData
 import SwiftUI
 
 struct ThisWeekView: View {
-    @Binding var selectedTab: AppTab
+    var isTabSelected: Bool
+    var onOpenGrocery: () -> Void
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [PlanWeek]
     @Query private var recipes: [Recipe]
@@ -11,6 +12,10 @@ struct ThisWeekView: View {
     @Query private var memories: [MealMemory]
     @State private var viewModel = ThisWeekViewModel()
     @State private var replacingMeal: ReplacingMeal?
+    @State private var allowsPhotos = false
+    /// True on the landing tab so the first screen is not a blank frame.
+    /// Cleared when the tab is left, so a later return waits one turn.
+    @State private var showsWeek = true
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var householdSize: Int {
@@ -19,6 +24,55 @@ struct ThisWeekView: View {
     }
 
     var body: some View {
+        NavigationStack {
+            Group {
+                if isTabSelected && showsWeek {
+                    selectedWeek
+                } else {
+                    Theme.canvas
+                }
+            }
+            .navigationTitle("Bu Hafta")
+            .background(Theme.canvas)
+            .navigationDestination(for: RecipeRoute.self) { route in
+                RecipeDetailView(route: route, allowsCookBar: true)
+            }
+            .sheet(item: $replacingMeal) { meal in
+                SmartReplacementView(mealID: meal.id)
+            }
+            .alert(
+                "İşlem tamamlanamadı",
+                isPresented: alertIsPresented
+            ) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(viewModel.alertMessage ?? "")
+            }
+        }
+        .task(id: isTabSelected) {
+            if !isTabSelected {
+                showsWeek = false
+                allowsPhotos = false
+                return
+            }
+            if !showsWeek {
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                showsWeek = true
+            }
+            try? await Task.sleep(for: TabSwitchTiming.settle)
+            guard !Task.isCancelled else { return }
+            viewModel.ensureWeek(in: modelContext)
+            allowsPhotos = true
+            Analytics.track(.planViewed)
+            if !viewModel.explanation(weeks: weeks).isEmpty {
+                Analytics.trackOnce(.recommendationReasonViewed)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectedWeek: some View {
         let storedPrefs = prefs.min { $0.createdAt < $1.createdAt }
         let meals = viewModel.meals(
             weeks: weeks,
@@ -31,9 +85,8 @@ struct ThisWeekView: View {
         let summary = viewModel.summary(meals: meals)
         let featured = viewModel.featuredEvening(in: meals)
 
-        NavigationStack {
-            Group {
-                if meals.isEmpty {
+        Group {
+            if meals.isEmpty {
                     WarmEmptyState(
                         title: "Bu hafta henüz kurulmadı",
                         message: "Akşamlarını birlikte seçelim. Süre sınırını yükseltmek veya sevmediğin malzemeleri azaltmak yeni tarifler açar.",
@@ -56,6 +109,7 @@ struct ThisWeekView: View {
                                         recipe: recipes.first { $0.slug == featured.slug },
                                         title: viewModel.featuredEveningTitle(for: featured),
                                         isWorking: viewModel.isWorking,
+                                        loadsPhoto: allowsPhotos,
                                         onReplace: { replacingMeal = ReplacingMeal(id: featured.id) }
                                     )
                                 }
@@ -80,6 +134,7 @@ struct ThisWeekView: View {
                                         meal: meal,
                                         recipe: recipes.first { $0.slug == meal.slug },
                                         isWorking: viewModel.isWorking,
+                                        loadsPhoto: allowsPhotos,
                                         onReplace: { replacingMeal = ReplacingMeal(id: meal.id) },
                                         onSkip: { viewModel.skip(uuid: meal.id, in: modelContext) }
                                     )
@@ -90,30 +145,6 @@ struct ThisWeekView: View {
                     }
                     .background(Theme.canvas)
                 }
-            }
-            .navigationTitle("Bu Hafta")
-            .background(Theme.canvas)
-            .navigationDestination(for: RecipeRoute.self) { route in
-                RecipeDetailView(route: route, allowsCookBar: true)
-            }
-            .sheet(item: $replacingMeal) { meal in
-                SmartReplacementView(mealID: meal.id)
-            }
-            .alert(
-                "İşlem tamamlanamadı",
-                isPresented: alertIsPresented
-            ) {
-                Button("Tamam", role: .cancel) {}
-            } message: {
-                Text(viewModel.alertMessage ?? "")
-            }
-        }
-        .onAppear {
-            viewModel.ensureWeek(in: modelContext)
-            Analytics.track(.planViewed)
-            if !planExplanation.isEmpty {
-                Analytics.trackOnce(.recommendationReasonViewed)
-            }
         }
     }
 
@@ -166,7 +197,7 @@ struct ThisWeekView: View {
                     .foregroundStyle(Theme.secondaryText)
             }
             Button {
-                selectedTab = .grocery
+                onOpenGrocery()
             } label: {
                 Label("Market listesi", systemImage: "cart")
                     .font(.subheadline.weight(.semibold))
@@ -180,10 +211,10 @@ struct ThisWeekView: View {
 
     private func memoryPattern(_ prefs: UserPrefs?) -> MealPattern? {
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
         let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         let dismissed = Set(prefs?.dismissedPatternIDs ?? [])
-        return MealPatternService.patterns(memories: map, candidates: catalog, dismissed: dismissed).first
+        return MealPatternService.patterns(memories: map, bySlug: index.bySlug, dismissed: dismissed).first
     }
 
     private func explanationCard(_ text: String) -> some View {
@@ -275,6 +306,7 @@ private struct WeekMealCard: View {
     var meal: WeekMealPresentation
     var recipe: Recipe?
     var isWorking: Bool
+    var loadsPhoto: Bool
     var onReplace: () -> Void
     var onSkip: () -> Void
     @State private var isPhotoShown = false
@@ -317,6 +349,7 @@ private struct WeekMealCard: View {
                             author: recipe?.photoAuthor ?? "",
                             license: recipe?.photoLicense ?? "",
                             layout: .thumbnail,
+                            loadsPhoto: loadsPhoto,
                             isPhotoShown: $isPhotoShown
                         )
                         VStack(alignment: .leading, spacing: 4) {
@@ -467,6 +500,7 @@ private struct TonightDinnerCard: View {
     var recipe: Recipe?
     var title: String
     var isWorking: Bool
+    var loadsPhoto: Bool
     var onReplace: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isPhotoShown = false
@@ -525,6 +559,7 @@ private struct TonightDinnerCard: View {
                         author: recipe?.photoAuthor ?? "",
                         license: recipe?.photoLicense ?? "",
                         layout: .backdrop,
+                        loadsPhoto: loadsPhoto,
                         isPhotoShown: $isPhotoShown
                     )
                     Theme.scrimTop

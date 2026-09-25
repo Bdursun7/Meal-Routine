@@ -3,6 +3,7 @@ import SwiftUI
 /// Capped groups above the full catalog. Hidden while a search or chip filter is on.
 struct PersonalizedDiscoveryView: View {
     var sections: [DiscoverySection]
+    var loadsPhoto: Bool = true
     var recipe: (String) -> Recipe?
 
     var body: some View {
@@ -18,7 +19,8 @@ struct PersonalizedDiscoveryView: View {
                                 badgeTitle: item.badge?.title,
                                 photoURL: recipe.photoURL,
                                 photoAuthor: recipe.photoAuthor,
-                                photoLicense: recipe.photoLicense
+                                photoLicense: recipe.photoLicense,
+                                loadsPhoto: loadsPhoto
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())

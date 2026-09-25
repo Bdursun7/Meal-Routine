@@ -10,7 +10,16 @@ enum PersonalizedScoringService {
         memories: [String: MealMemorySnapshot],
         candidates: [PickerCandidate]
     ) -> TasteProfile {
-        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        profile(
+            memories: memories,
+            bySlug: Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        )
+    }
+
+    static func profile(
+        memories: [String: MealMemorySnapshot],
+        bySlug: [String: PickerCandidate]
+    ) -> TasteProfile {
         var categoryLoves: [String: Int] = [:]
         var proteinLoves: [String: Int] = [:]
         var cuisineLoves: [String: Int] = [:]
@@ -145,16 +154,41 @@ enum PersonalizedScoringService {
         now: Date
     ) -> RecipeMemoryScore {
         let taste = profile(memories: memories, candidates: candidates)
+        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         return score(
             candidate,
             memory: memories[candidate.slug],
             taste: taste,
-            candidates: candidates,
+            catalogBySlug: bySlug,
             preferences: preferences,
             anchors: anchors,
             dayOffset: dayOffset,
             now: now
         )
+    }
+
+    /// One rank for a list row. The taste profile and slug index are built by the caller
+    /// once for the whole catalog, not once per comparison.
+    static func listRank(
+        _ candidate: PickerCandidate,
+        memory: MealMemorySnapshot?,
+        taste: TasteProfile,
+        catalogBySlug: [String: PickerCandidate],
+        preferences: PlanningPreferences,
+        anchors: [PickerCandidate] = [],
+        dayOffset: Int = 0,
+        now: Date
+    ) -> Int {
+        score(
+            candidate,
+            memory: memory,
+            taste: taste,
+            catalogBySlug: catalogBySlug,
+            preferences: preferences,
+            anchors: anchors,
+            dayOffset: dayOffset,
+            now: now
+        ).final
     }
 
     static func isEligible(
@@ -201,6 +235,7 @@ enum PersonalizedScoringService {
         var chosen: [PickerCandidate] = []
         var scores: [String: RecipeMemoryScore] = [:]
         var offset = startDayOffset
+        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         while chosen.count < limit {
             let ranked = remaining.map { candidate in
                 (
@@ -209,7 +244,7 @@ enum PersonalizedScoringService {
                         candidate,
                         memory: memories[candidate.slug],
                         taste: taste,
-                        candidates: candidates,
+                        catalogBySlug: bySlug,
                         preferences: preferences,
                         anchors: anchors,
                         dayOffset: offset,
@@ -257,7 +292,7 @@ enum PersonalizedScoringService {
         _ candidate: PickerCandidate,
         memory: MealMemorySnapshot?,
         taste: TasteProfile,
-        candidates: [PickerCandidate],
+        catalogBySlug: [String: PickerCandidate],
         preferences: PlanningPreferences,
         anchors: [PickerCandidate],
         dayOffset: Int,
@@ -273,7 +308,7 @@ enum PersonalizedScoringService {
         preference += weekdayBias(candidate, dayOffset: dayOffset, style: preferences.weekdayStyle, anchors: anchors)
         preference += difficultyBias(candidate.difficulty, preference: preferences.difficulty)
 
-        let behavior = behaviorScore(candidate, memory: memory, taste: taste, candidates: candidates)
+        let behavior = behaviorScore(candidate, memory: memory, taste: taste, catalogBySlug: catalogBySlug)
         let repetition = repetitionPenalty(memory: memory, preference: preferences.repetition, now: now)
         let discovery = discoveryScore(
             candidate,
@@ -295,10 +330,10 @@ enum PersonalizedScoringService {
         _ candidate: PickerCandidate,
         memory: MealMemorySnapshot?,
         taste: TasteProfile,
-        candidates: [PickerCandidate]
+        catalogBySlug: [String: PickerCandidate]
     ) -> Int {
         guard let memory else {
-            return similarBonus(candidate, taste: taste, candidates: candidates)
+            return similarBonus(candidate, taste: taste, catalogBySlug: catalogBySlug)
         }
         var score = 0
         if memory.latestRating == .loved || (memory.latestRating == nil && memory.lovedCount > 0) {
@@ -340,7 +375,7 @@ enum PersonalizedScoringService {
             score -= 100
         }
         if memory.lovedCount == 0 {
-            score += similarBonus(candidate, taste: taste, candidates: candidates)
+            score += similarBonus(candidate, taste: taste, catalogBySlug: catalogBySlug)
         }
         return score
     }
@@ -348,11 +383,10 @@ enum PersonalizedScoringService {
     private static func similarBonus(
         _ candidate: PickerCandidate,
         taste: TasteProfile,
-        candidates: [PickerCandidate]
+        catalogBySlug: [String: PickerCandidate]
     ) -> Int {
-        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         for slug in taste.lovedSlugs where slug != candidate.slug {
-            guard let other = bySlug[slug] else { continue }
+            guard let other = catalogBySlug[slug] else { continue }
             if !candidate.protein.isEmpty, candidate.protein == other.protein { return 4 }
             if same(candidate.category, other.category) { return 4 }
             if !candidate.tags.isEmpty, !candidate.tags.isDisjoint(with: other.tags) { return 4 }
