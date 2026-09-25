@@ -8,8 +8,17 @@ enum AppTab: Hashable {
     case profile
 }
 
+/// How long a tab switch is given before photo decodes and store maintenance.
+/// The bar animation itself is about a third of a second.
+enum TabSwitchTiming {
+    static let settle: Duration = .milliseconds(250)
+}
+
 struct MainTabView: View {
     @State private var selectedTab: AppTab = .week
+    /// Bu Hafta is the landing tab. The others are installed on first selection,
+    /// after one turn, so their `@Query`s are not live during unrelated switches.
+    @State private var installedTabs: Set<AppTab> = [.week]
 
     private static let configureTabBar: Void = {
         let appearance = UITabBarAppearance()
@@ -30,19 +39,50 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ThisWeekView(selectedTab: $selectedTab)
-                .tabItem { Label("Bu Hafta", systemImage: selectedTab == .week ? "calendar.circle.fill" : "calendar") }
-                .tag(AppTab.week)
-            RecipeListView()
-                .tabItem { Label("Tarifler", systemImage: selectedTab == .recipes ? "book.closed.fill" : "book.closed") }
-                .tag(AppTab.recipes)
-            GroceryView()
-                .tabItem { Label("Market", systemImage: selectedTab == .grocery ? "cart.fill" : "cart") }
-                .tag(AppTab.grocery)
-            ProfileView()
-                .tabItem { Label("Profil", systemImage: selectedTab == .profile ? "person.crop.circle.fill" : "person.crop.circle") }
-                .tag(AppTab.profile)
+            tabRoot(.week, title: "Bu Hafta", symbol: "calendar", selectedSymbol: "calendar.circle.fill") {
+                ThisWeekView(
+                    isTabSelected: selectedTab == .week,
+                    onOpenGrocery: { selectedTab = .grocery }
+                )
+            }
+            tabRoot(.recipes, title: "Tarifler", symbol: "book.closed", selectedSymbol: "book.closed.fill") {
+                RecipeListView(isTabSelected: selectedTab == .recipes)
+            }
+            tabRoot(.grocery, title: "Market", symbol: "cart", selectedSymbol: "cart.fill") {
+                GroceryView(isTabSelected: selectedTab == .grocery)
+            }
+            tabRoot(.profile, title: "Profil", symbol: "person.crop.circle", selectedSymbol: "person.crop.circle.fill") {
+                ProfileView(isTabSelected: selectedTab == .profile)
+            }
         }
         .tint(Theme.accent)
+        .onChange(of: selectedTab) { _, tab in
+            guard !installedTabs.contains(tab) else { return }
+            Task { @MainActor in
+                await Task.yield()
+                installedTabs.insert(tab)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tabRoot<Content: View>(
+        _ tab: AppTab,
+        title: String,
+        symbol: String,
+        selectedSymbol: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Group {
+            if installedTabs.contains(tab) {
+                content()
+            } else {
+                Theme.canvas
+            }
+        }
+        .tabItem {
+            Label(title, systemImage: selectedTab == tab ? selectedSymbol : symbol)
+        }
+        .tag(tab)
     }
 }

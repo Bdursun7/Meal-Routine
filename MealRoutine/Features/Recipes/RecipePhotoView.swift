@@ -26,6 +26,9 @@ struct RecipePhotoView: View {
     var author: String
     var license: String
     var layout: Layout
+    /// False while a tab switch is in flight. The row stays a placeholder and
+    /// does not start a fetch that would finish on the main actor mid-animation.
+    var loadsPhoto: Bool
     @Binding var isPhotoShown: Bool
 
     @State private var image: UIImage?
@@ -36,12 +39,14 @@ struct RecipePhotoView: View {
         author: String,
         license: String,
         layout: Layout,
+        loadsPhoto: Bool = true,
         isPhotoShown: Binding<Bool>
     ) {
         self.urlString = urlString
         self.author = author
         self.license = license
         self.layout = layout
+        self.loadsPhoto = loadsPhoto
         _isPhotoShown = isPhotoShown
         let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
         _phase = State(initialValue: hasRemotePhoto ? .loading : .missing)
@@ -84,7 +89,8 @@ struct RecipePhotoView: View {
             .accessibilityLabel(accessibilityText)
             .accessibilityAddTraits(phase == .shown ? .isImage : [])
             .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
-            .task(id: urlString) {
+            .task(id: loadsPhoto ? urlString : "") {
+                guard loadsPhoto else { return }
                 await load()
             }
     }
