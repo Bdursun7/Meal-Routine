@@ -216,11 +216,15 @@ struct RecipeDetailView: View {
     /// The evening opened from Bu Hafta, and only if it still belongs to this week.
     /// A previous week's cooked copy of the same recipe does not count.
     private var currentWeekCookMeal: PlannedMeal? {
-        guard allowsCookBar, let mealUUID = route.plannedMealUUID else { return nil }
-        let start = WeekCalendar.weekStart(containing: .now)
+        let now = Date.now
         return plannedMeals.first { meal in
-            meal.uuid == mealUUID
-                && meal.week.map { WeekCalendar.isSameDay($0.weekStart, start) } == true
+            meal.uuid == route.plannedMealUUID
+                && CookBarGate.showsCookBar(
+                    allowsCookBar: allowsCookBar,
+                    plannedMealID: route.plannedMealUUID,
+                    mealWeekStart: meal.week?.weekStart,
+                    now: now
+                )
         }
     }
 

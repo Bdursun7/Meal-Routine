@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+
+		T17B00000000000000000001 /* WeekPresentationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000001 /* WeekPresentationRules.swift */; };
+		T17B00000000000000000003 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000003 /* TestFixtures.swift */; };
+		T17B00000000000000000004 /* MealMemoryBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */; };
+		T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000005 /* PersonalizedScoringTests.swift */; };
+		T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000006 /* SmartReplacementTests.swift */; };
+		T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000007 /* PresentationRuleTests.swift */; };
+		T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000008 /* MealMemoryStoreTests.swift */; };
+		T17B00000000000000000009 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 		BA0D3D46B2336BA9DD1FB0A6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */; };
 		BADD9375E68D80C456D17AB1 /* MealRoutineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7D0BF68A037EDC997BE0B4 /* MealRoutineApp.swift */; };
 		BA7E98C80EB05AA30CE6E8AA /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA78A63829EDF5668299B751 /* ModelContainerFactory.swift */; };
@@ -97,7 +106,28 @@
 		FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */; };
 /* End PBXBuildFile section */
 
+
+/* Begin PBXContainerItemProxy section */
+		T17PROXY00000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000007 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000006;
+			remoteInfo = MealRoutine;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+
+		T17F00000000000000000001 /* WeekPresentationRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekPresentationRules.swift; sourceTree = "<group>"; };
+		T17F00000000000000000002 /* MealRoutineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T17F00000000000000000003 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryBehaviorTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000005 /* PersonalizedScoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedScoringTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000006 /* SmartReplacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReplacementTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000007 /* PresentationRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationRuleTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000008 /* MealMemoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryStoreTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A10000000000000000000002 /* MealRoutine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MealRoutine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FA7D0BF68A037EDC997BE0B4 /* MealRoutineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRoutineApp.swift; sourceTree = "<group>"; };
@@ -201,6 +231,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+
+		T17FRW0000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T17B00000000000000000009 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -208,6 +247,8 @@
 			isa = PBXGroup;
 			children = (
 				CAEDAEDE9E130AA3F1908070 /* MealRoutine */,
+				T17GRP0000000000000001 /* MealRoutineTests */,
+				T17GRP0000000000000002 /* Frameworks */,
 				A10000000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -402,6 +443,7 @@
 				FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */,
 				FAECC4845BB7251D105C954C /* RecipeRoute.swift */,
 				FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */,
+				T17F00000000000000000001 /* WeekPresentationRules.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -410,6 +452,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000002 /* MealRoutine.app */,
+				T17F00000000000000000002 /* MealRoutineTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -435,6 +478,28 @@
 			path = Discovery;
 			sourceTree = "<group>";
 		};
+
+		T17GRP0000000000000001 /* MealRoutineTests */ = {
+			isa = PBXGroup;
+			children = (
+				T17F00000000000000000003 /* TestFixtures.swift */,
+				T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */,
+				T17F00000000000000000008 /* MealMemoryStoreTests.swift */,
+				T17F00000000000000000005 /* PersonalizedScoringTests.swift */,
+				T17F00000000000000000007 /* PresentationRuleTests.swift */,
+				T17F00000000000000000006 /* SmartReplacementTests.swift */,
+			);
+			path = MealRoutineTests;
+			sourceTree = "<group>";
+		};
+		T17GRP0000000000000002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				T17F00000000000000000009 /* XCTest.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -455,6 +520,24 @@
 			productReference = A10000000000000000000002 /* MealRoutine.app */;
 			productType = "com.apple.product-type.application";
 		};
+
+		T17TARGET000000000001 /* MealRoutineTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T17CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineTests" */;
+			buildPhases = (
+				T17SRC0000000000000001 /* Sources */,
+				T17FRW0000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T17DEP000000000000001 /* PBXTargetDependency */,
+			);
+			name = MealRoutineTests;
+			productName = MealRoutineTests;
+			productReference = T17F00000000000000000002 /* MealRoutineTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -467,6 +550,10 @@
 				TargetAttributes = {
 					A10000000000000000000006 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					T17TARGET000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A10000000000000000000006;
 					};
 				};
 			};
@@ -486,6 +573,7 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000000006 /* MealRoutine */,
+				T17TARGET000000000001 /* MealRoutineTests */,
 			);
 		};
 /* End PBXProject section */
@@ -561,6 +649,7 @@
 				BAB0EBAAEABD42835C266F88 /* Formatters.swift in Sources */,
 				BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */,
 				BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */,
+				T17B00000000000000000001 /* WeekPresentationRules.swift in Sources */,
 				BA077293179F729097805D16 /* WeekCalendar.swift in Sources */,
 				BA0A11A1A11A11A11A11A001 /* Analytics.swift in Sources */,
 				BA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift in Sources */,
@@ -596,7 +685,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+
+		T17SRC0000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T17B00000000000000000003 /* TestFixtures.swift in Sources */,
+				T17B00000000000000000004 /* MealMemoryBehaviorTests.swift in Sources */,
+				T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */,
+				T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */,
+				T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */,
+				T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+
+/* Begin PBXTargetDependency section */
+		T17DEP000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000006 /* MealRoutine */;
+			targetProxy = T17PROXY00000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A1000000000000000000000A /* Debug */ = {
@@ -698,6 +810,55 @@
 			};
 			name = Release;
 		};
+
+		T17DBG0000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine";
+			};
+			name = Debug;
+		};
+		T17REL0000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -715,6 +876,16 @@
 			buildConfigurations = (
 				A1000000000000000000000C /* Debug */,
 				A1000000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		T17CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T17DBG0000000000000001 /* Debug */,
+				T17REL0000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

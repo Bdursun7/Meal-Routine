@@ -368,6 +368,88 @@ private func checkDiscoveryAndReplacement() {
         activeChips: [.loved]
     ).map(\.slug)
     check(favorite == ["eski"], "favorite chip stays on loved recipes")
+
+    let evening = candidate("aksam", minutes: 50, category: "soup", protein: "legume")
+    let fasterMeal = candidate("hizli", minutes: 20, category: "egg", protein: "egg")
+    let slowMeal = candidate("yavas", minutes: 70, category: "stew", protein: "tofu")
+    let lovedGrill = candidate("tavuk", minutes: 40, category: "grill", protein: "poultry", rating: .loved)
+    let similarMeal = candidate("sote", minutes: 35, category: "skillet", protein: "poultry")
+    let freshMeal = candidate("yeni", minutes: 30, cuisine: "GR", category: "salad", protein: "dairy")
+    let banned = candidate("asla", score: 99, minutes: 15, category: "ban", protein: "tofu", rating: .never)
+    var hiddenMemory = MealMemorySnapshot(recipeID: "gizli")
+    hiddenMemory.neverAgain = true
+    let hidden = candidate("gizli", minutes: 15, category: "hide", protein: "egg")
+    let safe = candidate("guvenli", minutes: 20, category: "safe", protein: "dairy")
+    let intentCatalog = [evening, fasterMeal, slowMeal, lovedGrill, similarMeal, known, freshMeal, banned, hidden, safe]
+    let context = ReplacementMemory(
+        memories: ["gizli": hiddenMemory],
+        preferences: prefs(),
+        now: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let faster = MealReplacement.choices(
+        catalog: intentCatalog,
+        current: evening,
+        blockedSlugs: [evening.slug],
+        maxCookMinutes: 60,
+        dislikedIngredientIds: [],
+        activeChips: [.faster],
+        memory: context
+    ).map(\.slug)
+    check(faster.contains("hizli") && !faster.contains("yavas"), "faster keeps the shorter meal, got \(faster)")
+    check(!faster.contains("asla") && !faster.contains("gizli"), "faster still drops never again, got \(faster)")
+    let similarSlugs = MealReplacement.choices(
+        catalog: intentCatalog,
+        current: evening,
+        blockedSlugs: [evening.slug],
+        maxCookMinutes: 60,
+        dislikedIngredientIds: [],
+        activeChips: [.similarLoved],
+        memory: context
+    ).map(\.slug)
+    check(similarSlugs == ["sote"], "similar-to-loved follows the loved protein, got \(similarSlugs)")
+}
+
+private func checkPresentation() {
+    let cooked = MealMemorySnapshot(recipeID: "pilav", timesCooked: 2)
+    check(RecommendationReasonService.badge(for: cooked, hasHistory: false) == nil, "no history hides the familiar badge")
+    check(RecommendationReasonService.badge(for: nil, hasHistory: false) == nil, "no history hides the new badge")
+    check(RecommendationReasonService.badge(for: cooked, hasHistory: true) == .familiar, "cooked history is Tanıdık")
+    check(RecommendationReasonService.badge(for: nil, hasHistory: true) == .new, "unseen recipe with history is Yeni")
+
+    check(
+        SkipControl.appearance(isSkipped: false, isCooked: false, isWorking: false) == .idle,
+        "idle skip stays tappable"
+    )
+    check(
+        SkipControl.appearance(isSkipped: true, isCooked: false, isWorking: false) == .selected,
+        "skipped meal uses the selected treatment"
+    )
+    check(SkipControl.usesFilledAccent(.selected) && !SkipControl.usesFilledAccent(.idle), "only the skipped control is filled")
+    check(
+        SkipControl.appearance(isSkipped: false, isCooked: true, isWorking: false) == .unavailable,
+        "a cooked meal does not look like an active skip"
+    )
+
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let thisWeek = WeekCalendar.weekStart(containing: now)
+    let mealID = UUID()
+    check(
+        CookBarGate.showsCookBar(allowsCookBar: true, plannedMealID: mealID, mealWeekStart: thisWeek, now: now),
+        "this week's planned meal can show the cook bar"
+    )
+    check(
+        !CookBarGate.showsCookBar(allowsCookBar: false, plannedMealID: mealID, mealWeekStart: thisWeek, now: now),
+        "Tarifler does not show the cook bar"
+    )
+    check(
+        !CookBarGate.showsCookBar(
+            allowsCookBar: true,
+            plannedMealID: mealID,
+            mealWeekStart: WeekCalendar.date(weekStart: thisWeek, dayOffset: -7),
+            now: now
+        ),
+        "last week's meal does not show the cook bar"
+    )
 }
 
 @main
@@ -378,6 +460,7 @@ struct MealMemoryChecks {
         checkScoring()
         checkExplanationAndPatterns()
         checkDiscoveryAndReplacement()
+        checkPresentation()
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)
             exit(1)

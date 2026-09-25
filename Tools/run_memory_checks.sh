@@ -19,5 +19,7 @@ OUT="${TMPDIR:-/tmp}/meal-memory-checks"
   "$ROOT/MealRoutine/Services/MealPatternService.swift" \
   "$ROOT/MealRoutine/Services/DiscoverySections.swift" \
   "$ROOT/MealRoutine/Services/MealReplacement.swift" \
+  "$ROOT/MealRoutine/Support/WeekCalendar.swift" \
+  "$ROOT/MealRoutine/Support/WeekPresentationRules.swift" \
   "$ROOT/Tools/meal_memory_checks.swift"
 (cd "$ROOT" && "$OUT")

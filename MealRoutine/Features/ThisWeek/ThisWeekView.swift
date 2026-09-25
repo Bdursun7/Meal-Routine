@@ -339,7 +339,7 @@ private struct WeekMealCard: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             if meal.isSkipped {
-                                Text("Atlandı")
+                                Text(SkipControl.title(isSkipped: true))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(Theme.onAccent)
                                     .padding(.horizontal, 8)
@@ -376,32 +376,38 @@ private struct WeekMealCard: View {
                 .accessibilityLabel("Değiştir")
                 .accessibilityHint("Bu akşam için alternatif tarifleri açar")
             } second: {
+                let skip = SkipControl.appearance(
+                    isSkipped: meal.isSkipped,
+                    isCooked: meal.isCooked,
+                    isWorking: isWorking
+                )
+                let filled = SkipControl.usesFilledAccent(skip)
                 Button(action: onSkip) {
-                    Text(meal.isSkipped ? "Atlandı" : "Atladım")
+                    Text(SkipControl.title(isSkipped: meal.isSkipped))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(meal.isSkipped ? Theme.onAccent : Theme.accent)
+                        .foregroundStyle(filled ? Theme.onAccent : Theme.accent)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(
-                            meal.isSkipped ? Theme.accent : Color.clear,
+                            filled ? Theme.accent : Color.clear,
                             in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                         )
                         .overlay {
-                            if !meal.isSkipped {
+                            if !filled {
                                 RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                                     .strokeBorder(Theme.accent, lineWidth: 1.5)
                             }
                         }
                 }
                 .buttonStyle(.plain)
-                .disabled(isWorking || meal.isCooked)
-                .allowsHitTesting(!meal.isSkipped)
-                .accessibilityLabel(meal.isSkipped ? "Atlandı" : "Atladım")
+                .disabled(skip == .unavailable)
+                .allowsHitTesting(skip == .idle)
+                .accessibilityLabel(SkipControl.title(isSkipped: meal.isSkipped))
                 .accessibilityHint(
-                    meal.isSkipped
+                    skip == .selected
                         ? "Bu akşam atlandı. Tarif ve market listesi duruyor"
                         : "Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar"
                 )
-                .accessibilityAddTraits(meal.isSkipped ? .isSelected : [])
+                .accessibilityAddTraits(skip == .selected ? .isSelected : [])
             }
         }
         .padding(16)
@@ -593,7 +599,7 @@ private struct TonightDinnerCard: View {
                     .foregroundStyle(Color.white)
             }
             if meal.isSkipped {
-                Text("Atlandı")
+                Text(SkipControl.title(isSkipped: true))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 10)
