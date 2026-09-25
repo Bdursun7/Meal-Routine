@@ -8,6 +8,7 @@ struct ThisWeekView: View {
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
     @Query private var prefs: [UserPrefs]
+    @Query private var memories: [MealMemory]
     @State private var viewModel = ThisWeekViewModel()
     @State private var replacingMeal: ReplacingMeal?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -18,12 +19,16 @@ struct ThisWeekView: View {
     }
 
     var body: some View {
+        let storedPrefs = prefs.min { $0.createdAt < $1.createdAt }
         let meals = viewModel.meals(
             weeks: weeks,
             recipes: recipes,
             feedback: feedback,
-            householdSize: householdSize
+            householdSize: householdSize,
+            memories: memories,
+            prefs: storedPrefs
         )
+        let planExplanation = viewModel.explanation(weeks: weeks)
         let summary = viewModel.summary(meals: meals)
         let featured = viewModel.featuredEvening(in: meals)
 
@@ -43,6 +48,9 @@ struct ThisWeekView: View {
                         VStack(alignment: .leading, spacing: Theme.sectionGap) {
                             VStack(alignment: .leading, spacing: Theme.cardGap) {
                                 progressCard(summary)
+                                if !planExplanation.isEmpty {
+                                    explanationCard(planExplanation)
+                                }
                                 if let featured {
                                     TonightDinnerCard(
                                         meal: featured,
@@ -52,7 +60,9 @@ struct ThisWeekView: View {
                                         onReplace: { replacingMeal = ReplacingMeal(id: featured.id) }
                                     )
                                 }
-                                if let insight = viewModel.preferenceInsight(recipes: recipes, feedback: feedback) {
+                                if let pattern = memoryPattern(storedPrefs) {
+                                    patternCard(pattern)
+                                } else if let insight = viewModel.preferenceInsight(recipes: recipes, feedback: feedback) {
                                     insightCard(insight)
                                 }
                             }
@@ -71,7 +81,8 @@ struct ThisWeekView: View {
                                         meal: meal,
                                         recipe: recipes.first { $0.slug == meal.slug },
                                         isWorking: viewModel.isWorking,
-                                        onReplace: { replacingMeal = ReplacingMeal(id: meal.id) }
+                                        onReplace: { replacingMeal = ReplacingMeal(id: meal.id) },
+                                        onSkip: { viewModel.skip(uuid: meal.id, in: modelContext) }
                                     )
                                 }
                             }
@@ -87,7 +98,7 @@ struct ThisWeekView: View {
                 RecipeDetailView(route: route, allowsCookBar: true)
             }
             .sheet(item: $replacingMeal) { meal in
-                MealReplacementSheet(mealID: meal.id)
+                SmartReplacementView(mealID: meal.id)
             }
             .alert(
                 "İşlem tamamlanamadı",
@@ -101,6 +112,9 @@ struct ThisWeekView: View {
         .onAppear {
             viewModel.ensureWeek(in: modelContext)
             Analytics.track(.planViewed)
+            if !planExplanation.isEmpty {
+                Analytics.trackOnce(.recommendationReasonViewed)
+            }
         }
     }
 
@@ -165,6 +179,56 @@ struct ThisWeekView: View {
         }
     }
 
+    private func memoryPattern(_ prefs: UserPrefs?) -> MealPattern? {
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = WeekPlanService.pickerCandidates(from: recipes, ratings: ratings)
+        let map = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let dismissed = Set(prefs?.dismissedPatternIDs ?? [])
+        return MealPatternService.patterns(memories: map, candidates: catalog, dismissed: dismissed).first
+    }
+
+    private func explanationCard(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Bu haftanın notu", systemImage: "text.quote")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            Text(text)
+                .font(.body)
+                .foregroundStyle(Theme.textCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .mealCardSurface()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Bu haftanın notu. \(text)")
+    }
+
+    private func patternCard(_ pattern: MealPattern) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Yemek hafızan", systemImage: "sparkles")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            Text(pattern.message)
+                .font(.body)
+                .foregroundStyle(Theme.textCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Bunu gizle") {
+                viewModel.dismissPattern(pattern.id, in: modelContext)
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.secondaryText)
+            .accessibilityHint("Bu çıkarımı bir sonraki plana kadar gizler")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .mealCardSurface()
+        .accessibilityElement(children: .combine)
+        .onAppear {
+            Analytics.trackOnce(.mealPatternViewed)
+        }
+    }
+
     private func insightCard(_ insight: PreferenceInsight) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(insight.title, systemImage: "sparkles")
@@ -213,83 +277,159 @@ private struct WeekMealCard: View {
     var recipe: Recipe?
     var isWorking: Bool
     var onReplace: () -> Void
+    var onSkip: () -> Void
     @State private var isPhotoShown = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(meal.dayTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Theme.accent.opacity(0.15), in: Capsule())
-                    Text(meal.dateTitle)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                Spacer(minLength: 8)
-                if meal.isCooked {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(Theme.sage)
-                        .accessibilityLabel("Pişti")
-                }
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.secondaryText)
-                    .accessibilityHidden(true)
-            }
-
             NavigationLink(value: RecipeRoute(slug: meal.slug, plannedMealUUID: meal.id)) {
-                HStack(alignment: .top, spacing: 12) {
-                    RecipePhotoView(
-                        urlString: recipe?.photoURL ?? "",
-                        author: recipe?.photoAuthor ?? "",
-                        license: recipe?.photoLicense ?? "",
-                        layout: .thumbnail,
-                        isPhotoShown: $isPhotoShown
-                    )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(meal.recipeName)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Theme.textCharcoal)
-                        Text("\(meal.minutes) dk · \(meal.servings) kişilik")
-                            .font(.footnote)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(meal.dayTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Theme.accent.opacity(0.15), in: Capsule())
+                            Text(meal.dateTitle)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryText)
+                        }
+                        Spacer(minLength: 8)
+                        if let badge = meal.badgeTitle {
+                            FamiliarityBadgeLabel(title: badge)
+                        }
+                        if meal.isCooked {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(Theme.sage)
+                                .accessibilityLabel("Pişti")
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(Theme.secondaryText)
-                        if let rating = meal.rating {
-                            Label(rating.title, systemImage: rating.systemImage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if isPhotoShown {
-                            RecipePhotoCreditText(
-                                author: recipe?.photoAuthor ?? "",
-                                license: recipe?.photoLicense ?? "",
-                                style: .compact
-                            )
-                        }
+                            .accessibilityHidden(true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(alignment: .top, spacing: 12) {
+                        RecipePhotoView(
+                            urlString: recipe?.photoURL ?? "",
+                            author: recipe?.photoAuthor ?? "",
+                            license: recipe?.photoLicense ?? "",
+                            layout: .thumbnail,
+                            isPhotoShown: $isPhotoShown
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(meal.recipeName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Theme.textCharcoal)
+                            Text("\(meal.minutes) dk · \(meal.servings) kişilik")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryText)
+                            if let rating = meal.rating {
+                                Label(rating.title, systemImage: rating.systemImage)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !meal.reason.isEmpty {
+                                Text(meal.reason)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.accent)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if meal.showsSkippedChrome {
+                                Text(SkipControl.title(isSkipped: true))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.onAccent)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Theme.accent, in: Capsule())
+                            }
+                            if isPhotoShown {
+                                RecipePhotoCreditText(
+                                    author: recipe?.photoAuthor ?? "",
+                                    license: recipe?.photoLicense ?? "",
+                                    style: .compact
+                                )
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Tarif detayını açar")
 
-            Button("Değiştir") {
-                onReplace()
+            if meal.showsSkip {
+                AdaptiveActions {
+                    replaceButton
+                } second: {
+                    skipButton
+                }
+            } else {
+                replaceButton
             }
-            .font(.subheadline.weight(.semibold))
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
-            .tint(Theme.accent)
-            .frame(minHeight: 44)
-            .disabled(isWorking)
-            .accessibilityLabel("Değiştir")
-            .accessibilityHint("Bu akşam için alternatif tarifleri açar")
         }
         .padding(16)
         .mealCardSurface()
+        .overlay {
+            if meal.showsSkippedChrome {
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .strokeBorder(Theme.accent, lineWidth: 2)
+            }
+        }
+    }
+
+    private var replaceButton: some View {
+        Button("Değiştir") {
+            onReplace()
+        }
+        .font(.subheadline.weight(.semibold))
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: Theme.chipRadius))
+        .tint(Theme.accent)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .disabled(isWorking)
+        .accessibilityLabel("Değiştir")
+        .accessibilityHint("Bu akşam için alternatif tarifleri açar")
+    }
+
+    private var skipButton: some View {
+        let skip = SkipControl.appearance(
+            isSkipped: meal.isSkipped,
+            isCooked: meal.isCooked,
+            isWorking: isWorking
+        )
+        let filled = SkipControl.usesFilledAccent(skip)
+        return Button(action: onSkip) {
+            Text(SkipControl.title(isSkipped: meal.isSkipped))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(filled ? Theme.onAccent : Theme.accent)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    filled ? Theme.accent : Color.clear,
+                    in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                )
+                .overlay {
+                    if !filled {
+                        RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+                            .strokeBorder(Theme.accent, lineWidth: 1.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(skip == .unavailable)
+        .allowsHitTesting(skip == .idle)
+        .accessibilityLabel(SkipControl.title(isSkipped: meal.isSkipped))
+        .accessibilityHint(
+            skip == .selected
+                ? "Bu akşam atlandı. Tarif ve market listesi duruyor"
+                : "Tarifi ve market listesini değiştirmeden bu akşamı atlanmış sayar"
+        )
+        .accessibilityAddTraits(skip == .selected ? .isSelected : [])
     }
 }
 
@@ -456,14 +596,33 @@ private struct TonightDinnerCard: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(Color.white.opacity(0.16), in: Capsule())
+            if let badge = meal.badgeTitle {
+                FamiliarityBadgeLabel(title: badge, onDarkBackground: true)
+            }
+            if !meal.reason.isEmpty {
+                Text(meal.reason)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.92))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if meal.isCooked {
                 Label("Pişti", systemImage: "checkmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.white)
             }
+            if meal.showsSkippedChrome {
+                Text(SkipControl.title(isSkipped: true))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white, in: Capsule())
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik")
+        .accessibilityLabel(
+            "\(title). \(meal.recipeName). \(meal.minutes) dakika. \(meal.servings) kişilik\(meal.showsSkippedChrome ? ". Atlandı" : "")"
+        )
     }
 }

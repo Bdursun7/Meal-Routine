@@ -9,6 +9,7 @@ struct MealReplacementSheet: View {
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
     @Query private var prefs: [UserPrefs]
+    @Query private var memories: [MealMemory]
     @State private var chips: Set<ReplacementChip> = []
     @State private var errorMessage: String?
     @State private var isWorking = false
@@ -20,7 +21,8 @@ struct MealReplacementSheet: View {
             weeks: weeks,
             recipes: recipes,
             feedback: feedback,
-            prefs: prefs
+            prefs: prefs,
+            memories: memories
         )
         NavigationStack {
             ScrollView {
@@ -110,8 +112,11 @@ struct MealReplacementSheet: View {
         isWorking = true
         defer { isWorking = false }
         do {
-            try WeekPlanService.replaceMeal(uuid: mealID, with: slug, in: modelContext)
+            let reason = chips.map(\.title).sorted().joined(separator: ", ")
+            try WeekPlanService.replaceMeal(uuid: mealID, with: slug, reason: reason, in: modelContext)
             try GroceryListService.rebuild(in: modelContext)
+            let intent = chips.count == 1 ? (chips.first?.rawValue ?? "open") : (chips.isEmpty ? "open" : "mixed")
+            Analytics.track(.smartReplacementUsed, properties: ["intent": intent])
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

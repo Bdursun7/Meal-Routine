@@ -13,11 +13,19 @@ final class ProfileViewModel {
     var statusMessage: String?
     var errorMessage: String?
     var isConfirmingReset = false
+    var discovery = DiscoveryLevel.balanced
+    var repetition = RepeatPreference.balanced
+    var difficultyPreference = DifficultyPreference.mostlyEasy
+    var weekdayStyle = WeekdayStyle.mostlyQuick
     /// Last values read from the store. An untouched stepper adopts a save made elsewhere.
     private var loadedHousehold = 2
     private var loadedEvenings = 5
     private var loadedMinutes = CookTimeOptions.defaultMinutes
     private var loadedDislikes: [String] = []
+    private var loadedDiscovery = DiscoveryLevel.balanced
+    private var loadedRepetition = RepeatPreference.balanced
+    private var loadedDifficulty = DifficultyPreference.mostlyEasy
+    private var loadedWeekday = WeekdayStyle.mostlyQuick
 
     /// Refreshes the form from the store. A stepper the user has moved, and not saved, is left alone.
     func load(_ prefs: UserPrefs?) {
@@ -38,11 +46,51 @@ final class ProfileViewModel {
         if !didLoad || dislikedIDs == loadedDislikes {
             dislikedIDs = storedDislikes
         }
+        if !didLoad || discovery == loadedDiscovery {
+            discovery = prefs.discoveryLevel
+        }
+        if !didLoad || repetition == loadedRepetition {
+            repetition = prefs.repeatPreference
+        }
+        if !didLoad || difficultyPreference == loadedDifficulty {
+            difficultyPreference = prefs.difficultyPreference
+        }
+        if !didLoad || weekdayStyle == loadedWeekday {
+            weekdayStyle = prefs.weekdayStyle
+        }
         loadedHousehold = storedHousehold
         loadedEvenings = storedEvenings
         loadedMinutes = storedMinutes
         loadedDislikes = storedDislikes
+        loadedDiscovery = prefs.discoveryLevel
+        loadedRepetition = prefs.repeatPreference
+        loadedDifficulty = prefs.difficultyPreference
+        loadedWeekday = prefs.weekdayStyle
         didLoad = true
+    }
+
+    /// Writes planning knobs for the next generated week. The open week stays.
+    func savePlanning(in context: ModelContext) {
+        do {
+            guard let prefs = try UserPrefsStore.existing(in: context) else { return }
+            if prefs.discoveryLevel != discovery {
+                Analytics.track(.discoveryPreferenceChanged, properties: ["level": discovery.rawValue])
+            }
+            if prefs.repeatPreference != repetition {
+                Analytics.track(.repetitionPreferenceChanged, properties: ["level": repetition.rawValue])
+            }
+            prefs.discoveryLevel = discovery
+            prefs.repeatPreference = repetition
+            prefs.difficultyPreference = difficultyPreference
+            prefs.weekdayStyle = weekdayStyle
+            try context.save()
+            loadedDiscovery = discovery
+            loadedRepetition = repetition
+            loadedDifficulty = difficultyPreference
+            loadedWeekday = weekdayStyle
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func dislikedNames(in recipes: [Recipe]) -> [String] {
@@ -122,6 +170,10 @@ final class ProfileViewModel {
             for item in orphanItems { context.delete(item) }
             let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
             for entry in feedback { context.delete(entry) }
+            let memories = try context.fetch(FetchDescriptor<MealMemory>())
+            for memory in memories { context.delete(memory) }
+            let events = try context.fetch(FetchDescriptor<MealBehaviorEvent>())
+            for event in events { context.delete(event) }
             let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
             for check in checks { context.delete(check) }
             let storedPrefs = try context.fetch(FetchDescriptor<UserPrefs>())

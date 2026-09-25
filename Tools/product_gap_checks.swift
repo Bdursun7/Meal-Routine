@@ -290,6 +290,17 @@ private func checkAnalytics() {
         "grocery_opened",
         "grocery_item_checked",
         "grocery_list_completed",
+        "meal_memory_updated",
+        "personalized_recommendation_viewed",
+        "personalized_recommendation_selected",
+        "recommendation_reason_viewed",
+        "discovery_preference_changed",
+        "repetition_preference_changed",
+        "meal_pattern_viewed",
+        "meal_memory_reset",
+        "smart_replacement_used",
+        "new_recipe_cooked",
+        "familiar_recipe_cooked",
     ]
     check(Set(AnalyticsEvent.allCases.map(\.rawValue)) == expected, "checklist event names")
 

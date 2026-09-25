@@ -46,7 +46,12 @@ final class RecipeDetailViewModel {
         isShowingRatingPrompt = false
     }
 
-    func saveRating(rating: MealRating, slug: String, in context: ModelContext) {
+    func saveRating(
+        rating: MealRating,
+        reasons: [FeedbackReason] = [],
+        slug: String,
+        in context: ModelContext
+    ) {
         guard isShowingRatingPrompt, !isSavingRating else { return }
         isSavingRating = true
         defer { isSavingRating = false }
@@ -58,6 +63,7 @@ final class RecipeDetailViewModel {
                 slug: slug,
                 rating: rating,
                 cooked: pendingCooked,
+                reasons: reasons,
                 in: context
             )
             pendingCooked = false

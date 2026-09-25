@@ -17,6 +17,8 @@ struct PickerCandidate: Equatable, Sendable {
     var protein: String
     /// Catalog diet tags (`vegetarian`, `vegan`, …). Empty when the recipe lists none.
     var diets: Set<String> = []
+    /// Catalog difficulty (`easy`, `medium`, `hard`). Empty skips the V2 difficulty gate.
+    var difficulty: String = ""
 }
 
 /// A cook or a plan that should pull this recipe down for a while.

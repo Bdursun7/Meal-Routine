@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+
+		T17B00000000000000000001 /* WeekPresentationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000001 /* WeekPresentationRules.swift */; };
+		T17B00000000000000000003 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000003 /* TestFixtures.swift */; };
+		T17B00000000000000000004 /* MealMemoryBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */; };
+		T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000005 /* PersonalizedScoringTests.swift */; };
+		T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000006 /* SmartReplacementTests.swift */; };
+		T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000007 /* PresentationRuleTests.swift */; };
+		T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000008 /* MealMemoryStoreTests.swift */; };
+		T17B00000000000000000009 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 		BA0D3D46B2336BA9DD1FB0A6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */; };
 		BADD9375E68D80C456D17AB1 /* MealRoutineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7D0BF68A037EDC997BE0B4 /* MealRoutineApp.swift */; };
 		BA7E98C80EB05AA30CE6E8AA /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA78A63829EDF5668299B751 /* ModelContainerFactory.swift */; };
@@ -71,9 +80,54 @@
 		BAE79929CB2D00C1135A093F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA4E801F3A031C2E9BA55415 /* PrivacyInfo.xcprivacy */; };
 		BA460A646DD6DDF48F7CA56B /* ingredient-aliases.tr.json in Resources */ = {isa = PBXBuildFile; fileRef = FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */; };
 		BA341F75B64DDC998C31DB99 /* recipes.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = FAAEADD99759A35A9C873AC6 /* recipes.v1.json */; };
+		01D6CAFD41E9CB058DC1A728 /* FeedbackReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3B186522FC60DF0E087A2D3 /* FeedbackReason.swift */; };
+		D52800066E0457A20A46A22C /* UserDiscoveryPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25EEBF3D9580380C8327E37 /* UserDiscoveryPreference.swift */; };
+		C686EAFA1C62C6B29E87E092 /* RecipeMemoryScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F086931F468602CB8F2E82 /* RecipeMemoryScore.swift */; };
+		CF958CE7EC37D9BF5FD5EDFA /* MealMemorySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2F10097BEE682D29D2434C /* MealMemorySnapshot.swift */; };
+		E1D661D747FBCA731E0DE7B8 /* MealMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C68F985AF343ABCEDED6FB6 /* MealMemory.swift */; };
+		9FFCCA81ACBB859279A21AE8 /* MealBehaviorEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5EED99A54F47804650A072F /* MealBehaviorEvent.swift */; };
+		7065082F9950E64402BD6B38 /* ConfidenceCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F8355C3D070AD4832BA785 /* ConfidenceCalculator.swift */; };
+		69F55D48FEB0E8730174853D /* PlanExplanationBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDC4ED8859DAD50B1A52327 /* PlanExplanationBuilder.swift */; };
+		C18E482D063162081730096F /* RecommendationReasonService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCB43D3FC707EE08AFBA407 /* RecommendationReasonService.swift */; };
+		101C2736800624D75AABBCCA /* PersonalizedScoringService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004DEE36A5DE61A40A1AA046 /* PersonalizedScoringService.swift */; };
+		9E3B946CE389DF8B78E7000C /* MealPatternService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561EB8027850B4B79EED586F /* MealPatternService.swift */; };
+		C07086A76E91591FD60CEEC0 /* DiscoverySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D35EDEF6D29087F9AD1D018 /* DiscoverySections.swift */; };
+		62C32DB18FF88EBC61AE186A /* MealMemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996282D5C56B50067727D9C4 /* MealMemoryService.swift */; };
+		F740C7DB655D82A7798A8471 /* BehaviorTrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065DD8F884811DE02BE4E698 /* BehaviorTrackingService.swift */; };
+		59006B837ABE5B3A3D485EEF /* ReplacementIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCEA03B7E124F8A4157D6343 /* ReplacementIntent.swift */; };
+		5BB88BD4F0534A863E33691C /* RecommendationReasonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B90A654C82E49EA9F563E0 /* RecommendationReasonView.swift */; };
+		3C538C8CA5954251FD094E4B /* SmartReplacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AE42CC5B050DB91F61DB7E /* SmartReplacementView.swift */; };
+		22642CE125DBE26605A07FD8 /* MealPatternCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0AEAE0B4F2D313EA91C948 /* MealPatternCard.swift */; };
+		EBDA51EF5F3646FC1A522731 /* MealMemoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89729443766CDFC15F3FF314 /* MealMemoryViewModel.swift */; };
+		6B17A6DAAA3A7C073A2B62FD /* MealHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8F25693F29A29938CBB98B /* MealHistoryView.swift */; };
+		5870ABE707774AFE122861DB /* MealMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7016CC0812CD6DD0CB5E8CE2 /* MealMemoryView.swift */; };
+		3C9F8FDC5A5F16C9A231F436 /* DiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA1D3AAA34CB7C9D1D57998 /* DiscoveryViewModel.swift */; };
+		DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */; };
+		FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */; };
 /* End PBXBuildFile section */
 
+
+/* Begin PBXContainerItemProxy section */
+		T17PROXY00000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000007 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000006;
+			remoteInfo = MealRoutine;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+
+		T17F00000000000000000001 /* WeekPresentationRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekPresentationRules.swift; sourceTree = "<group>"; };
+		T17F00000000000000000002 /* MealRoutineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T17F00000000000000000003 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryBehaviorTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000005 /* PersonalizedScoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedScoringTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000006 /* SmartReplacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReplacementTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000007 /* PresentationRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationRuleTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000008 /* MealMemoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryStoreTests.swift; sourceTree = "<group>"; };
+		T17F00000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A10000000000000000000002 /* MealRoutine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MealRoutine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FA7D0BF68A037EDC997BE0B4 /* MealRoutineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRoutineApp.swift; sourceTree = "<group>"; };
@@ -139,6 +193,30 @@
 		FA4E801F3A031C2E9BA55415 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ingredient-aliases.tr.json"; sourceTree = "<group>"; };
 		FAAEADD99759A35A9C873AC6 /* recipes.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = recipes.v1.json; sourceTree = "<group>"; };
+		C3B186522FC60DF0E087A2D3 /* FeedbackReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackReason.swift; sourceTree = "<group>"; };
+		A25EEBF3D9580380C8327E37 /* UserDiscoveryPreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDiscoveryPreference.swift; sourceTree = "<group>"; };
+		60F086931F468602CB8F2E82 /* RecipeMemoryScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeMemoryScore.swift; sourceTree = "<group>"; };
+		7C2F10097BEE682D29D2434C /* MealMemorySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemorySnapshot.swift; sourceTree = "<group>"; };
+		1C68F985AF343ABCEDED6FB6 /* MealMemory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemory.swift; sourceTree = "<group>"; };
+		F5EED99A54F47804650A072F /* MealBehaviorEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealBehaviorEvent.swift; sourceTree = "<group>"; };
+		F3F8355C3D070AD4832BA785 /* ConfidenceCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfidenceCalculator.swift; sourceTree = "<group>"; };
+		CBDC4ED8859DAD50B1A52327 /* PlanExplanationBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanExplanationBuilder.swift; sourceTree = "<group>"; };
+		4FCB43D3FC707EE08AFBA407 /* RecommendationReasonService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationReasonService.swift; sourceTree = "<group>"; };
+		004DEE36A5DE61A40A1AA046 /* PersonalizedScoringService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedScoringService.swift; sourceTree = "<group>"; };
+		561EB8027850B4B79EED586F /* MealPatternService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPatternService.swift; sourceTree = "<group>"; };
+		9D35EDEF6D29087F9AD1D018 /* DiscoverySections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverySections.swift; sourceTree = "<group>"; };
+		996282D5C56B50067727D9C4 /* MealMemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryService.swift; sourceTree = "<group>"; };
+		065DD8F884811DE02BE4E698 /* BehaviorTrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BehaviorTrackingService.swift; sourceTree = "<group>"; };
+		BCEA03B7E124F8A4157D6343 /* ReplacementIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplacementIntent.swift; sourceTree = "<group>"; };
+		04B90A654C82E49EA9F563E0 /* RecommendationReasonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationReasonView.swift; sourceTree = "<group>"; };
+		95AE42CC5B050DB91F61DB7E /* SmartReplacementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReplacementView.swift; sourceTree = "<group>"; };
+		2D0AEAE0B4F2D313EA91C948 /* MealPatternCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPatternCard.swift; sourceTree = "<group>"; };
+		89729443766CDFC15F3FF314 /* MealMemoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryViewModel.swift; sourceTree = "<group>"; };
+		6F8F25693F29A29938CBB98B /* MealHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealHistoryView.swift; sourceTree = "<group>"; };
+		7016CC0812CD6DD0CB5E8CE2 /* MealMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryView.swift; sourceTree = "<group>"; };
+		CCA1D3AAA34CB7C9D1D57998 /* DiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViewModel.swift; sourceTree = "<group>"; };
+		EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationCard.swift; sourceTree = "<group>"; };
+		C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedDiscoveryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -153,6 +231,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+
+		T17FRW0000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T17B00000000000000000009 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -160,6 +247,8 @@
 			isa = PBXGroup;
 			children = (
 				CAEDAEDE9E130AA3F1908070 /* MealRoutine */,
+				T17GRP0000000000000001 /* MealRoutineTests */,
+				T17GRP0000000000000002 /* Frameworks */,
 				A10000000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -203,6 +292,8 @@
 		CA6C2E638F7898ED7EDA22ED /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				81261658B58AECDEDB04675A /* MealMemory */,
+				1CFB715FC949D74CF0AFB453 /* Discovery */,
 				CA11919D0572F2C0D07B7FAF /* Grocery */,
 				CA9721CCFCDC4B0CC9A7E15C /* Onboarding */,
 				CA1B312F7912323187BB2D93 /* Profile */,
@@ -256,6 +347,9 @@
 		CA0DD2C1DB7F82D01B0540D5 /* ThisWeek */ = {
 			isa = PBXGroup;
 			children = (
+				95AE42CC5B050DB91F61DB7E /* SmartReplacementView.swift */,
+				04B90A654C82E49EA9F563E0 /* RecommendationReasonView.swift */,
+				BCEA03B7E124F8A4157D6343 /* ReplacementIntent.swift */,
 				FA0A11A1A11A11A11A11A006 /* MealReplacementView.swift */,
 				FA8FE074D8A29C1FEC5071EC /* ThisWeekView.swift */,
 				FA197BDEDFA96DDB7489736E /* ThisWeekViewModel.swift */,
@@ -266,6 +360,12 @@
 		CA94A9F7CB7739CBB772F4BA /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F5EED99A54F47804650A072F /* MealBehaviorEvent.swift */,
+				1C68F985AF343ABCEDED6FB6 /* MealMemory.swift */,
+				7C2F10097BEE682D29D2434C /* MealMemorySnapshot.swift */,
+				60F086931F468602CB8F2E82 /* RecipeMemoryScore.swift */,
+				A25EEBF3D9580380C8327E37 /* UserDiscoveryPreference.swift */,
+				C3B186522FC60DF0E087A2D3 /* FeedbackReason.swift */,
 				FAF486B3694AF36D5F58AD62 /* CatalogImportState.swift */,
 				FAAA23D4B86245BC82939972 /* GroceryItem.swift */,
 				FA721ACD849BDB23BA99D158 /* IngredientLine.swift */,
@@ -292,6 +392,14 @@
 		CAEE345BB75ECE9630EEFA79 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				065DD8F884811DE02BE4E698 /* BehaviorTrackingService.swift */,
+				996282D5C56B50067727D9C4 /* MealMemoryService.swift */,
+				9D35EDEF6D29087F9AD1D018 /* DiscoverySections.swift */,
+				561EB8027850B4B79EED586F /* MealPatternService.swift */,
+				004DEE36A5DE61A40A1AA046 /* PersonalizedScoringService.swift */,
+				4FCB43D3FC707EE08AFBA407 /* RecommendationReasonService.swift */,
+				CBDC4ED8859DAD50B1A52327 /* PlanExplanationBuilder.swift */,
+				F3F8355C3D070AD4832BA785 /* ConfidenceCalculator.swift */,
 				CA9F9083EE730028C05A65F8 /* Catalog */,
 				FA0A11A1A11A11A11A11A001 /* Analytics.swift */,
 				FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */,
@@ -335,6 +443,7 @@
 				FA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift */,
 				FAECC4845BB7251D105C954C /* RecipeRoute.swift */,
 				FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */,
+				T17F00000000000000000001 /* WeekPresentationRules.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -343,8 +452,52 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000002 /* MealRoutine.app */,
+				T17F00000000000000000002 /* MealRoutineTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		81261658B58AECDEDB04675A /* MealMemory */ = {
+			isa = PBXGroup;
+			children = (
+				2D0AEAE0B4F2D313EA91C948 /* MealPatternCard.swift */,
+				89729443766CDFC15F3FF314 /* MealMemoryViewModel.swift */,
+				6F8F25693F29A29938CBB98B /* MealHistoryView.swift */,
+				7016CC0812CD6DD0CB5E8CE2 /* MealMemoryView.swift */,
+			);
+			path = MealMemory;
+			sourceTree = "<group>";
+		};
+		1CFB715FC949D74CF0AFB453 /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				CCA1D3AAA34CB7C9D1D57998 /* DiscoveryViewModel.swift */,
+				EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */,
+				C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */,
+			);
+			path = Discovery;
+			sourceTree = "<group>";
+		};
+
+		T17GRP0000000000000001 /* MealRoutineTests */ = {
+			isa = PBXGroup;
+			children = (
+				T17F00000000000000000003 /* TestFixtures.swift */,
+				T17F00000000000000000004 /* MealMemoryBehaviorTests.swift */,
+				T17F00000000000000000008 /* MealMemoryStoreTests.swift */,
+				T17F00000000000000000005 /* PersonalizedScoringTests.swift */,
+				T17F00000000000000000007 /* PresentationRuleTests.swift */,
+				T17F00000000000000000006 /* SmartReplacementTests.swift */,
+			);
+			path = MealRoutineTests;
+			sourceTree = "<group>";
+		};
+		T17GRP0000000000000002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				T17F00000000000000000009 /* XCTest.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -367,6 +520,24 @@
 			productReference = A10000000000000000000002 /* MealRoutine.app */;
 			productType = "com.apple.product-type.application";
 		};
+
+		T17TARGET000000000001 /* MealRoutineTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T17CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineTests" */;
+			buildPhases = (
+				T17SRC0000000000000001 /* Sources */,
+				T17FRW0000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T17DEP000000000000001 /* PBXTargetDependency */,
+			);
+			name = MealRoutineTests;
+			productName = MealRoutineTests;
+			productReference = T17F00000000000000000002 /* MealRoutineTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -379,6 +550,10 @@
 				TargetAttributes = {
 					A10000000000000000000006 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					T17TARGET000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A10000000000000000000006;
 					};
 				};
 			};
@@ -398,6 +573,7 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000000006 /* MealRoutine */,
+				T17TARGET000000000001 /* MealRoutineTests */,
 			);
 		};
 /* End PBXProject section */
@@ -473,6 +649,7 @@
 				BAB0EBAAEABD42835C266F88 /* Formatters.swift in Sources */,
 				BA6C4E91A0B74D18E2F0A1C3 /* GroceryCategory.swift in Sources */,
 				BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */,
+				T17B00000000000000000001 /* WeekPresentationRules.swift in Sources */,
 				BA077293179F729097805D16 /* WeekCalendar.swift in Sources */,
 				BA0A11A1A11A11A11A11A001 /* Analytics.swift in Sources */,
 				BA0A11A1A11A11A11A11A002 /* RecipeBrowse.swift in Sources */,
@@ -481,10 +658,57 @@
 				BA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift in Sources */,
 				BA0A11A1A11A11A11A11A006 /* MealReplacementView.swift in Sources */,
 				BA0A11A1A11A11A11A11A007 /* PrivacyView.swift in Sources */,
+				01D6CAFD41E9CB058DC1A728 /* FeedbackReason.swift in Sources */,
+				D52800066E0457A20A46A22C /* UserDiscoveryPreference.swift in Sources */,
+				C686EAFA1C62C6B29E87E092 /* RecipeMemoryScore.swift in Sources */,
+				CF958CE7EC37D9BF5FD5EDFA /* MealMemorySnapshot.swift in Sources */,
+				E1D661D747FBCA731E0DE7B8 /* MealMemory.swift in Sources */,
+				9FFCCA81ACBB859279A21AE8 /* MealBehaviorEvent.swift in Sources */,
+				7065082F9950E64402BD6B38 /* ConfidenceCalculator.swift in Sources */,
+				69F55D48FEB0E8730174853D /* PlanExplanationBuilder.swift in Sources */,
+				C18E482D063162081730096F /* RecommendationReasonService.swift in Sources */,
+				101C2736800624D75AABBCCA /* PersonalizedScoringService.swift in Sources */,
+				9E3B946CE389DF8B78E7000C /* MealPatternService.swift in Sources */,
+				C07086A76E91591FD60CEEC0 /* DiscoverySections.swift in Sources */,
+				62C32DB18FF88EBC61AE186A /* MealMemoryService.swift in Sources */,
+				F740C7DB655D82A7798A8471 /* BehaviorTrackingService.swift in Sources */,
+				59006B837ABE5B3A3D485EEF /* ReplacementIntent.swift in Sources */,
+				5BB88BD4F0534A863E33691C /* RecommendationReasonView.swift in Sources */,
+				3C538C8CA5954251FD094E4B /* SmartReplacementView.swift in Sources */,
+				22642CE125DBE26605A07FD8 /* MealPatternCard.swift in Sources */,
+				EBDA51EF5F3646FC1A522731 /* MealMemoryViewModel.swift in Sources */,
+				6B17A6DAAA3A7C073A2B62FD /* MealHistoryView.swift in Sources */,
+				5870ABE707774AFE122861DB /* MealMemoryView.swift in Sources */,
+				3C9F8FDC5A5F16C9A231F436 /* DiscoveryViewModel.swift in Sources */,
+				DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */,
+				FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		T17SRC0000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T17B00000000000000000003 /* TestFixtures.swift in Sources */,
+				T17B00000000000000000004 /* MealMemoryBehaviorTests.swift in Sources */,
+				T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */,
+				T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */,
+				T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */,
+				T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+
+/* Begin PBXTargetDependency section */
+		T17DEP000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000006 /* MealRoutine */;
+			targetProxy = T17PROXY00000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A1000000000000000000000A /* Debug */ = {
@@ -534,7 +758,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MealRoutine;
@@ -548,7 +772,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -563,7 +787,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MealRoutine;
@@ -577,12 +801,61 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+
+		T17DBG0000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine";
+			};
+			name = Debug;
+		};
+		T17REL0000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine";
 			};
 			name = Release;
 		};
@@ -603,6 +876,16 @@
 			buildConfigurations = (
 				A1000000000000000000000C /* Debug */,
 				A1000000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		T17CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T17DBG0000000000000001 /* Debug */,
+				T17REL0000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

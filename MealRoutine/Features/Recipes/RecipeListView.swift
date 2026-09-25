@@ -5,7 +5,10 @@ struct RecipeListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
+    @Query private var memories: [MealMemory]
+    @Query private var prefs: [UserPrefs]
     @State private var viewModel = RecipeListViewModel()
+    @State private var discovery = DiscoveryViewModel()
 
     var body: some View {
         @Bindable var viewModel = self.viewModel
@@ -31,12 +34,17 @@ struct RecipeListView: View {
                                 onClear: viewModel.clearFilters
                             )
                         }
+                        if !viewModel.hasActiveFilters {
+                            PersonalizedDiscoveryView(sections: discoverySections) { slug in
+                                recipes.first { $0.slug == slug }
+                            }
+                        }
                         if visible.isEmpty {
                             Section {
                                 recipeSearchEmpty
                             }
                         } else {
-                            Section {
+                            Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
                                 ForEach(visible) { recipe in
                                     RecipeListRow(
                                         recipe: recipe,
@@ -62,6 +70,11 @@ struct RecipeListView: View {
                 }
             }
             .navigationTitle("Tarifler")
+            .onAppear {
+                if !discoverySections.isEmpty {
+                    Analytics.trackOnce(.personalizedRecommendationViewed)
+                }
+            }
             .navigationDestination(for: RecipeRoute.self) { route in
                 RecipeDetailView(route: route, allowsCookBar: false)
             }
@@ -71,6 +84,15 @@ struct RecipeListView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
+    }
+
+    private var discoverySections: [DiscoverySection] {
+        discovery.sections(
+            recipes: recipes,
+            feedback: feedback,
+            memories: memories,
+            prefs: prefs.min { $0.createdAt < $1.createdAt }
+        )
     }
 
     private var recipeSearchEmpty: some View {
@@ -200,8 +222,10 @@ private struct RecipeListRow: View {
                             )
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 2)
                 }
+                .contentShape(Rectangle())
             }
             .accessibilityHint("Tarif detayını açar")
 

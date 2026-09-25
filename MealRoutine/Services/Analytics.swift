@@ -20,6 +20,17 @@ enum AnalyticsEvent: String, CaseIterable, Sendable {
     case groceryOpened = "grocery_opened"
     case groceryItemChecked = "grocery_item_checked"
     case groceryListCompleted = "grocery_list_completed"
+    case mealMemoryUpdated = "meal_memory_updated"
+    case personalizedRecommendationViewed = "personalized_recommendation_viewed"
+    case personalizedRecommendationSelected = "personalized_recommendation_selected"
+    case recommendationReasonViewed = "recommendation_reason_viewed"
+    case discoveryPreferenceChanged = "discovery_preference_changed"
+    case repetitionPreferenceChanged = "repetition_preference_changed"
+    case mealPatternViewed = "meal_pattern_viewed"
+    case mealMemoryReset = "meal_memory_reset"
+    case smartReplacementUsed = "smart_replacement_used"
+    case newRecipeCooked = "new_recipe_cooked"
+    case familiarRecipeCooked = "familiar_recipe_cooked"
 }
 
 struct AnalyticsEntry: Equatable, Sendable {

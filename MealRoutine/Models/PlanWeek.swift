@@ -8,6 +8,8 @@ final class PlanWeek {
     var weekStart: Date
     var createdAt: Date
     var householdSize: Int
+    /// Deterministic sentence for this plan. Empty until a V2 fill writes one.
+    var explanation: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \PlannedMeal.week)
     var meals: [PlannedMeal] = []
