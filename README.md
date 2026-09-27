@@ -13,6 +13,10 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 3. If you run on a device, pick your Development Team under Signing & Capabilities. The simulator can use Sign to Run Locally.
 4. Run. The first launch imports `MealRoutine/Recipes/recipes.v1.json` into SwiftData.
 
+## V3 recipe import
+
+On branch `v3.0-import` (or a PR into that branch), Tarifler → **+** saves a recipe by hand, from a public link, or from pasted text. Review is required before it can be planned. Instagram and TikTok links stay source references unless the page exposes a public recipe; paste the caption or enter the recipe by hand. The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). On the simulator, paste and manual entry are the reliable path if the extension is not signed into the App Group yet. Imported recipes are not MealRoutine text and are not favorites until you say so.
+
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 
 ## V1 scope

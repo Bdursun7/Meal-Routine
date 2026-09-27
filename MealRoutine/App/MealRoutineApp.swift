@@ -18,5 +18,8 @@ struct MealRoutineApp: App {
             RootView()
         }
         .modelContainer(container)
+        .onOpenURL { url in
+            ImportInboxRouter.shared.handleOpenURL(url)
+        }
     }
 }

@@ -46,19 +46,20 @@ enum GroceryListService {
                 householdSize: householdSize
             )
             for ingredient in recipe.ingredients {
+                guard let source = ImportedGrocery.sourceLine(for: ingredient) else { continue }
                 let quantity = PortionScaler.scale(
-                    quantity: ingredient.quantity,
+                    quantity: source.quantity,
                     scaling: ingredient.scaling,
                     baseServings: recipe.baseServings,
                     householdSize: servings
                 )
                 sources.append(
                     GrocerySourceLine(
-                        ingredientId: ingredient.ingredientId,
-                        nameTR: ingredient.displayName,
-                        nameEN: ingredient.nameEN,
+                        ingredientId: source.ingredientId,
+                        nameTR: source.nameTR,
+                        nameEN: source.nameEN,
                         quantity: quantity,
-                        unit: ingredient.unit
+                        unit: source.unit
                     )
                 )
                 contributions.append(
@@ -66,9 +67,9 @@ enum GroceryListService {
                         mealUUID: meal.uuid,
                         recipeSlug: meal.recipeSlug,
                         sortIndex: ingredient.sortIndex,
-                        ingredientId: ingredient.ingredientId,
+                        ingredientId: source.ingredientId,
                         quantity: quantity,
-                        unit: ingredient.unit
+                        unit: source.unit
                     )
                 )
             }

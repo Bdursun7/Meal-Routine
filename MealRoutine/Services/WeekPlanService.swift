@@ -4,6 +4,8 @@ import SwiftData
 enum WeekPlanError: LocalizedError {
     case noAlternative
     case missingPreferences
+    case notPlannable
+    case alreadyPlanned
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +13,10 @@ enum WeekPlanError: LocalizedError {
             "Bu filtrelere uyan başka tarif kalmadı."
         case .missingPreferences:
             "Tercihler bulunamadı. Profil'den kurulumu tamamla."
+        case .notPlannable:
+            "Bu tarif plana eklenemiyor. Ad, malzeme veya yapılış eksik olabilir; ya da bir daha asla işaretli."
+        case .alreadyPlanned:
+            "Bu tarif bu haftada zaten var."
         }
     }
 }
@@ -247,6 +253,80 @@ enum WeekPlanService {
         )
         try context.save()
         Analytics.track(.mealReplaced)
+        trackImportedOutcome(.importedRecipeReplaced, slug: trimmed, in: context)
+    }
+
+    /// Puts one saved import on the current week because the cook chose it.
+    /// Automatic planning still skips unknown time, never-again, and disliked ingredients.
+    @MainActor
+    static func placeImportedRecipe(slug: String, in context: ModelContext, now: Date = .now) throws {
+        let trimmed = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recipes = try context.fetch(FetchDescriptor<Recipe>())
+        guard let recipe = recipes.first(where: { $0.slug == trimmed }),
+              ImportedRecipeEligibility.allowsPlanning(recipe) else {
+            throw WeekPlanError.notPlannable
+        }
+        guard let prefs = try UserPrefsStore.existing(in: context) else {
+            throw WeekPlanError.missingPreferences
+        }
+        let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
+        if FeedbackIndex.latestRatings(in: feedback)[trimmed] == .never {
+            throw WeekPlanError.notPlannable
+        }
+        let memories = try MealMemoryService.snapshots(in: context)
+        if memories[trimmed]?.neverAgain == true {
+            throw WeekPlanError.notPlannable
+        }
+        if !recipe.ingredientIDs.isDisjoint(with: Set(prefs.dislikedIngredientIds)) {
+            throw WeekPlanError.notPlannable
+        }
+        guard let week = try ensureCurrentWeek(in: context, now: now) else {
+            throw WeekPlanError.missingPreferences
+        }
+        if week.meals.contains(where: { $0.recipeSlug == trimmed }) {
+            throw WeekPlanError.alreadyPlanned
+        }
+        let today = WeekCalendar.dayOffset(for: now, weekStart: week.weekStart)
+        let ordered = week.meals.sorted { $0.dayOffset < $1.dayOffset }
+        guard let meal = ordered.first(where: { $0.dayOffset == today }) ?? ordered.first else {
+            throw WeekPlanError.notPlannable
+        }
+        let plannedAt = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
+        MealExposureLog.record([
+            RecentMealSighting(slug: meal.recipeSlug, at: meal.cookedAt ?? plannedAt, wasCooked: meal.cookedAt != nil),
+        ], now: now)
+        try BehaviorTrackingService.record(
+            .replaced,
+            recipeSlug: meal.recipeSlug,
+            at: now,
+            planWeekID: week.uuid,
+            plannedMealID: meal.uuid,
+            replacementReason: "import",
+            in: context,
+            saves: false
+        )
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        for check in checks where check.mealUUID == meal.uuid {
+            context.delete(check)
+        }
+        meal.recipeSlug = trimmed
+        meal.titleSnapshot = recipe.displayName
+        meal.cookedAt = nil
+        meal.skippedAt = nil
+        try BehaviorTrackingService.record(
+            .selected,
+            recipeSlug: trimmed,
+            at: now,
+            planWeekID: week.uuid,
+            plannedMealID: meal.uuid,
+            in: context,
+            saves: false
+        )
+        try context.save()
+        GroceryListService.discardRebuildCache()
+        try GroceryListService.rebuild(in: context, now: now)
+        Analytics.track(.mealReplaced)
+        trackImportedOutcome(.importedRecipeAddedToPlan, slug: trimmed, in: context)
     }
 
     /// Records a skip without changing the recipe or the grocery list.
@@ -286,6 +366,7 @@ enum WeekPlanService {
             )
             try context.save()
             Analytics.track(.mealCooked)
+            trackImportedOutcome(.importedRecipeCooked, slug: meal.recipeSlug, in: context)
         }
     }
 
@@ -300,6 +381,7 @@ enum WeekPlanService {
         Analytics.track(.recipeRated)
         if loved {
             Analytics.track(.recipeLoved)
+            trackImportedOutcome(.importedRecipeFavorited, slug: trimmed, in: context)
         }
     }
 
@@ -332,6 +414,7 @@ enum WeekPlanService {
             saves: false
         )
         try context.save()
+        trackImportedOutcome(.importedRecipeFeedbackGiven, slug: slug, in: context)
     }
 
     static func planRequest(from prefs: UserPrefs) -> PlanRequest {
@@ -347,7 +430,8 @@ enum WeekPlanService {
         from recipes: [Recipe],
         ratings: [String: MealRating]
     ) -> [PickerCandidate] {
-        recipes.map { recipe in
+        recipes.compactMap { recipe in
+            guard ImportedRecipeEligibility.allowsPlanning(recipe) else { return nil }
             let orderedIds = recipe.ingredients
                 .sorted { lhs, rhs in
                     if lhs.sortIndex != rhs.sortIndex { return lhs.sortIndex < rhs.sortIndex }
@@ -360,7 +444,7 @@ enum WeekPlanService {
                 .filter { !$0.isEmpty }
             return PickerCandidate(
                 slug: recipe.slug,
-                totalMinutes: recipe.totalMinutes,
+                totalMinutes: recipe.timeIsUnknown ? 10_000 : recipe.totalMinutes,
                 trDogfoodScore: recipe.trDogfoodScore,
                 ingredientIds: Set(orderedIds),
                 rating: ratings[recipe.slug],
@@ -369,9 +453,22 @@ enum WeekPlanService {
                 tags: Set(tags),
                 protein: MealRecommender.proteinFamily(in: orderedIds),
                 diets: Set(recipe.diets.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
-                difficulty: recipe.difficulty
+                difficulty: recipe.difficulty,
+                timeIsUnknown: recipe.timeIsUnknown,
+                importInterest: !recipe.isBundledCatalog
             )
         }
+    }
+
+    @MainActor
+    private static func trackImportedOutcome(
+        _ event: AnalyticsEvent,
+        slug: String,
+        in context: ModelContext
+    ) {
+        guard let recipe = try? context.fetch(FetchDescriptor<Recipe>()).first(where: { $0.slug == slug }),
+              !recipe.isBundledCatalog else { return }
+        Analytics.track(event, properties: ["origin": recipe.origin.rawValue])
     }
 
     private static func recentSightings(

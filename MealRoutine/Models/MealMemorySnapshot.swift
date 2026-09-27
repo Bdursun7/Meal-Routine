@@ -48,6 +48,10 @@ enum MealBehaviorEventType: String, Codable, CaseIterable, Sendable {
     case okay
     case neverAgain
     case favorited
+    /// The cook saved an import. Interest only. It does not mean liked or cooked.
+    case imported
+    /// The cook changed the recipe text. Preference scores stay put.
+    case edited
 }
 
 /// Applies one signal onto a snapshot. Explicit feedback is recorded in full.
@@ -90,6 +94,8 @@ enum MealMemoryReducer {
             memory.latestRating = .never
         case .favorited:
             memory.isFavorite = true
+        case .imported, .edited:
+            break
         }
         apply(reasons: reasons, to: &memory)
         memory.confidence = ConfidenceCalculator.level(for: memory)

@@ -13,6 +13,8 @@ struct RecipeListView: View {
     @State private var allowsPhotos = false
     @State private var showsCatalog = false
     @State private var scrolledSlug: String?
+    @State private var showsImport = false
+    @Query(sort: \RecipeImportDraft.updatedAt, order: .reverse) private var drafts: [RecipeImportDraft]
 
     var body: some View {
         NavigationStack {
@@ -24,6 +26,19 @@ struct RecipeListView: View {
                 }
             }
             .navigationTitle("Tarifler")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showsImport = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Tarif ekle")
+                }
+            }
+            .sheet(isPresented: $showsImport) {
+                ImportFlowView()
+            }
             .navigationDestination(for: RecipeRoute.self) { route in
                 RecipeDetailView(route: route, allowsCookBar: false)
             }
@@ -55,7 +70,7 @@ struct RecipeListView: View {
     private var selectedCatalog: some View {
         @Bindable var viewModel = self.viewModel
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let visible = viewModel.filtered(recipes, ratings: ratings)
+        let visible = viewModel.filtered(recipes, ratings: ratings, memories: memories)
         Group {
             if recipes.isEmpty {
                     WarmEmptyState(
@@ -71,9 +86,18 @@ struct RecipeListView: View {
                                 category: $viewModel.category,
                                 cookTime: $viewModel.cookTime,
                                 lovedOnly: $viewModel.lovedOnly,
+                                library: $viewModel.library,
+                                sort: $viewModel.sort,
                                 showsClear: viewModel.hasActiveFilters,
                                 onClear: viewModel.clearFilters
                             )
+                            if !drafts.isEmpty {
+                                Button {
+                                    showsImport = true
+                                } label: {
+                                    Label("Taslaklar (\(drafts.count))", systemImage: "doc.text")
+                                }
+                            }
                         }
                         if !viewModel.hasActiveFilters {
                             PersonalizedDiscoveryView(sections: discoverySections, loadsPhoto: allowsPhotos) { slug in
@@ -85,22 +109,7 @@ struct RecipeListView: View {
                                 recipeSearchEmpty
                             }
                         } else {
-                            Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
-                                ForEach(visible, id: \.slug) { recipe in
-                                    RecipeListRow(
-                                        recipe: recipe,
-                                        isLoved: ratings[recipe.slug] == .loved,
-                                        loadsPhoto: allowsPhotos,
-                                        onToggleFavorite: {
-                                            viewModel.toggleFavorite(
-                                                slug: recipe.slug,
-                                                isLoved: ratings[recipe.slug] == .loved,
-                                                in: modelContext
-                                            )
-                                        }
-                                    )
-                                }
-                            }
+                            recipeSections(visible, ratings: ratings)
                         }
                     }
                     .mealCanvas()
@@ -121,6 +130,53 @@ struct RecipeListView: View {
             memories: memories,
             prefs: prefs.min { $0.createdAt < $1.createdAt }
         )
+    }
+
+    @ViewBuilder
+    private func recipeSections(_ visible: [Recipe], ratings: [String: MealRating]) -> some View {
+        let showGroups = viewModel.library == .all && !viewModel.hasSearchText && viewModel.category == .all
+        if showGroups {
+            let imported = visible.filter { !$0.isBundledCatalog }
+            let bundled = visible.filter(\.isBundledCatalog)
+            if !imported.isEmpty {
+                Section("İçe aktarılan tariflerin") {
+                    recipeRows(imported, ratings: ratings)
+                }
+            }
+            if !bundled.isEmpty {
+                Section(viewModel.hasChipFilters ? "Sonuçlar" : "Katalog") {
+                    recipeRows(bundled, ratings: ratings)
+                }
+            }
+        } else {
+            Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
+                recipeRows(visible, ratings: ratings)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func recipeRows(_ recipes: [Recipe], ratings: [String: MealRating]) -> some View {
+        ForEach(recipes, id: \.slug) { recipe in
+            let memory = memories.first { $0.recipeSlug == recipe.slug }
+            RecipeListRow(
+                recipe: recipe,
+                isLoved: ratings[recipe.slug] == .loved,
+                badges: RecipeImportLabels.badges(
+                    for: recipe,
+                    cooked: (memory?.timesCooked ?? 0) > 0,
+                    isFavorite: memory?.isFavorite == true || ratings[recipe.slug] == .loved
+                ),
+                loadsPhoto: allowsPhotos,
+                onToggleFavorite: {
+                    viewModel.toggleFavorite(
+                        slug: recipe.slug,
+                        isLoved: ratings[recipe.slug] == .loved,
+                        in: modelContext
+                    )
+                }
+            )
+        }
     }
 
     private var recipeSearchEmpty: some View {
@@ -162,6 +218,8 @@ private struct RecipeFilterBar: View {
     @Binding var category: RecipeBrowseCategory
     @Binding var cookTime: RecipeCookTimeFilter
     @Binding var lovedOnly: Bool
+    @Binding var library: RecipeLibraryScope
+    @Binding var sort: RecipeLibrarySort
     var showsClear: Bool
     var onClear: () -> Void
 
@@ -181,6 +239,23 @@ private struct RecipeFilterBar: View {
                     }
                 }
             }
+
+            Text("Koleksiyon")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 8) {
+                ForEach(RecipeLibraryScope.allCases) { item in
+                    FilterChip(title: item.title, isSelected: library == item, hint: "Koleksiyona göre süzer") {
+                        library = item
+                    }
+                }
+            }
+            Picker("Sıralama", selection: $sort) {
+                ForEach(RecipeLibrarySort.allCases) { item in
+                    Text(item.title).tag(item)
+                }
+            }
+            .pickerStyle(.menu)
 
             Text("Süre ve favoriler")
                 .font(.caption.weight(.semibold))
@@ -220,6 +295,7 @@ private struct RecipeFilterBar: View {
 private struct RecipeListRow: View {
     var recipe: Recipe
     var isLoved: Bool
+    var badges: [String] = []
     var loadsPhoto: Bool
     var onToggleFavorite: () -> Void
     @State private var isPhotoShown = false
@@ -240,10 +316,16 @@ private struct RecipeListRow: View {
                         Text(recipe.displayName)
                             .font(.headline)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.turkish(recipe.difficulty)) · \(RegionLabel.turkish(recipe.country))")
+                        Text("\(recipe.timeIsUnknown ? "Süre yok" : "\(recipe.totalMinutes) dk") · \(DifficultyLabel.turkish(recipe.difficulty)) · \(RegionLabel.turkish(recipe.country))")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if !badges.isEmpty {
+                            Text(badges.joined(separator: " · "))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if isPhotoShown {
                             RecipePhotoCreditText(
                                 author: recipe.photoAuthor,

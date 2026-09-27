@@ -57,6 +57,8 @@ final class Recipe {
     /// True when total time was not in the source and the cook has not set one.
     /// Unknown time is not stored as zero minutes of cooking.
     var timeIsUnknown: Bool = false
+    /// True when the source did not give a yield. Amounts stay as written.
+    var servingsUnspecified: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \IngredientLine.recipe)
     var ingredients: [IngredientLine] = []

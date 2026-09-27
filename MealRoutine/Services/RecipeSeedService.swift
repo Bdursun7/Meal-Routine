@@ -51,6 +51,7 @@ enum RecipeSeedService {
         // deletion. A crash after that delete leaves a short store; shouldSkipImport
         // refuses a matching fingerprint until every catalog recipe is present again.
         CatalogIndexCache.invalidate()
+        // Bundled rows are replaced. Imported and manual recipes stay on device.
         let staleRecipes = try context.fetch(FetchDescriptor<Recipe>())
             .filter { CatalogRecipeGuard.isBundled(originRaw: $0.originRaw) }
         if !staleRecipes.isEmpty {
