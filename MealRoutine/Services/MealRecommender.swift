@@ -253,6 +253,10 @@ enum MealRecommender {
         "chinesesausage": "red-meat",
         "ribs": "red-meat",
         "rabbit": "red-meat",
+        "sucuk": "red-meat",
+        "pastirma": "red-meat",
+        "liver": "red-meat",
+        "tripe": "red-meat",
 
         "fish": "seafood",
         "salmon": "seafood",
@@ -269,6 +273,9 @@ enum MealRecommender {
         "clams": "seafood",
         "barramundi": "seafood",
         "hilsa": "seafood",
+        "anchovy": "seafood",
+        "mackerel": "seafood",
+        "seabass": "seafood",
 
         "egg": "egg",
         "eggs": "egg",
@@ -278,6 +285,7 @@ enum MealRecommender {
         "lentils": "legume",
         "chickpeas": "legume",
         "beans": "legume",
+        "broadbeans": "legume",
         "butterbeans": "legume",
         "soybeans": "legume",
         "moongdal": "legume",

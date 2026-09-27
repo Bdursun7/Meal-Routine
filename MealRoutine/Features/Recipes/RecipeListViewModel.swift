@@ -11,6 +11,9 @@ final class RecipeListViewModel {
     var lovedOnly = false
     var errorMessage: String?
 
+    @ObservationIgnored private var filteredKey: Int?
+    @ObservationIgnored private var filteredRecipes: [Recipe] = []
+
     var hasSearchText: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -31,7 +34,13 @@ final class RecipeListViewModel {
     }
 
     func filtered(_ recipes: [Recipe], ratings: [String: MealRating]) -> [Recipe] {
+        let index = CatalogIndexCache.warm(recipes: recipes, ratings: ratings)
+        let key = filterKey(indexKey: index.key, ratings: ratings)
+        if key == filteredKey {
+            return filteredRecipes
+        }
         let bySlug = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        let proteinBySlug = Dictionary(index.candidates.map { ($0.slug, $0.protein) }, uniquingKeysWith: { first, _ in first })
         let items = recipes.map { recipe in
             RecipeBrowseItem(
                 slug: recipe.slug,
@@ -39,7 +48,7 @@ final class RecipeListViewModel {
                 nameEN: recipe.nameEN,
                 country: recipe.country,
                 totalMinutes: recipe.totalMinutes,
-                protein: MealRecommender.proteinFamily(in: Self.orderedIDs(recipe)),
+                protein: proteinBySlug[recipe.slug] ?? "",
                 diets: Set(recipe.diets.map { $0.lowercased() }),
                 tags: Set(recipe.tags.map { $0.lowercased() }),
                 isLoved: ratings[recipe.slug] == .loved
@@ -51,7 +60,24 @@ final class RecipeListViewModel {
             cookTime: cookTime,
             lovedOnly: lovedOnly
         )
-        return RecipeBrowse.filter(items, query: query).compactMap { bySlug[$0.slug] }
+        let visible = RecipeBrowse.filter(items, query: query).compactMap { bySlug[$0.slug] }
+        filteredKey = key
+        filteredRecipes = visible
+        return visible
+    }
+
+    private func filterKey(indexKey: Int, ratings: [String: MealRating]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(indexKey)
+        hasher.combine(searchText)
+        hasher.combine(category.rawValue)
+        hasher.combine(cookTime.rawValue)
+        hasher.combine(lovedOnly)
+        for (slug, rating) in ratings.sorted(by: { $0.key < $1.key }) {
+            hasher.combine(slug)
+            hasher.combine(rating.rawValue)
+        }
+        return hasher.finalize()
     }
 
     func toggleFavorite(slug: String, isLoved: Bool, in context: ModelContext) {
@@ -61,14 +87,5 @@ final class RecipeListViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    private static func orderedIDs(_ recipe: Recipe) -> [String] {
-        recipe.ingredients
-            .sorted { lhs, rhs in
-                if lhs.sortIndex != rhs.sortIndex { return lhs.sortIndex < rhs.sortIndex }
-                return lhs.ingredientId < rhs.ingredientId
-            }
-            .map(\.ingredientId)
     }
 }

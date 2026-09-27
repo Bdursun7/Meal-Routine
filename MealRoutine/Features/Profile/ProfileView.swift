@@ -2,17 +2,41 @@ import SwiftData
 import SwiftUI
 
 struct ProfileView: View {
+    var isTabSelected: Bool
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system
     @Query private var prefs: [UserPrefs]
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
     @State private var viewModel = ProfileViewModel()
+    @State private var showsProfile = false
 
     var body: some View {
-        @Bindable var viewModel = self.viewModel
         NavigationStack {
-            Form {
+            Group {
+                if isTabSelected && showsProfile {
+                    profileForm
+                } else {
+                    Theme.canvas
+                }
+            }
+            .navigationTitle("Profil")
+        }
+        .task(id: isTabSelected) {
+            if !isTabSelected {
+                showsProfile = false
+                return
+            }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
+            showsProfile = true
+        }
+    }
+
+    private var profileForm: some View {
+        @Bindable var viewModel = self.viewModel
+        return Form {
                 Section("Ev") {
                     Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
@@ -176,6 +200,7 @@ struct ProfileView: View {
                     Link("theunitools.com/en/data", destination: Attribution.landingURL)
                     Link("CC BY-SA 4.0", destination: Attribution.licenseURL)
                     Text("Özet ve adımlar, UniTools metninin Türkçe yerelleştirmesidir. İngilizce kaynak metin katalogda durur.")
+                    Text("Özgün MealRoutine tarifleri ayrıca yazılmıştır. Bu satırlar UniTools lisansı taşımaz. Varsa fotoğrafları ayrı bir Commons kredisidir; yazar ve lisans tarif metninin lisansı değildir.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text("Tarif fotoğrafları katalogdaki yazar ve lisansla gösterilir. Açılmış bir fotoğraf cihazda kalır. Fotoğraf yoksa veya henüz indirilmediyse çatal-bıçak görseli durur. Hafta, market ve pişirme fotoğrafsız da çalışır.")
@@ -210,10 +235,6 @@ struct ProfileView: View {
             } message: {
                 Text("Bu işlem geri alınamaz. Kurulum yeniden açılır.")
             }
-        }
-        .onAppear {
-            viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
-        }
     }
 
     private var cookedCount: Int {

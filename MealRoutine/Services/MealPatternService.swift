@@ -15,9 +15,20 @@ enum MealPatternService {
         candidates: [PickerCandidate],
         dismissed: Set<String> = []
     ) -> [MealPattern] {
+        patterns(
+            memories: memories,
+            bySlug: Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first }),
+            dismissed: dismissed
+        )
+    }
+
+    static func patterns(
+        memories: [String: MealMemorySnapshot],
+        bySlug: [String: PickerCandidate],
+        dismissed: Set<String> = []
+    ) -> [MealPattern] {
         let points = MealMemoryReducer.dataPointCount(in: Array(memories.values))
         guard points >= minimumDataPoints else { return [] }
-        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         var found: [MealPattern] = []
 
         let cooked = memories.filter { $0.value.timesCooked > 0 }

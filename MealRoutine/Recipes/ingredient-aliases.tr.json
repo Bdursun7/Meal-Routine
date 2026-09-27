@@ -26,6 +26,8 @@
     "bayleaf": "Defne yaprağı",
     "bayleaves": "Defne yaprağı",
     "beans": "Fasulye",
+    "broadbeans": "İç bakla",
+    "chard": "Pazı",
     "beansprouts": "Filiz",
     "beef": "Dana eti",
     "beef-stock": "Et suyu",
@@ -375,7 +377,22 @@
     "cornmeal": "Mısır unu",
     "fat": "Yağ / iç yağı",
     "pandan": "Pandan",
-    "aji": "Aji biber"
+    "aji": "Aji biber",
+    "anchovy": "Hamsi",
+    "artichoke": "Enginar",
+    "borlotti": "Barbunya",
+    "cauliflower": "Karnabahar",
+    "grapeleaves": "Asma yaprağı",
+    "liver": "Ciğer",
+    "mackerel": "Palamut",
+    "okra": "Bamya",
+    "pastirma": "Pastırma",
+    "seabass": "Levrek",
+    "semolina": "İrmik",
+    "sucuk": "Sucuk",
+    "tarhana": "Tarhana",
+    "tripe": "İşkembe",
+    "vermicelli": "Şehriye"
   },
   "missingInCatalog": [
     [
