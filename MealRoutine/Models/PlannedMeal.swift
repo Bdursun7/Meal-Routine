@@ -15,6 +15,9 @@ final class PlannedMeal {
     var cookedAt: Date?
     /// Set when the household skips the evening. The recipe and grocery list stay.
     var skippedAt: Date? = nil
+    /// Title kept so a deleted import can still be read on an old week.
+    /// Empty on catalog meals, so a missing bundled slug still follows plan repair.
+    var titleSnapshot: String = ""
     var week: PlanWeek? = nil
 
     init(

@@ -104,6 +104,7 @@
 		3C9F8FDC5A5F16C9A231F436 /* DiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA1D3AAA34CB7C9D1D57998 /* DiscoveryViewModel.swift */; };
 		DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */; };
 		FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */; };
+		V3B0000000000000000001 /* RecipeImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000001 /* RecipeImportModels.swift */; };
 /* End PBXBuildFile section */
 
 
@@ -217,6 +218,7 @@
 		CCA1D3AAA34CB7C9D1D57998 /* DiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViewModel.swift; sourceTree = "<group>"; };
 		EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationCard.swift; sourceTree = "<group>"; };
 		C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedDiscoveryView.swift; sourceTree = "<group>"; };
+		V3F0000000000000000001 /* RecipeImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -373,6 +375,7 @@
 				FABB48411EB1369A5F3F64B8 /* PlannedMeal.swift */,
 				FACDB1564B1462C4B8C5E1CC /* PlanWeek.swift */,
 				FAAC7A39EB1D4DF07B47AD96 /* Recipe.swift */,
+				V3F0000000000000000001 /* RecipeImportModels.swift */,
 				FA362B238398434F12AECCDF /* RecipeFeedback.swift */,
 				FA0D7B28CCA94FA4D05063D0 /* RecipeStep.swift */,
 				FA3B95C884ACD24419941542 /* UserPrefs.swift */,
@@ -682,6 +685,7 @@
 				3C9F8FDC5A5F16C9A231F436 /* DiscoveryViewModel.swift in Sources */,
 				DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */,
 				FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */,
+				V3B0000000000000000001 /* RecipeImportModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

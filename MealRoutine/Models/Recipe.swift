@@ -35,6 +35,29 @@ final class Recipe {
     var photoAuthor: String
     var photoLicense: String
 
+    /// V3 import metadata. Existing catalog rows migrate as built-in.
+    /// Defaults keep the lightweight SwiftData migration compatible with V1/V2 stores.
+    var originRaw: String = RecipeOrigin.builtIn.rawValue
+    var sourceURL: String = ""
+    var sourceTitle: String = ""
+    var sourcePlatformRaw: String = ""
+    /// Stable id such as an Instagram shortcode. Empty when the source has none.
+    var sourceKey: String = ""
+    var importedAt: Date? = nil
+    var lastImportedAt: Date? = nil
+    var importStatusRaw: String = ""
+    var extractionConfidence: Double? = nil
+    var requiresReview: Bool = false
+    var isUserEdited: Bool = false
+    var userNotes: String = ""
+    /// True when the cook confirmed a recipe that still has no ingredient lines.
+    var confirmedMissingIngredients: Bool = false
+    /// True when the cook confirmed a recipe that still has no instruction steps.
+    var confirmedMissingInstructions: Bool = false
+    /// True when total time was not in the source and the cook has not set one.
+    /// Unknown time is not stored as zero minutes of cooking.
+    var timeIsUnknown: Bool = false
+
     @Relationship(deleteRule: .cascade, inverse: \IngredientLine.recipe)
     var ingredients: [IngredientLine] = []
 
@@ -115,5 +138,33 @@ final class Recipe {
 
     var ingredientIDs: Set<String> {
         Set(ingredients.map(\.ingredientId))
+    }
+
+    var origin: RecipeOrigin {
+        get { RecipeOrigin(rawValue: originRaw) ?? .builtIn }
+        set { originRaw = newValue.rawValue }
+    }
+
+    var sourcePlatform: RecipeSourcePlatform? {
+        get {
+            let raw = sourcePlatformRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty else { return nil }
+            return RecipeSourcePlatform(rawValue: raw)
+        }
+        set { sourcePlatformRaw = newValue?.rawValue ?? "" }
+    }
+
+    var importStatus: RecipeImportStatus? {
+        get {
+            let raw = importStatusRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty else { return nil }
+            return RecipeImportStatus(rawValue: raw)
+        }
+        set { importStatusRaw = newValue?.rawValue ?? "" }
+    }
+
+    /// Bundled UniTools and MealRoutine originals. User imports are never this.
+    var isBundledCatalog: Bool {
+        origin == .builtIn
     }
 }

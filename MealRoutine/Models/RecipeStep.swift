@@ -8,6 +8,9 @@ final class RecipeStep {
     var textTR: String
     var minutes: Int?
     var sortIndex: Int
+    /// V3. Catalog steps stay certain. Empty original text means there was no separate source line.
+    var isUncertain: Bool = false
+    var originalText: String = ""
     var recipe: Recipe? = nil
 
     init(
