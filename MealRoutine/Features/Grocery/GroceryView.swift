@@ -58,7 +58,7 @@ struct GroceryView: View {
         @Bindable var viewModel = self.viewModel
         let fullList = viewModel.presentation(weeks: weeks)
         let list = viewModel.applyingSearch(to: fullList)
-        List {
+        return List {
                 if fullList.isEmpty {
                     Section {
                         WarmEmptyState(
