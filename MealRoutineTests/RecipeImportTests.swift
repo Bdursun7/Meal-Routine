@@ -349,6 +349,45 @@ final class RecipeImportTests: XCTestCase {
         XCTAssertEqual(sorted.first?.slug, "imp")
     }
 
+    func testPlaceImportedRecipeLeavesCookedEveningsUntouched() throws {
+        UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey) }
+        let container = try ModelContainerFactory.make(inMemory: true)
+        let context = container.mainContext
+        let now = TestFixtures.now
+        let prefs = UserPrefs(householdSize: 2, hasCompletedOnboarding: true, createdAt: now)
+        context.insert(prefs)
+        let week = PlanWeek(weekStart: WeekCalendar.weekStart(containing: now), householdSize: 2, createdAt: now)
+        context.insert(week)
+        let today = WeekCalendar.dayOffset(for: now, weekStart: week.weekStart)
+        let other = today == 6 ? 0 : today + 1
+        let cooked = PlannedMeal(dayOffset: today, recipeSlug: "pilav", servings: 2, cookedAt: now)
+        let open = PlannedMeal(dayOffset: other, recipeSlug: "corba", servings: 2)
+        context.insert(cooked)
+        context.insert(open)
+        cooked.week = week
+        open.week = week
+        try context.save()
+
+        var document = sampleDocument(title: "Mercimek", ingredient: "mercimek")
+        document.origin = .imported
+        let saved = try RecipeImportService.save(document, in: context, now: now)
+        try WeekPlanService.placeImportedRecipe(slug: saved.slug, in: context, now: now)
+
+        let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
+        let cookedMeal = try XCTUnwrap(meals.first { $0.dayOffset == today })
+        let openMeal = try XCTUnwrap(meals.first { $0.dayOffset == other })
+        XCTAssertEqual(cookedMeal.recipeSlug, "pilav")
+        XCTAssertEqual(cookedMeal.cookedAt, now)
+        XCTAssertEqual(openMeal.recipeSlug, saved.slug)
+        XCTAssertEqual(openMeal.titleSnapshot, "Mercimek")
+        let displaced = try MealMemoryService.snapshots(in: context)["corba"]
+        XCTAssertEqual(displaced?.timesReplaced ?? 0, 0)
+        let imported = try XCTUnwrap(try MealMemoryService.snapshots(in: context)[saved.slug])
+        XCTAssertEqual(imported.timesCooked, 0)
+        XCTAssertFalse(imported.isFavorite)
+    }
+
     private func sampleDocument(title: String, ingredient: String) -> RecipeImportDocument {
         var document = RecipeImportDocument.emptyManual()
         document.title = title

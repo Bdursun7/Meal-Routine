@@ -93,8 +93,8 @@ struct RecipeDetailView: View {
 
     @ToolbarContentBuilder
     private func favoriteToolbar() -> some ToolbarContent {
-        if let recipe, !recipe.isBundledCatalog {
-            ToolbarItem(placement: .topBarLeading) {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if let recipe, !recipe.isBundledCatalog {
                 Menu {
                     Button("Düzenle") { showsImportEditor = true }
                     Button("Bu haftaya ekle") { placeOnCurrentWeek(recipe) }
@@ -102,11 +102,9 @@ struct RecipeDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
-                .accessibilityLabel("İçe aktarılan tarif")
+                .accessibilityLabel("Tarif işlemleri")
             }
-        }
-        if recipe != nil {
-            ToolbarItem(placement: .topBarTrailing) {
+            if recipe != nil {
                 favoriteHeart(isLoved: currentRating == .loved)
             }
         }
@@ -338,7 +336,6 @@ struct RecipeDetailView: View {
         }
     }
 
-    @ViewBuilder
     @ViewBuilder
     private func importSection(_ recipe: Recipe) -> some View {
         if !recipe.isBundledCatalog {

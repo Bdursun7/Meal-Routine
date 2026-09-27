@@ -4,8 +4,9 @@ import SwiftData
 enum WeekPlanError: LocalizedError {
     case noAlternative
     case missingPreferences
-    case notPlannable
-    case alreadyPlanned
+        case notPlannable
+        case alreadyPlanned
+        case noOpenEvening
 
     var errorDescription: String? {
         switch self {
@@ -17,6 +18,8 @@ enum WeekPlanError: LocalizedError {
             "Bu tarif plana eklenemiyor. Ad, malzeme veya yapılış eksik olabilir; ya da bir daha asla işaretli."
         case .alreadyPlanned:
             "Bu tarif bu haftada zaten var."
+        case .noOpenEvening:
+            "Bu haftanın açık akşamı kalmadı. Pişirilmiş akşamların üzerine yazılmaz."
         }
     }
 }
@@ -288,23 +291,14 @@ enum WeekPlanService {
         }
         let today = WeekCalendar.dayOffset(for: now, weekStart: week.weekStart)
         let ordered = week.meals.sorted { $0.dayOffset < $1.dayOffset }
-        guard let meal = ordered.first(where: { $0.dayOffset == today }) ?? ordered.first else {
-            throw WeekPlanError.notPlannable
+        let open = ordered.filter { $0.cookedAt == nil }
+        guard let meal = open.first(where: { $0.dayOffset == today }) ?? open.first else {
+            throw WeekPlanError.noOpenEvening
         }
         let plannedAt = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
         MealExposureLog.record([
-            RecentMealSighting(slug: meal.recipeSlug, at: meal.cookedAt ?? plannedAt, wasCooked: meal.cookedAt != nil),
+            RecentMealSighting(slug: meal.recipeSlug, at: plannedAt, wasCooked: false),
         ], now: now)
-        try BehaviorTrackingService.record(
-            .replaced,
-            recipeSlug: meal.recipeSlug,
-            at: now,
-            planWeekID: week.uuid,
-            plannedMealID: meal.uuid,
-            replacementReason: "import",
-            in: context,
-            saves: false
-        )
         let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
         for check in checks where check.mealUUID == meal.uuid {
             context.delete(check)
@@ -325,7 +319,6 @@ enum WeekPlanService {
         try context.save()
         GroceryListService.discardRebuildCache()
         try GroceryListService.rebuild(in: context, now: now)
-        Analytics.track(.mealReplaced)
         trackImportedOutcome(.importedRecipeAddedToPlan, slug: trimmed, in: context)
     }
 

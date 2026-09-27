@@ -355,6 +355,7 @@ struct ImportFlowView: View {
     @Query private var recipes: [Recipe]
     @State private var viewModel = ImportViewModel()
     @State private var didPrepare = false
+    @State private var confirmManualReset = false
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -391,6 +392,14 @@ struct ImportFlowView: View {
             Button("Tamam", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        .alert("Elle girişe geçilsin mi?", isPresented: $confirmManualReset) {
+            Button("Elle gir", role: .destructive) {
+                viewModel.startManual(keepingSource: true)
+            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("Çıkarılan metin silinir. Kaynak adresi durur.")
         }
         .alert("Tarif kaydedilsin mi?", isPresented: $viewModel.confirmSave) {
             Button("Kaydet") {
@@ -585,7 +594,7 @@ struct ImportFlowView: View {
                 Button("Taslak olarak sakla") {
                     viewModel.saveDraft(in: modelContext, drafts: drafts)
                 }
-                Button("Elle gir") { viewModel.startManual(keepingSource: true) }
+                Button("Elle gir") { beginManualEntry() }
                 if !viewModel.document.sourceURL.isEmpty {
                     Button("Yeniden dene") {
                         viewModel.urlText = viewModel.document.sourceURL
@@ -818,6 +827,21 @@ struct ImportFlowView: View {
     private func reindexSteps() {
         for index in viewModel.document.instructions.indices {
             viewModel.document.instructions[index].sortOrder = index
+        }
+    }
+
+    private func beginManualEntry() {
+        let title = viewModel.document.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasIngredient = viewModel.document.ingredients.contains {
+            !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let hasStep = viewModel.document.instructions.contains {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        if title.isEmpty && !hasIngredient && !hasStep {
+            viewModel.startManual(keepingSource: true)
+        } else {
+            confirmManualReset = true
         }
     }
 
