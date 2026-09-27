@@ -51,7 +51,8 @@ struct RootView: View {
         isSeeding = true
         seedError = nil
         do {
-            try RecipeSeedService.seedIfNeeded(context: modelContext)
+            try await RecipeSeedService.seedIfNeeded(context: modelContext)
+            try CatalogIndexCache.warm(in: modelContext)
             isSeeding = false
         } catch {
             seedError = error.localizedDescription

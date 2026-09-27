@@ -2,17 +2,41 @@ import SwiftData
 import SwiftUI
 
 struct ProfileView: View {
+    var isTabSelected: Bool
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system
     @Query private var prefs: [UserPrefs]
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
     @State private var viewModel = ProfileViewModel()
+    @State private var showsProfile = false
 
     var body: some View {
-        @Bindable var viewModel = self.viewModel
         NavigationStack {
-            Form {
+            Group {
+                if isTabSelected && showsProfile {
+                    profileForm
+                } else {
+                    Theme.canvas
+                }
+            }
+            .navigationTitle("Profil")
+        }
+        .task(id: isTabSelected) {
+            if !isTabSelected {
+                showsProfile = false
+                return
+            }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
+            showsProfile = true
+        }
+    }
+
+    private var profileForm: some View {
+        @Bindable var viewModel = self.viewModel
+        Form {
                 Section("Ev") {
                     Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
@@ -211,10 +235,6 @@ struct ProfileView: View {
             } message: {
                 Text("Bu işlem geri alınamaz. Kurulum yeniden açılır.")
             }
-        }
-        .onAppear {
-            viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
-        }
     }
 
     private var cookedCount: Int {

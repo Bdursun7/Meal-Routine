@@ -8,10 +8,25 @@ enum RecommendationReasonService {
         profile: TasteProfile,
         catalog: [PickerCandidate]
     ) -> String? {
+        personalReason(
+            for: candidate,
+            memory: memory,
+            profile: profile,
+            catalogBySlug: Dictionary(catalog.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        )
+    }
+
+    /// `catalogBySlug` is built once for the screen. The array overload rebuilds it per call.
+    static func personalReason(
+        for candidate: PickerCandidate,
+        memory: MealMemorySnapshot?,
+        profile: TasteProfile,
+        catalogBySlug: [String: PickerCandidate]
+    ) -> String? {
         if let memory, memory.lovedCount > 0 {
             return "Bunu daha önce sevmiştin"
         }
-        if let similar = similarLovedLabel(for: candidate, profile: profile, catalog: catalog) {
+        if let similar = similarLovedLabel(for: candidate, profile: profile, bySlug: catalogBySlug) {
             return similar
         }
         if let memory, memory.timesCooked >= 2 {
@@ -61,10 +76,9 @@ enum RecommendationReasonService {
     private static func similarLovedLabel(
         for candidate: PickerCandidate,
         profile: TasteProfile,
-        catalog: [PickerCandidate]
+        bySlug: [String: PickerCandidate]
     ) -> String? {
         guard profile.lovedSlugs.contains(where: { $0 != candidate.slug }) else { return nil }
-        let bySlug = Dictionary(catalog.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         for slug in profile.lovedSlugs where slug != candidate.slug {
             guard let other = bySlug[slug] else { continue }
             if sharesShape(candidate, other) {

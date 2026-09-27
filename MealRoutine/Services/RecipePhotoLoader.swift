@@ -6,7 +6,8 @@ import FoundationNetworking
 /// Disk cache for catalog photos.
 ///
 /// Files live under Caches/RecipePhotos. The system may delete that directory.
-/// There is no in-app eviction list; a full pass of the catalog is about 14 MB.
+/// There is no in-app eviction list. Commons originals are stored as thumbnails
+/// instead of the full upload.
 enum RecipePhotoDiskCache {
     static func defaultDirectory() -> URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
@@ -47,7 +48,12 @@ enum RecipePhotoDiskCache {
 /// the screen keeps the placeholder and the rest of the app does not wait on it.
 enum RecipePhotoLoader {
     /// Larger than every bundled photo (the biggest is about 220 KB).
+    /// Also larger than a 960 px Commons thumbnail, so a full original that slipped
+    /// past the rendition step is still refused.
     static let maxBytes = 8_000_000
+    /// Visible rows plus a little prefetch. The catalog has 195 photos; opening
+    /// Tarifler used to start one request per row with no cap.
+    static let maxConcurrentFetches = 3
     /// Cloudflare rejects some default agents. This one is accepted for the catalog JPEGs.
     static let userAgent = "MealRoutine/1.0 (iOS; recipe-photo)"
 
@@ -57,22 +63,52 @@ enum RecipePhotoLoader {
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 30
+        configuration.httpMaximumConnectionsPerHost = maxConcurrentFetches
         // Default waitsForConnectivity is false, so a missing network fails into the placeholder
         // instead of holding the photo task open.
         return URLSession(configuration: configuration)
     }()
 
+    private static let fetchGate = RecipePhotoFetchGate(limit: maxConcurrentFetches)
+
     static func load(
         remoteURL: URL,
+        maxPixel: Int = RecipePhoto.heroMaxPixel,
         session: URLSession = RecipePhotoLoader.session,
         directory: URL = RecipePhotoDiskCache.defaultDirectory()
     ) async -> Data? {
-        if let cached = RecipePhotoDiskCache.read(remoteURL: remoteURL, directory: directory),
-           cached.count <= maxBytes,
-           RecipePhoto.isSupportedImageData(cached) {
+        let fetchURL = RecipePhoto.deliveryURL(for: remoteURL, maxPixel: maxPixel)
+        if let cached = await cachedImageData(for: fetchURL, directory: directory) {
             return cached
         }
+        return await fetchGate.withSlot {
+            if Task.isCancelled { return nil }
+            if let cached = await cachedImageData(for: fetchURL, directory: directory) {
+                return cached
+            }
+            return await fetchAndStore(fetchURL, session: session, directory: directory)
+        }
+    }
 
+    /// Disk hits used to run on the main actor: `load` is async, and the read sat
+    /// before the first await, so every visible row read its file during the tab animation.
+    private static func cachedImageData(for remoteURL: URL, directory: URL) async -> Data? {
+        let limit = maxBytes
+        return await Task.detached(priority: .utility) {
+            guard let cached = RecipePhotoDiskCache.read(remoteURL: remoteURL, directory: directory),
+                  cached.count <= limit,
+                  RecipePhoto.isSupportedImageData(cached) else {
+                return nil
+            }
+            return cached
+        }.value
+    }
+
+    private static func fetchAndStore(
+        _ remoteURL: URL,
+        session: URLSession,
+        directory: URL
+    ) async -> Data? {
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 20
@@ -90,10 +126,57 @@ enum RecipePhotoLoader {
             guard data.count <= maxBytes, RecipePhoto.isSupportedImageData(data) else {
                 return nil
             }
-            RecipePhotoDiskCache.write(data, remoteURL: remoteURL, directory: directory)
+            let stored = data
+            await Task.detached(priority: .utility) {
+                RecipePhotoDiskCache.write(stored, remoteURL: remoteURL, directory: directory)
+            }.value
             return data
         } catch {
             return nil
+        }
+    }
+}
+
+/// Caps simultaneous photo downloads. A cache hit does not take a slot.
+/// A cancelled row stays in the queue until a slot frees, then hands that slot
+/// to the next row. Removing it early can drop the wakeup.
+private actor RecipePhotoFetchGate {
+    private let limit: Int
+    private var inFlight = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) {
+        self.limit = max(limit, 1)
+    }
+
+    func withSlot(_ body: @Sendable () async -> Data?) async -> Data? {
+        guard await acquire() else { return nil }
+        let value = await body()
+        release()
+        return value
+    }
+
+    private func acquire() async -> Bool {
+        if Task.isCancelled { return false }
+        if inFlight < limit {
+            inFlight += 1
+            return true
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+        if Task.isCancelled {
+            release()
+            return false
+        }
+        return true
+    }
+
+    private func release() {
+        if !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        } else {
+            inFlight -= 1
         }
     }
 }

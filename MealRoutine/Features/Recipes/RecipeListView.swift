@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct RecipeListView: View {
+    var isTabSelected: Bool
     @Environment(\.modelContext) private var modelContext
     @Query private var recipes: [Recipe]
     @Query private var feedback: [RecipeFeedback]
@@ -9,14 +10,54 @@ struct RecipeListView: View {
     @Query private var prefs: [UserPrefs]
     @State private var viewModel = RecipeListViewModel()
     @State private var discovery = DiscoveryViewModel()
+    @State private var allowsPhotos = false
+    @State private var showsCatalog = false
+    @State private var scrolledSlug: String?
 
     var body: some View {
+        NavigationStack {
+            Group {
+                if isTabSelected && showsCatalog {
+                    selectedCatalog
+                } else {
+                    Theme.canvas
+                }
+            }
+            .navigationTitle("Tarifler")
+            .navigationDestination(for: RecipeRoute.self) { route in
+                RecipeDetailView(route: route, allowsCookBar: false)
+            }
+            .alert("Kaydedilemedi", isPresented: alertIsPresented) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
+        }
+        .task(id: isTabSelected) {
+            if !isTabSelected {
+                showsCatalog = false
+                allowsPhotos = false
+                return
+            }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            showsCatalog = true
+            try? await Task.sleep(for: TabSwitchTiming.settle)
+            guard !Task.isCancelled else { return }
+            allowsPhotos = true
+            if !discoverySections.isEmpty {
+                Analytics.trackOnce(.personalizedRecommendationViewed)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectedCatalog: some View {
         @Bindable var viewModel = self.viewModel
         let ratings = FeedbackIndex.latestRatings(in: feedback)
         let visible = viewModel.filtered(recipes, ratings: ratings)
-        NavigationStack {
-            Group {
-                if recipes.isEmpty {
+        Group {
+            if recipes.isEmpty {
                     WarmEmptyState(
                         title: "Tarifler yolda",
                         message: "Katalog açılınca akşam yemekleri burada listelenir.",
@@ -35,7 +76,7 @@ struct RecipeListView: View {
                             )
                         }
                         if !viewModel.hasActiveFilters {
-                            PersonalizedDiscoveryView(sections: discoverySections) { slug in
+                            PersonalizedDiscoveryView(sections: discoverySections, loadsPhoto: allowsPhotos) { slug in
                                 recipes.first { $0.slug == slug }
                             }
                         }
@@ -45,10 +86,11 @@ struct RecipeListView: View {
                             }
                         } else {
                             Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
-                                ForEach(visible) { recipe in
+                                ForEach(visible, id: \.slug) { recipe in
                                     RecipeListRow(
                                         recipe: recipe,
                                         isLoved: ratings[recipe.slug] == .loved,
+                                        loadsPhoto: allowsPhotos,
                                         onToggleFavorite: {
                                             viewModel.toggleFavorite(
                                                 slug: recipe.slug,
@@ -67,22 +109,8 @@ struct RecipeListView: View {
                         placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "Tarif ara"
                     )
+                    .scrollPosition(id: $scrolledSlug)
                 }
-            }
-            .navigationTitle("Tarifler")
-            .onAppear {
-                if !discoverySections.isEmpty {
-                    Analytics.trackOnce(.personalizedRecommendationViewed)
-                }
-            }
-            .navigationDestination(for: RecipeRoute.self) { route in
-                RecipeDetailView(route: route, allowsCookBar: false)
-            }
-            .alert("Kaydedilemedi", isPresented: alertIsPresented) {
-                Button("Tamam", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
         }
     }
 
@@ -192,6 +220,7 @@ private struct RecipeFilterBar: View {
 private struct RecipeListRow: View {
     var recipe: Recipe
     var isLoved: Bool
+    var loadsPhoto: Bool
     var onToggleFavorite: () -> Void
     @State private var isPhotoShown = false
 
@@ -204,6 +233,7 @@ private struct RecipeListRow: View {
                         author: recipe.photoAuthor,
                         license: recipe.photoLicense,
                         layout: .thumbnail,
+                        loadsPhoto: loadsPhoto,
                         isPhotoShown: $isPhotoShown
                     )
                     VStack(alignment: .leading, spacing: 4) {

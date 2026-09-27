@@ -107,6 +107,46 @@ private func checkURLPolicy() {
     check(commons?.host == "upload.wikimedia.org", "wikimedia upload host allowed")
     check(RecipePhoto.remoteURL(from: "https://example.com/a.jpg") == nil, "unknown host rejected")
     check(RecipePhoto.remoteURL(from: "https://thumb.wikimedia.org/a.jpg") == nil, "thumb CDN host rejected")
+
+    let uni = URL(string: "https://theunitools.com/recipes/menemen.jpg")!
+    check(RecipePhoto.deliveryURL(for: uni, maxPixel: 320) == uni, "unitools url is not a commons rendition")
+
+    let original = URL(string: "https://upload.wikimedia.org/wikipedia/commons/d/d6/Joojeh-kabab.JPG")!
+    let hero = RecipePhoto.deliveryURL(for: original, maxPixel: RecipePhoto.heroMaxPixel)
+    check(
+        hero.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Joojeh-kabab.JPG/960px-Joojeh-kabab.JPG",
+        "commons original becomes a 960 thumbnail, got \(hero.absoluteString)"
+    )
+    let row = RecipePhoto.deliveryURL(for: original, maxPixel: RecipePhoto.thumbnailMaxPixel)
+    check(
+        row.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Joojeh-kabab.JPG/320px-Joojeh-kabab.JPG",
+        "list row asks for 320, got \(row.absoluteString)"
+    )
+
+    let encoded = URL(string: "https://upload.wikimedia.org/wikipedia/commons/5/5c/%C4%B0%C3%A7li_k%C3%B6fte.png")!
+    let encodedThumb = RecipePhoto.deliveryURL(for: encoded, maxPixel: 320)
+    check(
+        encodedThumb.absoluteString.contains("/thumb/5/5c/")
+            && encodedThumb.absoluteString.contains("320px-")
+            && encodedThumb.absoluteString.contains("%C4%B0%C3%A7li_k%C3%B6fte.png"),
+        "encoded commons filename survives the rendition, got \(encodedThumb.absoluteString)"
+    )
+
+    let wide = URL(string: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Ojja_merguez%2C_Tunisie%2C_avril_2019.jpg/960px-Ojja_merguez%2C_Tunisie%2C_avril_2019.jpg")!
+    check(
+        RecipePhoto.deliveryURL(for: wide, maxPixel: 960).absoluteString == wide.absoluteString,
+        "960 thumbnail stays when 960 is enough"
+    )
+    let narrowed = RecipePhoto.deliveryURL(for: wide, maxPixel: 320)
+    check(
+        narrowed.absoluteString.hasSuffix("/320px-Ojja_merguez%2C_Tunisie%2C_avril_2019.jpg"),
+        "wider thumbnail is narrowed, got \(narrowed.absoluteString)"
+    )
+    let odd = URL(string: "https://upload.wikimedia.org/wikipedia/commons/extra/d/d6/File.jpg")!
+    check(
+        RecipePhoto.deliveryURL(for: odd, maxPixel: 320).absoluteString == odd.absoluteString,
+        "unrecognized commons path is left alone"
+    )
 }
 
 private func checkImageSniff() {
@@ -158,6 +198,7 @@ private final class StubPhotoProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var hits = 0
     nonisolated(unsafe) static var lastAgent: String?
+    nonisolated(unsafe) static var lastURL: URL?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
 
@@ -166,6 +207,7 @@ private final class StubPhotoProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         Self.hits += 1
         Self.lastAgent = request.value(forHTTPHeaderField: "User-Agent")
+        Self.lastURL = request.url
         let url = request.url ?? URL(string: "https://theunitools.com/")!
         let response = HTTPURLResponse(
             url: url,
@@ -236,6 +278,35 @@ private func checkLoader() async {
     let huge = await RecipePhotoLoader.load(remoteURL: hugeURL, session: session, directory: directory)
     check(huge == nil, "oversized body is refused")
     check(RecipePhotoDiskCache.read(remoteURL: hugeURL, directory: directory) == nil, "oversized body was not cached")
+
+    let commons = URL(string: "https://upload.wikimedia.org/wikipedia/commons/d/d6/Joojeh-kabab.JPG")!
+    let expectedThumb = RecipePhoto.deliveryURL(for: commons, maxPixel: RecipePhoto.thumbnailMaxPixel)
+    StubPhotoProtocol.status = 200
+    StubPhotoProtocol.body = jpeg
+    StubPhotoProtocol.hits = 0
+    StubPhotoProtocol.lastURL = nil
+    let commonsLoaded = await RecipePhotoLoader.load(
+        remoteURL: commons,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(commonsLoaded == jpeg, "commons rendition returns the body")
+    check(StubPhotoProtocol.hits == 1, "commons rendition fetched once")
+    check(StubPhotoProtocol.lastURL == expectedThumb, "loader fetches the thumbnail, got \(StubPhotoProtocol.lastURL?.absoluteString ?? "nil")")
+    check(
+        RecipePhotoDiskCache.read(remoteURL: expectedThumb, directory: directory) == jpeg,
+        "thumbnail bytes are cached under the rendition url"
+    )
+    StubPhotoProtocol.hits = 0
+    let commonsCached = await RecipePhotoLoader.load(
+        remoteURL: commons,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(commonsCached == jpeg, "commons rendition is served from disk")
+    check(StubPhotoProtocol.hits == 0, "cached rendition does not use the network")
 }
 
 @main

@@ -29,11 +29,11 @@ final class MealMemoryViewModel {
         prefs: UserPrefs?
     ) -> MealMemorySummary {
         let names = Dictionary(recipes.map { ($0.slug, $0.displayName) }, uniquingKeysWith: { first, _ in first })
-        let catalog = WeekPlanService.pickerCandidates(
-            from: recipes,
+        let index = CatalogIndexCache.warm(
+            recipes: recipes,
             ratings: FeedbackIndex.latestRatings(in: feedback)
         )
-        let bySlug = Dictionary(catalog.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        let bySlug = index.bySlug
         let snapshots = memories.map(\.snapshot)
         let map = Dictionary(snapshots.map { ($0.recipeID, $0) }, uniquingKeysWith: { first, _ in first })
         func label(_ slug: String) -> String { names[slug] ?? slug }
@@ -93,17 +93,11 @@ final class MealMemoryViewModel {
         }
 
         let disliked = prefs?.dislikedIngredientIds ?? []
-        var ingredientNames: [String: String] = [:]
-        for recipe in recipes {
-            for line in recipe.ingredients where ingredientNames[line.ingredientId] == nil {
-                ingredientNames[line.ingredientId] = line.displayName
-            }
-        }
-        let avoided = disliked.map { ingredientNames[$0] ?? $0 }
+        let avoided = disliked.map { index.ingredientNames[$0] ?? $0 }
 
         let patterns = MealPatternService.patterns(
             memories: map,
-            candidates: catalog,
+            bySlug: bySlug,
             dismissed: Set(prefs?.dismissedPatternIDs ?? [])
         )
         let points = MealMemoryReducer.dataPointCount(in: snapshots)
