@@ -36,7 +36,7 @@ struct ProfileView: View {
 
     private var profileForm: some View {
         @Bindable var viewModel = self.viewModel
-        Form {
+        return Form {
                 Section("Ev") {
                     Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
