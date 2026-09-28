@@ -16,10 +16,10 @@ struct MealRoutineApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .onOpenURL { url in
+                    ImportInboxRouter.shared.handleOpenURL(url)
+                }
         }
         .modelContainer(container)
-        .onOpenURL { url in
-            ImportInboxRouter.shared.handleOpenURL(url)
-        }
     }
 }
