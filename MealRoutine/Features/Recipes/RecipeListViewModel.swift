@@ -50,9 +50,9 @@ final class RecipeListViewModel {
         let bySlug = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let proteinBySlug = Dictionary(index.candidates.map { ($0.slug, $0.protein) }, uniquingKeysWith: { first, _ in first })
         let memoryBySlug = Dictionary(memories.map { ($0.recipeSlug, $0) }, uniquingKeysWith: { first, _ in first })
-        let items = recipes.map { recipe in
+        let items: [RecipeBrowseItem] = recipes.map { recipe in
             let memory = memoryBySlug[recipe.slug]
-            RecipeBrowseItem(
+            return RecipeBrowseItem(
                 slug: recipe.slug,
                 displayName: recipe.displayName,
                 nameEN: recipe.nameEN,
