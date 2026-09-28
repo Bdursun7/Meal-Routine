@@ -80,7 +80,7 @@ final class RecipeListViewModel {
             library: library,
             sort: sort
         )
-        let visible = RecipeBrowse.filter(items, query: query).compactMap { bySlug[$0.slug] }
+        let visible = RecipeBrowse.filter(items as! [RecipeBrowseItem], query: query).compactMap { bySlug[$0.slug] }
         filteredKey = key
         filteredRecipes = visible
         return visible
