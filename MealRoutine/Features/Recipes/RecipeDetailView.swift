@@ -410,6 +410,7 @@ struct RecipeDetailView: View {
         )
     }
 
+    @ViewBuilder
     private func summarySection(_ recipe: Recipe) -> some View {
         if !recipe.displaySummary.isEmpty {
             Section("Özet") {
