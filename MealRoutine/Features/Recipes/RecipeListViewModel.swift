@@ -52,7 +52,6 @@ final class RecipeListViewModel {
         let memoryBySlug = Dictionary(memories.map { ($0.recipeSlug, $0) }, uniquingKeysWith: { first, _ in first })
         let items = recipes.map { recipe in
             let memory = memoryBySlug[recipe.slug]
-            let ingredientBlob = recipe.ingredients.map(\.displayName).joined(separator: " ")
             RecipeBrowseItem(
                 slug: recipe.slug,
                 displayName: recipe.displayName,
@@ -68,8 +67,7 @@ final class RecipeListViewModel {
                 importedAt: recipe.importedAt,
                 lastCookedAt: memory?.lastCookedAt,
                 timesCooked: memory?.timesCooked ?? 0,
-                searchBlob: [ingredientBlob, recipe.category, recipe.sourceTitle, recipe.userNotes]
-                    .joined(separator: " ")
+                searchBlob: index.searchBlobs[recipe.slug] ?? ""
             )
         }
         let query = RecipeBrowseQuery(
@@ -80,7 +78,7 @@ final class RecipeListViewModel {
             library: library,
             sort: sort
         )
-        let visible = RecipeBrowse.filter(items as! [RecipeBrowseItem], query: query).compactMap { bySlug[$0.slug] }
+        let visible = RecipeBrowse.filter(items, query: query).compactMap { bySlug[$0.slug] }
         filteredKey = key
         filteredRecipes = visible
         return visible

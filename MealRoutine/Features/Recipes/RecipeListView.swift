@@ -28,6 +28,18 @@ struct RecipeListView: View {
             .navigationTitle("Tarifler")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sıralama", selection: sortBinding) {
+                            ForEach(RecipeLibrarySort.allCases) { item in
+                                Text(item.title).tag(item)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .accessibilityLabel("Sıralama")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showsImport = true
                     } label: {
@@ -71,6 +83,7 @@ struct RecipeListView: View {
         @Bindable var viewModel = self.viewModel
         let ratings = FeedbackIndex.latestRatings(in: feedback)
         let visible = viewModel.filtered(recipes, ratings: ratings, memories: memories)
+        let memoryBySlug = Dictionary(memories.map { ($0.recipeSlug, $0) }, uniquingKeysWith: { first, _ in first })
         Group {
             if recipes.isEmpty {
                     WarmEmptyState(
@@ -87,7 +100,6 @@ struct RecipeListView: View {
                                 cookTime: $viewModel.cookTime,
                                 lovedOnly: $viewModel.lovedOnly,
                                 library: $viewModel.library,
-                                sort: $viewModel.sort,
                                 showsClear: viewModel.hasActiveFilters,
                                 onClear: viewModel.clearFilters
                             )
@@ -109,7 +121,7 @@ struct RecipeListView: View {
                                 recipeSearchEmpty
                             }
                         } else {
-                            recipeSections(visible, ratings: ratings)
+                            recipeSections(visible, ratings: ratings, memoryBySlug: memoryBySlug)
                         }
                     }
                     .mealCanvas()
@@ -133,32 +145,40 @@ struct RecipeListView: View {
     }
 
     @ViewBuilder
-    private func recipeSections(_ visible: [Recipe], ratings: [String: MealRating]) -> some View {
+    private func recipeSections(
+        _ visible: [Recipe],
+        ratings: [String: MealRating],
+        memoryBySlug: [String: MealMemory]
+    ) -> some View {
         let showGroups = viewModel.library == .all && !viewModel.hasSearchText && viewModel.category == .all
         if showGroups {
             let imported = visible.filter { !$0.isBundledCatalog }
             let bundled = visible.filter(\.isBundledCatalog)
             if !imported.isEmpty {
                 Section("İçe aktarılan tariflerin") {
-                    recipeRows(imported, ratings: ratings)
+                    recipeRows(imported, ratings: ratings, memoryBySlug: memoryBySlug)
                 }
             }
             if !bundled.isEmpty {
                 Section(viewModel.hasChipFilters ? "Sonuçlar" : "Katalog") {
-                    recipeRows(bundled, ratings: ratings)
+                    recipeRows(bundled, ratings: ratings, memoryBySlug: memoryBySlug)
                 }
             }
         } else {
             Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
-                recipeRows(visible, ratings: ratings)
+                recipeRows(visible, ratings: ratings, memoryBySlug: memoryBySlug)
             }
         }
     }
 
     @ViewBuilder
-    private func recipeRows(_ recipes: [Recipe], ratings: [String: MealRating]) -> some View {
+    private func recipeRows(
+        _ recipes: [Recipe],
+        ratings: [String: MealRating],
+        memoryBySlug: [String: MealMemory]
+    ) -> some View {
         ForEach(recipes, id: \.slug) { recipe in
-            let memory = memories.first { $0.recipeSlug == recipe.slug }
+            let memory = memoryBySlug[recipe.slug]
             RecipeListRow(
                 recipe: recipe,
                 isLoved: ratings[recipe.slug] == .loved,
@@ -204,6 +224,13 @@ struct RecipeListView: View {
         .listRowBackground(Theme.cardSurface)
     }
 
+    private var sortBinding: Binding<RecipeLibrarySort> {
+        Binding(
+            get: { viewModel.sort },
+            set: { viewModel.sort = $0 }
+        )
+    }
+
     private var alertIsPresented: Binding<Bool> {
         Binding(
             get: { viewModel.errorMessage != nil },
@@ -219,7 +246,6 @@ private struct RecipeFilterBar: View {
     @Binding var cookTime: RecipeCookTimeFilter
     @Binding var lovedOnly: Bool
     @Binding var library: RecipeLibraryScope
-    @Binding var sort: RecipeLibrarySort
     var showsClear: Bool
     var onClear: () -> Void
 
@@ -250,12 +276,6 @@ private struct RecipeFilterBar: View {
                     }
                 }
             }
-            Picker("Sıralama", selection: $sort) {
-                ForEach(RecipeLibrarySort.allCases) { item in
-                    Text(item.title).tag(item)
-                }
-            }
-            .pickerStyle(.menu)
 
             Text("Süre ve favoriler")
                 .font(.caption.weight(.semibold))

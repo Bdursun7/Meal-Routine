@@ -542,6 +542,9 @@ struct CatalogIndex: Equatable, Sendable {
     var bySlug: [String: PickerCandidate]
     var displayNames: [String: String]
     var ingredientNames: [String: String]
+    /// Ingredient names plus import source fields, built with the index.
+    /// The recipe list must not walk `recipe.ingredients` again while the tab appears.
+    var searchBlobs: [String: String] = [:]
 }
 
 @MainActor
@@ -551,6 +554,7 @@ enum CatalogIndexCache {
         var candidates: [PickerCandidate]
         var displayNames: [String: String]
         var ingredientNames: [String: String]
+        var searchBlobs: [String: String]
     }
 
     private static var base: Base?
@@ -600,18 +604,32 @@ enum CatalogIndexCache {
         let unrated = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
         var displayNames: [String: String] = [:]
         var ingredientNames: [String: String] = [:]
+        var searchBlobs: [String: String] = [:]
         displayNames.reserveCapacity(recipes.count)
+        searchBlobs.reserveCapacity(recipes.count)
         for recipe in recipes {
             displayNames[recipe.slug] = recipe.displayName
-            for line in recipe.ingredients where ingredientNames[line.ingredientId] == nil {
-                ingredientNames[line.ingredientId] = line.displayName
+            var ingredientBlob: [String] = []
+            ingredientBlob.reserveCapacity(recipe.ingredients.count)
+            for line in recipe.ingredients {
+                if ingredientNames[line.ingredientId] == nil {
+                    ingredientNames[line.ingredientId] = line.displayName
+                }
+                ingredientBlob.append(line.displayName)
             }
+            searchBlobs[recipe.slug] = [
+                ingredientBlob.joined(separator: " "),
+                recipe.category,
+                recipe.sourceTitle,
+                recipe.userNotes,
+            ].joined(separator: " ")
         }
         let built = Base(
             key: key,
             candidates: unrated,
             displayNames: displayNames,
-            ingredientNames: ingredientNames
+            ingredientNames: ingredientNames,
+            searchBlobs: searchBlobs
         )
         base = built
         unratedIndex = makeIndex(from: built, candidates: unrated)
@@ -647,7 +665,8 @@ enum CatalogIndexCache {
             candidates: candidates,
             bySlug: Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first }),
             displayNames: base.displayNames,
-            ingredientNames: base.ingredientNames
+            ingredientNames: base.ingredientNames,
+            searchBlobs: base.searchBlobs
         )
     }
 

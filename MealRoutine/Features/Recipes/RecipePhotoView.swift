@@ -53,46 +53,49 @@ struct RecipePhotoView: View {
     }
 
     var body: some View {
-        Color.clear
-            .frame(maxWidth: fillsWidth ? .infinity : side)
-            .frame(width: fillsWidth ? nil : side, height: layout == .backdrop ? nil : side)
-            .frame(minHeight: layout == .backdrop ? 180 : nil)
-            .overlay {
-                ZStack {
-                    if layout == .hero || layout == .backdrop {
-                        LinearGradient(
-                            colors: [Theme.accent.opacity(0.92), Theme.accent.opacity(0.55), Theme.sage.opacity(0.85)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    } else {
-                        Theme.accent.opacity(0.16)
-                    }
-                    if let image, phase == .shown {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        placeholderMark
-                    }
-                    if phase == .loading, layout == .hero || layout == .backdrop {
-                        ProgressView()
-                            .tint(Theme.onAccent)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    }
-                }
+        ZStack {
+            if layout == .hero || layout == .backdrop {
+                LinearGradient(
+                    colors: [Theme.accent.opacity(0.92), Theme.accent.opacity(0.55), Theme.sage.opacity(0.85)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                Theme.accent.opacity(0.16)
             }
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilityText)
-            .accessibilityAddTraits(phase == .shown ? .isImage : [])
-            .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
-            .task(id: loadsPhoto ? urlString : "") {
-                guard loadsPhoto else { return }
-                await load()
+            if let image, phase == .shown, canDrawBitmap(image) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(minWidth: 1, minHeight: 1)
+            } else {
+                placeholderMark
             }
+            if phase == .loading, layout == .hero || layout == .backdrop {
+                ProgressView()
+                    .tint(Theme.onAccent)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
+        }
+        .frame(minWidth: fillsWidth ? nil : side, minHeight: fixedHeight)
+        .frame(width: fillsWidth ? nil : side, height: layout == .backdrop ? nil : fixedHeight)
+        .frame(maxWidth: fillsWidth ? .infinity : side, minHeight: fixedHeight)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityAddTraits(phase == .shown ? .isImage : [])
+        .task(id: loadsPhoto ? urlString : "") {
+            guard loadsPhoto else { return }
+            await load()
+        }
+    }
+
+    /// A list cell can be measured at the full row width and height 0.
+    /// A bitmap with either edge at 0 is the slot Core Animation refuses to create.
+    private func canDrawBitmap(_ image: UIImage) -> Bool {
+        image.size.width > 0 && image.size.height > 0 && fixedHeight > 0
     }
 
     private var fillsWidth: Bool {
@@ -108,6 +111,15 @@ struct RecipePhotoView: View {
     }
 
     private var side: CGFloat {
+        switch layout {
+        case .hero, .backdrop: fixedHeight
+        case .thumbnail: 64
+        case .plate: 72
+        }
+    }
+
+    /// Positive on every layout. Backdrop may grow taller; it never collapses to 0.
+    private var fixedHeight: CGFloat {
         switch layout {
         case .hero: 220
         case .thumbnail: 64
@@ -182,7 +194,7 @@ struct RecipePhotoView: View {
         let maxPixel = CGFloat(fetchMaxPixel)
         let decoded = await RecipePhotoDecodeGate.shared.image(from: data, maxPixel: maxPixel)
         guard !Task.isCancelled else { return }
-        guard let decoded else {
+        guard let decoded, decoded.size.width > 0, decoded.size.height > 0 else {
             RecipePhotoDiskCache.remove(
                 remoteURL: remoteURL,
                 directory: RecipePhotoDiskCache.defaultDirectory()
@@ -300,6 +312,7 @@ private actor RecipePhotoDecodeGate {
 
 private enum RecipePhotoDecoder {
     static func image(from data: Data, maxPixel: CGFloat) -> UIImage? {
+        guard maxPixel >= 1 else { return nil }
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
             return nil
