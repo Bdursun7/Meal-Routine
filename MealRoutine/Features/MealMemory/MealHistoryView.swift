@@ -59,6 +59,8 @@ struct MealHistoryView: View {
         case .okay: "İdare eder"
         case .neverAgain: "Bir daha asla"
         case .favorited: "Favorilere eklendi"
+        case .imported: "İçe aktarıldı"
+        case .edited: "Düzenlendi"
         }
     }
 }

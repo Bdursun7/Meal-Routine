@@ -49,6 +49,7 @@ enum DifficultyLabel {
         case "easy": "Kolay"
         case "medium": "Orta"
         case "hard": "Zor"
+        case "unknown": "Bilinmiyor"
         default: raw
         }
     }

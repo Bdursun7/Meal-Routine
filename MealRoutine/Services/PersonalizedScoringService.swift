@@ -201,6 +201,7 @@ enum PersonalizedScoringService {
         now: Date = .now
     ) -> Bool {
         if blockedSlugs.contains(candidate.slug) { return false }
+        if candidate.timeIsUnknown { return false }
         if candidate.rating == .never || memory?.neverAgain == true { return false }
         if candidate.totalMinutes > preferences.maxCookMinutes { return false }
         if !candidate.ingredientIds.isDisjoint(with: preferences.dislikedIngredientIds) { return false }
@@ -450,6 +451,9 @@ enum PersonalizedScoringService {
         case .adventurous:
             score *= 2
             if isNew { score += 2 }
+        }
+        if candidate.importInterest && isNew {
+            score += 1
         }
         return score
     }

@@ -16,6 +16,12 @@ final class IngredientLine {
     var noteTR: String = ""
     var trAliasCurated: Bool
     var sortIndex: Int
+    /// V3. Catalog rows stay required, certain, and on the grocery list.
+    var isOptional: Bool = false
+    var isUncertain: Bool = false
+    var originalText: String = ""
+    /// Unstructured lines stay off the automatic grocery list until the cook enables them.
+    var includeInGrocery: Bool = true
     var recipe: Recipe? = nil
 
     init(

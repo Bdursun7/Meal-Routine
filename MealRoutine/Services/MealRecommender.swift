@@ -19,6 +19,10 @@ struct PickerCandidate: Equatable, Sendable {
     var diets: Set<String> = []
     /// Catalog difficulty (`easy`, `medium`, `hard`). Empty skips the V2 difficulty gate.
     var difficulty: String = ""
+    /// Imported recipes with no confirmed total time stay out of automatic planning.
+    var timeIsUnknown: Bool = false
+    /// Saving a recipe is interest, weaker than a favorite or a cook.
+    var importInterest: Bool = false
 }
 
 /// A cook or a plan that should pull this recipe down for a while.

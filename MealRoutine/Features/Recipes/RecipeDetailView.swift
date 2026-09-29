@@ -23,6 +23,9 @@ struct RecipeDetailView: View {
     @Query private var plannedMeals: [PlannedMeal]
     @Query private var ingredientChecks: [IngredientCheck]
     @Query private var memories: [MealMemory]
+    @State private var showsImportEditor = false
+    @State private var showsDeleteConfirm = false
+    @State private var placeMessage: String?
 
     let route: RecipeRoute
     /// Only Bu Hafta passes true. Tarifler and Profil leave this false, so the cook bar is never built.
@@ -90,8 +93,18 @@ struct RecipeDetailView: View {
 
     @ToolbarContentBuilder
     private func favoriteToolbar() -> some ToolbarContent {
-        if recipe != nil {
-            ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if let recipe, !recipe.isBundledCatalog {
+                Menu {
+                    Button("Düzenle") { showsImportEditor = true }
+                    Button("Bu haftaya ekle") { placeOnCurrentWeek(recipe) }
+                    Button("Sil", role: .destructive) { showsDeleteConfirm = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("Tarif işlemleri")
+            }
+            if recipe != nil {
                 favoriteHeart(isLoved: currentRating == .loved)
             }
         }
@@ -132,6 +145,25 @@ struct RecipeDetailView: View {
             }
             .onAppear {
                 Analytics.track(.recipeOpened)
+                if let recipe, !recipe.isBundledCatalog {
+                    Analytics.track(.importedRecipeViewed, properties: ["origin": recipe.origin.rawValue])
+                }
+            }
+            .sheet(isPresented: $showsImportEditor) {
+                if let recipe {
+                    ImportFlowView(editingSlug: recipe.slug)
+                }
+            }
+            .alert("Tarif silinsin mi?", isPresented: $showsDeleteConfirm) {
+                Button("Sil", role: .destructive) { deleteImportedRecipe() }
+                Button("Vazgeç", role: .cancel) {}
+            } message: {
+                Text(deleteMessage)
+            }
+            .alert("Plan", isPresented: placeMessageIsPresented) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(placeMessage ?? "")
             }
             .task(id: recipe?.slug) {
                 guard let recipe else { return }
@@ -278,6 +310,7 @@ struct RecipeDetailView: View {
         List {
             heroSection(recipe)
             summarySection(recipe)
+            importSection(recipe)
             memorySection(recipe)
             dietSection(recipe)
             portionSection(recipe)
@@ -301,6 +334,80 @@ struct RecipeDetailView: View {
                     .recipeDetailRow()
             }
         }
+    }
+
+    @ViewBuilder
+    private func importSection(_ recipe: Recipe) -> some View {
+        if !recipe.isBundledCatalog {
+            Section("Kaynak") {
+                let badges = RecipeImportLabels.badges(
+                    for: recipe,
+                    cooked: (memories.first?.timesCooked ?? 0) > 0,
+                    isFavorite: memories.first?.isFavorite == true || currentRating == .loved
+                )
+                if !badges.isEmpty {
+                    Text(badges.joined(separator: " · "))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .recipeDetailRow()
+                }
+                Text(Attribution.recipeLine(provider: recipe.sourceProvider, attribution: recipe.sourceAttribution))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                    .recipeDetailRow()
+                if let url = URL(string: recipe.sourceURL), !recipe.sourceURL.isEmpty {
+                    Link("Kaynağı aç", destination: url)
+                        .recipeDetailRow()
+                }
+                if recipe.servingsUnspecified {
+                    Text("Porsiyon kaynakta yok. Miktarlar yazıldığı gibi markete gider.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .recipeDetailRow()
+                }
+                if recipe.ingredients.contains(where: \.isUncertain) {
+                    Text("Bazı miktarlar belirsiz. Eksik sayı uydurulmadı.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .recipeDetailRow()
+                }
+            }
+        }
+    }
+
+    private func placeOnCurrentWeek(_ recipe: Recipe) {
+        do {
+            try WeekPlanService.placeImportedRecipe(slug: recipe.slug, in: modelContext)
+            placeMessage = "Bu haftanın bir akşamına eklendi."
+        } catch {
+            placeMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteImportedRecipe() {
+        guard let recipe else { return }
+        do {
+            try RecipeImportService.delete(recipe, in: modelContext)
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
+        }
+    }
+
+    private var deleteMessage: String {
+        let cooked = (memories.first?.timesCooked ?? 0) > 0
+        if cooked {
+            return "Pişirme geçmişi durur. Gelecek plan ve market listesinden çıkar. Eski haftalarda adı görünmeye devam eder."
+        }
+        return "Tarif koleksiyondan silinir. Gelecek plan ve market listesine girmez."
+    }
+
+    private var placeMessageIsPresented: Binding<Bool> {
+        Binding(
+            get: { placeMessage != nil },
+            set: { isPresented in
+                if !isPresented { placeMessage = nil }
+            }
+        )
     }
 
     @ViewBuilder
@@ -663,8 +770,9 @@ struct RecipeDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             RecipeMetaChips(
-                minutes: recipe.totalMinutes,
+                minutes: recipe.timeIsUnknown ? -1 : recipe.totalMinutes,
                 servings: activeServings,
+                servingsUnspecified: recipe.servingsUnspecified,
                 difficulty: DifficultyLabel.turkish(recipe.difficulty)
             )
             Text("\(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
@@ -719,6 +827,7 @@ struct RecipeDetailView: View {
 private struct RecipeMetaChips: View {
     var minutes: Int
     var servings: Int
+    var servingsUnspecified = false
     var difficulty: String
 
     var body: some View {
@@ -747,11 +856,11 @@ private struct RecipeMetaChips: View {
     }
 
     private var timeChip: some View {
-        chip(symbol: "clock", text: "\(minutes) dk")
+        chip(symbol: "clock", text: minutes < 0 ? "Süre yok" : "\(minutes) dk")
     }
 
     private var servingsChip: some View {
-        chip(symbol: "person.2", text: "\(servings) kişilik")
+        chip(symbol: "person.2", text: servingsUnspecified ? "Porsiyon yok" : "\(servings) kişilik")
     }
 
     private var difficultyChip: some View {
