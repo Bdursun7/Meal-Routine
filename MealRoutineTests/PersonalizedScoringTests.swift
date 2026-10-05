@@ -127,6 +127,76 @@ final class PersonalizedScoringTests: XCTestCase {
         XCTAssertEqual(loved, PlanExplanationBuilder.lovedLean)
     }
 
+    func testHardRecipesStayOutUntilTheHouseholdOptsIn() {
+        let hard = TestFixtures.candidate("zor", score: 90, difficulty: "hard")
+        let easy = TestFixtures.candidate("kolay", score: 40, difficulty: "easy")
+
+        XCTAssertFalse(PersonalizedScoringService.isEligible(
+            hard,
+            preferences: TestFixtures.prefs(difficulty: .easyOnly),
+            memory: nil,
+            blockedSlugs: []
+        ))
+        XCTAssertFalse(PersonalizedScoringService.isEligible(
+            hard,
+            preferences: TestFixtures.prefs(difficulty: .mostlyEasy),
+            memory: nil,
+            blockedSlugs: []
+        ))
+        XCTAssertFalse(PersonalizedScoringService.isEligible(
+            hard,
+            preferences: TestFixtures.prefs(difficulty: .openToMedium),
+            memory: nil,
+            blockedSlugs: []
+        ))
+        XCTAssertTrue(PersonalizedScoringService.isEligible(
+            hard,
+            preferences: TestFixtures.prefs(difficulty: .openToHard),
+            memory: nil,
+            blockedSlugs: []
+        ))
+        XCTAssertTrue(PersonalizedScoringService.isEligible(
+            TestFixtures.candidate("orta", difficulty: "medium"),
+            preferences: TestFixtures.prefs(difficulty: .openToMedium),
+            memory: nil,
+            blockedSlugs: []
+        ))
+
+        let blocked = PersonalizedScoringService.select(
+            candidates: [hard, easy],
+            evenings: 1,
+            preferences: TestFixtures.prefs(difficulty: .openToMedium),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertEqual(blocked.slugs, ["kolay"])
+
+        let included = PersonalizedScoringService.select(
+            candidates: [hard, easy],
+            evenings: 1,
+            preferences: TestFixtures.prefs(difficulty: .openToHard),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertEqual(included.slugs, ["zor"])
+    }
+
+    func testOpenToHardCopyPersistsAndUnknownRawFallsBack() {
+        XCTAssertEqual(DifficultyPreference.openToHard.title, "Zora da açığım")
+        XCTAssertEqual(DifficultyPreference.openToHard.detail, "Zor tarifler de hafta planında görünebilir")
+        XCTAssertEqual(
+            DifficultyPreference.allCases.map(\.title),
+            ["Yalnızca kolay", "Çoğunlukla kolay", "Ortaya da açığım", "Zora da açığım"]
+        )
+
+        let prefs = UserPrefs(hasCompletedOnboarding: true, createdAt: TestFixtures.now)
+        prefs.difficultyPreferenceRaw = "not-a-level"
+        XCTAssertEqual(prefs.difficultyPreference, .mostlyEasy)
+        prefs.difficultyPreference = .openToHard
+        XCTAssertEqual(prefs.difficultyPreferenceRaw, DifficultyPreference.openToHard.rawValue)
+        XCTAssertEqual(prefs.planningPreferences.difficulty, .openToHard)
+    }
+
     private func penalty(_ memory: MealMemorySnapshot, _ repetition: RepeatPreference) -> Int {
         PersonalizedScoringService.score(
             TestFixtures.candidate("tavuk", score: 50, protein: "poultry"),

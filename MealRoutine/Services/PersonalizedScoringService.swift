@@ -510,7 +510,7 @@ enum PersonalizedScoringService {
     private static func difficultyBias(_ raw: String, preference: DifficultyPreference) -> Int {
         let difficulty = normalized(raw)
         if difficulty == "medium", preference == .mostlyEasy { return -4 }
-        if difficulty == "hard" { return -8 }
+        if difficulty == "hard", preference != .openToHard { return -8 }
         return 0
     }
 
@@ -522,6 +522,8 @@ enum PersonalizedScoringService {
             return false
         case .mostlyEasy, .openToMedium:
             return difficulty != "hard"
+        case .openToHard:
+            return true
         }
     }
 
