@@ -27,8 +27,49 @@ enum RecipeValidationService {
         return issues.isEmpty ? .valid : .invalid(issues)
     }
 
-    @MainActor static func validate(_ recipe: Recipe) -> RecipeValidationResult {
-        validate(RecipeCollectionService.form(from: recipe))
+    static func validate(_ recipe: Recipe) -> RecipeValidationResult {
+        validate(form(from: recipe))
+    }
+
+    /// Reads stored fields only. Kept off the main-actor collection service so planning can call it.
+    static func form(from recipe: Recipe) -> RecipeForm {
+        let ingredients = recipe.ingredients
+            .sorted { $0.sortIndex < $1.sortIndex }
+            .map { line in
+                RecipeFormIngredient(
+                    name: line.displayName,
+                    quantity: line.quantity,
+                    unit: line.unit,
+                    preparationNote: line.displayNote,
+                    isOptional: line.isOptional
+                )
+            }
+        let steps = recipe.steps
+            .sorted { $0.sortIndex < $1.sortIndex }
+            .map(\.displayText)
+        let unknownTime = recipe.timeIsUnknown
+        return RecipeForm(
+            name: recipe.displayName,
+            servings: recipe.baseServings > 0 ? recipe.baseServings : nil,
+            prepMinutes: unknownTime ? nil : positiveMinutes(recipe.prepMinutes),
+            cookMinutes: unknownTime ? nil : positiveMinutes(recipe.cookMinutes),
+            totalMinutes: unknownTime ? nil : positiveMinutes(recipe.totalMinutes),
+            category: recipe.category,
+            cuisine: recipe.country,
+            difficulty: recipe.difficulty == "unknown" ? "" : recipe.difficulty,
+            notes: recipe.userNotes,
+            ingredients: ingredients.isEmpty ? [RecipeFormIngredient()] : ingredients,
+            steps: steps.isEmpty ? [""] : steps,
+            sourceURL: recipe.sourceURL,
+            sourceTitle: recipe.sourceTitle,
+            sourcePlatform: recipe.sourcePlatform ?? .unknown,
+            sourceImagePath: recipe.sourceImagePath,
+            origin: recipe.origin == .builtIn ? .manual : recipe.origin
+        )
+    }
+
+    private static func positiveMinutes(_ value: Int) -> Int? {
+        value > 0 ? value : nil
     }
 
     private static func isActiveIngredient(_ line: RecipeFormIngredient) -> Bool {
@@ -189,39 +230,7 @@ enum RecipeCollectionService {
     }
 
     static func form(from recipe: Recipe) -> RecipeForm {
-        let ingredients = recipe.ingredients
-            .sorted { $0.sortIndex < $1.sortIndex }
-            .map { line in
-                RecipeFormIngredient(
-                    name: line.displayName,
-                    quantity: line.quantity,
-                    unit: line.unit,
-                    preparationNote: line.displayNote,
-                    isOptional: line.isOptional
-                )
-            }
-        let steps = recipe.steps
-            .sorted { $0.sortIndex < $1.sortIndex }
-            .map(\.displayText)
-        let unknownTime = recipe.timeIsUnknown
-        return RecipeForm(
-            name: recipe.displayName,
-            servings: recipe.baseServings > 0 ? recipe.baseServings : nil,
-            prepMinutes: unknownTime ? nil : positive(recipe.prepMinutes),
-            cookMinutes: unknownTime ? nil : positive(recipe.cookMinutes),
-            totalMinutes: unknownTime ? nil : positive(recipe.totalMinutes),
-            category: recipe.category,
-            cuisine: recipe.country,
-            difficulty: recipe.difficulty == "unknown" ? "" : recipe.difficulty,
-            notes: recipe.userNotes,
-            ingredients: ingredients.isEmpty ? [RecipeFormIngredient()] : ingredients,
-            steps: steps.isEmpty ? [""] : steps,
-            sourceURL: recipe.sourceURL,
-            sourceTitle: recipe.sourceTitle,
-            sourcePlatform: recipe.sourcePlatform ?? .unknown,
-            sourceImagePath: recipe.sourceImagePath,
-            origin: recipe.origin == .builtIn ? .manual : recipe.origin
-        )
+        RecipeValidationService.form(from: recipe)
     }
 
     static func refreshIndex(in context: ModelContext) throws {
@@ -398,10 +407,6 @@ enum RecipeCollectionService {
         return String(trimmed.prefix(80))
     }
 
-    private static func positive(_ value: Int) -> Int? {
-        value > 0 ? value : nil
-    }
-
     private static func freshSlug() -> String {
         "kayit-\(UUID().uuidString.lowercased())"
     }
@@ -424,7 +429,8 @@ enum ImportedIngredientIdentity {
 
 enum ImportedRecipeEligibility {
     /// Catalog rows stay plannable. A personal recipe must be ready to cook and pass validation.
-    @MainActor @MainActor static func allowsPlanning(_ recipe: Recipe) -> Bool {
+    /// Not main-actor isolated: the week index calls this while it is building candidates.
+    nonisolated static func allowsPlanning(_ recipe: Recipe) -> Bool {
         if recipe.isBundledCatalog { return true }
         guard recipe.collectionState == .readyToCook else { return false }
         return RecipeValidationService.validate(recipe) == .valid
