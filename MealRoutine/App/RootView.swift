@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var prefs: [UserPrefs]
     @State private var household = HouseholdSession.shared
+    @State private var testMode = HouseholdTestMode.shared
     @State private var seedAttempt = 0
     @State private var isSeeding = true
     @State private var seedError: String?
@@ -54,6 +55,15 @@ struct RootView: View {
         }
         .onAppear {
             Analytics.trackOnce(.appOpened)
+        }
+        .overlay(alignment: .top) {
+            if let notice = testMode.banner {
+                HouseholdTestBanner(notice: notice) {
+                    testMode.dismissBanner()
+                }
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+            }
         }
     }
 

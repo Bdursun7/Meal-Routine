@@ -6,6 +6,7 @@ import UIKit
 struct HouseholdSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var session = HouseholdSession.shared
+    @State private var testMode = HouseholdTestMode.shared
     @State private var householdName = ""
     @State private var inviteCode = ""
     @State private var cookingDays: Set<Int> = []
@@ -16,6 +17,7 @@ struct HouseholdSettingsView: View {
 
     var body: some View {
         Form {
+            HouseholdTestModeSection(session: session, testMode: testMode)
             statusSection
             if session.account == nil {
                 signInSection
@@ -33,6 +35,13 @@ struct HouseholdSettingsView: View {
         }
         .navigationTitle("Ev halkı")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if testMode.isEnabled {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HouseholdTestBadge()
+                }
+            }
+        }
         .onAppear(perform: loadPreference)
     }
 
@@ -64,29 +73,44 @@ struct HouseholdSettingsView: View {
 
     private var signInSection: some View {
         Section {
-            Text("İki kişi aynı haftayı seçebilsin diye Apple ile giriş yeter. Google, e-posta veya telefon yok.")
-                .font(.footnote)
-                .foregroundStyle(Theme.secondaryText)
-            SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName]
-            } onCompletion: { result in
-                switch result {
-                case .success(let authorization):
-                    guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else { return }
-                    let name = credential.fullName.flatMap { PersonNameComponentsFormatter().string(from: $0) }
-                    session.adoptAppleUser(id: credential.user, displayName: name)
-                    Task {
-                        await session.refresh(in: modelContext)
-                        if let code = session.pendingInviteCode {
-                            await session.acceptInvite(code: code, in: modelContext)
-                        }
-                    }
-                case .failure:
-                    session.statusMessage = "Apple ile giriş tamamlanamadı."
+            if session.isTestMode {
+                Text("Test modunda Apple kimliği yok. Bu oturum yalnızca bu telefonda durur.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                Button("Test olarak gir") {
+                    session.signInForTest()
                 }
+                .accessibilityIdentifier("household.testSignIn")
+                .accessibilityLabel("Test olarak gir")
+            } else if HouseholdTestLaunch.allowsAppleServices {
+                Text("İki kişi aynı haftayı seçebilsin diye Apple ile giriş yeter. Google, e-posta veya telefon yok.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.fullName]
+                } onCompletion: { result in
+                    switch result {
+                    case .success(let authorization):
+                        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else { return }
+                        let name = credential.fullName.flatMap { PersonNameComponentsFormatter().string(from: $0) }
+                        session.adoptAppleUser(id: credential.user, displayName: name)
+                        Task {
+                            await session.refresh(in: modelContext)
+                            if let code = session.pendingInviteCode {
+                                await session.acceptInvite(code: code, in: modelContext)
+                            }
+                        }
+                    case .failure:
+                        session.statusMessage = "Apple ile giriş tamamlanamadı."
+                    }
+                }
+                .frame(height: 44)
+                .accessibilityLabel("Apple ile giriş yap")
+            } else {
+                Text("Bu derleme Apple ile girişi, iCloud’u ve bildirimi imzalamaz. Ev halkını denemek için Test modunu aç.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
             }
-            .frame(height: 44)
-            .accessibilityLabel("Apple ile giriş yap")
         } header: {
             Text("Hesap")
         }
@@ -101,6 +125,7 @@ struct HouseholdSettingsView: View {
                 session.createHousehold(name: householdName, in: modelContext)
             }
             .disabled(householdName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityIdentifier("household.create")
         } header: {
             Text("Ev halkı kur")
         } footer: {
@@ -182,6 +207,7 @@ struct HouseholdSettingsView: View {
                     Button("Partnerini davet et") {
                         session.createInvite(in: modelContext)
                     }
+                    .accessibilityIdentifier("household.invite")
                     .accessibilityHint("Altı haneli kod ve bağlantı oluşturur")
                 }
             } header: {
@@ -209,6 +235,7 @@ struct HouseholdSettingsView: View {
             Button("Ortak haftayı kur") {
                 session.generateSharedWeek(in: modelContext)
             }
+            .accessibilityIdentifier("household.generateWeek")
             .accessibilityHint("İki kişinin hafızasına ve bu haftanın vetolarına göre plan kurar")
         } header: {
             Text("Bu hafta")
@@ -305,7 +332,7 @@ struct HouseholdSettingsView: View {
                     session.leave(in: modelContext)
                 }
             }
-            Button("Apple oturumunu kapat") {
+            Button(session.isTestMode ? "Test oturumunu kapat" : "Apple oturumunu kapat") {
                 session.signOut(in: modelContext)
             }
         }

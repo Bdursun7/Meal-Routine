@@ -83,3 +83,34 @@ Xcode’da MealRoutine hedefine şunlar eklenmeli (entitlements dosyası bunlar�
 İki hesapla denemek: iki simülatör veya cihaz, ikisi de iCloud ve Apple kimliğiyle girişli. Ev sahibi davet eder, partner kodu Profil → Birlikte planla altına yapıştırır. CloudKit şeması ilk çalıştırmada `HouseholdBoard` ve `HouseholdInviteLookup` kayıt türlerini geliştirme ortamında oluşturur; production’a ayrıca taşımak gerekir.
 
 Abonelik, kiler, bütçe ve web istemcisi bu sürümde yoktur.
+
+## Test modu
+
+Ücretli Apple Developer hesabı olmadan ev halkını **tek simülatörde** veya ücretsiz kişisel ekiple denemek için. Test modu açıkken Sign in with Apple, CloudKit ve push çağrılmaz. Aynı `HouseholdSyncTransport` soyutlamasının sahte uygulaması (`FakeHouseholdBackend`) panoyu bellekte tutar; SwiftData yalnızca bu telefonun önbelleğidir.
+
+Açmak:
+
+1. Profil → Birlikte planla → **Test modu**
+2. **Test olarak gir** (Apple kimliği yok)
+3. Ev halkı kur, **Partnerini davet et** (kod ve `mealroutine://` bağlantısı görünür)
+4. **Test Partner katılsın**
+5. Ortak haftayı kur. Bu Hafta kartında ve ev ekranında Test Partner adına İstiyorum / Olur / Bu hafta olmaz denir. Veto **Karar gerekiyor** açar. **Partner yerine koysun** bu haftanın vetosunu eleyen bir yemek seçer. Market’te **Test Partner işaretlesin** ortak işareti yazar. Kararlar listesi ve uygulama içi bildirim şeridi aynı telefonda durur.
+
+**Test verisini sıfırla** test evini, partneri ve bildirim günlüğünü siler. Test modu kapalıyken gerçek CloudKit yolu değişmez. Tek başına plan da değişmez.
+
+UI testi `-HouseholdTestMode` ile açılır.
+
+### Ücretsiz imza
+
+`MealRoutine Local` şeması `Debug-Local` derlemesini kullanır. Ayarlar `Config/Debug-Local.xcconfig` içindedir.
+
+| | Debug / Release | Debug-Local |
+| --- | --- | --- |
+| Entitlements | `MealRoutine.entitlements` (Apple ile giriş, iCloud, Push, App Group) | `MealRoutine.Local.entitlements` (boş) |
+| Share extension | App Group | boş entitlements |
+| Info.plist | remote-notification | `Info-Local.plist`, arka plan bildirimi yok |
+| Swift | `DEBUG` | `DEBUG HOUSEHOLD_LOCAL` |
+
+Simülatör: şemayı **MealRoutine Local** seç, bir iOS 18 simülatörü seç, çalıştır. Ücretli takım gerekmez. Ücretsiz kişisel ekipte de aynı şema imzalanır; Sign in with Apple, iCloud ve Push bu derlemede yoktur. Paylaşım uzantısının App Group’u da bu şemada yoktur; tarif ekleme uygulama içinden sürer.
+
+Test modu şunları **kanıtlamaz**: iki cihaz arasında gerçek CloudKit eşitlemesi, `CKShare`, public davet kaydı, sessiz push veya production şeması. Onlar için ücretli hesap ve normal **MealRoutine** şeması gerekir.

@@ -2,17 +2,6 @@ import Foundation
 #if canImport(CloudKit)
 import CloudKit
 
-struct HouseholdServerConflict: Error {
-    var server: HouseholdSnapshot
-}
-
-struct HouseholdInviteLookup: Equatable, Sendable {
-    var householdId: UUID
-    var shareURL: URL?
-    var expiresAt: Date
-    var status: String
-}
-
 /// CloudKit is the shared store. The private zone holds the owner's board.
 /// A CKShare lets the second member read and write it. Invite codes live in the
 /// public database so the partner can find the share before they are a member.
@@ -219,6 +208,45 @@ enum CloudKitHouseholdTransport {
         let serverRecord = ck?.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord
         guard let serverRecord, let snapshot = try? snapshot(from: serverRecord) else { return nil }
         return snapshot
+    }
+}
+
+/// Session-facing CloudKit store. Method bodies stay on CloudKitHouseholdTransport.
+struct CloudKitHouseholdBackend: HouseholdSyncTransport {
+    func push(_ snapshot: HouseholdSnapshot) async throws -> HouseholdSnapshot {
+        try await CloudKitHouseholdTransport.push(snapshot)
+    }
+
+    func pull(householdId: UUID) async throws -> HouseholdSnapshot? {
+        try await CloudKitHouseholdTransport.pull(householdId: householdId)
+    }
+
+    func pullShared(url: URL) async throws -> HouseholdSnapshot? {
+        try await CloudKitHouseholdTransport.pullShared(url: url)
+    }
+
+    func publishInvite(
+        _ invite: HouseholdInvite,
+        householdName: String,
+        snapshot: HouseholdSnapshot
+    ) async throws -> URL? {
+        try await CloudKitHouseholdTransport.publishInvite(invite, householdName: householdName, snapshot: snapshot)
+    }
+
+    func lookup(code: String) async throws -> HouseholdInviteLookup {
+        try await CloudKitHouseholdTransport.lookup(code: code)
+    }
+
+    func acceptShare(url: URL) async throws {
+        try await CloudKitHouseholdTransport.acceptShare(url: url)
+    }
+
+    func deleteBoard(householdId: UUID) async throws {
+        try await CloudKitHouseholdTransport.deleteBoard(householdId: householdId)
+    }
+
+    func registerChangeSubscription() async {
+        await CloudKitHouseholdTransport.registerChangeSubscription()
     }
 }
 #endif

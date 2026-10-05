@@ -7,6 +7,7 @@ struct GroceryView: View {
     @Query private var weeks: [PlanWeek]
     @State private var viewModel = GroceryViewModel()
     @State private var household = HouseholdSession.shared
+    @State private var testMode = HouseholdTestMode.shared
     @State private var showsMarket = false
 
     var body: some View {
@@ -65,9 +66,19 @@ struct GroceryView: View {
         return List {
                 if household.isHouseholdMode {
                     Section {
+                        if testMode.isEnabled {
+                            HouseholdTestBadge()
+                        }
                         Text("Ortak liste. Biri işaretleyince diğerinde de kapanır.")
                             .font(.footnote)
                             .foregroundStyle(Theme.secondaryText)
+                        if household.showsPartnerControls {
+                            Button("Test Partner işaretlesin") {
+                                Task { await household.partnerCheckNextGrocery(in: modelContext) }
+                            }
+                            .accessibilityIdentifier("household.partner.grocery")
+                            .accessibilityHint("İlk işaretsiz malzemeyi partner adına kapatır")
+                        }
                     }
                 }
                 if fullList.isEmpty {

@@ -121,6 +121,13 @@
 		V4B0000000000000000005 /* HouseholdSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F0000000000000000005 /* HouseholdSession.swift */; };
 		V4B0000000000000000006 /* HouseholdSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F0000000000000000006 /* HouseholdSettingsView.swift */; };
 		V4B0000000000000000007 /* HouseholdPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F0000000000000000007 /* HouseholdPlanningTests.swift */; };
+		V4B0000000000000000008 /* HouseholdBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F0000000000000000008 /* HouseholdBackend.swift */; };
+		V4B0000000000000000009 /* FakeHouseholdBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F0000000000000000009 /* FakeHouseholdBackend.swift */; };
+		V4B000000000000000000A /* HouseholdTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000A /* HouseholdTestMode.swift */; };
+		V4B000000000000000000B /* HouseholdTestControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000B /* HouseholdTestControls.swift */; };
+		V4B000000000000000000C /* HouseholdTestModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000C /* HouseholdTestModeTests.swift */; };
+		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
+		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 
@@ -133,6 +140,13 @@
 			remoteInfo = MealRoutineShare;
 		};
 		T17PROXY00000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000007 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000006;
+			remoteInfo = MealRoutine;
+		};
+		U1PRX0000000000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A10000000000000000000007 /* Project object */;
 			proxyType = 1;
@@ -256,6 +270,14 @@
 		V4F0000000000000000005 /* HouseholdSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSession.swift; sourceTree = "<group>"; };
 		V4F0000000000000000006 /* HouseholdSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdSettingsView.swift; sourceTree = "<group>"; };
 		V4F0000000000000000007 /* HouseholdPlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdPlanningTests.swift; sourceTree = "<group>"; };
+		V4F0000000000000000008 /* HouseholdBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdBackend.swift; sourceTree = "<group>"; };
+		V4F0000000000000000009 /* FakeHouseholdBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakeHouseholdBackend.swift; sourceTree = "<group>"; };
+		V4F000000000000000000A /* HouseholdTestMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestMode.swift; sourceTree = "<group>"; };
+		V4F000000000000000000B /* HouseholdTestControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestControls.swift; sourceTree = "<group>"; };
+		V4F000000000000000000C /* HouseholdTestModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestModeTests.swift; sourceTree = "<group>"; };
+		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
+		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -279,14 +301,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		U1FRW0000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				U1B0000000000000000002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		A10000000000000000000004 = {
 			isa = PBXGroup;
 			children = (
+				HTLGRP0000000000000001 /* Config */,
 				CAEDAEDE9E130AA3F1908070 /* MealRoutine */,
 				T17GRP0000000000000001 /* MealRoutineTests */,
+				U1GRP0000000000000001 /* MealRoutineUITests */,
 				V3GRP0000000000000003 /* ShareExtension */,
 				T17GRP0000000000000002 /* Frameworks */,
 				A10000000000000000000005 /* Products */,
@@ -524,6 +556,7 @@
 			children = (
 				A10000000000000000000002 /* MealRoutine.app */,
 				T17F00000000000000000002 /* MealRoutineTests.xctest */,
+				U1F0000000000000000002 /* MealRoutineUITests.xctest */,
 				V3EXT000000000000002 /* MealRoutineShare.appex */,
 			);
 			name = Products;
@@ -562,6 +595,7 @@
 				T17F00000000000000000006 /* SmartReplacementTests.swift */,
 				V3F0000000000000000007 /* RecipeImportTests.swift */,
 				V4F0000000000000000007 /* HouseholdPlanningTests.swift */,
+				V4F000000000000000000C /* HouseholdTestModeTests.swift */,
 			);
 			path = MealRoutineTests;
 			sourceTree = "<group>";
@@ -583,6 +617,9 @@
 				V4F0000000000000000003 /* HouseholdPersistence.swift */,
 				V4F0000000000000000004 /* CloudKitHouseholdSync.swift */,
 				V4F0000000000000000005 /* HouseholdSession.swift */,
+				V4F0000000000000000008 /* HouseholdBackend.swift */,
+				V4F0000000000000000009 /* FakeHouseholdBackend.swift */,
+				V4F000000000000000000A /* HouseholdTestMode.swift */,
 			);
 			path = Household;
 			sourceTree = "<group>";
@@ -591,8 +628,25 @@
 			isa = PBXGroup;
 			children = (
 				V4F0000000000000000006 /* HouseholdSettingsView.swift */,
+				V4F000000000000000000B /* HouseholdTestControls.swift */,
 			);
 			path = Household;
+			sourceTree = "<group>";
+		};
+		U1GRP0000000000000001 /* MealRoutineUITests */ = {
+			isa = PBXGroup;
+			children = (
+				U1F0000000000000000001 /* HouseholdFlowUITests.swift */,
+			);
+			path = MealRoutineUITests;
+			sourceTree = "<group>";
+		};
+		HTLGRP0000000000000001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				HTLF000000000000000001 /* Debug-Local.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -636,6 +690,24 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 
+		U1TARGET000000000001 /* MealRoutineUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = U1CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineUITests" */;
+			buildPhases = (
+				U1SRC0000000000000001 /* Sources */,
+				U1FRW0000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				U1DEP0000000000000001 /* PBXTargetDependency */,
+			);
+			name = MealRoutineUITests;
+			productName = MealRoutineUITests;
+			productReference = U1F0000000000000000002 /* MealRoutineUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+
 		V3EXT000000000000001 /* MealRoutineShare */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = V3CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineShare" */;
@@ -668,6 +740,10 @@
 						CreatedOnToolsVersion = 16.0;
 						TestTargetID = A10000000000000000000006;
 					};
+					U1TARGET000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A10000000000000000000006;
+					};
 					V3EXT000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -690,6 +766,7 @@
 			targets = (
 				A10000000000000000000006 /* MealRoutine */,
 				T17TARGET000000000001 /* MealRoutineTests */,
+				U1TARGET000000000001 /* MealRoutineUITests */,
 				V3EXT000000000000001 /* MealRoutineShare */,
 			);
 		};
@@ -824,6 +901,10 @@
 				V4B0000000000000000004 /* CloudKitHouseholdSync.swift in Sources */,
 				V4B0000000000000000005 /* HouseholdSession.swift in Sources */,
 				V4B0000000000000000006 /* HouseholdSettingsView.swift in Sources */,
+				V4B0000000000000000008 /* HouseholdBackend.swift in Sources */,
+				V4B0000000000000000009 /* FakeHouseholdBackend.swift in Sources */,
+				V4B000000000000000000A /* HouseholdTestMode.swift in Sources */,
+				V4B000000000000000000B /* HouseholdTestControls.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -840,6 +921,7 @@
 				T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */,
 				V3B0000000000000000007 /* RecipeImportTests.swift in Sources */,
 				V4B0000000000000000007 /* HouseholdPlanningTests.swift in Sources */,
+				V4B000000000000000000C /* HouseholdTestModeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -850,6 +932,14 @@
 				V3B0000000000000000008 /* ShareViewController.swift in Sources */,
 				V3B0000000000000000009 /* ShareHandoff.swift in Sources */,
 				V3B000000000000000000B /* RecipeSourceService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		U1SRC0000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -866,6 +956,11 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000006 /* MealRoutine */;
 			targetProxy = T17PROXY00000000000001 /* PBXContainerItemProxy */;
+		};
+		U1DEP0000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000006 /* MealRoutine */;
+			targetProxy = U1PRX0000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1072,11 +1167,167 @@
 			};
 			name = Release;
 		};
+		HTLP00000000000000000A /* Debug-Local */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = HTLF000000000000000001 /* Debug-Local.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug-Local;
+		};
+		HTLP00000000000000000C /* Debug-Local */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.Local.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MealRoutine/Info-Local.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MealRoutine;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug-Local;
+		};
+		HTLT000000000000000001 /* Debug-Local */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine";
+			};
+			name = Debug-Local;
+		};
+		HTLS000000000000000001 /* Debug-Local */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.Local.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug-Local;
+		};
+		U1DBG0000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MealRoutine;
+			};
+			name = Debug;
+		};
+		U1REL0000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MealRoutine;
+			};
+			name = Release;
+		};
+		U1LOC0000000000000001 /* Debug-Local */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 4.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MealRoutine;
+			};
+			name = Debug-Local;
+		};
 /* Begin XCConfigurationList section */
 		A1000000000000000000000E /* Build configuration list for PBXProject "MealRoutine" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1000000000000000000000A /* Debug */,
+				HTLP00000000000000000A /* Debug-Local */,
 				A1000000000000000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1086,6 +1337,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1000000000000000000000C /* Debug */,
+				HTLP00000000000000000C /* Debug-Local */,
 				A1000000000000000000000D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1096,7 +1348,18 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				T17DBG0000000000000001 /* Debug */,
+				HTLT000000000000000001 /* Debug-Local */,
 				T17REL0000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		U1CFG0000000000000001 /* Build configuration list for PBXNativeTarget "MealRoutineUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				U1DBG0000000000000001 /* Debug */,
+				U1LOC0000000000000001 /* Debug-Local */,
+				U1REL0000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1105,6 +1368,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				V3DBG0000000000000001 /* Debug */,
+				HTLS000000000000000001 /* Debug-Local */,
 				V3REL0000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;

@@ -27,6 +27,8 @@ The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It w
 
 Optional Sign in with Apple and CloudKit. Without a household, This Week stays the personal plan. With one, two people share the week, reactions, a this-week veto (not Never Again), the grocery checks, and a short decision history. Personal meal memory is not copied. See `docs/v4-household.md`.
 
+No paid Apple Developer account: open the **MealRoutine Local** scheme (`Debug-Local`, no Sign in with Apple / iCloud / Push entitlements), run on a simulator, then Profil → Birlikte planla → **Test modu**. That path is one device and a fake partner. It does not prove CloudKit sync or real push.
+
 ## V1 scope
 
 - Onboarding: welcome, then four steps (household, dislikes, up to 8 taste ratings, summary). The week is created only from “Haftamı oluştur” on the summary. Household size is 1–8, evenings are 1–7, max cook time is 30 / 45 / 60 / 90 minutes (default 60). Egg and eggs share one “Yumurta” dislike chip.

@@ -1,5 +1,9 @@
 # Optional XcodeGen spec. The checked-in MealRoutine.xcodeproj already opens in Xcode.
 name: MealRoutine
+configs:
+  Debug: debug
+  Debug-Local: debug
+  Release: release
 options:
   bundleIdPrefix: com.mealroutine
   deploymentTarget:
@@ -44,6 +48,11 @@ targets:
         CURRENT_PROJECT_VERSION: "4"
         CODE_SIGN_ENTITLEMENTS: MealRoutine/MealRoutine.entitlements
         INFOPLIST_FILE: MealRoutine/Info.plist
+      configs:
+        Debug-Local:
+          CODE_SIGN_ENTITLEMENTS: MealRoutine/MealRoutine.Local.entitlements
+          INFOPLIST_FILE: MealRoutine/Info-Local.plist
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG HOUSEHOLD_LOCAL
     dependencies:
       - target: MealRoutineShare
         embed: true
@@ -70,6 +79,10 @@ targets:
         CURRENT_PROJECT_VERSION: "4"
         SKIP_INSTALL: YES
         TARGETED_DEVICE_FAMILY: "1"
+      configs:
+        Debug-Local:
+          CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.Local.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG HOUSEHOLD_LOCAL
   MealRoutineTests:
     type: bundle.unit-test
     platform: iOS
@@ -85,3 +98,38 @@ targets:
         SWIFT_VERSION: "5.0"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MealRoutine.app/MealRoutine"
         BUNDLE_LOADER: "$(TEST_HOST)"
+      configs:
+        Debug-Local:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG HOUSEHOLD_LOCAL
+  MealRoutineUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: MealRoutineUITests
+    dependencies:
+      - target: MealRoutine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mealroutine.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        TEST_TARGET_NAME: MealRoutine
+schemes:
+  MealRoutine Local:
+    build:
+      targets:
+        MealRoutine: all
+        MealRoutineTests: [test]
+        MealRoutineUITests: [test]
+    run:
+      config: Debug-Local
+    test:
+      config: Debug-Local
+      targets:
+        - MealRoutineTests
+        - MealRoutineUITests
+    analyze:
+      config: Debug-Local
+    archive:
+      config: Release
