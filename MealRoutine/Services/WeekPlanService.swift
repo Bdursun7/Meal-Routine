@@ -4,6 +4,9 @@ import SwiftData
 enum WeekPlanError: LocalizedError {
     case noAlternative
     case missingPreferences
+        case notPlannable
+        case alreadyPlanned
+        case noOpenEvening
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +14,12 @@ enum WeekPlanError: LocalizedError {
             "Bu filtrelere uyan başka tarif kalmadı."
         case .missingPreferences:
             "Tercihler bulunamadı. Profil'den kurulumu tamamla."
+        case .notPlannable:
+            "Bu tarif plana eklenemiyor. Ad, malzeme veya yapılış eksik olabilir; ya da bir daha asla işaretli."
+        case .alreadyPlanned:
+            "Bu tarif bu haftada zaten var."
+        case .noOpenEvening:
+            "Bu haftanın açık akşamı kalmadı. Pişirilmiş akşamların üzerine yazılmaz."
         }
     }
 }
@@ -249,6 +258,69 @@ enum WeekPlanService {
         Analytics.track(.mealReplaced)
     }
 
+    /// Puts one saved import on the current week because the cook chose it.
+    /// Automatic planning still skips unknown time, never-again, and disliked ingredients.
+    @MainActor
+    static func placeImportedRecipe(slug: String, in context: ModelContext, now: Date = .now) throws {
+        let trimmed = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recipes = try context.fetch(FetchDescriptor<Recipe>())
+        guard let recipe = recipes.first(where: { $0.slug == trimmed }),
+              ImportedRecipeEligibility.allowsPlanning(recipe) else {
+            throw WeekPlanError.notPlannable
+        }
+        guard let prefs = try UserPrefsStore.existing(in: context) else {
+            throw WeekPlanError.missingPreferences
+        }
+        let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
+        if FeedbackIndex.latestRatings(in: feedback)[trimmed] == .never {
+            throw WeekPlanError.notPlannable
+        }
+        let memories = try MealMemoryService.snapshots(in: context)
+        if memories[trimmed]?.neverAgain == true {
+            throw WeekPlanError.notPlannable
+        }
+        if !recipe.ingredientIDs.isDisjoint(with: Set(prefs.dislikedIngredientIds)) {
+            throw WeekPlanError.notPlannable
+        }
+        guard let week = try ensureCurrentWeek(in: context, now: now) else {
+            throw WeekPlanError.missingPreferences
+        }
+        if week.meals.contains(where: { $0.recipeSlug == trimmed }) {
+            throw WeekPlanError.alreadyPlanned
+        }
+        let today = WeekCalendar.dayOffset(for: now, weekStart: week.weekStart)
+        let ordered = week.meals.sorted { $0.dayOffset < $1.dayOffset }
+        let open = ordered.filter { $0.cookedAt == nil }
+        guard let meal = open.first(where: { $0.dayOffset == today }) ?? open.first else {
+            throw WeekPlanError.noOpenEvening
+        }
+        let plannedAt = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
+        MealExposureLog.record([
+            RecentMealSighting(slug: meal.recipeSlug, at: plannedAt, wasCooked: false),
+        ], now: now)
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        for check in checks where check.mealUUID == meal.uuid {
+            context.delete(check)
+        }
+        meal.recipeSlug = trimmed
+        meal.titleSnapshot = recipe.displayName
+        meal.cookedAt = nil
+        meal.skippedAt = nil
+        try BehaviorTrackingService.record(
+            .selected,
+            recipeSlug: trimmed,
+            at: now,
+            planWeekID: week.uuid,
+            plannedMealID: meal.uuid,
+            in: context,
+            saves: false
+        )
+        try context.save()
+        GroceryListService.discardRebuildCache()
+        try GroceryListService.rebuild(in: context, now: now)
+        trackPersonalPlan(slug: trimmed, in: context)
+    }
+
     /// Records a skip without changing the recipe or the grocery list.
     @MainActor
     static func markSkipped(uuid: UUID, in context: ModelContext, at date: Date = .now) throws {
@@ -347,7 +419,8 @@ enum WeekPlanService {
         from recipes: [Recipe],
         ratings: [String: MealRating]
     ) -> [PickerCandidate] {
-        recipes.map { recipe in
+        recipes.compactMap { recipe in
+            guard ImportedRecipeEligibility.allowsPlanning(recipe) else { return nil }
             let orderedIds = recipe.ingredients
                 .sorted { lhs, rhs in
                     if lhs.sortIndex != rhs.sortIndex { return lhs.sortIndex < rhs.sortIndex }
@@ -369,9 +442,22 @@ enum WeekPlanService {
                 tags: Set(tags),
                 protein: MealRecommender.proteinFamily(in: orderedIds),
                 diets: Set(recipe.diets.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
-                difficulty: recipe.difficulty
+                difficulty: recipe.difficulty,
+                timeIsUnknown: recipe.timeIsUnknown,
+                importInterest: false
             )
         }
+    }
+
+    @MainActor
+    private static func trackPersonalPlan(slug: String, in context: ModelContext) {
+        guard let recipe = try? context.fetch(FetchDescriptor<Recipe>()).first(where: { $0.slug == slug }),
+              !recipe.isBundledCatalog else { return }
+        Analytics.track(.recipeAddedToPlan, properties: [
+            "origin": recipe.origin.rawValue,
+            "platform": recipe.sourcePlatform?.rawValue ?? "unknown",
+            "state": recipe.collectionState.rawValue,
+        ])
     }
 
     private static func recentSightings(
@@ -452,6 +538,9 @@ struct CatalogIndex: Equatable, Sendable {
     var bySlug: [String: PickerCandidate]
     var displayNames: [String: String]
     var ingredientNames: [String: String]
+    /// Ingredient names plus import source fields, built with the index.
+    /// The recipe list must not walk `recipe.ingredients` again while the tab appears.
+    var searchBlobs: [String: String] = [:]
 }
 
 @MainActor
@@ -461,6 +550,7 @@ enum CatalogIndexCache {
         var candidates: [PickerCandidate]
         var displayNames: [String: String]
         var ingredientNames: [String: String]
+        var searchBlobs: [String: String]
     }
 
     private static var base: Base?
@@ -503,25 +593,39 @@ enum CatalogIndexCache {
     }
 
     private static func ensureBase(_ recipes: [Recipe]) {
-        if let base, recipes.count <= base.candidates.count {
+        let key = recipeKey(recipes)
+        if let base, base.key == key {
             return
         }
-        let key = recipeKey(recipes)
         let unrated = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
         var displayNames: [String: String] = [:]
         var ingredientNames: [String: String] = [:]
+        var searchBlobs: [String: String] = [:]
         displayNames.reserveCapacity(recipes.count)
+        searchBlobs.reserveCapacity(recipes.count)
         for recipe in recipes {
             displayNames[recipe.slug] = recipe.displayName
-            for line in recipe.ingredients where ingredientNames[line.ingredientId] == nil {
-                ingredientNames[line.ingredientId] = line.displayName
+            var ingredientBlob: [String] = []
+            ingredientBlob.reserveCapacity(recipe.ingredients.count)
+            for line in recipe.ingredients {
+                if ingredientNames[line.ingredientId] == nil {
+                    ingredientNames[line.ingredientId] = line.displayName
+                }
+                ingredientBlob.append(line.displayName)
             }
+            searchBlobs[recipe.slug] = [
+                ingredientBlob.joined(separator: " "),
+                recipe.category,
+                recipe.sourceTitle,
+                recipe.userNotes,
+            ].joined(separator: " ")
         }
         let built = Base(
             key: key,
             candidates: unrated,
             displayNames: displayNames,
-            ingredientNames: ingredientNames
+            ingredientNames: ingredientNames,
+            searchBlobs: searchBlobs
         )
         base = built
         unratedIndex = makeIndex(from: built, candidates: unrated)
@@ -557,7 +661,8 @@ enum CatalogIndexCache {
             candidates: candidates,
             bySlug: Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first }),
             displayNames: base.displayNames,
-            ingredientNames: base.ingredientNames
+            ingredientNames: base.ingredientNames,
+            searchBlobs: base.searchBlobs
         )
     }
 
@@ -588,6 +693,10 @@ enum CatalogIndexCache {
             hasher.combine(recipe.difficulty)
             hasher.combine(recipe.tags)
             hasher.combine(recipe.diets)
+            hasher.combine(recipe.originRaw)
+            hasher.combine(recipe.collectionStateRaw)
+            hasher.combine(recipe.sourceURL)
+            hasher.combine(recipe.timeIsUnknown)
         }
         return hasher.finalize()
     }

@@ -16,6 +16,9 @@ struct MealRoutineApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .onOpenURL { url in
+                    CollectionRouter.shared.handleOpenURL(url)
+                }
         }
         .modelContainer(container)
     }

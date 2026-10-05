@@ -13,6 +13,7 @@ struct RecipeListView: View {
     @State private var allowsPhotos = false
     @State private var showsCatalog = false
     @State private var scrolledSlug: String?
+    @State private var router = CollectionRouter.shared
 
     var body: some View {
         NavigationStack {
@@ -24,8 +25,35 @@ struct RecipeListView: View {
                 }
             }
             .navigationTitle("Tarifler")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sıralama", selection: sortBinding) {
+                            ForEach(RecipeLibrarySort.allCases) { item in
+                                Text(item.title).tag(item)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .accessibilityLabel("Sıralama")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        router.editor = .newRecipe
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Yeni tarif")
+                }
+            }
             .navigationDestination(for: RecipeRoute.self) { route in
                 RecipeDetailView(route: route, allowsCookBar: false)
+            }
+            .navigationDestination(isPresented: openSlugIsPresented) {
+                if let slug = router.openSlug {
+                    RecipeDetailView(route: RecipeRoute(slug: slug), allowsCookBar: false)
+                }
             }
             .alert("Kaydedilemedi", isPresented: alertIsPresented) {
                 Button("Tamam", role: .cancel) {}
@@ -55,7 +83,8 @@ struct RecipeListView: View {
     private var selectedCatalog: some View {
         @Bindable var viewModel = self.viewModel
         let ratings = FeedbackIndex.latestRatings(in: feedback)
-        let visible = viewModel.filtered(recipes, ratings: ratings)
+        let visible = viewModel.filtered(recipes, ratings: ratings, memories: memories)
+        let memoryBySlug = Dictionary(memories.map { ($0.recipeSlug, $0) }, uniquingKeysWith: { first, _ in first })
         Group {
             if recipes.isEmpty {
                     WarmEmptyState(
@@ -71,6 +100,7 @@ struct RecipeListView: View {
                                 category: $viewModel.category,
                                 cookTime: $viewModel.cookTime,
                                 lovedOnly: $viewModel.lovedOnly,
+                                library: $viewModel.library,
                                 showsClear: viewModel.hasActiveFilters,
                                 onClear: viewModel.clearFilters
                             )
@@ -85,22 +115,7 @@ struct RecipeListView: View {
                                 recipeSearchEmpty
                             }
                         } else {
-                            Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
-                                ForEach(visible, id: \.slug) { recipe in
-                                    RecipeListRow(
-                                        recipe: recipe,
-                                        isLoved: ratings[recipe.slug] == .loved,
-                                        loadsPhoto: allowsPhotos,
-                                        onToggleFavorite: {
-                                            viewModel.toggleFavorite(
-                                                slug: recipe.slug,
-                                                isLoved: ratings[recipe.slug] == .loved,
-                                                in: modelContext
-                                            )
-                                        }
-                                    )
-                                }
-                            }
+                            recipeSections(visible, ratings: ratings, memoryBySlug: memoryBySlug)
                         }
                     }
                     .mealCanvas()
@@ -123,12 +138,71 @@ struct RecipeListView: View {
         )
     }
 
+    @ViewBuilder
+    private func recipeSections(
+        _ visible: [Recipe],
+        ratings: [String: MealRating],
+        memoryBySlug: [String: MealMemory]
+    ) -> some View {
+        let showGroups = viewModel.library == .all && !viewModel.hasSearchText && viewModel.category == .all
+        if showGroups {
+            let trying = visible.filter { !$0.isBundledCatalog && $0.collectionState == .savedToTry }
+            let ready = visible.filter { !$0.isBundledCatalog && $0.collectionState == .readyToCook }
+            let bundled = visible.filter(\.isBundledCatalog)
+            if !trying.isEmpty {
+                Section("Denenecek") {
+                    recipeRows(trying, ratings: ratings, memoryBySlug: memoryBySlug)
+                }
+            }
+            if !ready.isEmpty {
+                Section("Pişirmeye hazır") {
+                    recipeRows(ready, ratings: ratings, memoryBySlug: memoryBySlug)
+                }
+            }
+            if !bundled.isEmpty {
+                Section(viewModel.hasChipFilters ? "Sonuçlar" : "Katalog") {
+                    recipeRows(bundled, ratings: ratings, memoryBySlug: memoryBySlug)
+                }
+            }
+        } else {
+            Section(viewModel.hasActiveFilters ? "Sonuçlar" : "Tüm tarifler") {
+                recipeRows(visible, ratings: ratings, memoryBySlug: memoryBySlug)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func recipeRows(
+        _ recipes: [Recipe],
+        ratings: [String: MealRating],
+        memoryBySlug: [String: MealMemory]
+    ) -> some View {
+        ForEach(recipes, id: \.slug) { recipe in
+            let memory = memoryBySlug[recipe.slug]
+            RecipeListRow(
+                recipe: recipe,
+                isLoved: ratings[recipe.slug] == .loved,
+                badges: RecipeCollectionLabels.badges(for: recipe),
+                loadsPhoto: allowsPhotos,
+                onToggleFavorite: {
+                    viewModel.toggleFavorite(
+                        slug: recipe.slug,
+                        isLoved: ratings[recipe.slug] == .loved,
+                        in: modelContext
+                    )
+                }
+            )
+        }
+    }
+
     private var recipeSearchEmpty: some View {
         let searching = viewModel.hasSearchText
         let filtering = viewModel.hasChipFilters
-        let title = searching ? "Sonuç yok" : "Bu süzgeçte tarif yok"
+        let title = viewModel.library == .savedToTry && !searching ? "Denenecek tarif yok" : (searching ? "Sonuç yok" : "Bu süzgeçte tarif yok")
         let message: String
-        if searching && filtering {
+        if viewModel.library == .savedToTry && !searching {
+            message = "Paylaş menüsünden bir tarifi Deneyeceğim diye kaydedebilirsin."
+        } else if searching && filtering {
             message = "Bu arama ve süzgeçle eşleşen tarif yok."
         } else if searching {
             message = "Bu aramayla eşleşen tarif yok."
@@ -148,6 +222,22 @@ struct RecipeListView: View {
         .listRowBackground(Theme.cardSurface)
     }
 
+    private var sortBinding: Binding<RecipeLibrarySort> {
+        Binding(
+            get: { viewModel.sort },
+            set: { viewModel.sort = $0 }
+        )
+    }
+
+    private var openSlugIsPresented: Binding<Bool> {
+        Binding(
+            get: { router.openSlug != nil },
+            set: { isPresented in
+                if !isPresented { router.openSlug = nil }
+            }
+        )
+    }
+
     private var alertIsPresented: Binding<Bool> {
         Binding(
             get: { viewModel.errorMessage != nil },
@@ -162,6 +252,7 @@ private struct RecipeFilterBar: View {
     @Binding var category: RecipeBrowseCategory
     @Binding var cookTime: RecipeCookTimeFilter
     @Binding var lovedOnly: Bool
+    @Binding var library: RecipeLibraryScope
     var showsClear: Bool
     var onClear: () -> Void
 
@@ -178,6 +269,17 @@ private struct RecipeFilterBar: View {
                         hint: "Kategoriye göre süzer"
                     ) {
                         category = item
+                    }
+                }
+            }
+
+            Text("Koleksiyon")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 8) {
+                ForEach(RecipeLibraryScope.allCases) { item in
+                    FilterChip(title: item.title, isSelected: library == item, hint: "Koleksiyona göre süzer") {
+                        library = item
                     }
                 }
             }
@@ -220,6 +322,7 @@ private struct RecipeFilterBar: View {
 private struct RecipeListRow: View {
     var recipe: Recipe
     var isLoved: Bool
+    var badges: [String] = []
     var loadsPhoto: Bool
     var onToggleFavorite: () -> Void
     @State private var isPhotoShown = false
@@ -234,16 +337,23 @@ private struct RecipeListRow: View {
                         license: recipe.photoLicense,
                         layout: .thumbnail,
                         loadsPhoto: loadsPhoto,
+                        localImagePath: recipe.sourceImagePath,
                         isPhotoShown: $isPhotoShown
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recipe.displayName)
                             .font(.headline)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.turkish(recipe.difficulty)) · \(RegionLabel.turkish(recipe.country))")
+                        Text(rowSubtitle(recipe))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if !badges.isEmpty {
+                            Text(badges.joined(separator: " · "))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if isPhotoShown {
                             RecipePhotoCreditText(
                                 author: recipe.photoAuthor,
@@ -271,5 +381,21 @@ private struct RecipeListRow: View {
         }
         .padding(.vertical, 4)
         .listRowBackground(Theme.card)
+    }
+
+    private func rowSubtitle(_ recipe: Recipe) -> String {
+        if !recipe.isBundledCatalog && recipe.collectionState == .savedToTry {
+            let source = RecipeSourceService.displayName(
+                platform: recipe.sourcePlatform ?? .unknown,
+                sourceTitle: recipe.sourceTitle,
+                url: recipe.sourceURL
+            )
+            if let savedAt = recipe.savedAt {
+                return "\(source) · \(savedAt.formatted(date: .abbreviated, time: .omitted))"
+            }
+            return source
+        }
+        let time = recipe.timeIsUnknown ? "Süre yok" : "\(recipe.totalMinutes) dk"
+        return "\(time) · \(DifficultyLabel.turkish(recipe.difficulty)) · \(RegionLabel.turkish(recipe.country))"
     }
 }

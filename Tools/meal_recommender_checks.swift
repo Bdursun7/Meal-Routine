@@ -96,7 +96,7 @@ private func checkFilters() {
         maxCookMinutes: 90,
         dislikedIngredientIds: []
     )
-    check(capped.count == MealRecommender.eveningCap, "evenings should cap at 5, got \(capped.count)")
+    check(capped.count == MealRecommender.eveningCap, "evenings should cap at 7, got \(capped.count)")
     check(MealRecommender.pick(candidates: catalog, evenings: 0, maxCookMinutes: 90, dislikedIngredientIds: []).isEmpty, "zero evenings")
 }
 

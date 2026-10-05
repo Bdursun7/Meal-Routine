@@ -13,6 +13,15 @@ enum WeekCalendar {
         return calendar.startOfDay(for: start)
     }
 
+    static func dayOffset(for date: Date, weekStart: Date) -> Int {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        let start = calendar.startOfDay(for: weekStart)
+        let day = calendar.startOfDay(for: date)
+        let days = calendar.dateComponents([.day], from: start, to: day).day ?? 0
+        return min(max(days, 0), 6)
+    }
+
     static func date(weekStart: Date, dayOffset: Int) -> Date {
         var calendar = Calendar(identifier: .iso8601)
         calendar.timeZone = .current

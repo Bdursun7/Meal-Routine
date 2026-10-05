@@ -146,7 +146,7 @@ final class ProfileViewModel {
         }
     }
 
-    /// Deletes household prefs, the week, the grocery list, ratings, and the exposure log.
+    /// Deletes household prefs, the week, the grocery list, ratings, imports, and the exposure log.
     /// The bundled recipe catalog stays on device.
     func resetLocalData(in context: ModelContext) {
         do {
@@ -169,6 +169,11 @@ final class ProfileViewModel {
             for check in checks { context.delete(check) }
             let storedPrefs = try context.fetch(FetchDescriptor<UserPrefs>())
             for prefs in storedPrefs { context.delete(prefs) }
+            let imported = try context.fetch(FetchDescriptor<Recipe>())
+            for recipe in imported where !recipe.isBundledCatalog { context.delete(recipe) }
+            let drafts = try context.fetch(FetchDescriptor<RecipeImportDraft>())
+            for draft in drafts { context.delete(draft) }
+            CatalogIndexCache.invalidate()
             try context.save()
             UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
             didLoad = false

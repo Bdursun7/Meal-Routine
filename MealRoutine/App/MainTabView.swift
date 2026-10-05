@@ -19,6 +19,7 @@ struct MainTabView: View {
     /// Bu Hafta is the landing tab. The others are installed on first selection,
     /// after one turn, so their `@Query`s are not live during unrelated switches.
     @State private var installedTabs: Set<AppTab> = [.week]
+    @State private var router = CollectionRouter.shared
 
     private static let configureTabBar: Void = {
         let appearance = UITabBarAppearance()
@@ -38,6 +39,7 @@ struct MainTabView: View {
     }
 
     var body: some View {
+        @Bindable var router = router
         TabView(selection: $selectedTab) {
             tabRoot(.week, title: "Bu Hafta", symbol: "calendar", selectedSymbol: "calendar.circle.fill") {
                 ThisWeekView(
@@ -56,6 +58,25 @@ struct MainTabView: View {
             }
         }
         .tint(Theme.accent)
+        .sheet(item: $router.editor) { launch in
+            RecipeEditorView(launch: launch)
+        }
+        .onChange(of: router.editor?.id) { _, id in
+            guard id != nil else { return }
+            installedTabs.insert(.recipes)
+            selectedTab = .recipes
+        }
+        .onChange(of: router.openSlug) { _, slug in
+            guard slug != nil else { return }
+            installedTabs.insert(.recipes)
+            selectedTab = .recipes
+        }
+        .onAppear {
+            if router.editor != nil || router.openSlug != nil {
+                installedTabs.insert(.recipes)
+                selectedTab = .recipes
+            }
+        }
         .onChange(of: selectedTab) { _, tab in
             guard !installedTabs.contains(tab) else { return }
             Task { @MainActor in

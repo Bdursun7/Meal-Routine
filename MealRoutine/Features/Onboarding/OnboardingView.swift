@@ -158,7 +158,7 @@ struct OnboardingView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
-                    bullet("Haftada en fazla 5 akşam", systemImage: "calendar")
+                    bullet("Haftada en fazla 7 akşam", systemImage: "calendar")
                     bullet("Tek yemek Değiştir (tüm haftayı silmez)", systemImage: "arrow.triangle.2.circlepath")
                     bullet(
                         "Pişirdim + Sevdim/İdare/Asla → sonraki haftalar; market plandan birleşir",
@@ -205,7 +205,7 @@ struct OnboardingView: View {
                             }
                         }
                     }
-                    Text("Haftada en fazla 5 akşam.")
+                    Text("Haftada en fazla 7 akşam.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

@@ -356,10 +356,11 @@ private func checkGroupingAndQuantityEdits() {
 }
 
 private func checkEveningLabels() {
-    check(EveningCountOptions.values == [1, 2, 3, 4, 5], "evening choices stay 1...5")
+    check(EveningCountOptions.values == [1, 2, 3, 4, 5, 6, 7], "evening choices stay 1...7")
     check(EveningCountOptions.label(1) == "1 akşam", "one evening label")
     check(EveningCountOptions.label(3) == "3 akşam", "three evening label")
     check(EveningCountOptions.label(5) == "5 akşam", "five evening label")
+    check(EveningCountOptions.label(7) == "7 akşam", "seven evening label")
     check(!EveningCountOptions.label(4).contains("Evening"), "labels stay Turkish")
 }
 

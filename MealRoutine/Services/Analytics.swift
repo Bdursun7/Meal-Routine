@@ -31,6 +31,15 @@ enum AnalyticsEvent: String, CaseIterable, Sendable {
     case smartReplacementUsed = "smart_replacement_used"
     case newRecipeCooked = "new_recipe_cooked"
     case familiarRecipeCooked = "familiar_recipe_cooked"
+    case recipeQuickSaved = "recipe_quick_saved"
+    case recipeCompletionStarted = "recipe_completion_started"
+    case recipeCompletionFinished = "recipe_completion_finished"
+    case recipeCompletionAbandoned = "recipe_completion_abandoned"
+    case recipeAddedManually = "recipe_added_manually"
+    case recipeOpenedOriginal = "recipe_opened_original"
+    case recipeAddedToPlan = "recipe_added_to_plan"
+    case savedRecipeDeleted = "saved_recipe_deleted"
+    case savedRecipeDuplicateDetected = "saved_recipe_duplicate_detected"
 }
 
 struct AnalyticsEntry: Equatable, Sendable {

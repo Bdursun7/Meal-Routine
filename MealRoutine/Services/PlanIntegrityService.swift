@@ -17,7 +17,13 @@ enum PlanIntegrityService {
     @MainActor
     static func repair(in context: ModelContext, now: Date = .now) throws -> Bool {
         let recipes = try context.fetch(FetchDescriptor<Recipe>())
-        let live = Set(recipes.map(\.slug))
+        let mealsForSnapshots = try context.fetch(FetchDescriptor<PlannedMeal>())
+        let snapshotSlugs = Set(
+            mealsForSnapshots
+                .filter { !$0.titleSnapshot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .map(\.recipeSlug)
+        )
+        let live = Set(recipes.map(\.slug)).union(snapshotSlugs)
         let meals = try context.fetch(FetchDescriptor<PlannedMeal>())
         let currentWeek = try WeekPlanService.currentWeek(in: context, now: now)
         let currentID = currentWeek?.uuid

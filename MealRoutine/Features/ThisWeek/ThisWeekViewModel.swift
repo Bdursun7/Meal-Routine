@@ -137,7 +137,8 @@ final class ThisWeekViewModel {
                     id: meal.uuid,
                     dayTitle: WeekCalendar.dayTitle(offset: meal.dayOffset),
                     dateTitle: WeekCalendar.shortDate(date),
-                    recipeName: recipe?.displayName ?? meal.recipeSlug,
+                    recipeName: recipe?.displayName
+                        ?? (meal.titleSnapshot.isEmpty ? meal.recipeSlug : meal.titleSnapshot),
                     minutes: recipe?.totalMinutes ?? 0,
                     difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
                     servings: ActiveServings.resolve(
