@@ -97,10 +97,10 @@ enum HouseholdSizeLimits {
     }
 }
 
-/// Evenings planned per week. The stored range is 1...5, matching `MealRecommender.eveningCap`.
+/// Evenings planned per week. The stored range is 1...7, matching `MealRecommender.eveningCap`.
 enum EveningCountOptions {
     static let minimum = 1
-    static let maximum = 5
+    static let maximum = 7
     static var values: [Int] { Array(minimum...maximum) }
 
     /// Chip and picker label. Always a Turkish phrase, never a raw count or type dump.

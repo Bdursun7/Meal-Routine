@@ -57,7 +57,7 @@ struct MealRankBreakdown: Equatable, Sendable {
 /// anchor so the next evening pays for repeating it. Ties break on ascending slug.
 enum MealRecommender {
     /// Keep equal to `EveningCountOptions.maximum`. The onboarding chips use that list.
-    static let eveningCap = 5
+    static let eveningCap = 7
     static let recencyWindowDays = 21
     static let secondsPerDay = 86_400
 
