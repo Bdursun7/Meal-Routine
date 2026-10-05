@@ -1,6 +1,6 @@
 import Foundation
 
-struct HouseholdServerConflict: Error {
+struct HouseholdServerConflict: Error, Sendable {
     var server: HouseholdSnapshot
 }
 

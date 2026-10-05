@@ -109,7 +109,7 @@ enum HouseholdExclusion: String, Equatable, Sendable {
     case householdAvoided
 }
 
-enum HouseholdError: Error, Equatable, LocalizedError {
+enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
     case nameEmpty
     case alreadyInHousehold
     case notOwner
