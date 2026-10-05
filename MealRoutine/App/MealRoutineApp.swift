@@ -17,7 +17,7 @@ struct MealRoutineApp: App {
         WindowGroup {
             RootView()
                 .onOpenURL { url in
-                    ImportInboxRouter.shared.handleOpenURL(url)
+                    CollectionRouter.shared.handleOpenURL(url)
                 }
         }
         .modelContainer(container)

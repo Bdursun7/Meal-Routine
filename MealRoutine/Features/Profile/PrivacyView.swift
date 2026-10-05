@@ -8,7 +8,7 @@ struct PrivacyView: View {
                 Text("Verilerin bu telefonda durur. Hesap yok, bulut yok.")
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Haftan, tercihlerin, puanların, yemek hafızan, market listen ve içe aktardığın tarifler cihazdan çıkmaz. Kaynak adresi de bu telefonda kalır. Konum istenmez. Temel kişiselleştirme internet olmadan çalışır.")
+                Text("Haftan, tercihlerin, puanların, yemek hafızan, market listen ve kaydettiğin tarifler cihazdan çıkmaz. Kaynak adresi de bu telefonda kalır. Konum istenmez. Temel kişiselleştirme internet olmadan çalışır.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

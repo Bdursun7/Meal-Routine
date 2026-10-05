@@ -13,9 +13,13 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 3. If you run on a device, pick your Development Team under Signing & Capabilities. The simulator can use Sign to Run Locally.
 4. Run. The first launch imports `MealRoutine/Recipes/recipes.v1.json` into SwiftData.
 
-## V3 recipe import
+## V3 Personal Recipe Collection
 
-On branch `v3.0-import` (or a PR into that branch), Tarifler → **+** saves a recipe by hand, from a public link, or from pasted text. Review is required before it can be planned. Instagram and TikTok links stay source references unless the page exposes a public recipe; paste the caption or enter the recipe by hand. The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). On the simulator, paste and manual entry are the reliable path if the extension is not signed into the App Group yet. Imported recipes are not MealRoutine text and are not favorites until you say so.
+On branch `v3.0-import` (or a PR into that branch), a shared link is only a source. MealRoutine does not download or reconstruct the recipe.
+
+Share to MealRoutine, tap **Deneyeceğim**, and the discovery lands in Tarifler → **Denenecek** with its title, URL, platform, and image when the system provides them. No ingredients are required yet. **Tarifi tamamla** or Tarifler → **+** → **Yeni tarif** opens the same editor. A recipe becomes **Pişirmeye hazır** only after a name, at least one ingredient with a quantity, at least one step, and servings. Only those recipes enter the week, the grocery list, and Meal Memory. Favorites stay the existing Sevdiklerim heart.
+
+The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It writes a capture file before it closes, and the app copies that into SwiftData on the next launch. On the simulator, **Yeni tarif** works without the extension. The share sheet needs the App Group signed. Duplicate detection compares a normalized source URL and never overwrites a saved recipe.
 
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 
@@ -58,6 +62,8 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 2. **MealRoutine** şemasını ve iOS 18+ bir simülatör seç.
 3. Gerçek cihazda çalıştıracaksan Signing & Capabilities altından Development Team seç. Simülatör için Sign to Run Locally yeter.
 4. Çalıştır. İlk açılışta `MealRoutine/Recipes/recipes.v1.json` SwiftData'ya alınır.
+
+V3 kişisel tarif koleksiyonudur. Paylaşılan adres yalnızca kaynaktır; sayfa indirilmez ve tarif metni uydurulmaz. **Deneyeceğim** tarifi Denenecek listesine koyar. **Tarifi tamamla** ve **Yeni tarif** aynı formu kullanır. Haftaya, markete ve yemek hafızasına yalnız pişirmeye hazır tarifler girer.
 
 `project.yml`, isteğe bağlı bir XcodeGen tarifidir. Projeyi açmak için gerekmez. `xcodegen generate` mevcut `MealRoutine.xcodeproj` dosyasını yeniden yazar.
 

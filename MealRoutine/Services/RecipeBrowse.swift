@@ -73,22 +73,22 @@ enum RecipeCookTimeFilter: String, CaseIterable, Identifiable, Sendable {
 
 enum RecipeLibraryScope: String, CaseIterable, Identifiable, Sendable {
     case all
-    case builtIn
-    case imported
+    case catalog
+    case savedToTry
+    case readyToCook
     case notTried
     case cooked
-    case needsReview
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .all: "Tümü"
-        case .builtIn: "Katalog"
-        case .imported: "İçe aktarılan"
+        case .catalog: "Katalog"
+        case .savedToTry: "Denenecek"
+        case .readyToCook: "Pişirmeye hazır"
         case .notTried: "Denenmemiş"
         case .cooked: "Pişirilen"
-        case .needsReview: "İnceleme"
         }
     }
 }
@@ -133,8 +133,8 @@ struct RecipeBrowseItem: Equatable, Sendable {
     var diets: Set<String>
     var tags: Set<String>
     var isLoved: Bool
-    var origin: String = RecipeOrigin.builtIn.rawValue
-    var requiresReview: Bool = false
+    var origin: String = "builtIn"
+    var collectionState: String = "readyToCook"
     var importedAt: Date? = nil
     var lastCookedAt: Date? = nil
     var timesCooked: Int = 0
@@ -161,16 +161,16 @@ enum RecipeBrowse {
         switch scope {
         case .all:
             return true
-        case .builtIn:
-            return item.origin == RecipeOrigin.builtIn.rawValue || item.origin.isEmpty
-        case .imported:
-            return item.origin == RecipeOrigin.imported.rawValue || item.origin == RecipeOrigin.manual.rawValue
+        case .catalog:
+            return item.origin == "builtIn" || item.origin.isEmpty
+        case .savedToTry:
+            return item.collectionState == "savedToTry"
+        case .readyToCook:
+            return item.origin != "builtIn" && !item.origin.isEmpty && item.collectionState == "readyToCook"
         case .notTried:
-            return item.timesCooked == 0
+            return item.collectionState != "savedToTry" && item.timesCooked == 0
         case .cooked:
             return item.timesCooked > 0
-        case .needsReview:
-            return item.requiresReview
         }
     }
 

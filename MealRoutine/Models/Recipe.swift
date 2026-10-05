@@ -59,6 +59,12 @@ final class Recipe {
     var timeIsUnknown: Bool = false
     /// True when the source did not give a yield. Amounts stay as written.
     var servingsUnspecified: Bool = false
+    /// Personal collection. Catalog rows stay ready to cook.
+    var collectionStateRaw: String = RecipeCollectionState.readyToCook.rawValue
+    /// Relative path of a shared or chosen photo. Empty when there is no local image.
+    var sourceImagePath: String = ""
+    var savedAt: Date? = nil
+    var completedAt: Date? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \IngredientLine.recipe)
     var ingredients: [IngredientLine] = []
@@ -143,8 +149,20 @@ final class Recipe {
     }
 
     var origin: RecipeOrigin {
-        get { RecipeOrigin(rawValue: originRaw) ?? .builtIn }
+        get {
+            let raw = originRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if raw == "imported" { return .savedExternal }
+            return RecipeOrigin(rawValue: raw) ?? .builtIn
+        }
         set { originRaw = newValue.rawValue }
+    }
+
+    var collectionState: RecipeCollectionState {
+        get {
+            if origin == .builtIn { return .readyToCook }
+            return RecipeCollectionState(rawValue: collectionStateRaw) ?? .readyToCook
+        }
+        set { collectionStateRaw = newValue.rawValue }
     }
 
     var sourcePlatform: RecipeSourcePlatform? {
@@ -156,16 +174,7 @@ final class Recipe {
         set { sourcePlatformRaw = newValue?.rawValue ?? "" }
     }
 
-    var importStatus: RecipeImportStatus? {
-        get {
-            let raw = importStatusRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !raw.isEmpty else { return nil }
-            return RecipeImportStatus(rawValue: raw)
-        }
-        set { importStatusRaw = newValue?.rawValue ?? "" }
-    }
-
-    /// Bundled UniTools and MealRoutine originals. User imports are never this.
+    /// Bundled UniTools and MealRoutine originals. Personal recipes are never this.
     var isBundledCatalog: Bool {
         origin == .builtIn
     }

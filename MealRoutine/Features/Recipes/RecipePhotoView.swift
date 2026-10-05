@@ -29,6 +29,8 @@ struct RecipePhotoView: View {
     /// False while a tab switch is in flight. The row stays a placeholder and
     /// does not start a fetch that would finish on the main actor mid-animation.
     var loadsPhoto: Bool
+    /// Local collection photo. Empty for catalog rows.
+    var localImagePath: String
     @Binding var isPhotoShown: Bool
 
     @State private var image: UIImage?
@@ -40,6 +42,7 @@ struct RecipePhotoView: View {
         license: String,
         layout: Layout,
         loadsPhoto: Bool = true,
+        localImagePath: String = "",
         isPhotoShown: Binding<Bool>
     ) {
         self.urlString = urlString
@@ -47,9 +50,11 @@ struct RecipePhotoView: View {
         self.license = license
         self.layout = layout
         self.loadsPhoto = loadsPhoto
+        self.localImagePath = localImagePath
         _isPhotoShown = isPhotoShown
         let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
-        _phase = State(initialValue: hasRemotePhoto ? .loading : .missing)
+        let hasLocalPhoto = !localImagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        _phase = State(initialValue: (hasRemotePhoto || hasLocalPhoto) ? .loading : .missing)
     }
 
     var body: some View {
@@ -86,7 +91,7 @@ struct RecipePhotoView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(phase == .shown ? .isImage : [])
-        .task(id: loadsPhoto ? urlString : "") {
+        .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)" : "") {
             guard loadsPhoto else { return }
             await load()
         }
@@ -176,6 +181,12 @@ struct RecipePhotoView: View {
     }
 
     private func load() async {
+        if RecipePhoto.remoteURL(from: urlString) == nil, let local = localBitmap() {
+            image = local
+            phase = .shown
+            isPhotoShown = true
+            return
+        }
         guard let remoteURL = RecipePhoto.remoteURL(from: urlString) else {
             image = nil
             isPhotoShown = false
@@ -205,6 +216,14 @@ struct RecipePhotoView: View {
         image = decoded
         phase = .shown
         isPhotoShown = true
+    }
+
+    private func localBitmap() -> UIImage? {
+        guard let url = RecipeCaptureStore.resolve(localImagePath),
+              let image = UIImage(contentsOfFile: url.path),
+              image.size.width > 0,
+              image.size.height > 0 else { return nil }
+        return image
     }
 }
 

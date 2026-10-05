@@ -54,6 +54,7 @@ targets:
     sources:
       - path: ShareExtension
       - path: MealRoutine/Features/RecipeImport/ShareHandoff.swift
+      - path: MealRoutine/Services/Import/RecipeSourceService.swift
     info:
       path: ShareExtension/Info.plist
     entitlements:

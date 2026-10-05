@@ -105,10 +105,10 @@
 		DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */; };
 		FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */; };
 		V3B0000000000000000001 /* RecipeImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000001 /* RecipeImportModels.swift */; };
-		V3B0000000000000000002 /* RecipeTextParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000002 /* RecipeTextParsing.swift */; };
-		V3B0000000000000000003 /* RecipeExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000003 /* RecipeExtractionService.swift */; };
 		V3B0000000000000000004 /* RecipeImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000004 /* RecipeImportService.swift */; };
-		V3B0000000000000000005 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000005 /* ImportFlowView.swift */; };
+		V3B0000000000000000005 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000005 /* RecipeEditorView.swift */; };
+		V3B000000000000000000A /* RecipeSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F000000000000000000A /* RecipeSourceService.swift */; };
+		V3B000000000000000000B /* RecipeSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F000000000000000000A /* RecipeSourceService.swift */; };
 		V3B0000000000000000006 /* ShareHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000006 /* ShareHandoff.swift */; };
 		V3B0000000000000000007 /* RecipeImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000007 /* RecipeImportTests.swift */; };
 		V3B0000000000000000008 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000008 /* ShareViewController.swift */; };
@@ -235,10 +235,9 @@
 		EB823C20A65F9CE4E65A465C /* RecommendationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationCard.swift; sourceTree = "<group>"; };
 		C71E44585EC49ABAB58ED8A8 /* PersonalizedDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedDiscoveryView.swift; sourceTree = "<group>"; };
 		V3F0000000000000000001 /* RecipeImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportModels.swift; sourceTree = "<group>"; };
-		V3F0000000000000000002 /* RecipeTextParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeTextParsing.swift; sourceTree = "<group>"; };
-		V3F0000000000000000003 /* RecipeExtractionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeExtractionService.swift; sourceTree = "<group>"; };
 		V3F0000000000000000004 /* RecipeImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportService.swift; sourceTree = "<group>"; };
-		V3F0000000000000000005 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
+		V3F0000000000000000005 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
+		V3F000000000000000000A /* RecipeSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeSourceService.swift; sourceTree = "<group>"; };
 		V3F0000000000000000006 /* ShareHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareHandoff.swift; sourceTree = "<group>"; };
 		V3F0000000000000000007 /* RecipeImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportTests.swift; sourceTree = "<group>"; };
 		V3F0000000000000000008 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -458,8 +457,7 @@
 		V3GRP0000000000000001 /* Import */ = {
 			isa = PBXGroup;
 			children = (
-				V3F0000000000000000002 /* RecipeTextParsing.swift */,
-				V3F0000000000000000003 /* RecipeExtractionService.swift */,
+				V3F000000000000000000A /* RecipeSourceService.swift */,
 				V3F0000000000000000004 /* RecipeImportService.swift */,
 			);
 			path = Import;
@@ -468,7 +466,7 @@
 		V3GRP0000000000000002 /* RecipeImport */ = {
 			isa = PBXGroup;
 			children = (
-				V3F0000000000000000005 /* ImportFlowView.swift */,
+				V3F0000000000000000005 /* RecipeEditorView.swift */,
 				V3F0000000000000000006 /* ShareHandoff.swift */,
 			);
 			path = RecipeImport;
@@ -778,10 +776,9 @@
 				DD5B168722012CD8552373C0 /* RecommendationCard.swift in Sources */,
 				FB67A557CE8DFBB75F40CED5 /* PersonalizedDiscoveryView.swift in Sources */,
 				V3B0000000000000000001 /* RecipeImportModels.swift in Sources */,
-				V3B0000000000000000002 /* RecipeTextParsing.swift in Sources */,
-				V3B0000000000000000003 /* RecipeExtractionService.swift in Sources */,
+				V3B000000000000000000A /* RecipeSourceService.swift in Sources */,
 				V3B0000000000000000004 /* RecipeImportService.swift in Sources */,
-				V3B0000000000000000005 /* ImportFlowView.swift in Sources */,
+				V3B0000000000000000005 /* RecipeEditorView.swift in Sources */,
 				V3B0000000000000000006 /* ShareHandoff.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -807,6 +804,7 @@
 			files = (
 				V3B0000000000000000008 /* ShareViewController.swift in Sources */,
 				V3B0000000000000000009 /* ShareHandoff.swift in Sources */,
+				V3B000000000000000000B /* RecipeSourceService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

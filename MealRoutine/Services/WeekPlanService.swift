@@ -256,7 +256,6 @@ enum WeekPlanService {
         )
         try context.save()
         Analytics.track(.mealReplaced)
-        trackImportedOutcome(.importedRecipeReplaced, slug: trimmed, in: context)
     }
 
     /// Puts one saved import on the current week because the cook chose it.
@@ -319,7 +318,7 @@ enum WeekPlanService {
         try context.save()
         GroceryListService.discardRebuildCache()
         try GroceryListService.rebuild(in: context, now: now)
-        trackImportedOutcome(.importedRecipeAddedToPlan, slug: trimmed, in: context)
+        trackPersonalPlan(slug: trimmed, in: context)
     }
 
     /// Records a skip without changing the recipe or the grocery list.
@@ -359,7 +358,6 @@ enum WeekPlanService {
             )
             try context.save()
             Analytics.track(.mealCooked)
-            trackImportedOutcome(.importedRecipeCooked, slug: meal.recipeSlug, in: context)
         }
     }
 
@@ -374,7 +372,6 @@ enum WeekPlanService {
         Analytics.track(.recipeRated)
         if loved {
             Analytics.track(.recipeLoved)
-            trackImportedOutcome(.importedRecipeFavorited, slug: trimmed, in: context)
         }
     }
 
@@ -407,7 +404,6 @@ enum WeekPlanService {
             saves: false
         )
         try context.save()
-        trackImportedOutcome(.importedRecipeFeedbackGiven, slug: slug, in: context)
     }
 
     static func planRequest(from prefs: UserPrefs) -> PlanRequest {
@@ -437,7 +433,7 @@ enum WeekPlanService {
                 .filter { !$0.isEmpty }
             return PickerCandidate(
                 slug: recipe.slug,
-                totalMinutes: recipe.timeIsUnknown ? 10_000 : recipe.totalMinutes,
+                totalMinutes: recipe.totalMinutes,
                 trDogfoodScore: recipe.trDogfoodScore,
                 ingredientIds: Set(orderedIds),
                 rating: ratings[recipe.slug],
@@ -448,20 +444,20 @@ enum WeekPlanService {
                 diets: Set(recipe.diets.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
                 difficulty: recipe.difficulty,
                 timeIsUnknown: recipe.timeIsUnknown,
-                importInterest: !recipe.isBundledCatalog
+                importInterest: false
             )
         }
     }
 
     @MainActor
-    private static func trackImportedOutcome(
-        _ event: AnalyticsEvent,
-        slug: String,
-        in context: ModelContext
-    ) {
+    private static func trackPersonalPlan(slug: String, in context: ModelContext) {
         guard let recipe = try? context.fetch(FetchDescriptor<Recipe>()).first(where: { $0.slug == slug }),
               !recipe.isBundledCatalog else { return }
-        Analytics.track(event, properties: ["origin": recipe.origin.rawValue])
+        Analytics.track(.recipeAddedToPlan, properties: [
+            "origin": recipe.origin.rawValue,
+            "platform": recipe.sourcePlatform?.rawValue ?? "unknown",
+            "state": recipe.collectionState.rawValue,
+        ])
     }
 
     private static func recentSightings(
@@ -597,10 +593,10 @@ enum CatalogIndexCache {
     }
 
     private static func ensureBase(_ recipes: [Recipe]) {
-        if let base, recipes.count <= base.candidates.count {
+        let key = recipeKey(recipes)
+        if let base, base.key == key {
             return
         }
-        let key = recipeKey(recipes)
         let unrated = WeekPlanService.pickerCandidates(from: recipes, ratings: [:])
         var displayNames: [String: String] = [:]
         var ingredientNames: [String: String] = [:]
@@ -697,6 +693,10 @@ enum CatalogIndexCache {
             hasher.combine(recipe.difficulty)
             hasher.combine(recipe.tags)
             hasher.combine(recipe.diets)
+            hasher.combine(recipe.originRaw)
+            hasher.combine(recipe.collectionStateRaw)
+            hasher.combine(recipe.sourceURL)
+            hasher.combine(recipe.timeIsUnknown)
         }
         return hasher.finalize()
     }

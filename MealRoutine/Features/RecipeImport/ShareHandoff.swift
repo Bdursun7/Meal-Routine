@@ -1,119 +1,155 @@
 import Foundation
 import Observation
 
-/// One shared item waiting for review. The share extension and the app both use this file.
-struct SharedImportPayload: Codable, Equatable, Sendable, Identifiable {
-    var id: UUID
-    var urlString: String?
-    var text: String?
-    var sourceHint: String?
-    var receivedAt: Date
-
-    init(
-        id: UUID = UUID(),
-        urlString: String? = nil,
-        text: String? = nil,
-        sourceHint: String? = nil,
-        receivedAt: Date = .now
-    ) {
-        self.id = id
-        self.urlString = urlString
-        self.text = text
-        self.sourceHint = sourceHint
-        self.receivedAt = receivedAt
-    }
-}
-
-/// App Group inbox. When the group is unavailable the main app still reads its own support folder.
-enum ShareHandoff {
+/// App Group files the share extension writes before it closes.
+/// The main app copies them into SwiftData the next time it is open.
+enum RecipeCaptureStore {
     static let appGroupID = "group.com.mealroutine.app"
-    static let fileName = "import-inbox.json"
-    private static let defaultsKey = "import-inbox"
+    static let capturesName = "captures.json"
+    static let indexName = "collection-index.json"
+    static let imageDirectory = "RecipeImages"
 
-    static func write(_ payload: SharedImportPayload) throws {
-        let data = try JSONEncoder().encode(payload)
-        let url = try inboxFileURL()
+    static func enqueue(_ capture: RecipeCapture) throws {
+        var pending = pending()
+        pending.removeAll { $0.id == capture.id }
+        pending.append(capture)
+        try write(pending, name: capturesName)
+    }
+
+    static func pending() -> [RecipeCapture] {
+        read([RecipeCapture].self, name: capturesName) ?? []
+    }
+
+    static func remove(ids: Set<UUID>) {
+        let remaining = pending().filter { !ids.contains($0.id) }
+        try? write(remaining, name: capturesName)
+    }
+
+    static func index() -> [CollectionSourceRecord] {
+        read([CollectionSourceRecord].self, name: indexName) ?? []
+    }
+
+    static func writeIndex(_ records: [CollectionSourceRecord]) throws {
+        try write(records, name: indexName)
+    }
+
+    /// Existing collection row for this URL, if the index or a waiting capture already has it.
+    static func existingSlug(for rawURL: String?) -> String? {
+        guard let rawURL, let key = RecipeSourceService.normalizedKey(rawURL) else { return nil }
+        if let record = index().first(where: { $0.normalizedURL == key }) {
+            return record.slug
+        }
+        let waiting = pending().contains { capture in
+            guard !capture.allowDuplicate, let other = capture.urlString else { return false }
+            return RecipeSourceService.normalizedKey(other) == key
+        }
+        return waiting ? "pending" : nil
+    }
+
+    static func saveImage(_ data: Data, id: UUID) throws -> String {
+        let relative = "\(imageDirectory)/\(id.uuidString.lowercased()).jpg"
+        let url = try fileURL(relative)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         try data.write(to: url, options: .atomic)
-        UserDefaults(suiteName: appGroupID)?.set(data, forKey: defaultsKey)
+        return relative
     }
 
-    static func peek() -> SharedImportPayload? {
-        if let url = try? inboxFileURL(),
-           let data = try? Data(contentsOf: url),
-           let payload = try? JSONDecoder().decode(SharedImportPayload.self, from: data) {
-            return payload
+    static func resolve(_ storedPath: String) -> URL? {
+        let trimmed = storedPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasPrefix("/") {
+            return URL(fileURLWithPath: trimmed)
         }
-        if let data = UserDefaults(suiteName: appGroupID)?.data(forKey: defaultsKey),
-           let payload = try? JSONDecoder().decode(SharedImportPayload.self, from: data) {
-            return payload
-        }
-        return nil
+        return try? fileURL(trimmed)
     }
 
-    static func consume() -> SharedImportPayload? {
-        let payload = peek()
-        if let url = try? inboxFileURL() {
-            try? FileManager.default.removeItem(at: url)
-        }
-        UserDefaults(suiteName: appGroupID)?.removeObject(forKey: defaultsKey)
-        return payload
+    private static func read<T: Decodable>(_ type: T.Type, name: String) -> T? {
+        guard let url = try? fileURL(name),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
     }
 
-    /// Enough for the share extension, which does not link the recipe parser.
-    static func publicHTTPURL(_ raw: String) -> URL? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https",
-              url.host?.contains(".") == true else { return nil }
-        return url
-    }
-
-    static func inboxFileURL() throws -> URL {
-        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            return group.appendingPathComponent(fileName)
-        }
-        let support = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
+    private static func write<T: Encodable>(_ value: T, name: String) throws {
+        let data = try JSONEncoder().encode(value)
+        let url = try fileURL(name)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
         )
-        return support
-            .appendingPathComponent("MealRoutine", isDirectory: true)
-            .appendingPathComponent(fileName)
+        try data.write(to: url, options: .atomic)
+    }
+
+    private static func fileURL(_ name: String) throws -> URL {
+        let root: URL
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            root = group
+        } else {
+            let support = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            root = support.appendingPathComponent("MealRoutine", isDirectory: true)
+        }
+        return root.appendingPathComponent(name)
     }
 }
 
-/// Opens the import sheet when a share lands, including after onboarding.
+enum RecipeEditorLaunch: Identifiable, Equatable {
+    case newRecipe
+    case recipe(String)
+
+    var id: String {
+        switch self {
+        case .newRecipe: "new"
+        case .recipe(let slug): "recipe-\(slug)"
+        }
+    }
+
+    var slug: String? {
+        switch self {
+        case .newRecipe: nil
+        case .recipe(let slug): slug
+        }
+    }
+}
+
+/// Opens a saved recipe or the editor after a share link. Capture files are drained separately.
 @MainActor
 @Observable
-final class ImportInboxRouter {
-    static let shared = ImportInboxRouter()
+final class CollectionRouter {
+    static let shared = CollectionRouter()
 
-    var presentationID: UUID?
-    var payload: SharedImportPayload?
-
-    func refreshFromInbox() {
-        guard let payload = ShareHandoff.peek() else { return }
-        self.payload = payload
-        presentationID = payload.id
-    }
+    var openSlug: String?
+    var editor: RecipeEditorLaunch?
+    var pendingCaptureID: UUID?
 
     func handleOpenURL(_ url: URL) {
         guard url.scheme?.lowercased() == "mealroutine" else { return }
-        refreshFromInbox()
+        let host = url.host?.lowercased() ?? ""
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        switch host {
+        case "recipe":
+            let slug = items.first { $0.name == "slug" }?.value?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let slug, !slug.isEmpty, slug != "pending" {
+                openSlug = slug
+            }
+        case "complete":
+            if let raw = items.first(where: { $0.name == "capture" })?.value {
+                pendingCaptureID = UUID(uuidString: raw)
+            }
+        default:
+            break
+        }
     }
 
-    func takePayload() -> SharedImportPayload? {
-        let current = payload ?? ShareHandoff.peek()
-        _ = ShareHandoff.consume()
-        payload = nil
-        presentationID = nil
-        return current
+    func applyDrain(_ mapped: [UUID: String]) {
+        guard let id = pendingCaptureID, let slug = mapped[id] else { return }
+        editor = .recipe(slug)
+        pendingCaptureID = nil
     }
 }

@@ -17,7 +17,7 @@ enum Attribution {
             return uniTools
         }
         let line = attribution.trimmingCharacters(in: .whitespacesAndNewlines)
-        if key == "import" || key == "manual" {
+        if key == "import" || key == "manual" || key == "saved" || key == "external" {
             return line.isEmpty ? "Kaynak: dış tarif" : line
         }
         if line.isEmpty {

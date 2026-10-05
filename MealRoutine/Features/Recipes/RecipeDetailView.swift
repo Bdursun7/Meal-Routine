@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// A neighbor from the warmed catalog index. Detail fetches only its own recipe.
 private struct SimilarRecipeLink: Identifiable {
@@ -96,9 +97,17 @@ struct RecipeDetailView: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if let recipe, !recipe.isBundledCatalog {
                 Menu {
-                    Button("Düzenle") { showsImportEditor = true }
-                    Button("Bu haftaya ekle") { placeOnCurrentWeek(recipe) }
-                    Button("Sil", role: .destructive) { showsDeleteConfirm = true }
+                    if recipe.collectionState == .savedToTry {
+                        Button("Tarifi tamamla") { showsImportEditor = true }
+                        Button("Sil", role: .destructive) { deletePersonalRecipe() }
+                    } else {
+                        Button("Düzenle") { showsImportEditor = true }
+                        Button("Bu haftaya ekle") { placeOnCurrentWeek(recipe) }
+                        Button("Sil", role: .destructive) { showsDeleteConfirm = true }
+                    }
+                    if RecipeSourceService.publicURL(recipe.sourceURL) != nil {
+                        Button("Orijinali aç") { openOriginal(recipe) }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -145,17 +154,14 @@ struct RecipeDetailView: View {
             }
             .onAppear {
                 Analytics.track(.recipeOpened)
-                if let recipe, !recipe.isBundledCatalog {
-                    Analytics.track(.importedRecipeViewed, properties: ["origin": recipe.origin.rawValue])
-                }
             }
             .sheet(isPresented: $showsImportEditor) {
                 if let recipe {
-                    ImportFlowView(editingSlug: recipe.slug)
+                    RecipeEditorView(launch: .recipe(recipe.slug))
                 }
             }
             .alert("Tarif silinsin mi?", isPresented: $showsDeleteConfirm) {
-                Button("Sil", role: .destructive) { deleteImportedRecipe() }
+                Button("Sil", role: .destructive) { deletePersonalRecipe() }
                 Button("Vazgeç", role: .cancel) {}
             } message: {
                 Text(deleteMessage)
@@ -295,14 +301,56 @@ struct RecipeDetailView: View {
 
     @ViewBuilder
     private func content(_ recipe: Recipe) -> some View {
-        VStack(spacing: 0) {
-            recipeList(recipe)
-                .layoutPriority(1)
-            if showsCookAction {
-                cookBar
+        if !recipe.isBundledCatalog && recipe.collectionState == .savedToTry {
+            savedToTryContent(recipe)
+        } else {
+            VStack(spacing: 0) {
+                recipeList(recipe)
+                    .layoutPriority(1)
+                if showsCookAction {
+                    cookBar
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Theme.bgCream)
+        }
+    }
+
+    private func savedToTryContent(_ recipe: Recipe) -> some View {
+        List {
+            Section {
+                recipeHero(recipe)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Theme.bgCream)
+            }
+            Section("Kaynak") {
+                Text(RecipeSourceService.displayName(
+                    platform: recipe.sourcePlatform ?? .unknown,
+                    sourceTitle: recipe.sourceTitle,
+                    url: recipe.sourceURL
+                ))
+                if let savedAt = recipe.savedAt {
+                    Text(savedAt.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundStyle(.secondary)
+                }
+                Text(recipe.collectionState.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                if let url = RecipeSourceService.publicURL(recipe.sourceURL) {
+                    Link("Orijinali aç", destination: url)
+                        .simultaneousGesture(TapGesture().onEnded { trackOriginal(recipe) })
+                }
+            }
+            Section {
+                Button("Tarifi tamamla") { showsImportEditor = true }
+                    .frame(minHeight: 44)
+                Button("Sil", role: .destructive) { deletePersonalRecipe() }
+                    .frame(minHeight: 44)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .listStyle(.plain)
+        .mealCanvas()
         .background(Theme.bgCream)
     }
 
@@ -340,11 +388,7 @@ struct RecipeDetailView: View {
     private func importSection(_ recipe: Recipe) -> some View {
         if !recipe.isBundledCatalog {
             Section("Kaynak") {
-                let badges = RecipeImportLabels.badges(
-                    for: recipe,
-                    cooked: (memories.first?.timesCooked ?? 0) > 0,
-                    isFavorite: memories.first?.isFavorite == true || currentRating == .loved
-                )
+                let badges = RecipeCollectionLabels.badges(for: recipe)
                 if !badges.isEmpty {
                     Text(badges.joined(separator: " · "))
                         .font(.subheadline.weight(.semibold))
@@ -355,18 +399,13 @@ struct RecipeDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                     .recipeDetailRow()
-                if let url = URL(string: recipe.sourceURL), !recipe.sourceURL.isEmpty {
-                    Link("Kaynağı aç", destination: url)
+                if let url = RecipeSourceService.publicURL(recipe.sourceURL) {
+                    Link("Orijinali aç", destination: url)
+                        .simultaneousGesture(TapGesture().onEnded { trackOriginal(recipe) })
                         .recipeDetailRow()
                 }
-                if recipe.servingsUnspecified {
-                    Text("Porsiyon kaynakta yok. Miktarlar yazıldığı gibi markete gider.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .recipeDetailRow()
-                }
-                if recipe.ingredients.contains(where: \.isUncertain) {
-                    Text("Bazı miktarlar belirsiz. Eksik sayı uydurulmadı.")
+                if !recipe.userNotes.isEmpty {
+                    Text(recipe.userNotes)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .recipeDetailRow()
@@ -384,13 +423,28 @@ struct RecipeDetailView: View {
         }
     }
 
-    private func deleteImportedRecipe() {
+    private func deletePersonalRecipe() {
         guard let recipe else { return }
         do {
-            try RecipeImportService.delete(recipe, in: modelContext)
+            try RecipeCollectionService.delete(recipe, in: modelContext)
         } catch {
             viewModel.errorMessage = error.localizedDescription
         }
+    }
+
+    private func openOriginal(_ recipe: Recipe) {
+        trackOriginal(recipe)
+        if let url = RecipeSourceService.publicURL(recipe.sourceURL) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func trackOriginal(_ recipe: Recipe) {
+        Analytics.track(.recipeOpenedOriginal, properties: [
+            "origin": recipe.origin.rawValue,
+            "platform": recipe.sourcePlatform?.rawValue ?? "unknown",
+            "state": recipe.collectionState.rawValue,
+        ])
     }
 
     private var deleteMessage: String {
@@ -736,6 +790,7 @@ struct RecipeDetailView: View {
                 author: recipe.photoAuthor,
                 license: recipe.photoLicense,
                 layout: .hero,
+                localImagePath: recipe.sourceImagePath,
                 isPhotoShown: $isHeroPhotoShown
             )
             heroCredit(recipe)

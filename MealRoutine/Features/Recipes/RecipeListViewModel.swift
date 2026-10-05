@@ -62,9 +62,9 @@ final class RecipeListViewModel {
                 diets: Set(recipe.diets.map { $0.lowercased() }),
                 tags: Set(recipe.tags.map { $0.lowercased() }),
                 isLoved: ratings[recipe.slug] == .loved || memory?.isFavorite == true,
-                origin: recipe.originRaw,
-                requiresReview: recipe.requiresReview,
-                importedAt: recipe.importedAt,
+                origin: recipe.origin.rawValue,
+                collectionState: recipe.collectionState.rawValue,
+                importedAt: recipe.savedAt ?? recipe.importedAt,
                 lastCookedAt: memory?.lastCookedAt,
                 timesCooked: memory?.timesCooked ?? 0,
                 searchBlob: index.searchBlobs[recipe.slug] ?? ""
