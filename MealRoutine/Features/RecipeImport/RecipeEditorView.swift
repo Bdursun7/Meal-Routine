@@ -102,7 +102,7 @@ struct RecipeEditorView: View {
     private var identitySection: some View {
         Section("Tarif") {
             validatedField(.name) {
-                TextField("Ad", text: $form.name)
+                TextField("Ad", text: limitedText(\.name, maxCharacters: RecipeFieldLimits.name))
             }
             validatedField(.servings) {
                 TextField("Porsiyon", text: servingsText)
@@ -126,16 +126,20 @@ struct RecipeEditorView: View {
             ForEach(Array(form.ingredients.indices), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
                     validatedField(.ingredientName(index)) {
-                        TextField("Malzeme", text: $form.ingredients[index].name)
+                        TextField("Malzeme", text: ingredientName(index))
                     }
-                    HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .top) {
                         validatedField(.ingredientQuantity(index)) {
                             TextField("Miktar", text: quantityText(index))
                                 .keyboardType(.decimalPad)
                         }
-                        unitPicker(index)
+                        validatedField(.ingredientUnit(index)) {
+                            unitPicker(index)
+                        }
                     }
-                    TextField("Hazırlık notu", text: $form.ingredients[index].preparationNote)
+                    validatedField(.ingredientNote(index)) {
+                        TextField("Hazırlık notu", text: preparationNote(index))
+                    }
                     Toggle("İsteğe bağlı", isOn: $form.ingredients[index].isOptional)
                     HStack {
                         Button("Yukarı") { moveIngredient(index, by: -1) }
@@ -160,7 +164,7 @@ struct RecipeEditorView: View {
             ForEach(Array(form.steps.indices), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
                     validatedField(.step(index)) {
-                        TextField("Adım", text: $form.steps[index], axis: .vertical)
+                        TextField("Adım", text: stepText(index), axis: .vertical)
                     }
                     HStack {
                         Button("Yukarı") { moveStep(index, by: -1) }
@@ -180,12 +184,18 @@ struct RecipeEditorView: View {
 
     private var timeSection: some View {
         Section("Süre") {
-            TextField("Hazırlık (dk)", text: minutesText(\.prepMinutes))
-                .keyboardType(.numberPad)
-            TextField("Pişirme (dk)", text: minutesText(\.cookMinutes))
-                .keyboardType(.numberPad)
-            TextField("Toplam (dk)", text: minutesText(\.totalMinutes))
-                .keyboardType(.numberPad)
+            validatedField(.prepMinutes) {
+                TextField("Hazırlık (dk)", text: minutesText(\.prepMinutesText, \.prepMinutes))
+                    .keyboardType(.numberPad)
+            }
+            validatedField(.cookMinutes) {
+                TextField("Pişirme (dk)", text: minutesText(\.cookMinutesText, \.cookMinutes))
+                    .keyboardType(.numberPad)
+            }
+            validatedField(.totalMinutes) {
+                TextField("Toplam (dk)", text: minutesText(\.totalMinutesText, \.totalMinutes))
+                    .keyboardType(.numberPad)
+            }
             Text("Boş süre uydurulmaz. Bilinmeyen süre planda sayı olarak görünmez.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -194,15 +204,21 @@ struct RecipeEditorView: View {
 
     private var detailSection: some View {
         Section("Ayrıntı") {
-            TextField("Kategori", text: $form.category)
-            TextField("Mutfak", text: $form.cuisine)
+            validatedField(.category) {
+                TextField("Kategori", text: limitedText(\.category, maxCharacters: RecipeFieldLimits.category))
+            }
+            validatedField(.cuisine) {
+                TextField("Mutfak", text: limitedText(\.cuisine, maxCharacters: RecipeFieldLimits.cuisine))
+            }
             Picker("Zorluk", selection: $form.difficulty) {
                 Text("Seçilmedi").tag("")
                 Text("Kolay").tag("easy")
                 Text("Orta").tag("medium")
                 Text("Zor").tag("hard")
             }
-            TextField("Not", text: $form.notes, axis: .vertical)
+            validatedField(.notes) {
+                TextField("Not", text: limitedText(\.notes, maxCharacters: RecipeFieldLimits.notes), axis: .vertical)
+            }
         }
     }
 
@@ -210,10 +226,14 @@ struct RecipeEditorView: View {
         Section("Kaynak") {
             Text(form.sourcePlatform.title)
                 .foregroundStyle(.secondary)
-            TextField("Kaynak adresi", text: $form.sourceURL)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-            TextField("Kaynak başlığı", text: $form.sourceTitle)
+            validatedField(.sourceURL) {
+                TextField("Kaynak adresi", text: limitedText(\.sourceURL, maxCharacters: RecipeFieldLimits.sourceURL))
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+            }
+            validatedField(.sourceTitle) {
+                TextField("Kaynak başlığı", text: limitedText(\.sourceTitle, maxCharacters: RecipeFieldLimits.sourceTitle))
+            }
             if let url = RecipeSourceService.publicURL(form.sourceURL) {
                 Link("Orijinali aç", destination: url)
             }
@@ -225,40 +245,136 @@ struct RecipeEditorView: View {
         return UIImage(contentsOfFile: url.path)
     }
 
+    private func limitedText(
+        _ keyPath: WritableKeyPath<RecipeForm, String>,
+        maxCharacters: Int
+    ) -> Binding<String> {
+        Binding(
+            get: { form[keyPath: keyPath] },
+            set: { form[keyPath: keyPath] = RecipeTextLimit.clamp($0, maxCharacters: maxCharacters) }
+        )
+    }
+
+    private func ingredientName(_ index: Int) -> Binding<String> {
+        Binding(
+            get: {
+                guard form.ingredients.indices.contains(index) else { return "" }
+                return form.ingredients[index].name
+            },
+            set: { text in
+                guard form.ingredients.indices.contains(index) else { return }
+                form.ingredients[index].name = RecipeTextLimit.clamp(text, maxCharacters: RecipeFieldLimits.ingredientName)
+            }
+        )
+    }
+
+    private func preparationNote(_ index: Int) -> Binding<String> {
+        Binding(
+            get: {
+                guard form.ingredients.indices.contains(index) else { return "" }
+                return form.ingredients[index].preparationNote
+            },
+            set: { text in
+                guard form.ingredients.indices.contains(index) else { return }
+                form.ingredients[index].preparationNote = RecipeTextLimit.clamp(
+                    text,
+                    maxCharacters: RecipeFieldLimits.preparationNote
+                )
+            }
+        )
+    }
+
+    private func stepText(_ index: Int) -> Binding<String> {
+        Binding(
+            get: {
+                guard form.steps.indices.contains(index) else { return "" }
+                return form.steps[index]
+            },
+            set: { text in
+                guard form.steps.indices.contains(index) else { return }
+                form.steps[index] = RecipeTextLimit.clamp(text, maxCharacters: RecipeFieldLimits.step)
+            }
+        )
+    }
+
     private var servingsText: Binding<String> {
         Binding(
-            get: { form.servings.map(String.init) ?? "" },
-            set: { form.servings = Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            get: {
+                if !form.servingsText.isEmpty { return form.servingsText }
+                return form.servings.map(String.init) ?? ""
+            },
+            set: { raw in
+                let clamped = RecipeTextLimit.clamp(raw, maxCharacters: RecipeFieldLimits.servingsDigits)
+                form.servingsText = clamped
+                switch RecipeNumericInput.whole(clamped, maxDigits: RecipeFieldLimits.servingsDigits) {
+                case .value(let number):
+                    form.servings = number
+                case .empty:
+                    form.servings = nil
+                case .notANumber, .tooManyDigits:
+                    form.servings = nil
+                }
+            }
         )
     }
 
     private func quantityText(_ index: Int) -> Binding<String> {
         Binding(
             get: {
-                guard form.ingredients.indices.contains(index),
-                      let quantity = form.ingredients[index].quantity else { return "" }
-                return quantity.formatted(.number.precision(.fractionLength(0...2)))
+                guard form.ingredients.indices.contains(index) else { return "" }
+                let line = form.ingredients[index]
+                if !line.quantityText.isEmpty { return line.quantityText }
+                return line.quantity.map(Self.quantityDisplay) ?? ""
             },
             set: { text in
                 guard form.ingredients.indices.contains(index) else { return }
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
-                if trimmed.isEmpty {
+                let clamped = RecipeTextLimit.clamp(text, maxCharacters: RecipeFieldLimits.quantityCharacters)
+                form.ingredients[index].quantityText = clamped
+                switch RecipeNumericInput.decimal(clamped) {
+                case .value(let number):
+                    form.ingredients[index].quantity = number
+                case .empty:
                     form.ingredients[index].quantity = nil
-                } else {
-                    form.ingredients[index].quantity = Double(trimmed)
+                case .notANumber, .tooLong:
+                    form.ingredients[index].quantity = nil
                 }
             }
         )
     }
 
-    private func minutesText(_ keyPath: WritableKeyPath<RecipeForm, Int?>) -> Binding<String> {
+    private func minutesText(
+        _ textKey: WritableKeyPath<RecipeForm, String>,
+        _ valueKey: WritableKeyPath<RecipeForm, Int?>
+    ) -> Binding<String> {
         Binding(
-            get: { form[keyPath: keyPath].map(String.init) ?? "" },
-            set: { text in
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                form[keyPath: keyPath] = trimmed.isEmpty ? nil : Int(trimmed)
+            get: {
+                let typed = form[keyPath: textKey]
+                if !typed.isEmpty { return typed }
+                return form[keyPath: valueKey].map(String.init) ?? ""
+            },
+            set: { raw in
+                let clamped = RecipeTextLimit.clamp(raw, maxCharacters: RecipeFieldLimits.minutesDigits)
+                form[keyPath: textKey] = clamped
+                switch RecipeNumericInput.whole(clamped, maxDigits: RecipeFieldLimits.minutesDigits) {
+                case .value(let number) where number > 0:
+                    form[keyPath: valueKey] = number
+                case .empty:
+                    form[keyPath: valueKey] = nil
+                case .value, .notANumber, .tooManyDigits:
+                    form[keyPath: valueKey] = nil
+                }
             }
         )
+    }
+
+    /// Plain digits and a dot, so a loaded quantity round-trips without locale grouping.
+    private static func quantityDisplay(_ value: Double) -> String {
+        guard value.isFinite else { return "" }
+        if value.rounded() == value, abs(value) < 1_000_000_000 {
+            return String(Int(value))
+        }
+        let rounded = (value * 100).rounded() / 100
+        return String(rounded)
     }
 
     private func moveIngredient(_ index: Int, by offset: Int) {
@@ -291,7 +407,30 @@ struct RecipeEditorView: View {
             form = RecipeForm.emptyManual()
             canonicalizeUnits()
         }
+        syncNumericDrafts()
         baseline = form
+    }
+
+    /// Copies stored numbers into the text drafts so Kaydet reads the same value the field shows.
+    private func syncNumericDrafts() {
+        if form.servingsText.isEmpty, let servings = form.servings, servings > 0 {
+            form.servingsText = String(servings)
+        }
+        if form.prepMinutesText.isEmpty, let minutes = form.prepMinutes, minutes > 0 {
+            form.prepMinutesText = String(minutes)
+        }
+        if form.cookMinutesText.isEmpty, let minutes = form.cookMinutes, minutes > 0 {
+            form.cookMinutesText = String(minutes)
+        }
+        if form.totalMinutesText.isEmpty, let minutes = form.totalMinutes, minutes > 0 {
+            form.totalMinutesText = String(minutes)
+        }
+        for index in form.ingredients.indices {
+            guard form.ingredients[index].quantityText.isEmpty,
+                  let quantity = form.ingredients[index].quantity,
+                  quantity > 0 else { continue }
+            form.ingredients[index].quantityText = Self.quantityDisplay(quantity)
+        }
     }
 
     private func requestDismiss() {

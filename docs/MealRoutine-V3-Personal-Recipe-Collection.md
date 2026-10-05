@@ -644,8 +644,10 @@ var sortOrder: Int
 ### Rules
 
 - Quantity may be empty while editing.
-- Quantity must be present before a recipe becomes `readyToCook`.
-- Unit may be empty when the ingredient naturally does not require one.
+- Quantity must be present and greater than zero before a recipe becomes `readyToCook`.
+- Quantity is a number. A decimal separator is allowed. Text such as "biraz" does not save as an empty amount.
+- Every active ingredient (one with a name, quantity, unit, or preparation note) needs a unit chosen from the catalog list. Empty and "Birim yok" do not count. A cleared placeholder row does not.
+- The stored unit is the catalog code (`g`, `piece`), including when the cook picked a known alias such as "adet".
 - Preparation notes are preserved separately from the ingredient name.
 - User-entered text is never rewritten into a different ingredient without explicit user action.
 - No automatic ingredient normalization is required in V3.
@@ -697,17 +699,19 @@ Validation exists to prevent incomplete recipes from entering planning.
 
 A recipe is `readyToCook` when:
 
-- name is not empty
+- name is not empty, after trimming whitespace, and within 80 characters
 - at least one ingredient exists
-- every ingredient has a name
-- every ingredient has a quantity
+- every active ingredient has a name (within 60 characters) and a quantity greater than zero
+- every active ingredient has a catalog unit
 - at least one instruction exists
-- every instruction has non-empty text
-- servings is greater than zero
+- every instruction has non-empty text (within 500 characters)
+- servings is a whole number, 1 or greater, at most 3 digits
+- prep, cook, and total minutes, when filled in, are whole numbers of at most 4 digits. Empty minutes stay unknown and are not invented
+- notes, source URL, source title, category, cuisine, and preparation notes stay within their character caps
 
 ### Optional fields
 
-These do not block completion:
+These may be left empty:
 
 - prep time
 - cook time
@@ -718,6 +722,8 @@ These do not block completion:
 - notes
 - image
 - source URL
+
+A minute that is filled in must be a whole number. Category, cuisine, notes, preparation notes, and the source fields must stay within their character caps.
 
 ### Validation message
 

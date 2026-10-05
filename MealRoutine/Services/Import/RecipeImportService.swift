@@ -4,36 +4,76 @@ import SwiftData
 enum RecipeValidationService {
     static func validate(_ form: RecipeForm) -> RecipeValidationResult {
         var issues: [RecipeValidationIssue] = []
-        if form.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            issues.append(.missingName)
+        if let issue = nameIssue(form.name) {
+            issues.append(issue)
+        }
+        if let issue = servingsIssue(form) {
+            issues.append(issue)
         }
         let active = form.ingredients.filter(isActiveIngredient)
-        if active.isEmpty || active.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-            issues.append(.missingIngredient)
+        var missingIngredient = active.isEmpty
+        var missingQuantity = false
+        var invalidQuantity = false
+        var quantityTooLong = false
+        var missingUnit = false
+        var ingredientNameTooLong = false
+        var noteTooLong = false
+        for line in active {
+            if let issue = ingredientNameIssue(line.name) {
+                switch issue {
+                case .missingIngredient:
+                    missingIngredient = true
+                case .ingredientNameTooLong:
+                    ingredientNameTooLong = true
+                default:
+                    break
+                }
+            }
+            if let issue = quantityIssue(line) {
+                switch issue {
+                case .missingQuantity:
+                    missingQuantity = true
+                case .invalidQuantity:
+                    invalidQuantity = true
+                case .quantityTooLong:
+                    quantityTooLong = true
+                default:
+                    break
+                }
+            }
+            if !hasCatalogUnit(line) {
+                missingUnit = true
+            }
+            if trimmed(line.preparationNote).count > RecipeFieldLimits.preparationNote {
+                noteTooLong = true
+            }
         }
-        if active.contains(where: { ($0.quantity ?? 0) <= 0 }) {
-            issues.append(.missingQuantity)
-        }
-        let steps = form.steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        let filled = steps.filter { !$0.isEmpty }
-        if filled.isEmpty {
-            issues.append(.missingInstruction)
-        } else if steps.contains(where: \.isEmpty) {
-            issues.append(.emptyInstruction)
-        }
-        if (form.servings ?? 0) <= 0 {
-            issues.append(.missingServings)
-        }
+        if missingIngredient { issues.append(.missingIngredient) }
+        if invalidQuantity { issues.append(.invalidQuantity) }
+        if quantityTooLong { issues.append(.quantityTooLong) }
+        if missingQuantity { issues.append(.missingQuantity) }
+        if missingUnit { issues.append(.missingUnit) }
+        if ingredientNameTooLong { issues.append(.ingredientNameTooLong) }
+        if noteTooLong { issues.append(.preparationNoteTooLong) }
+        issues.append(contentsOf: stepIssues(form.steps))
+        if let issue = minutesIssue(form.prepMinutesText) { issues.append(issue) }
+        if let cook = minutesIssue(form.cookMinutesText), !issues.contains(cook) { issues.append(cook) }
+        if let total = minutesIssue(form.totalMinutesText), !issues.contains(total) { issues.append(total) }
+        if trimmed(form.category).count > RecipeFieldLimits.category { issues.append(.categoryTooLong) }
+        if trimmed(form.cuisine).count > RecipeFieldLimits.cuisine { issues.append(.cuisineTooLong) }
+        if trimmed(form.notes).count > RecipeFieldLimits.notes { issues.append(.notesTooLong) }
+        if trimmed(form.sourceURL).count > RecipeFieldLimits.sourceURL { issues.append(.sourceURLTooLong) }
+        if trimmed(form.sourceTitle).count > RecipeFieldLimits.sourceTitle { issues.append(.sourceTitleTooLong) }
         return issues.isEmpty ? .valid : .invalid(issues)
     }
 
-    /// Visual order: name, servings, each ingredient, then each step. The editor focuses the first.
+    /// Visual order matches the form. The editor focuses the first field.
     static func invalidFields(in form: RecipeForm) -> [RecipeEditorField] {
         var fields: [RecipeEditorField] = []
-        if form.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if nameIssue(form.name) != nil {
             fields.append(.name)
         }
-        if (form.servings ?? 0) <= 0 {
+        if servingsIssue(form) != nil {
             fields.append(.servings)
         }
         let active = form.ingredients.filter(isActiveIngredient)
@@ -43,43 +83,121 @@ enum RecipeValidationService {
             }
         } else {
             for (index, line) in form.ingredients.enumerated() where isActiveIngredient(line) {
-                if line.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if ingredientNameIssue(line.name) != nil {
                     fields.append(.ingredientName(index))
                 }
-                if (line.quantity ?? 0) <= 0 {
+                if quantityIssue(line) != nil {
                     fields.append(.ingredientQuantity(index))
+                }
+                if !hasCatalogUnit(line) {
+                    fields.append(.ingredientUnit(index))
+                }
+                if trimmed(line.preparationNote).count > RecipeFieldLimits.preparationNote {
+                    fields.append(.ingredientNote(index))
                 }
             }
         }
-        let steps = form.steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let steps = form.steps.map(trimmed)
         let filled = steps.contains { !$0.isEmpty }
         if !filled {
             if steps.indices.contains(0) {
                 fields.append(.step(0))
             }
         } else {
-            for (index, step) in steps.enumerated() where step.isEmpty {
+            for (index, step) in steps.enumerated() where step.isEmpty || step.count > RecipeFieldLimits.step {
                 fields.append(.step(index))
             }
         }
+        if minutesIssue(form.prepMinutesText) != nil { fields.append(.prepMinutes) }
+        if minutesIssue(form.cookMinutesText) != nil { fields.append(.cookMinutes) }
+        if minutesIssue(form.totalMinutesText) != nil { fields.append(.totalMinutes) }
+        if trimmed(form.category).count > RecipeFieldLimits.category { fields.append(.category) }
+        if trimmed(form.cuisine).count > RecipeFieldLimits.cuisine { fields.append(.cuisine) }
+        if trimmed(form.notes).count > RecipeFieldLimits.notes { fields.append(.notes) }
+        if trimmed(form.sourceURL).count > RecipeFieldLimits.sourceURL { fields.append(.sourceURL) }
+        if trimmed(form.sourceTitle).count > RecipeFieldLimits.sourceTitle { fields.append(.sourceTitle) }
         return fields
     }
 
     static func message(for field: RecipeEditorField, in form: RecipeForm) -> String {
         switch field {
         case .name:
-            return RecipeValidationIssue.missingName.message
+            return nameIssue(form.name)?.message ?? RecipeValidationIssue.missingName.message
         case .servings:
-            return RecipeValidationIssue.missingServings.message
-        case .ingredientName:
-            return RecipeValidationIssue.missingIngredient.message
-        case .ingredientQuantity:
-            return RecipeValidationIssue.missingQuantity.message
-        case .step:
-            let hasText = form.steps.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            return servingsIssue(form)?.message ?? RecipeValidationIssue.missingServings.message
+        case .ingredientName(let index):
+            let name = form.ingredients.indices.contains(index) ? form.ingredients[index].name : ""
+            return ingredientNameIssue(name)?.message ?? RecipeValidationIssue.missingIngredient.message
+        case .ingredientQuantity(let index):
+            guard form.ingredients.indices.contains(index) else {
+                return RecipeValidationIssue.missingQuantity.message
+            }
+            return quantityIssue(form.ingredients[index])?.message ?? RecipeValidationIssue.missingQuantity.message
+        case .ingredientUnit:
+            return RecipeValidationIssue.missingUnit.message
+        case .ingredientNote:
+            return RecipeValidationIssue.preparationNoteTooLong.message
+        case .step(let index):
+            let text = form.steps.indices.contains(index) ? trimmed(form.steps[index]) : ""
+            if text.count > RecipeFieldLimits.step {
+                return RecipeValidationIssue.stepTooLong.message
+            }
+            let hasText = form.steps.contains { !trimmed($0).isEmpty }
             return hasText
                 ? RecipeValidationIssue.emptyInstruction.message
                 : RecipeValidationIssue.missingInstruction.message
+        case .prepMinutes:
+            return minutesIssue(form.prepMinutesText)?.message ?? RecipeValidationIssue.invalidMinutes.message
+        case .cookMinutes:
+            return minutesIssue(form.cookMinutesText)?.message ?? RecipeValidationIssue.invalidMinutes.message
+        case .totalMinutes:
+            return minutesIssue(form.totalMinutesText)?.message ?? RecipeValidationIssue.invalidMinutes.message
+        case .category:
+            return RecipeValidationIssue.categoryTooLong.message
+        case .cuisine:
+            return RecipeValidationIssue.cuisineTooLong.message
+        case .notes:
+            return RecipeValidationIssue.notesTooLong.message
+        case .sourceURL:
+            return RecipeValidationIssue.sourceURLTooLong.message
+        case .sourceTitle:
+            return RecipeValidationIssue.sourceTitleTooLong.message
+        }
+    }
+
+    /// Servings the cook actually entered. Junk text does not become 0 or nil success.
+    static func resolvedServings(_ form: RecipeForm) -> Int? {
+        switch RecipeNumericInput.whole(form.servingsText, maxDigits: RecipeFieldLimits.servingsDigits) {
+        case .value(let number):
+            return number
+        case .empty:
+            return form.servings
+        case .notANumber, .tooManyDigits:
+            return nil
+        }
+    }
+
+    /// Minutes the cook entered. Empty and 0 stay unknown. Junk stays unknown and fails validation.
+    static func resolvedMinutes(text: String, stored: Int?) -> Int? {
+        switch RecipeNumericInput.whole(text, maxDigits: RecipeFieldLimits.minutesDigits) {
+        case .value(let number):
+            return number > 0 ? number : nil
+        case .empty:
+            guard let stored, stored > 0 else { return nil }
+            return stored
+        case .notANumber, .tooManyDigits:
+            return nil
+        }
+    }
+
+    static func resolvedQuantity(_ line: RecipeFormIngredient) -> Double? {
+        switch RecipeNumericInput.decimal(line.quantityText) {
+        case .value(let number):
+            return number
+        case .empty:
+            return line.quantity
+        case .notANumber, .tooLong:
+            return nil
         }
     }
 
@@ -107,9 +225,13 @@ enum RecipeValidationService {
         return RecipeForm(
             name: recipe.displayName,
             servings: recipe.baseServings > 0 ? recipe.baseServings : nil,
+            servingsText: "",
             prepMinutes: unknownTime ? nil : positiveMinutes(recipe.prepMinutes),
+            prepMinutesText: "",
             cookMinutes: unknownTime ? nil : positiveMinutes(recipe.cookMinutes),
+            cookMinutesText: "",
             totalMinutes: unknownTime ? nil : positiveMinutes(recipe.totalMinutes),
+            totalMinutesText: "",
             category: recipe.category,
             cuisine: recipe.country,
             difficulty: recipe.difficulty == "unknown" ? "" : recipe.difficulty,
@@ -128,12 +250,96 @@ enum RecipeValidationService {
         value > 0 ? value : nil
     }
 
+    private static func trimmed(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private static func isActiveIngredient(_ line: RecipeFormIngredient) -> Bool {
-        if !line.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if !trimmed(line.name).isEmpty { return true }
+        if !trimmed(line.quantityText).isEmpty { return true }
         if line.quantity != nil { return true }
-        if !line.unit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
-        if !line.preparationNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if !trimmed(line.unit).isEmpty { return true }
+        if !trimmed(line.preparationNote).isEmpty { return true }
         return false
+    }
+
+    private static func hasCatalogUnit(_ line: RecipeFormIngredient) -> Bool {
+        let code = RecipeUnitChoices.canonical(line.unit)
+        return RecipeUnitChoices.codes.contains(code)
+    }
+
+    private static func nameIssue(_ raw: String) -> RecipeValidationIssue? {
+        let name = trimmed(raw)
+        if name.isEmpty { return .missingName }
+        if name.count > RecipeFieldLimits.name { return .nameTooLong }
+        return nil
+    }
+
+    private static func ingredientNameIssue(_ raw: String) -> RecipeValidationIssue? {
+        let name = trimmed(raw)
+        if name.isEmpty { return .missingIngredient }
+        if name.count > RecipeFieldLimits.ingredientName { return .ingredientNameTooLong }
+        return nil
+    }
+
+    private static func servingsIssue(_ form: RecipeForm) -> RecipeValidationIssue? {
+        switch RecipeNumericInput.whole(form.servingsText, maxDigits: RecipeFieldLimits.servingsDigits) {
+        case .notANumber:
+            return .invalidServings
+        case .tooManyDigits:
+            return .servingsTooLong
+        case .value(let number):
+            return number >= 1 ? nil : .missingServings
+        case .empty:
+            guard let servings = form.servings, servings >= 1 else { return .missingServings }
+            if String(servings).count > RecipeFieldLimits.servingsDigits { return .servingsTooLong }
+            return nil
+        }
+    }
+
+    private static func minutesIssue(_ text: String) -> RecipeValidationIssue? {
+        switch RecipeNumericInput.whole(text, maxDigits: RecipeFieldLimits.minutesDigits) {
+        case .notANumber:
+            return .invalidMinutes
+        case .tooManyDigits:
+            return .minutesTooLong
+        case .empty, .value:
+            return nil
+        }
+    }
+
+    private static func quantityIssue(_ line: RecipeFormIngredient) -> RecipeValidationIssue? {
+        switch RecipeNumericInput.decimal(line.quantityText) {
+        case .notANumber:
+            return .invalidQuantity
+        case .tooLong:
+            return .quantityTooLong
+        case .value(let number):
+            return number > 0 ? nil : .missingQuantity
+        case .empty:
+            guard let quantity = line.quantity, quantity > 0 else { return .missingQuantity }
+            if !storedQuantityFits(quantity) { return .quantityTooLong }
+            return nil
+        }
+    }
+
+    private static func storedQuantityFits(_ value: Double) -> Bool {
+        guard value.isFinite else { return false }
+        let text = value.rounded() == value && abs(value) < 1_000_000_000
+            ? String(Int(value))
+            : String((value * 100).rounded() / 100)
+        if case .value = RecipeNumericInput.decimal(text) { return true }
+        return false
+    }
+
+    private static func stepIssues(_ steps: [String]) -> [RecipeValidationIssue] {
+        let texts = steps.map(trimmed)
+        let filled = texts.filter { !$0.isEmpty }
+        if filled.isEmpty { return [.missingInstruction] }
+        var issues: [RecipeValidationIssue] = []
+        if texts.contains(where: \.isEmpty) { issues.append(.emptyInstruction) }
+        if filled.contains(where: { $0.count > RecipeFieldLimits.step }) { issues.append(.stepTooLong) }
+        return issues
     }
 }
 
@@ -339,14 +545,17 @@ enum RecipeCollectionService {
         recipe.country = form.cuisine.trimmingCharacters(in: .whitespacesAndNewlines)
         let difficulty = form.difficulty.trimmingCharacters(in: .whitespacesAndNewlines)
         recipe.difficulty = difficulty.isEmpty ? "unknown" : difficulty
-        recipe.baseServings = form.servings ?? 1
-        recipe.prepMinutes = form.prepMinutes ?? 0
-        recipe.cookMinutes = form.cookMinutes ?? 0
-        if let total = form.totalMinutes {
+        recipe.baseServings = RecipeValidationService.resolvedServings(form) ?? 1
+        let prep = RecipeValidationService.resolvedMinutes(text: form.prepMinutesText, stored: form.prepMinutes)
+        let cook = RecipeValidationService.resolvedMinutes(text: form.cookMinutesText, stored: form.cookMinutes)
+        let total = RecipeValidationService.resolvedMinutes(text: form.totalMinutesText, stored: form.totalMinutes)
+        recipe.prepMinutes = prep ?? 0
+        recipe.cookMinutes = cook ?? 0
+        if let total {
             recipe.totalMinutes = total
             recipe.timeIsUnknown = false
-        } else if form.prepMinutes != nil || form.cookMinutes != nil {
-            recipe.totalMinutes = (form.prepMinutes ?? 0) + (form.cookMinutes ?? 0)
+        } else if prep != nil || cook != nil {
+            recipe.totalMinutes = (prep ?? 0) + (cook ?? 0)
             recipe.timeIsUnknown = false
         } else {
             recipe.totalMinutes = 0
@@ -378,12 +587,13 @@ enum RecipeCollectionService {
         let active = form.ingredients.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         for (index, line) in active.enumerated() {
             let name = line.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let quantity = RecipeValidationService.resolvedQuantity(line)
             let row = IngredientLine(
                 ingredientId: ImportedIngredientIdentity.id(name: name),
                 nameEN: "",
                 nameTR: name,
-                quantity: line.quantity,
-                unit: line.unit.trimmingCharacters(in: .whitespacesAndNewlines),
+                quantity: quantity,
+                unit: RecipeUnitChoices.canonical(line.unit),
                 scaling: "linear",
                 note: line.preparationNote.trimmingCharacters(in: .whitespacesAndNewlines),
                 noteTR: line.preparationNote.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -391,7 +601,7 @@ enum RecipeCollectionService {
                 sortIndex: index
             )
             row.isOptional = line.isOptional
-            row.includeInGrocery = line.quantity != nil
+            row.includeInGrocery = quantity != nil
             row.recipe = recipe
             context.insert(row)
             recipe.ingredients.append(row)

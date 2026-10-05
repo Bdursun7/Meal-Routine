@@ -124,11 +124,16 @@ final class RecipeImportTests: XCTestCase {
     func testCompletionRules() {
         var form = RecipeForm.emptyManual()
         XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingName))
+        form.name = "   "
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingName))
         form.name = "Köfte"
         XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingIngredient))
         form.ingredients = [RecipeFormIngredient(name: "kıyma")]
-        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingQuantity))
+        let namedOnly = RecipeValidationService.validate(form).issues
+        XCTAssertTrue(namedOnly.contains(.missingQuantity))
+        XCTAssertTrue(namedOnly.contains(.missingUnit))
         form.ingredients[0].quantity = 400
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingUnit))
         form.ingredients[0].unit = "g"
         XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingInstruction))
         form.steps = ["Yoğur.", ""]
@@ -138,6 +143,104 @@ final class RecipeImportTests: XCTestCase {
         XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingServings))
         form.servings = 4
         XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        form.ingredients.append(RecipeFormIngredient())
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        form.ingredients.append(RecipeFormIngredient(name: "tuz", quantity: 1, isOptional: true))
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingUnit))
+        form.ingredients[2].unit = "tsp"
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+    }
+
+    func testNumericFieldsRejectJunkAndKeepRealNumbers() {
+        var form = readyForm()
+        form.servings = 4
+        form.servingsText = "abc"
+        let junkServings = RecipeValidationService.validate(form).issues
+        XCTAssertTrue(junkServings.contains(.invalidServings))
+        XCTAssertFalse(junkServings.contains(.missingServings))
+        XCTAssertNotEqual(RecipeValidationService.validate(form), .valid)
+        XCTAssertNil(RecipeValidationService.resolvedServings(form))
+        XCTAssertEqual(
+            RecipeValidationService.message(for: .servings, in: form),
+            RecipeValidationIssue.invalidServings.message
+        )
+
+        form.servingsText = "0"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.missingServings))
+        form.servingsText = "2.5"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.invalidServings))
+        form.servingsText = "1000"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.servingsTooLong))
+        form.servingsText = ""
+        form.servings = 4
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+
+        form.ingredients[0].quantity = 400
+        form.ingredients[0].quantityText = "biraz"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.invalidQuantity))
+        XCTAssertNil(RecipeValidationService.resolvedQuantity(form.ingredients[0]))
+        form.ingredients[0].quantityText = "1,5"
+        XCTAssertEqual(RecipeValidationService.resolvedQuantity(form.ingredients[0]), 1.5)
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        form.ingredients[0].quantityText = ""
+        form.ingredients[0].quantity = 400
+
+        form.prepMinutesText = "abc"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.invalidMinutes))
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .prepMinutes)
+        XCTAssertNil(RecipeValidationService.resolvedMinutes(text: form.prepMinutesText, stored: 15))
+        form.prepMinutesText = ""
+        form.prepMinutes = nil
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        form.cookMinutesText = "0"
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        XCTAssertNil(RecipeValidationService.resolvedMinutes(text: "0", stored: nil))
+    }
+
+    func testFieldLengthLimits() {
+        var form = readyForm()
+        form.name = String(repeating: "a", count: RecipeFieldLimits.name + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.nameTooLong))
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .name)
+        form.name = String(repeating: "a", count: RecipeFieldLimits.name)
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+
+        form.ingredients[0].name = String(repeating: "m", count: RecipeFieldLimits.ingredientName + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.ingredientNameTooLong))
+        form.ingredients[0].name = "kıyma"
+        form.ingredients[0].preparationNote = String(repeating: "n", count: RecipeFieldLimits.preparationNote + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.preparationNoteTooLong))
+        form.ingredients[0].preparationNote = ""
+        form.steps = [String(repeating: "s", count: RecipeFieldLimits.step + 1)]
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.stepTooLong))
+        form.steps = ["Yoğur."]
+        form.notes = String(repeating: "n", count: RecipeFieldLimits.notes + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.notesTooLong))
+        form.notes = ""
+        form.category = String(repeating: "k", count: RecipeFieldLimits.category + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.categoryTooLong))
+        form.category = ""
+        form.cuisine = String(repeating: "m", count: RecipeFieldLimits.cuisine + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.cuisineTooLong))
+        form.cuisine = ""
+        form.sourceURL = String(repeating: "u", count: RecipeFieldLimits.sourceURL + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.sourceURLTooLong))
+        form.sourceURL = ""
+        form.sourceTitle = String(repeating: "t", count: RecipeFieldLimits.sourceTitle + 1)
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.sourceTitleTooLong))
+        form.sourceTitle = ""
+        form.prepMinutesText = "12345"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.minutesTooLong))
+        form.prepMinutesText = ""
+        form.ingredients[0].quantityText = "1234567"
+        XCTAssertTrue(RecipeValidationService.validate(form).issues.contains(.quantityTooLong))
+        form.ingredients[0].quantityText = ""
+        form.ingredients[0].quantity = 400
+        XCTAssertEqual(RecipeValidationService.validate(form), .valid)
+        XCTAssertEqual(
+            RecipeTextLimit.clamp(String(repeating: "a", count: 200), maxCharacters: RecipeFieldLimits.name).count,
+            RecipeFieldLimits.name
+        )
     }
 
     func testEditorFocusesTheTopmostMissingFieldAndKeepsUnitCodes() {
@@ -151,6 +254,14 @@ final class RecipeImportTests: XCTestCase {
         XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .ingredientQuantity(0))
         form.ingredients[0].quantity = 400
         XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .step(0))
+        form.ingredients[0].unit = ""
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .ingredientUnit(0))
+        XCTAssertEqual(
+            RecipeValidationService.message(for: .ingredientUnit(0), in: form),
+            "Her malzemenin bir birimi olsun"
+        )
+        form.ingredients[0].unit = "Birim yok"
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .ingredientUnit(0))
         XCTAssertEqual(RecipeUnitChoices.canonical("adet"), "piece")
         XCTAssertEqual(RecipeUnitChoices.canonical("yemek kaşığı"), "tbsp")
         XCTAssertEqual(RecipeUnitChoices.canonical(""), "")
@@ -195,7 +306,7 @@ final class RecipeImportTests: XCTestCase {
         form.name = "Çorba"
         form.servings = 2
         form.ingredients = [
-            RecipeFormIngredient(name: "mercimek", quantity: 2, unit: "cup"),
+            RecipeFormIngredient(name: "mercimek", quantity: 2, unit: "g"),
             RecipeFormIngredient(name: "tuz", quantity: 1, unit: "tsp", isOptional: true),
         ]
         form.steps = ["Pişir."]
@@ -218,7 +329,7 @@ final class RecipeImportTests: XCTestCase {
         var form = RecipeForm.emptyManual()
         form.name = "Mantı"
         form.servings = 2
-        form.ingredients = [RecipeFormIngredient(name: "un", quantity: 2, unit: "cup")]
+        form.ingredients = [RecipeFormIngredient(name: "un", quantity: 2, unit: "g")]
         form.steps = ["Aç."]
         let recipe = try RecipeCollectionService.save(form, slug: nil, in: context)
         XCTAssertEqual(recipe.origin, .manual)
@@ -257,7 +368,7 @@ final class RecipeImportTests: XCTestCase {
         form.origin = .savedExternal
         form.servings = 2
         form.totalMinutes = 30
-        form.ingredients = [RecipeFormIngredient(name: "mercimek", quantity: 1, unit: "cup")]
+        form.ingredients = [RecipeFormIngredient(name: "mercimek", quantity: 1, unit: "g")]
         form.steps = ["Pişir."]
         let saved = try RecipeCollectionService.save(form, slug: nil, in: context, now: now)
         try WeekPlanService.placeImportedRecipe(slug: saved.slug, in: context, now: now)
@@ -317,6 +428,45 @@ final class RecipeImportTests: XCTestCase {
             query: RecipeBrowseQuery(sort: .recentlyAdded)
         )
         XCTAssertEqual(sorted.first?.slug, "imp")
+    }
+
+    func testTypedNumbersAndCatalogUnitsAreWhatGetsSaved() throws {
+        let context = try makeContext()
+        var form = readyForm()
+        form.servings = nil
+        form.servingsText = "3"
+        form.prepMinutesText = "20"
+        form.ingredients = [RecipeFormIngredient(name: "mercimek", quantityText: "1,5", unit: "adet")]
+        let recipe = try RecipeCollectionService.save(form, slug: nil, in: context)
+        XCTAssertEqual(recipe.baseServings, 3)
+        XCTAssertEqual(recipe.prepMinutes, 20)
+        XCTAssertEqual(recipe.timeIsUnknown, false)
+        XCTAssertEqual(recipe.ingredients.first?.quantity, 1.5)
+        XCTAssertEqual(recipe.ingredients.first?.unit, "piece")
+
+        form.servingsText = "abc"
+        form.servings = 0
+        do {
+            _ = try RecipeCollectionService.save(form, slug: recipe.slug, in: context)
+            XCTFail("Junk servings should not save")
+        } catch let error as RecipeCollectionError {
+            guard case .incomplete(let issues) = error else {
+                return XCTFail("Expected incomplete, got \(error)")
+            }
+            XCTAssertTrue(issues.contains(.invalidServings))
+        } catch {
+            XCTFail("Expected incomplete, got \(error)")
+        }
+        XCTAssertEqual(recipe.baseServings, 3)
+    }
+
+    private func readyForm() -> RecipeForm {
+        var form = RecipeForm.emptyManual()
+        form.name = "Köfte"
+        form.servings = 4
+        form.ingredients = [RecipeFormIngredient(name: "kıyma", quantity: 400, unit: "g")]
+        form.steps = ["Yoğur."]
+        return form
     }
 
     private func makeContext() throws -> ModelContext {
