@@ -27,7 +27,7 @@ enum RecipeValidationService {
         return issues.isEmpty ? .valid : .invalid(issues)
     }
 
-    static func validate(_ recipe: Recipe) -> RecipeValidationResult {
+    @MainActor static func validate(_ recipe: Recipe) -> RecipeValidationResult {
         validate(RecipeCollectionService.form(from: recipe))
     }
 
@@ -424,7 +424,7 @@ enum ImportedIngredientIdentity {
 
 enum ImportedRecipeEligibility {
     /// Catalog rows stay plannable. A personal recipe must be ready to cook and pass validation.
-    static func allowsPlanning(_ recipe: Recipe) -> Bool {
+    @MainActor @MainActor static func allowsPlanning(_ recipe: Recipe) -> Bool {
         if recipe.isBundledCatalog { return true }
         guard recipe.collectionState == .readyToCook else { return false }
         return RecipeValidationService.validate(recipe) == .valid
