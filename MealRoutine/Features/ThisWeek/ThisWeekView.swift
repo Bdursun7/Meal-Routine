@@ -11,6 +11,7 @@ struct ThisWeekView: View {
     @Query private var prefs: [UserPrefs]
     @Query private var memories: [MealMemory]
     @State private var viewModel = ThisWeekViewModel()
+    @State private var household = HouseholdSession.shared
     @State private var replacingMeal: ReplacingMeal?
     @State private var allowsPhotos = false
     /// True on the landing tab so the first screen is not a blank frame.
@@ -62,7 +63,11 @@ struct ThisWeekView: View {
             }
             try? await Task.sleep(for: TabSwitchTiming.settle)
             guard !Task.isCancelled else { return }
-            viewModel.ensureWeek(in: modelContext)
+            if household.isHouseholdMode {
+                await household.refresh(in: modelContext)
+            } else {
+                viewModel.ensureWeek(in: modelContext)
+            }
             allowsPhotos = true
             Analytics.track(.planViewed)
             if !viewModel.explanation(weeks: weeks).isEmpty {
@@ -74,13 +79,14 @@ struct ThisWeekView: View {
     @ViewBuilder
     private var selectedWeek: some View {
         let storedPrefs = prefs.min { $0.createdAt < $1.createdAt }
-        let meals = viewModel.meals(
+        let personalMeals = viewModel.meals(
             weeks: weeks,
             recipes: recipes,
             feedback: feedback,
             householdSize: householdSize,
             memories: memories
         )
+        let meals = householdMeals(from: personalMeals)
         let planExplanation = viewModel.explanation(weeks: weeks)
         let summary = viewModel.summary(meals: meals)
         let featured = viewModel.featuredEvening(in: meals)
@@ -88,17 +94,29 @@ struct ThisWeekView: View {
         Group {
             if meals.isEmpty {
                     WarmEmptyState(
-                        title: "Bu hafta henüz kurulmadı",
-                        message: "Akşamlarını birlikte seçelim. Süre sınırını yükseltmek veya sevmediğin malzemeleri azaltmak yeni tarifler açar.",
+                        title: household.isHouseholdMode ? "Ortak hafta henüz yok" : "Bu hafta henüz kurulmadı",
+                        message: household.isHouseholdMode
+                            ? "İkiniz de bakabileceğiniz bir plan kuralım. Kişisel hafızanız yerinde kalır."
+                            : "Akşamlarını birlikte seçelim. Süre sınırını yükseltmek veya sevmediğin malzemeleri azaltmak yeni tarifler açar.",
                         symbolName: "calendar",
                         accentSymbolName: "fork.knife",
-                        actionTitle: "Planı yeniden kur",
-                        action: { viewModel.regenerate(in: modelContext) }
+                        actionTitle: household.isHouseholdMode ? "Ortak planı kur" : "Planı yeniden kur",
+                        action: {
+                            if household.isHouseholdMode {
+                                household.generateSharedWeek(in: modelContext)
+                            } else {
+                                viewModel.regenerate(in: modelContext)
+                            }
+                        }
                     )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: Theme.sectionGap) {
                             VStack(alignment: .leading, spacing: Theme.cardGap) {
+                                if household.isHouseholdMode {
+                                    householdHeader
+                                    HouseholdSyncBanner(state: household.syncState)
+                                }
                                 progressCard(summary)
                                 if !planExplanation.isEmpty {
                                     explanationCard(planExplanation)
@@ -136,7 +154,10 @@ struct ThisWeekView: View {
                                         isWorking: viewModel.isWorking,
                                         loadsPhoto: allowsPhotos,
                                         onReplace: { replacingMeal = ReplacingMeal(id: meal.id) },
-                                        onSkip: { viewModel.skip(uuid: meal.id, in: modelContext) }
+                                        onSkip: { viewModel.skip(uuid: meal.id, in: modelContext) },
+                                        onReact: { kind in
+                                            household.setReaction(kind, mealID: meal.id, in: modelContext)
+                                        }
                                     )
                                 }
                             }
@@ -145,6 +166,52 @@ struct ThisWeekView: View {
                     }
                     .background(Theme.canvas)
                 }
+        }
+    }
+
+    private var householdHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(HouseholdWeekCopy.headline(members: household.snapshot.members))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.textCharcoal)
+            HStack {
+                Text("Bu hafta")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+                if let status = household.snapshot.plan?.status {
+                    Text(status.title)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Theme.accent.opacity(0.15), in: Capsule())
+                }
+            }
+            if household.snapshot.plan?.status == .ready, household.snapshot.plan?.isFinalized != true {
+                Button("Planı netleştir") {
+                    household.finalize(in: modelContext)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .accessibilityHint("Veto kalmadığında haftayı hazır sayar ve partneri bilgilendirir")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .mealCardSurface()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func householdMeals(from personal: [WeekMealPresentation]) -> [WeekMealPresentation] {
+        guard household.isHouseholdMode else { return personal }
+        guard household.snapshot.plan != nil else { return [] }
+        return personal.map { meal in
+            var copy = meal
+            copy.household = HouseholdWeekPresenter.chrome(
+                mealID: meal.id,
+                snapshot: household.snapshot,
+                userId: household.account?.id
+            )
+            return copy
         }
     }
 
@@ -309,6 +376,7 @@ private struct WeekMealCard: View {
     var loadsPhoto: Bool
     var onReplace: () -> Void
     var onSkip: () -> Void
+    var onReact: (MealReactionKind) -> Void
     @State private var isPhotoShown = false
 
     var body: some View {
@@ -395,6 +463,10 @@ private struct WeekMealCard: View {
             .buttonStyle(.plain)
             .accessibilityHint("Tarif detayını açar")
 
+            if let chrome = meal.household {
+                HouseholdReactionBar(chrome: chrome, isWorking: isWorking, onReact: onReact)
+            }
+
             if meal.showsSkip {
                 AdaptiveActions {
                     replaceButton
@@ -416,7 +488,7 @@ private struct WeekMealCard: View {
     }
 
     private var replaceButton: some View {
-        Button("Değiştir") {
+        Button(meal.household?.needsDecision == true ? "Başka yemek seç" : "Değiştir") {
             onReplace()
         }
         .font(.subheadline.weight(.semibold))

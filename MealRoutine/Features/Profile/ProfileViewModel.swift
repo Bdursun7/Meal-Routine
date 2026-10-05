@@ -137,10 +137,15 @@ final class ProfileViewModel {
             loadedEvenings = evenings
             loadedMinutes = maxCookMinutes
             try context.save()
-            let request = WeekPlanService.planRequest(from: prefs)
-            _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)
-            try GroceryListService.rebuild(in: context)
-            statusMessage = "Bu hafta yeniden kuruldu."
+            if HouseholdSession.shared.isHouseholdMode {
+                HouseholdSession.shared.generateSharedWeek(in: context)
+                statusMessage = "Ortak hafta yeniden kuruldu."
+            } else {
+                let request = WeekPlanService.planRequest(from: prefs)
+                _ = try WeekPlanService.replaceCurrentWeek(in: context, request: request)
+                try GroceryListService.rebuild(in: context)
+                statusMessage = "Bu hafta yeniden kuruldu."
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

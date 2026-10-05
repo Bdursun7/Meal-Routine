@@ -6,6 +6,7 @@ struct GroceryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [PlanWeek]
     @State private var viewModel = GroceryViewModel()
+    @State private var household = HouseholdSession.shared
     @State private var showsMarket = false
 
     var body: some View {
@@ -50,6 +51,9 @@ struct GroceryView: View {
             try? await Task.sleep(for: TabSwitchTiming.settle)
             guard !Task.isCancelled else { return }
             viewModel.rebuild(in: modelContext)
+            if household.isHouseholdMode {
+                try? HouseholdPlanBridge.applyGrocery(household.snapshot, in: modelContext)
+            }
             Analytics.track(.groceryOpened)
         }
     }
@@ -59,6 +63,13 @@ struct GroceryView: View {
         let fullList = viewModel.presentation(weeks: weeks)
         let list = viewModel.applyingSearch(to: fullList)
         return List {
+                if household.isHouseholdMode {
+                    Section {
+                        Text("Ortak liste. Biri işaretleyince diğerinde de kapanır.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                }
                 if fullList.isEmpty {
                     Section {
                         WarmEmptyState(

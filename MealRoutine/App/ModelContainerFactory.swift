@@ -17,6 +17,7 @@ enum ModelContainerFactory {
             MealMemory.self,
             MealBehaviorEvent.self,
             RecipeImportDraft.self,
+            HouseholdCacheBox.self,
         ])
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: inMemory,

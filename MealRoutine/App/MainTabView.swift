@@ -5,6 +5,7 @@ enum AppTab: Hashable {
     case week
     case recipes
     case grocery
+    case memory
     case profile
 }
 
@@ -52,6 +53,11 @@ struct MainTabView: View {
             }
             tabRoot(.grocery, title: "Market", symbol: "cart", selectedSymbol: "cart.fill") {
                 GroceryView(isTabSelected: selectedTab == .grocery)
+            }
+            tabRoot(.memory, title: "Hafıza", symbol: "brain", selectedSymbol: "brain.fill") {
+                NavigationStack {
+                    MealMemoryView()
+                }
             }
             tabRoot(.profile, title: "Profil", symbol: "person.crop.circle", selectedSymbol: "person.crop.circle.fill") {
                 ProfileView(isTabSelected: selectedTab == .profile)

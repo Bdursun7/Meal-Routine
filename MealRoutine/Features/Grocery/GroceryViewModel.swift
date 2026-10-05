@@ -159,6 +159,7 @@ final class GroceryViewModel {
     func toggle(_ id: UUID, in context: ModelContext) {
         do {
             try GroceryListService.toggle(id, in: context)
+            HouseholdSession.shared.noteGrocery(id: id, in: context)
         } catch {
             errorMessage = error.localizedDescription
         }

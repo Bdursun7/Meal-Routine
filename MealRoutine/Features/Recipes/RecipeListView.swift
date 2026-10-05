@@ -9,6 +9,7 @@ struct RecipeListView: View {
     @Query private var memories: [MealMemory]
     @Query private var prefs: [UserPrefs]
     @State private var viewModel = RecipeListViewModel()
+    @State private var household = HouseholdSession.shared
     @State private var discovery = DiscoveryViewModel()
     @State private var allowsPhotos = false
     @State private var showsCatalog = false
@@ -149,6 +150,26 @@ struct RecipeListView: View {
             let trying = visible.filter { !$0.isBundledCatalog && $0.collectionState == .savedToTry }
             let ready = visible.filter { !$0.isBundledCatalog && $0.collectionState == .readyToCook }
             let bundled = visible.filter(\.isBundledCatalog)
+            let shared = household.isHouseholdMode ? household.snapshot.recipeProjections.filter { projection in
+                HouseholdRecipeAccess.visibleForPlanning([projection]).count == 1
+                    && projection.ownerUserId != household.account?.id
+                    && !visible.contains { $0.slug == projection.slug && !$0.isBundledCatalog }
+            } : []
+            if !shared.isEmpty {
+                Section("Evde planlanabilir") {
+                    ForEach(shared) { projection in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(projection.title)
+                                .font(.body.weight(.semibold))
+                            Text("Planlamada kullanılabilir. Sahiplik eşinde kalır.")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryText)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(projection.title). Ev planında görünür. Kişisel koleksiyonuna kopyalanmaz.")
+                    }
+                }
+            }
             if !trying.isEmpty {
                 Section("Denenecek") {
                     recipeRows(trying, ratings: ratings, memoryBySlug: memoryBySlug)

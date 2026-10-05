@@ -94,9 +94,11 @@ final class RecipeDetailViewModel {
     private func markPendingMealCooked(slug: String, in context: ModelContext) throws {
         if let pendingPlannedMealUUID {
             try WeekPlanService.markCooked(uuid: pendingPlannedMealUUID, in: context)
+            HouseholdSession.shared.noteCooked(mealID: pendingPlannedMealUUID, in: context)
         } else if let week = try WeekPlanService.currentWeek(in: context),
                   let meal = week.meals.first(where: { $0.recipeSlug == slug }) {
             try WeekPlanService.markCooked(uuid: meal.uuid, in: context)
+            HouseholdSession.shared.noteCooked(mealID: meal.uuid, in: context)
         }
     }
 
