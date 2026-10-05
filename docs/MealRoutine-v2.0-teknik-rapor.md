@@ -119,7 +119,7 @@ Her keşif seviyesinde durur:
 - `rating == .never` veya `neverAgain`
 - süre tavanı
 - sevmediğin malzeme
-- zorluk kapısı (`easyOnly` yalnızca kolay; `mostlyEasy` ve `openToMedium` `hard` tarifleri keser)
+- zorluk kapısı (`easyOnly` yalnızca kolay; `mostlyEasy` ve `openToMedium` `hard` tarifleri keser; `openToHard` zor tarifleri de alır)
 - istenirse loved boşluğu (`RepeatPreference.lovedGapDays`: ara sıra 14, dengeli ve sık sık 7; sık pişirilen ve `often` değilse +3 gün)
 
 Havuz akşam sayısını dolduramazsa ikinci geçiş loved boşluğunu ve zorluk kapısını gevşetir. Never again ve disliked gevşemez.
@@ -128,7 +128,7 @@ Havuz akşam sayısını dolduramazsa ikinci geçiş loved boşluğunu ve zorluk
 
 `preference + behavior + variety + discovery - repetitionPenalty`. Beraberlikte slug alfabetik.
 
-**Preference:** `trDogfoodScore / 10`; kurulmuş sevilen kategori +5, protein +5, sık mutfak +3; süre `max(20, maxCook − 15)` altındaysa +2; hafta içi (`dayOffset < 5`) `mostlyQuick` için ≤30 dk +4, ≤45 +2, daha uzun −3; `balanced` için ≤45 dk +1. Zorluk: `mostlyEasy` + medium −4; `hard` −8.
+**Preference:** `trDogfoodScore / 10`; kurulmuş sevilen kategori +5, protein +5, sık mutfak +3; süre `max(20, maxCook − 15)` altındaysa +2; hafta içi (`dayOffset < 5`) `mostlyQuick` için ≤30 dk +4, ≤45 +2, daha uzun −3; `balanced` için ≤45 dk +1. Zorluk: `mostlyEasy` + medium −4; `hard` −8 (`openToHard` hariç, o zaman 0).
 
 **Behavior:** loved +10 (ölçeklenmez); okay +2; ≥2 pişirme `scale(6, cookRepeatConfidence)`; “yine yaparım” +3; loved’suz favori +4; her değiştirme `−scale(6, replacementConfidence)`; ≥2 atlama `−scale(4, …)`; süre kaygısı `−scale(7)`; zorluk kaygısı `−scale(6)`; never again −100. Loved yoksa benzer tarif bonusu +4 (protein, kategori veya etiket).
 

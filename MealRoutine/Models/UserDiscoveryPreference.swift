@@ -59,11 +59,12 @@ enum RepeatPreference: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Difficulty gate for the next plan. Hard recipes stay out.
+/// Difficulty gate for the next plan. Hard recipes stay out unless the household opts in.
 enum DifficultyPreference: String, Codable, CaseIterable, Identifiable, Sendable {
     case easyOnly
     case mostlyEasy
     case openToMedium
+    case openToHard
 
     var id: String { rawValue }
 
@@ -72,6 +73,7 @@ enum DifficultyPreference: String, Codable, CaseIterable, Identifiable, Sendable
         case .easyOnly: "Yalnızca kolay"
         case .mostlyEasy: "Çoğunlukla kolay"
         case .openToMedium: "Ortaya da açığım"
+        case .openToHard: "Zora da açığım"
         }
     }
 
@@ -80,6 +82,7 @@ enum DifficultyPreference: String, Codable, CaseIterable, Identifiable, Sendable
         case .easyOnly: "Yalnızca kolay tarifler"
         case .mostlyEasy: "Kolaylar önde, orta ara sıra"
         case .openToMedium: "Kolay ve orta tarifler"
+        case .openToHard: "Zor tarifler de hafta planında görünebilir"
         }
     }
 }

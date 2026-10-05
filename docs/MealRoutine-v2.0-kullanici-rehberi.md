@@ -134,8 +134,9 @@ Aynı ekranda **Sonraki plan**. Dört seçim bir sonraki hafta kurulurken kullan
 - **Yalnızca kolay**
 - **Çoğunlukla kolay**
 - **Ortaya da açığım**
+- **Zora da açığım** — zor tarifler de hafta planında görünebilir
 
-Çok zor tarifler bu seçimlerin dışında tutulur.
+İlk üç seçim zor tarifleri dışarıda tutar. **Zora da açığım** onları hafta planına alır.
 
 **Hafta içi**
 

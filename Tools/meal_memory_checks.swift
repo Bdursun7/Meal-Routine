@@ -270,6 +270,32 @@ private func checkScoring() {
         now: now
     )
     check(gated.slugs == ["kolay"], "easy-only drops hard recipes, got \(gated.slugs)")
+    check(
+        !PersonalizedScoringService.isEligible(
+            hard,
+            preferences: prefs(difficulty: .openToMedium),
+            memory: nil,
+            blockedSlugs: []
+        ),
+        "open to medium still drops hard recipes"
+    )
+    check(
+        PersonalizedScoringService.isEligible(
+            hard,
+            preferences: prefs(difficulty: .openToHard),
+            memory: nil,
+            blockedSlugs: []
+        ),
+        "open to hard allows hard recipes"
+    )
+    let optedIn = PersonalizedScoringService.select(
+        candidates: [hard, easy],
+        evenings: 1,
+        preferences: prefs(difficulty: .openToHard),
+        memories: [:],
+        now: now
+    )
+    check(optedIn.slugs == ["zor"], "open to hard can place the hard recipe, got \(optedIn.slugs)")
 }
 
 private func checkExplanationAndPatterns() {
