@@ -48,7 +48,8 @@ final class HouseholdTestModeTests: XCTestCase {
         XCTAssertEqual(lookup.status, HouseholdInviteStatus.pending.rawValue)
         let url = try XCTUnwrap(lookup.shareURL)
         try await backend.acceptShare(url: url)
-        var partnerBoard = try XCTUnwrap(try await backend.pullShared(url: url))
+        let sharedBoard = try await backend.pullShared(url: url)
+        var partnerBoard = try XCTUnwrap(sharedBoard)
         try HouseholdReducer.acceptInvite(
             snapshot: &partnerBoard,
             user: partner,
@@ -59,9 +60,10 @@ final class HouseholdTestModeTests: XCTestCase {
         HouseholdReducer.publishTaste(snapshot: &partnerBoard, projection: HouseholdTestPartner.taste(now: now))
         partnerBoard = try await backend.push(partnerBoard)
         let householdId = try XCTUnwrap(partnerBoard.household?.id)
+        let joinedBoard = try await backend.pull(householdId: householdId)
         ownerBoard = HouseholdConflictResolver.merge(
             local: ownerBoard,
-            server: try XCTUnwrap(try await backend.pull(householdId: householdId))
+            server: try XCTUnwrap(joinedBoard)
         )
         XCTAssertEqual(ownerBoard.members.count, HouseholdLimits.maxMembers)
         XCTAssertNotNil(ownerBoard.member(partner.id))
@@ -93,13 +95,15 @@ final class HouseholdTestModeTests: XCTestCase {
         )
         try HouseholdReducer.setReaction(snapshot: &ownerBoard, mealId: firstMeal, user: owner, reaction: .want, now: now)
         ownerBoard = try await backend.push(ownerBoard)
-        partnerBoard = try XCTUnwrap(try await backend.pull(householdId: householdId))
+        let partnerPull = try await backend.pull(householdId: householdId)
+        partnerBoard = try XCTUnwrap(partnerPull)
         try HouseholdReducer.setReaction(snapshot: &partnerBoard, mealId: firstMeal, user: partner, reaction: .okay, now: now)
         try HouseholdReducer.setReaction(snapshot: &partnerBoard, mealId: secondMeal, user: partner, reaction: .veto, now: now)
         partnerBoard = try await backend.push(partnerBoard)
+        let vetoedBoard = try await backend.pull(householdId: householdId)
         ownerBoard = HouseholdConflictResolver.merge(
             local: ownerBoard,
-            server: try XCTUnwrap(try await backend.pull(householdId: householdId))
+            server: try XCTUnwrap(vetoedBoard)
         )
 
         let vetoed = try XCTUnwrap(ownerBoard.plan?.meals.first { $0.id == secondMeal })
@@ -157,7 +161,7 @@ final class HouseholdTestModeTests: XCTestCase {
         XCTAssertFalse(HouseholdConflict.needsDecision(replaced.reactions))
         ownerBoard = try await backend.push(ownerBoard)
 
-        try syncGrocery(backend: backend, householdId: householdId, owner: owner, partner: partner, ownerBoard: &ownerBoard)
+        try await syncGrocery(backend: backend, householdId: householdId, owner: owner, partner: partner, ownerBoard: &ownerBoard)
 
         let kinds = Set(ownerBoard.activities.map(\.kind))
         XCTAssertTrue(kinds.contains(.householdCreated))
@@ -191,7 +195,9 @@ final class HouseholdTestModeTests: XCTestCase {
         var board = try HouseholdReducer.createHousehold(user: owner, name: "Test Evi", now: now)
         let invite = try HouseholdReducer.createInvite(snapshot: &board, user: owner, now: now, seed: 99)
         _ = try await backend.publishInvite(invite, householdName: "Test Evi", snapshot: board)
-        board = try XCTUnwrap(try await backend.pull(householdId: try XCTUnwrap(board.household?.id)))
+        let publishedId = try XCTUnwrap(board.household?.id)
+        let published = try await backend.pull(householdId: publishedId)
+        board = try XCTUnwrap(published)
         board.invites[0].expiresAt = now.addingTimeInterval(-60)
         board.invites[0].revision += 1
         board.revision += 1
@@ -206,7 +212,9 @@ final class HouseholdTestModeTests: XCTestCase {
         var revokedBoard = try HouseholdReducer.createHousehold(user: owner, name: "Diğer", now: now)
         let live = try HouseholdReducer.createInvite(snapshot: &revokedBoard, user: owner, now: now, seed: 100)
         _ = try await backend.publishInvite(live, householdName: "Diğer", snapshot: revokedBoard)
-        revokedBoard = try XCTUnwrap(try await backend.pull(householdId: try XCTUnwrap(revokedBoard.household?.id)))
+        let revokedId = try XCTUnwrap(revokedBoard.household?.id)
+        let revokedPull = try await backend.pull(householdId: revokedId)
+        revokedBoard = try XCTUnwrap(revokedPull)
         try HouseholdReducer.revokeInvite(snapshot: &revokedBoard, userId: owner.id, inviteId: live.id, now: now)
         revokedBoard = try await backend.push(revokedBoard)
         let lookup = try await backend.lookup(code: live.inviteCode)
@@ -229,7 +237,8 @@ final class HouseholdTestModeTests: XCTestCase {
         var ownerBoard = try twoMemberPlan(owner: owner, partner: partner)
         ownerBoard = try await backend.push(ownerBoard)
         let householdId = try XCTUnwrap(ownerBoard.household?.id)
-        var partnerBoard = try XCTUnwrap(try await backend.pull(householdId: householdId))
+        let partnerPull = try await backend.pull(householdId: householdId)
+        var partnerBoard = try XCTUnwrap(partnerPull)
         let mealId = try XCTUnwrap(ownerBoard.plan?.meals.first?.id)
         try HouseholdReducer.setReaction(snapshot: &ownerBoard, mealId: mealId, user: owner, reaction: .want, now: now)
         try HouseholdReducer.setReaction(snapshot: &partnerBoard, mealId: mealId, user: partner, reaction: .veto, now: now)
@@ -273,7 +282,8 @@ final class HouseholdTestModeTests: XCTestCase {
         partner: HouseholdUser,
         ownerBoard: inout HouseholdSnapshot
     ) async throws {
-        var partnerBoard = try XCTUnwrap(try await backend.pull(householdId: householdId))
+        let partnerPull = try await backend.pull(householdId: householdId)
+        var partnerBoard = try XCTUnwrap(partnerPull)
         try HouseholdReducer.setGrocery(snapshot: &ownerBoard, itemKey: "domates|g", isChecked: true, user: owner, now: now)
         ownerBoard = try await backend.push(ownerBoard)
         try HouseholdReducer.setGrocery(snapshot: &partnerBoard, itemKey: "sogan|adet", isChecked: true, user: partner, now: now)
@@ -284,9 +294,10 @@ final class HouseholdTestModeTests: XCTestCase {
             try HouseholdReducer.setGrocery(snapshot: &partnerBoard, itemKey: "sogan|adet", isChecked: true, user: partner, now: now.addingTimeInterval(1))
             partnerBoard = try await backend.push(partnerBoard)
         }
+        let syncedBoard = try await backend.pull(householdId: householdId)
         ownerBoard = HouseholdConflictResolver.merge(
             local: ownerBoard,
-            server: try XCTUnwrap(try await backend.pull(householdId: householdId))
+            server: try XCTUnwrap(syncedBoard)
         )
         let checks = Dictionary(uniqueKeysWithValues: ownerBoard.groceryCompletions.map { ($0.itemKey, $0.isChecked) })
         XCTAssertEqual(checks["domates|g"], true as Bool?)
