@@ -68,13 +68,13 @@ enum RecipeValidationService {
     static func message(for field: RecipeEditorField, in form: RecipeForm) -> String {
         switch field {
         case .name:
-            RecipeValidationIssue.missingName.message
+            return RecipeValidationIssue.missingName.message
         case .servings:
-            RecipeValidationIssue.missingServings.message
+            return RecipeValidationIssue.missingServings.message
         case .ingredientName:
-            RecipeValidationIssue.missingIngredient.message
+            return RecipeValidationIssue.missingIngredient.message
         case .ingredientQuantity:
-            RecipeValidationIssue.missingQuantity.message
+            return RecipeValidationIssue.missingQuantity.message
         case .step:
             let hasText = form.steps.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             return hasText
