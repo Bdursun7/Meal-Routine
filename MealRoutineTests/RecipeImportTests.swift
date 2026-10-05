@@ -311,7 +311,7 @@ final class RecipeImportTests: XCTestCase {
         ]
         form.steps = ["Pişir."]
         let recipe = try RecipeCollectionService.save(form, slug: nil, in: context, now: now)
-        let week = PlanWeek(weekStart: WeekCalendar.weekStart(containing: now), householdSize: 2, createdAt: now)
+        let week = PlanWeek(weekStart: WeekCalendar.weekStart(containing: now), createdAt: now, householdSize: 2)
         context.insert(week)
         let meal = PlannedMeal(dayOffset: 0, recipeSlug: recipe.slug, servings: 2)
         context.insert(meal)
@@ -351,7 +351,7 @@ final class RecipeImportTests: XCTestCase {
         let now = TestFixtures.now
         let prefs = UserPrefs(householdSize: 2, hasCompletedOnboarding: true, createdAt: now)
         context.insert(prefs)
-        let week = PlanWeek(weekStart: WeekCalendar.weekStart(containing: now), householdSize: 2, createdAt: now)
+        let week = PlanWeek(weekStart: WeekCalendar.weekStart(containing: now), createdAt: now, householdSize: 2)
         context.insert(week)
         let today = WeekCalendar.dayOffset(for: now, weekStart: week.weekStart)
         let other = today == 6 ? 0 : today + 1
