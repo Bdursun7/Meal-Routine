@@ -17,12 +17,13 @@ enum RecipeSeedService {
             throw CatalogError.unsupportedSchema(bundled.file.schemaVersion)
         }
 
-        let existingCount = try context.fetchCount(FetchDescriptor<Recipe>())
+        let existingRecipes = try context.fetch(FetchDescriptor<Recipe>())
+        let bundledCount = existingRecipes.filter { CatalogRecipeGuard.isBundled(originRaw: $0.originRaw) }.count
         let stored = try storedFingerprint(in: context)
         if !CatalogFingerprint.shouldSkipImport(
             storedFingerprint: stored,
             currentFingerprint: bundled.fingerprint,
-            existingRecipeCount: existingCount,
+            existingRecipeCount: bundledCount,
             catalogRecipeCount: bundled.file.recipes.count
         ) {
             try await importCatalog(bundled, bundle: bundle, into: context)
@@ -50,7 +51,9 @@ enum RecipeSeedService {
         // deletion. A crash after that delete leaves a short store; shouldSkipImport
         // refuses a matching fingerprint until every catalog recipe is present again.
         CatalogIndexCache.invalidate()
+        // Bundled rows are replaced. Imported and manual recipes stay on device.
         let staleRecipes = try context.fetch(FetchDescriptor<Recipe>())
+            .filter { CatalogRecipeGuard.isBundled(originRaw: $0.originRaw) }
         if !staleRecipes.isEmpty {
             for (index, recipe) in staleRecipes.enumerated() {
                 context.delete(recipe)

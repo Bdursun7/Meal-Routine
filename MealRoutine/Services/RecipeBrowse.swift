@@ -71,11 +71,55 @@ enum RecipeCookTimeFilter: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum RecipeLibraryScope: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case catalog
+    case savedToTry
+    case readyToCook
+    case notTried
+    case cooked
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "Tümü"
+        case .catalog: "Katalog"
+        case .savedToTry: "Denenecek"
+        case .readyToCook: "Pişirmeye hazır"
+        case .notTried: "Denenmemiş"
+        case .cooked: "Pişirilen"
+        }
+    }
+}
+
+enum RecipeLibrarySort: String, CaseIterable, Identifiable, Sendable {
+    case alphabetical
+    case recentlyAdded
+    case recentlyCooked
+    case mostCooked
+    case favorites
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .alphabetical: "Ada göre"
+        case .recentlyAdded: "Yeni eklenen"
+        case .recentlyCooked: "Son pişirilen"
+        case .mostCooked: "En çok pişen"
+        case .favorites: "Favoriler"
+        }
+    }
+}
+
 struct RecipeBrowseQuery: Equatable, Sendable {
     var searchText = ""
     var category: RecipeBrowseCategory = .all
     var cookTime: RecipeCookTimeFilter = .any
     var lovedOnly = false
+    var library: RecipeLibraryScope = .all
+    var sort: RecipeLibrarySort = .alphabetical
 }
 
 /// Fields the list can filter without a SwiftData model.
@@ -89,6 +133,12 @@ struct RecipeBrowseItem: Equatable, Sendable {
     var diets: Set<String>
     var tags: Set<String>
     var isLoved: Bool
+    var origin: String = "builtIn"
+    var collectionState: String = "readyToCook"
+    var importedAt: Date? = nil
+    var lastCookedAt: Date? = nil
+    var timesCooked: Int = 0
+    var searchBlob: String = ""
 }
 
 enum RecipeBrowse {
@@ -99,13 +149,51 @@ enum RecipeBrowse {
                 matchesCategory(item, query.category)
                     && matchesTime(item, query.cookTime)
                     && (!query.lovedOnly || item.isLoved)
+                    && matchesLibrary(item, query.library)
                     && matchesSearch(item, text)
             }
             .sorted { lhs, rhs in
-                let order = lhs.displayName.localizedStandardCompare(rhs.displayName)
-                if order != .orderedSame { return order == .orderedAscending }
-                return lhs.slug < rhs.slug
+                compare(lhs, rhs, sort: query.sort)
             }
+    }
+
+    static func matchesLibrary(_ item: RecipeBrowseItem, _ scope: RecipeLibraryScope) -> Bool {
+        switch scope {
+        case .all:
+            return true
+        case .catalog:
+            return item.origin == "builtIn" || item.origin.isEmpty
+        case .savedToTry:
+            return item.collectionState == "savedToTry"
+        case .readyToCook:
+            return item.origin != "builtIn" && !item.origin.isEmpty && item.collectionState == "readyToCook"
+        case .notTried:
+            return item.collectionState != "savedToTry" && item.timesCooked == 0
+        case .cooked:
+            return item.timesCooked > 0
+        }
+    }
+
+    private static func compare(_ lhs: RecipeBrowseItem, _ rhs: RecipeBrowseItem, sort: RecipeLibrarySort) -> Bool {
+        switch sort {
+        case .recentlyAdded:
+            let left = lhs.importedAt ?? .distantPast
+            let right = rhs.importedAt ?? .distantPast
+            if left != right { return left > right }
+        case .recentlyCooked:
+            let left = lhs.lastCookedAt ?? .distantPast
+            let right = rhs.lastCookedAt ?? .distantPast
+            if left != right { return left > right }
+        case .mostCooked:
+            if lhs.timesCooked != rhs.timesCooked { return lhs.timesCooked > rhs.timesCooked }
+        case .favorites:
+            if lhs.isLoved != rhs.isLoved { return lhs.isLoved && !rhs.isLoved }
+        case .alphabetical:
+            break
+        }
+        let order = lhs.displayName.localizedStandardCompare(rhs.displayName)
+        if order != .orderedSame { return order == .orderedAscending }
+        return lhs.slug < rhs.slug
     }
 
     static func matchesCategory(_ item: RecipeBrowseItem, _ category: RecipeBrowseCategory) -> Bool {
@@ -141,6 +229,7 @@ enum RecipeBrowse {
         if item.displayName.localizedCaseInsensitiveContains(text) { return true }
         if item.nameEN.localizedCaseInsensitiveContains(text) { return true }
         if item.country.localizedCaseInsensitiveContains(text) { return true }
+        if item.searchBlob.localizedCaseInsensitiveContains(text) { return true }
         return item.tags.contains { $0.localizedCaseInsensitiveContains(text) }
     }
 }

@@ -35,6 +35,37 @@ final class Recipe {
     var photoAuthor: String
     var photoLicense: String
 
+    /// V3 import metadata. Existing catalog rows migrate as built-in.
+    /// Defaults keep the lightweight SwiftData migration compatible with V1/V2 stores.
+    var originRaw: String = RecipeOrigin.builtIn.rawValue
+    var sourceURL: String = ""
+    var sourceTitle: String = ""
+    var sourcePlatformRaw: String = ""
+    /// Stable id such as an Instagram shortcode. Empty when the source has none.
+    var sourceKey: String = ""
+    var importedAt: Date? = nil
+    var lastImportedAt: Date? = nil
+    var importStatusRaw: String = ""
+    var extractionConfidence: Double? = nil
+    var requiresReview: Bool = false
+    var isUserEdited: Bool = false
+    var userNotes: String = ""
+    /// True when the cook confirmed a recipe that still has no ingredient lines.
+    var confirmedMissingIngredients: Bool = false
+    /// True when the cook confirmed a recipe that still has no instruction steps.
+    var confirmedMissingInstructions: Bool = false
+    /// True when total time was not in the source and the cook has not set one.
+    /// Unknown time is not stored as zero minutes of cooking.
+    var timeIsUnknown: Bool = false
+    /// True when the source did not give a yield. Amounts stay as written.
+    var servingsUnspecified: Bool = false
+    /// Personal collection. Catalog rows stay ready to cook.
+    var collectionStateRaw: String = RecipeCollectionState.readyToCook.rawValue
+    /// Relative path of a shared or chosen photo. Empty when there is no local image.
+    var sourceImagePath: String = ""
+    var savedAt: Date? = nil
+    var completedAt: Date? = nil
+
     @Relationship(deleteRule: .cascade, inverse: \IngredientLine.recipe)
     var ingredients: [IngredientLine] = []
 
@@ -115,5 +146,36 @@ final class Recipe {
 
     var ingredientIDs: Set<String> {
         Set(ingredients.map(\.ingredientId))
+    }
+
+    var origin: RecipeOrigin {
+        get {
+            let raw = originRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if raw == "imported" { return .savedExternal }
+            return RecipeOrigin(rawValue: raw) ?? .builtIn
+        }
+        set { originRaw = newValue.rawValue }
+    }
+
+    var collectionState: RecipeCollectionState {
+        get {
+            if origin == .builtIn { return .readyToCook }
+            return RecipeCollectionState(rawValue: collectionStateRaw) ?? .readyToCook
+        }
+        set { collectionStateRaw = newValue.rawValue }
+    }
+
+    var sourcePlatform: RecipeSourcePlatform? {
+        get {
+            let raw = sourcePlatformRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty else { return nil }
+            return RecipeSourcePlatform(rawValue: raw)
+        }
+        set { sourcePlatformRaw = newValue?.rawValue ?? "" }
+    }
+
+    /// Bundled UniTools and MealRoutine originals. Personal recipes are never this.
+    var isBundledCatalog: Bool {
+        origin == .builtIn
     }
 }

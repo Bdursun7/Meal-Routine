@@ -13,11 +13,19 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 3. If you run on a device, pick your Development Team under Signing & Capabilities. The simulator can use Sign to Run Locally.
 4. Run. The first launch imports `MealRoutine/Recipes/recipes.v1.json` into SwiftData.
 
+## V3 Personal Recipe Collection
+
+On branch `v3.0-import` (or a PR into that branch), a shared link is only a source. MealRoutine does not download or reconstruct the recipe.
+
+Share to MealRoutine, tap **Deneyeceğim**, and the discovery lands in Tarifler → **Denenecek** with its title, URL, platform, and image when the system provides them. No ingredients are required yet. **Tarifi tamamla** or Tarifler → **+** → **Yeni tarif** opens the same editor. A recipe becomes **Pişirmeye hazır** only after a name, at least one ingredient with a quantity, at least one step, and servings. Only those recipes enter the week, the grocery list, and Meal Memory. Favorites stay the existing Sevdiklerim heart.
+
+The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It writes a capture file before it closes, and the app copies that into SwiftData on the next launch. On the simulator, **Yeni tarif** works without the extension. The share sheet needs the App Group signed. Duplicate detection compares a normalized source URL and never overwrites a saved recipe.
+
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 
 ## V1 scope
 
-- Onboarding: welcome, then four steps (household, dislikes, up to 8 taste ratings, summary). The week is created only from “Haftamı oluştur” on the summary. Household size is 1–8, evenings are 1–5, max cook time is 30 / 45 / 60 / 90 minutes (default 60). Egg and eggs share one “Yumurta” dislike chip.
+- Onboarding: welcome, then four steps (household, dislikes, up to 8 taste ratings, summary). The week is created only from “Haftamı oluştur” on the summary. Household size is 1–8, evenings are 1–7, max cook time is 30 / 45 / 60 / 90 minutes (default 60). Egg and eggs share one “Yumurta” dislike chip.
 - Tabs: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - This week is filled by a deterministic recommender: cook time, disliked ingredients, and Never-again are hard filters; the curated score and Loved still boost; meals cooked or planned in the last 21 days rank lower; the same week avoids repeating cuisine, course, protein, and tags. No LLM.
 - Grocery list merges UniTools ingredient `id`s. Equivalent unit spellings sum together, and grams convert with kilograms (millilitres with litres). Incompatible units stay on separate rows and are flagged. Each evening scales from the recipe base to that meal’s servings (1–8). The default is the household size. Recipe detail shows the same scaled amounts. **Porsiyonu kaydet** on Profile locks the household onto every evening; on a planned meal it locks that evening only.
@@ -55,11 +63,13 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 3. Gerçek cihazda çalıştıracaksan Signing & Capabilities altından Development Team seç. Simülatör için Sign to Run Locally yeter.
 4. Çalıştır. İlk açılışta `MealRoutine/Recipes/recipes.v1.json` SwiftData'ya alınır.
 
+V3 kişisel tarif koleksiyonudur. Paylaşılan adres yalnızca kaynaktır; sayfa indirilmez ve tarif metni uydurulmaz. **Deneyeceğim** tarifi Denenecek listesine koyar. **Tarifi tamamla** ve **Yeni tarif** aynı formu kullanır. Haftaya, markete ve yemek hafızasına yalnız pişirmeye hazır tarifler girer.
+
 `project.yml`, isteğe bağlı bir XcodeGen tarifidir. Projeyi açmak için gerekmez. `xcodegen generate` mevcut `MealRoutine.xcodeproj` dosyasını yeniden yazar.
 
 ## V1 kapsamı
 
-- Kurulum: karşılama, sonra dört adım (ev, sevmediğin malzemeler, en fazla 8 tat puanı, özet). Hafta yalnızca özetteki “Haftamı oluştur” ile kurulur. Ev halkı 1–8, akşam 1–5, en fazla pişirme 30 / 45 / 60 / 90 dk (varsayılan 60). Yumurta chip’i `egg` ve `eggs` kimliklerini birlikte saklar.
+- Kurulum: karşılama, sonra dört adım (ev, sevmediğin malzemeler, en fazla 8 tat puanı, özet). Hafta yalnızca özetteki “Haftamı oluştur” ile kurulur. Ev halkı 1–8, akşam 1–7, en fazla pişirme 30 / 45 / 60 / 90 dk (varsayılan 60). Yumurta chip’i `egg` ve `eggs` kimliklerini birlikte saklar.
 - Sekmeler: **Bu Hafta**, **Tarifler**, **Market**, **Profil**.
 - Hafta, deterministik bir öneri motoruyla dolar: süre, sevmediğin malzeme ve “bir daha asla” elenir; kürasyon skoru ve Sevdim hâlâ yükseltir; son 21 günde pişen veya planlanan tarif geride kalır; aynı hafta mutfak, tür, protein ve etiketi tekrarlamamaya çalışır. LLM yok.
 - Market listesi, UniTools malzeme `id` değerlerini toplar. Eş anlamlı birimler birleşir; gram ile kilogram ve mililitre ile litre çevrilir. Uyumsuz birimler ayrı satırda kalır ve işaretlenir. Her akşam, tarif tabanından o akşamın porsiyonuna ölçeklenir (1–8). Varsayılan ev halkıdır. Tarif detayı aynı ölçekli miktarı gösterir. Profil’de **Porsiyonu kaydet** ev halkını bütün akşamlara yazar; planlı bir akşamda yalnız o akşamı kilitler.

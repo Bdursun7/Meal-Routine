@@ -202,7 +202,7 @@ enum PersonalizedScoringService {
     ) -> Bool {
         if blockedSlugs.contains(candidate.slug) { return false }
         if candidate.rating == .never || memory?.neverAgain == true { return false }
-        if candidate.totalMinutes > preferences.maxCookMinutes { return false }
+        if !candidate.timeIsUnknown, candidate.totalMinutes > preferences.maxCookMinutes { return false }
         if !candidate.ingredientIds.isDisjoint(with: preferences.dislikedIngredientIds) { return false }
         if enforceDifficulty, !allowsDifficulty(candidate.difficulty, preference: preferences.difficulty) {
             return false
@@ -304,7 +304,9 @@ enum PersonalizedScoringService {
         if taste.lovedCategories.contains(category) { preference += 5 }
         if !candidate.protein.isEmpty, taste.lovedProteins.contains(candidate.protein) { preference += 5 }
         if taste.frequentCuisines.contains(cuisine) { preference += 3 }
-        if candidate.totalMinutes <= comfortableMinutes(preferences.maxCookMinutes) { preference += 2 }
+        if !candidate.timeIsUnknown, candidate.totalMinutes <= comfortableMinutes(preferences.maxCookMinutes) {
+            preference += 2
+        }
         preference += weekdayBias(candidate, dayOffset: dayOffset, style: preferences.weekdayStyle, anchors: anchors)
         preference += difficultyBias(candidate.difficulty, preference: preferences.difficulty)
 
@@ -491,7 +493,7 @@ enum PersonalizedScoringService {
         style: WeekdayStyle,
         anchors: [PickerCandidate]
     ) -> Int {
-        guard dayOffset < 5 else { return 0 }
+        guard dayOffset < 5, !candidate.timeIsUnknown else { return 0 }
         switch style {
         case .mostlyQuick:
             if candidate.totalMinutes <= 30 { return 4 }

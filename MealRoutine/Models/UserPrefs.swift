@@ -23,7 +23,7 @@ final class UserPrefs {
 
     init(
         householdSize: Int = 2,
-        eveningsPerWeek: Int = 5,
+        eveningsPerWeek: Int = 7,
         maxCookMinutes: Int = CookTimeOptions.defaultMinutes,
         dislikedIngredientIds: [String] = [],
         hasCompletedOnboarding: Bool = false,

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var prefs: [UserPrefs]
     @State private var seedAttempt = 0
     @State private var isSeeding = true
@@ -41,8 +42,22 @@ struct RootView: View {
         .task(id: seedAttempt) {
             await seedCatalog()
         }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, !isSeeding, seedError == nil else { return }
+            drainCaptures()
+        }
         .onAppear {
             Analytics.trackOnce(.appOpened)
+        }
+    }
+
+    @MainActor
+    private func drainCaptures() {
+        do {
+            let mapped = try RecipeCollectionService.drainCaptures(in: modelContext)
+            CollectionRouter.shared.applyDrain(mapped)
+        } catch {
+            seedError = nil
         }
     }
 
@@ -54,6 +69,7 @@ struct RootView: View {
             try await RecipeSeedService.seedIfNeeded(context: modelContext)
             try CatalogIndexCache.warm(in: modelContext)
             isSeeding = false
+            drainCaptures()
         } catch {
             seedError = error.localizedDescription
             isSeeding = false

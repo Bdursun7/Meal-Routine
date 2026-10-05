@@ -265,11 +265,13 @@ private func checkInsight() {
 }
 
 private func checkEveningLabels() {
-    check(EveningCountOptions.values == [1, 2, 3, 4, 5], "evening choices")
+    check(EveningCountOptions.values == [1, 2, 3, 4, 5, 6, 7], "evening choices")
     check(EveningCountOptions.label(1) == "1 akşam", "1")
     check(EveningCountOptions.label(2) == "2 akşam", "2")
     check(EveningCountOptions.label(4) == "4 akşam", "4")
     check(EveningCountOptions.label(5) == "5 akşam", "5")
+    check(EveningCountOptions.label(6) == "6 akşam", "6")
+    check(EveningCountOptions.label(7) == "7 akşam", "7")
     check(!EveningCountOptions.label(3).contains("Evening"), "labels stay Turkish")
 }
 
@@ -301,6 +303,15 @@ private func checkAnalytics() {
         "smart_replacement_used",
         "new_recipe_cooked",
         "familiar_recipe_cooked",
+        "recipe_quick_saved",
+        "recipe_completion_started",
+        "recipe_completion_finished",
+        "recipe_completion_abandoned",
+        "recipe_added_manually",
+        "recipe_opened_original",
+        "recipe_added_to_plan",
+        "saved_recipe_deleted",
+        "saved_recipe_duplicate_detected",
     ]
     check(Set(AnalyticsEvent.allCases.map(\.rawValue)) == expected, "checklist event names")
 

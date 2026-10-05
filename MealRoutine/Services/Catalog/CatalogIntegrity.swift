@@ -30,6 +30,16 @@ enum CatalogFingerprint {
     }
 }
 
+/// Bundled rows are the only ones a catalog re-import may replace.
+/// An empty or unknown origin stays bundled so a V1/V2 store is not treated as user data.
+enum CatalogRecipeGuard {
+    static func isBundled(originRaw: String) -> Bool {
+        let trimmed = originRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        return RecipeOrigin(rawValue: trimmed) == .builtIn
+    }
+}
+
 /// Which planned-meal slugs no longer name a recipe, and how to repair that.
 ///
 /// The current week is regenerated with the meal recommender when it has an orphan and
