@@ -4,6 +4,18 @@ import XCTest
 
 @MainActor
 final class RecipeImportTests: XCTestCase {
+    private var container: ModelContainer!
+
+    override func setUp() async throws {
+        container = try ModelContainerFactory.make(inMemory: true)
+        UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
+    }
+
+    override func tearDown() async throws {
+        UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
+        container = nil
+    }
+
     func testURLKeyDropsTrackingAndKeepsThePath() {
         let left = RecipeSourceService.normalizedKey("https://www.Example.com/tarif/corba/?utm_source=ig&fbclid=abc&id=1")
         let right = RecipeSourceService.normalizedKey("http://example.com/tarif/corba?id=1&fbclid=zzz#photo")
@@ -88,7 +100,7 @@ final class RecipeImportTests: XCTestCase {
     }
 
     func testQuickSaveKeepsSourceAndDoesNotRequireIngredients() throws {
-        let context = try makeContext()
+        let context = container.mainContext
         var capture = RecipeCapture(
             urlString: "https://www.Example.com/tarif/corba/?utm_source=ig&fbclid=1",
             title: "Mercimek",
@@ -269,7 +281,7 @@ final class RecipeImportTests: XCTestCase {
     }
 
     func testReadyRecipeCanBePlannedAndSavedToTryCannot() throws {
-        let context = try makeContext()
+        let context = container.mainContext
         let capture = RecipeCapture(urlString: "https://example.com/kofte", title: "Köfte")
         let trying = try RecipeCollectionService.quickSave(capture, in: context)
         XCTAssertFalse(ImportedRecipeEligibility.allowsPlanning(trying))
@@ -298,7 +310,7 @@ final class RecipeImportTests: XCTestCase {
     }
 
     func testGroceryKeepsCompletedQuantities() throws {
-        let context = try makeContext()
+        let context = container.mainContext
         let now = TestFixtures.now
         let prefs = UserPrefs(householdSize: 2, hasCompletedOnboarding: true, createdAt: now)
         context.insert(prefs)
@@ -325,7 +337,7 @@ final class RecipeImportTests: XCTestCase {
     }
 
     func testManualRecipeAndMealMemoryStayOnTheExistingPath() throws {
-        let context = try makeContext()
+        let context = container.mainContext
         var form = RecipeForm.emptyManual()
         form.name = "Mantı"
         form.servings = 2
@@ -347,7 +359,7 @@ final class RecipeImportTests: XCTestCase {
     func testPlaceReadyRecipeLeavesCookedEveningsUntouched() throws {
         UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey)
         defer { UserDefaults.standard.removeObject(forKey: MealExposureLog.storageKey) }
-        let context = try makeContext()
+        let context = container.mainContext
         let now = TestFixtures.now
         let prefs = UserPrefs(householdSize: 2, hasCompletedOnboarding: true, createdAt: now)
         context.insert(prefs)
@@ -431,7 +443,7 @@ final class RecipeImportTests: XCTestCase {
     }
 
     func testTypedNumbersAndCatalogUnitsAreWhatGetsSaved() throws {
-        let context = try makeContext()
+        let context = container.mainContext
         var form = readyForm()
         form.servings = nil
         form.servingsText = "3"
@@ -469,8 +481,4 @@ final class RecipeImportTests: XCTestCase {
         return form
     }
 
-    private func makeContext() throws -> ModelContext {
-        let container = try ModelContainerFactory.make(inMemory: true)
-        return container.mainContext
-    }
 }
