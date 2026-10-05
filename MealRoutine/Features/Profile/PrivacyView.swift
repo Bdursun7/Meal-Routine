@@ -5,10 +5,10 @@ struct PrivacyView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Verilerin bu telefonda durur. Hesap yok, bulut yok.")
+                Text("Kişisel plan, puanlar ve yemek hafızan bu telefonda durur. Ev halkına katılmazsan buluta çıkmaz.")
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Haftan, tercihlerin, puanların, yemek hafızan, market listen ve kaydettiğin tarifler cihazdan çıkmaz. Kaynak adresi de bu telefonda kalır. Konum istenmez. Temel kişiselleştirme internet olmadan çalışır.")
+                Text("Tek başına kullanırken haftan, tercihlerin, puanların, yemek hafızan, market listen ve kaydettiğin tarifler cihazdan çıkmaz. Ev halkı kurarsan ortak plan, tepkiler, market işaretleri ve planlama için gereken kısa sinyaller iCloud üzerinden yalnızca o iki kişiye gider. Kişisel hafıza kopyalanmaz. Konum istenmez.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -16,7 +16,7 @@ struct PrivacyView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Kullanım olayları, örneğin planın oluşması, yalnızca bu cihazdaki günlüğe yazılır. İsim veya hesap tutulmaz ve bir sunucuya gitmez.")
+                Text("Kullanım olayları, örneğin planın oluşması, yalnızca bu cihazdaki günlüğe yazılır. Apple kimliği yalnızca ev halkı açıldığında saklanır ve reklam için kullanılmaz.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

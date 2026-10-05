@@ -5,6 +5,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Query private var prefs: [UserPrefs]
+    @State private var household = HouseholdSession.shared
     @State private var seedAttempt = 0
     @State private var isSeeding = true
     @State private var seedError: String?
@@ -42,9 +43,14 @@ struct RootView: View {
         .task(id: seedAttempt) {
             await seedCatalog()
         }
+        .onChange(of: household.pendingInviteCode) { _, code in
+            guard let code, household.account != nil, !isSeeding else { return }
+            Task { await household.acceptInvite(code: code, in: modelContext) }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, !isSeeding, seedError == nil else { return }
             drainCaptures()
+            Task { await HouseholdSession.shared.start(in: modelContext) }
         }
         .onAppear {
             Analytics.trackOnce(.appOpened)
@@ -70,6 +76,7 @@ struct RootView: View {
             try CatalogIndexCache.warm(in: modelContext)
             isSeeding = false
             drainCaptures()
+            await HouseholdSession.shared.start(in: modelContext)
         } catch {
             seedError = error.localizedDescription
             isSeeding = false

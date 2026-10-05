@@ -17,6 +17,7 @@ struct WeekMealPresentation: Identifiable, Equatable {
     var reason: String = ""
     var badgeTitle: String?
     var isSkipped: Bool = false
+    var household: HouseholdMealChrome? = nil
 
     /// Cooked meals do not offer Atladım. Cook wins if both flags were set.
     var showsSkip: Bool { SkipControl.showsAffordance(isCooked: isCooked) }

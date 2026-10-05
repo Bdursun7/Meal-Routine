@@ -11,6 +11,8 @@ struct MealReplacementSheet: View {
     @Query private var prefs: [UserPrefs]
     @Query private var memories: [MealMemory]
     @State private var chips: Set<ReplacementChip> = []
+    @State private var householdIntent: HouseholdReplacementIntent = .bothWillLike
+    @State private var household = HouseholdSession.shared
     @State private var errorMessage: String?
     @State private var isWorking = false
 
@@ -24,6 +26,7 @@ struct MealReplacementSheet: View {
             prefs: prefs,
             memories: memories
         )
+        let sharedChoices = householdChoices()
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.cardGap) {
@@ -37,41 +40,12 @@ struct MealReplacementSheet: View {
                             .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(ReplacementChip.allCases) { chip in
-                                FilterChip(
-                                    title: chip.title,
-                                    isSelected: chips.contains(chip),
-                                    hint: "Bu akşamın alternatiflerini süzer"
-                                ) {
-                                    chips = MealReplacement.toggled(chips, chip)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    if board.choices.isEmpty {
-                        Text("Bu filtreye uyan tarif kalmadı. Çipleri gevşet.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
+                    if household.isHouseholdMode {
+                        householdFilters
+                        choiceList(sharedChoices)
                     } else {
-                        VStack(spacing: 12) {
-                            ForEach(board.choices) { choice in
-                                Button {
-                                    commit(choice.slug)
-                                } label: {
-                                    ReplacementChoiceRow(choice: choice)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(isWorking)
-                                .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
-                                .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
-                            }
-                        }
-                        .padding(.top, 4)
+                        soloFilters
+                        choiceList(board.choices)
                     }
                 }
                 .padding(Theme.screenPadding)
@@ -107,14 +81,155 @@ struct MealReplacementSheet: View {
         )
     }
 
+    private var householdFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(HouseholdReplacementIntent.allCases) { intent in
+                    FilterChip(
+                        title: intent.title,
+                        isSelected: householdIntent == intent,
+                        hint: "Ev halkı için alternatifleri süzer"
+                    ) {
+                        householdIntent = intent
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var soloFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(ReplacementChip.allCases) { chip in
+                    FilterChip(
+                        title: chip.title,
+                        isSelected: chips.contains(chip),
+                        hint: "Bu akşamın alternatiflerini süzer"
+                    ) {
+                        chips = MealReplacement.toggled(chips, chip)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func choiceList(_ choices: [ReplacementChoicePresentation]) -> some View {
+        Group {
+            if choices.isEmpty {
+                Text("Bu filtreye uyan tarif kalmadı. Çipleri gevşet.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(choices) { choice in
+                        Button {
+                            commit(choice.slug)
+                        } label: {
+                            ReplacementChoiceRow(choice: choice)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isWorking)
+                        .accessibilityLabel("\(choice.name), \(choice.minutes) dakika. \(choice.reason)")
+                        .accessibilityHint("Yalnızca bu akşamın tarifini bununla değiştirir")
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func householdChoices() -> [ReplacementChoicePresentation] {
+        guard household.isHouseholdMode, let current = currentCandidate() else { return [] }
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        let catalog = HouseholdPlanBridge.candidates(
+            recipes: recipes,
+            ratings: ratings,
+            projections: household.snapshot.recipeProjections
+        )
+        let memoryMap = Dictionary(memories.map { ($0.recipeSlug, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let storedPrefs = prefs.min { $0.createdAt < $1.createdAt }
+        let userId = household.account?.id ?? ""
+        var tastes = [
+            MemberTaste(
+                userId: userId,
+                displayName: household.account.map(HouseholdReducer.displayName) ?? "Sen",
+                memories: memoryMap,
+                dislikedIngredientIds: Set(storedPrefs?.dislikedIngredientIds ?? [])
+            ),
+        ]
+        tastes.append(contentsOf: household.snapshot.tasteProjections.filter { $0.userId != userId }.map(MemberTasteProjectionBuilder.taste(from:)))
+        let vetoes = Set((household.snapshot.plan?.meals ?? []).filter { HouseholdConflict.needsDecision($0.reactions) }.map(\.recipeSlug))
+        let names = Dictionary(recipes.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        return HouseholdReplacement.choices(
+            catalog: catalog,
+            current: current,
+            tastes: tastes,
+            memory: household.snapshot.memory,
+            vetoSlugs: vetoes,
+            householdAvoided: Set(household.snapshot.preference?.avoidedIngredients ?? []),
+            maxCookMinutes: storedPrefs?.maxCookMinutes ?? 60,
+            intent: householdIntent,
+            currentUserId: userId,
+            blockedSlugs: Set(
+                (weeks.first { WeekCalendar.isSameDay($0.weekStart, WeekCalendar.weekStart(containing: .now)) }?.meals ?? [])
+                    .map(\.recipeSlug)
+            )
+        ).map { choice in
+            let recipe = names[choice.slug]
+            let title = recipe?.displayName ?? household.snapshot.recipeProjections.first { $0.slug == choice.slug }?.title ?? choice.slug
+            return ReplacementChoicePresentation(
+                slug: choice.slug,
+                name: title,
+                minutes: choice.minutes,
+                difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
+                categoryTitle: "",
+                reason: choice.reason,
+                photoURL: recipe?.photoURL ?? "",
+                photoAuthor: recipe?.photoAuthor ?? "",
+                photoLicense: recipe?.photoLicense ?? ""
+            )
+        }
+    }
+
+    private func currentCandidate() -> PickerCandidate? {
+        let week = weeks.first { week in
+            week.meals.contains { $0.uuid == mealID }
+        }
+        guard let meal = week?.meals.first(where: { $0.uuid == mealID }) else { return nil }
+        let ratings = FeedbackIndex.latestRatings(in: feedback)
+        return HouseholdPlanBridge.candidates(
+            recipes: recipes,
+            ratings: ratings,
+            projections: household.snapshot.recipeProjections
+        ).first { $0.slug == meal.recipeSlug }
+    }
+
     private func commit(_ slug: String) {
         guard !isWorking else { return }
         isWorking = true
         defer { isWorking = false }
         do {
-            let reason = chips.map(\.title).sorted().joined(separator: ", ")
-            try WeekPlanService.replaceMeal(uuid: mealID, with: slug, reason: reason, in: modelContext)
+            let reason = household.isHouseholdMode ? householdIntent.title : chips.map(\.title).sorted().joined(separator: ", ")
+            do {
+                try WeekPlanService.replaceMeal(uuid: mealID, with: slug, reason: reason, in: modelContext)
+            } catch {
+                guard household.isHouseholdMode, let projection = household.snapshot.recipeProjections.first(where: { $0.slug == slug }) else {
+                    throw error
+                }
+                try HouseholdPlanBridge.assignSharedSlug(
+                    mealID: mealID,
+                    slug: slug,
+                    title: projection.title,
+                    in: modelContext
+                )
+            }
+            household.noteReplacement(mealID: mealID, slug: slug, in: modelContext)
             try GroceryListService.rebuild(in: modelContext)
+            try HouseholdPlanBridge.applyGrocery(household.snapshot, in: modelContext)
             let intent = chips.count == 1 ? (chips.first?.rawValue ?? "open") : (chips.isEmpty ? "open" : "mixed")
             Analytics.track(.smartReplacementUsed, properties: ["intent": intent])
             dismiss()

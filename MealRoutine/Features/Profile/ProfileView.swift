@@ -37,6 +37,18 @@ struct ProfileView: View {
     private var profileForm: some View {
         @Bindable var viewModel = self.viewModel
         return Form {
+                Section("Ev halkı") {
+                    NavigationLink {
+                        HouseholdSettingsView()
+                    } label: {
+                        Text("Birlikte planla")
+                    }
+                    .accessibilityHint("Ev halkı, davet ve ortak hafta")
+                    Text("Apple ile girişten sonra en fazla iki kişi aynı haftayı seçer. Kişisel yemek hafızan ev halkına taşınmaz.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Ev") {
                     Stepper(value: $viewModel.householdSize, in: HouseholdSizeLimits.range) {
                         Text("Ev halkı: \(viewModel.householdSize)")
@@ -160,7 +172,7 @@ struct ProfileView: View {
 
                 Section("Katalog") {
                     Text("\(recipes.count) akşam tarifi yerelde yüklü.")
-                    Text("Öneri motoru süreye, sevmediğin malzemeye, yemek hafızana ve haftanın çeşitliliğine bakar. Hesap, reklam ve yapay zeka yok.")
+                    Text("Öneri motoru süreye, sevmediğin malzemeye, yemek hafızana ve haftanın çeşitliliğine bakar. Ev halkı isteğe bağlıdır ve yalnızca Apple ile giriş kullanır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
