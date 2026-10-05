@@ -44,6 +44,31 @@ enum RecipeValidationIssue: String, Equatable, Sendable, Identifiable {
     }
 }
 
+/// A field the recipe editor can focus when Kaydet fails.
+enum RecipeEditorField: Hashable, Sendable {
+    case name
+    case servings
+    case ingredientName(Int)
+    case ingredientQuantity(Int)
+    case step(Int)
+}
+
+/// Catalog unit codes. The editor stores these, not the Turkish label.
+enum RecipeUnitChoices {
+    static let codes = [
+        "g", "kg", "ml", "l", "piece", "tbsp", "tsp", "clove", "toTaste", "sprig", "pinch", "slice",
+    ]
+
+    /// Known spellings fold to a catalog code. An empty unit stays empty. Anything else is kept.
+    static func canonical(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let code = UnitNormalization.parse(trimmed).code
+        if codes.contains(code) { return code }
+        return trimmed
+    }
+}
+
 enum RecipeValidationResult: Equatable, Sendable {
     case valid
     case invalid([RecipeValidationIssue])

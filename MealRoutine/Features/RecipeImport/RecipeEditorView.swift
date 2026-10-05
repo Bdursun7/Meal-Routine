@@ -20,6 +20,8 @@ struct RecipeEditorView: View {
     @State private var startedCompletion = false
     @State private var errorMessage: String?
     @State private var didLoad = false
+    @State private var focusToken = 0
+    @FocusState private var focusedField: RecipeEditorField?
 
     private var existing: Recipe? {
         guard let slug = launch.slug else { return nil }
@@ -33,18 +35,28 @@ struct RecipeEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                identitySection
-                ingredientSection
-                stepSection
-                timeSection
-                detailSection
-                sourceSection
-                if !issues.isEmpty {
-                    Section("Kaydetmeden önce") {
-                        ForEach(issues) { issue in
-                            Text(issue.message)
+            ScrollViewReader { proxy in
+                Form {
+                    if !issues.isEmpty {
+                        Section("Kaydetmeden önce") {
+                            ForEach(issues) { issue in
+                                Text(issue.message)
+                                    .foregroundStyle(.red)
+                            }
                         }
+                    }
+                    identitySection
+                    ingredientSection
+                    stepSection
+                    timeSection
+                    detailSection
+                    sourceSection
+                }
+                .onChange(of: focusToken) { _, _ in
+                    guard let field = RecipeValidationService.invalidFields(in: form).first else { return }
+                    focusedField = field
+                    withAnimation {
+                        proxy.scrollTo(field, anchor: .center)
                     }
                 }
             }
@@ -89,9 +101,13 @@ struct RecipeEditorView: View {
 
     private var identitySection: some View {
         Section("Tarif") {
-            TextField("Ad", text: $form.name)
-            TextField("Porsiyon", text: servingsText)
-                .keyboardType(.numberPad)
+            validatedField(.name) {
+                TextField("Ad", text: $form.name)
+            }
+            validatedField(.servings) {
+                TextField("Porsiyon", text: servingsText)
+                    .keyboardType(.numberPad)
+            }
             if let image = localImage {
                 Image(uiImage: image)
                     .resizable()
@@ -109,11 +125,15 @@ struct RecipeEditorView: View {
         Section("Malzemeler") {
             ForEach(Array(form.ingredients.indices), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Malzeme", text: $form.ingredients[index].name)
-                    HStack {
-                        TextField("Miktar", text: quantityText(index))
-                            .keyboardType(.decimalPad)
-                        TextField("Birim", text: $form.ingredients[index].unit)
+                    validatedField(.ingredientName(index)) {
+                        TextField("Malzeme", text: $form.ingredients[index].name)
+                    }
+                    HStack(alignment: .firstTextBaseline) {
+                        validatedField(.ingredientQuantity(index)) {
+                            TextField("Miktar", text: quantityText(index))
+                                .keyboardType(.decimalPad)
+                        }
+                        unitPicker(index)
                     }
                     TextField("Hazırlık notu", text: $form.ingredients[index].preparationNote)
                     Toggle("İsteğe bağlı", isOn: $form.ingredients[index].isOptional)
@@ -139,7 +159,9 @@ struct RecipeEditorView: View {
         Section("Yapılış") {
             ForEach(Array(form.steps.indices), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Adım", text: $form.steps[index], axis: .vertical)
+                    validatedField(.step(index)) {
+                        TextField("Adım", text: $form.steps[index], axis: .vertical)
+                    }
                     HStack {
                         Button("Yukarı") { moveStep(index, by: -1) }
                         Button("Aşağı") { moveStep(index, by: 1) }
@@ -256,6 +278,7 @@ struct RecipeEditorView: View {
         didLoad = true
         if let existing {
             form = RecipeCollectionService.form(from: existing)
+            canonicalizeUnits()
             if existing.collectionState == .savedToTry && !startedCompletion {
                 startedCompletion = true
                 Analytics.track(.recipeCompletionStarted, properties: [
@@ -266,6 +289,7 @@ struct RecipeEditorView: View {
             }
         } else {
             form = RecipeForm.emptyManual()
+            canonicalizeUnits()
         }
         baseline = form
     }
@@ -290,9 +314,13 @@ struct RecipeEditorView: View {
     }
 
     private func save() {
+        canonicalizeUnits()
         let result = RecipeValidationService.validate(form)
         issues = result.issues
-        guard result == .valid else { return }
+        guard result == .valid else {
+            focusToken += 1
+            return
+        }
         do {
             _ = try RecipeCollectionService.save(
                 form,
@@ -330,6 +358,74 @@ struct RecipeEditorView: View {
             get: { duplicateSlug != nil },
             set: { if !$0 { duplicateSlug = nil } }
         )
+    }
+
+    private var showsFieldErrors: Bool {
+        !issues.isEmpty
+    }
+
+    private func canonicalizeUnits() {
+        for index in form.ingredients.indices {
+            form.ingredients[index].unit = RecipeUnitChoices.canonical(form.ingredients[index].unit)
+        }
+    }
+
+    private func unitSelection(_ index: Int) -> Binding<String> {
+        Binding(
+            get: {
+                guard form.ingredients.indices.contains(index) else { return "" }
+                return RecipeUnitChoices.canonical(form.ingredients[index].unit)
+            },
+            set: { newValue in
+                guard form.ingredients.indices.contains(index) else { return }
+                form.ingredients[index].unit = newValue
+            }
+        )
+    }
+
+    private func unitOptions(_ index: Int) -> [String] {
+        let current = form.ingredients.indices.contains(index)
+            ? RecipeUnitChoices.canonical(form.ingredients[index].unit)
+            : ""
+        if current.isEmpty || RecipeUnitChoices.codes.contains(current) {
+            return RecipeUnitChoices.codes
+        }
+        return RecipeUnitChoices.codes + [current]
+    }
+
+    private func unitPicker(_ index: Int) -> some View {
+        Picker("Birim", selection: unitSelection(index)) {
+            Text("Birim yok").tag("")
+            ForEach(unitOptions(index), id: \.self) { code in
+                Text(UnitLabels.turkish(code)).tag(code)
+            }
+        }
+        .pickerStyle(.menu)
+        .accessibilityLabel("Birim")
+    }
+
+    @ViewBuilder
+    private func validatedField<Content: View>(
+        _ field: RecipeEditorField,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let invalid = showsFieldErrors && RecipeValidationService.invalidFields(in: form).contains(field)
+        VStack(alignment: .leading, spacing: 4) {
+            content()
+                .focused($focusedField, equals: field)
+            if invalid {
+                Text(RecipeValidationService.message(for: field, in: form))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .id(field)
+        .padding(invalid ? 6 : 0)
+        .background(invalid ? Color.red.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(invalid ? Color.red : Color.clear, lineWidth: 1)
+        }
     }
 
     private var errorIsPresented: Binding<Bool> {

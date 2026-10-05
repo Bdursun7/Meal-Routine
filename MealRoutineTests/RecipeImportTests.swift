@@ -140,6 +140,23 @@ final class RecipeImportTests: XCTestCase {
         XCTAssertEqual(RecipeValidationService.validate(form), .valid)
     }
 
+    func testEditorFocusesTheTopmostMissingFieldAndKeepsUnitCodes() {
+        var form = RecipeForm.emptyManual()
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .name)
+        form.name = "Köfte"
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .servings)
+        form.servings = 4
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .ingredientName(0))
+        form.ingredients = [RecipeFormIngredient(name: "kıyma", unit: "adet")]
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .ingredientQuantity(0))
+        form.ingredients[0].quantity = 400
+        XCTAssertEqual(RecipeValidationService.invalidFields(in: form).first, .step(0))
+        XCTAssertEqual(RecipeUnitChoices.canonical("adet"), "piece")
+        XCTAssertEqual(RecipeUnitChoices.canonical("yemek kaşığı"), "tbsp")
+        XCTAssertEqual(RecipeUnitChoices.canonical(""), "")
+        XCTAssertEqual(RecipeUnitChoices.canonical("piece"), "piece")
+    }
+
     func testReadyRecipeCanBePlannedAndSavedToTryCannot() throws {
         let context = try makeContext()
         let capture = RecipeCapture(urlString: "https://example.com/kofte", title: "Köfte")

@@ -27,6 +27,62 @@ enum RecipeValidationService {
         return issues.isEmpty ? .valid : .invalid(issues)
     }
 
+    /// Visual order: name, servings, each ingredient, then each step. The editor focuses the first.
+    static func invalidFields(in form: RecipeForm) -> [RecipeEditorField] {
+        var fields: [RecipeEditorField] = []
+        if form.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields.append(.name)
+        }
+        if (form.servings ?? 0) <= 0 {
+            fields.append(.servings)
+        }
+        let active = form.ingredients.filter(isActiveIngredient)
+        if active.isEmpty {
+            if form.ingredients.indices.contains(0) {
+                fields.append(.ingredientName(0))
+            }
+        } else {
+            for (index, line) in form.ingredients.enumerated() where isActiveIngredient(line) {
+                if line.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    fields.append(.ingredientName(index))
+                }
+                if (line.quantity ?? 0) <= 0 {
+                    fields.append(.ingredientQuantity(index))
+                }
+            }
+        }
+        let steps = form.steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let filled = steps.contains { !$0.isEmpty }
+        if !filled {
+            if steps.indices.contains(0) {
+                fields.append(.step(0))
+            }
+        } else {
+            for (index, step) in steps.enumerated() where step.isEmpty {
+                fields.append(.step(index))
+            }
+        }
+        return fields
+    }
+
+    static func message(for field: RecipeEditorField, in form: RecipeForm) -> String {
+        switch field {
+        case .name:
+            RecipeValidationIssue.missingName.message
+        case .servings:
+            RecipeValidationIssue.missingServings.message
+        case .ingredientName:
+            RecipeValidationIssue.missingIngredient.message
+        case .ingredientQuantity:
+            RecipeValidationIssue.missingQuantity.message
+        case .step:
+            let hasText = form.steps.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            return hasText
+                ? RecipeValidationIssue.emptyInstruction.message
+                : RecipeValidationIssue.missingInstruction.message
+        }
+    }
+
     static func validate(_ recipe: Recipe) -> RecipeValidationResult {
         validate(form(from: recipe))
     }
