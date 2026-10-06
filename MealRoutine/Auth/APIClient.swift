@@ -268,6 +268,28 @@ struct AccountRepository {
         _ = try? await client.request(method: "POST", path: "/v1/auth/logout", body: body, authenticated: false)
     }
 
+    func exportData() async throws -> Data {
+        let (data, response) = try await client.request(
+            method: "GET",
+            path: "/v1/account/export",
+            body: nil,
+            authenticated: true
+        )
+        try client.validateAuth(response, data: data, authenticated: true)
+        return data
+    }
+
+    func deleteAccount() async throws -> AccountDeletionResult {
+        let (data, response) = try await client.request(
+            method: "DELETE",
+            path: "/v1/account",
+            body: nil,
+            authenticated: true
+        )
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder().decode(AccountDeletionResult.self, from: data)
+    }
+
     private func post<Body: Encodable>(_ path: String, body: Body, authenticated: Bool) async throws -> AuthSessionDTO {
         let data = try JSONEncoder().encode(body)
         let (responseData, response) = try await client.request(method: "POST", path: path, body: data, authenticated: authenticated)

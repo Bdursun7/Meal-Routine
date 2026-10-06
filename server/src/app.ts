@@ -12,6 +12,7 @@ import type { IdentityVerifier } from './jwks.js'
 import { redactSensitive } from './log.js'
 import { createMemoryMigration } from './memoryMigration.js'
 import { createMigrationService, parseUpload, type MigrationStore } from './migrationService.js'
+import { createPrivacyService } from './privacyService.js'
 import {
   createLogSender,
   createMemoryNotificationStore,
@@ -105,7 +106,7 @@ const mutationBody = z.object({
   entityId: z.string().min(1).max(80),
   operationType: z.enum(['add', 'check', 'replace', 'set', 'upsert', 'update', 'cook']),
   baseRevision: z.number().int().nonnegative(),
-  payload: z.record(z.string(), z.unknown()),
+  payload: z.record(z.string().max(80), z.unknown()).refine((value) => JSON.stringify(value).length <= 16_000),
 })
 
 export interface BuildAppOptions {
@@ -120,6 +121,7 @@ export interface BuildAppOptions {
   sender?: PushSender
   logger?: boolean
   logStream?: Writable
+  bodyLimit?: number
 }
 
 declare module 'fastify' {
@@ -140,24 +142,46 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     createRateLimiter({ windowMs: config.rateLimitWindowMs, max: config.rateLimitMax })
   const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
   const board = createBoardService(options.repo, options.repo, options.householdNow ?? options.now ?? (() => new Date()))
-  const migration = createMigrationService(options.migration ?? createMemoryMigration())
+  const migrationStore = options.migration ?? createMemoryMigration()
+  const migration = createMigrationService(migrationStore)
   const clock = options.now ?? (() => new Date())
   const pushSender = options.sender ?? createLogSender()
-  const notifications = createNotificationService(options.notifications ?? createMemoryNotificationStore(), pushSender, clock)
+  const notificationStore = options.notifications ?? createMemoryNotificationStore()
+  const notifications = createNotificationService(notificationStore, pushSender, clock)
+  const privacy = createPrivacyService({
+    repo: options.repo,
+    households,
+    migration: migrationStore,
+    notifications: notificationStore,
+    now: clock,
+  })
 
   const app = Fastify({
     logger: options.logStream
       ? { level: 'info', stream: options.logStream }
       : (options.logger ?? false),
     logController: new LogController({ disableRequestLogging: true }),
+    bodyLimit: options.bodyLimit ?? 1_048_576,
   })
 
   app.addHook('onRequest', async (request) => {
     if (request.url.startsWith('/v1')) enforceClientVersion(request)
   })
 
-  app.addHook('onSend', async (_request, reply, payload) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     reply.header('X-API-Version', config.apiVersion)
+    reply.header('X-Content-Type-Options', 'nosniff')
+    reply.header('Referrer-Policy', 'no-referrer')
+    reply.header('X-Frame-Options', 'DENY')
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    reply.header('Cache-Control', 'no-store')
+    const origin = headerValue(request.headers.origin)
+    if (config.corsOrigin && origin === config.corsOrigin) {
+      reply.header('Access-Control-Allow-Origin', config.corsOrigin)
+      reply.header('Vary', 'Origin')
+      reply.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Client-API-Version, Idempotency-Key')
+      reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+    }
     return payload
   })
 
@@ -169,13 +193,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       return reply.code(error.status).send(body)
     }
     const status = statusCode(error)
-    if (status === 400) {
+    if (status === 400 || status === 413) {
       request.log.warn({ code: 'invalid_request' }, 'request failed')
-      return reply.code(400).send({ error: 'invalid_request' })
+      return reply.code(status).send({ error: 'invalid_request' })
     }
     request.log.error({ code: 'internal' }, 'request failed')
     return reply.code(500).send({ error: 'internal' })
   })
+
+  app.options('*', async (_request, reply) => reply.code(204).send())
 
   app.get('/health', async () => ({ ok: true }))
 
@@ -226,14 +252,26 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   })
 
   app.get('/v1/auth/me', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const me = await service.me(accountId)
     return { account: me.account, identities: me.identities }
   })
 
+  app.get('/v1/account/export', async (request) => {
+    enforceWriteLimit(request, limiter, 'auth')
+    const accountId = await requireAccount(request, options)
+    return privacy.exportAccount(accountId)
+  })
+
+  app.delete('/v1/account', async (request) => {
+    enforceWriteLimit(request, limiter, 'auth')
+    const accountId = await requireAccount(request, options)
+    return privacy.deleteAccount(accountId)
+  })
+
   app.post('/v1/auth/link', async (request, reply) => {
     enforceRateLimit(request, limiter)
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const body = parse(linkBody, request.body)
     const verified = await verifyForProvider(options.verifier, body.provider, body.identityToken)
     if (body.provider === 'apple') {
@@ -244,25 +282,25 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   })
 
   app.delete('/v1/auth/identities/:provider', async (request, reply) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(z.object({ provider: z.string().min(1).max(20) }), request.params)
     return reply.send(await service.unlink(accountId, params.provider))
   })
 
   app.get('/v1/households/current', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return households.current(accountId)
   })
 
   app.post('/v1/households', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const body = parse(nameBody, request.body)
     return households.create(accountId, body.name)
   })
 
   app.get('/v1/households/:householdId', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const role = await options.repo.membership(params.householdId, accountId)
     if (!role) throw new AppError('not_found', 404)
@@ -271,7 +309,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.patch('/v1/households/:householdId', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const body = parse(nameBody, request.body)
     return households.rename(accountId, params.householdId, body.name)
@@ -279,7 +317,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.post('/v1/households/:householdId/invites', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const created = await households.createInvite(accountId, params.householdId)
     const code = created.household?.invites[0]?.code ?? ''
@@ -289,79 +327,79 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.post('/v1/households/:householdId/invites/:inviteId/resend', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(inviteParams, request.params)
     return households.resendInvite(accountId, params.householdId, params.inviteId)
   })
 
   app.post('/v1/households/:householdId/invites/:inviteId/cancel', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(inviteParams, request.params)
     return households.cancelInvite(accountId, params.householdId, params.inviteId)
   })
 
   app.post('/v1/invites/:code/accept', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(codeParams, request.params)
     return households.acceptInvite(accountId, params.code)
   })
 
   app.post('/v1/invites/:code/reject', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(codeParams, request.params)
     return households.rejectInvite(accountId, params.code)
   })
 
   app.delete('/v1/households/:householdId/members/:accountId', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(memberParams, request.params)
     return households.removeMember(accountId, params.householdId, params.accountId)
   })
 
   app.post('/v1/households/:householdId/leave', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     return households.leave(accountId, params.householdId)
   })
 
   app.post('/v1/households/:householdId/transfer', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const body = parse(transferBody, request.body)
     return households.transfer(accountId, params.householdId, body.accountId)
   })
 
   app.get('/v1/migration', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return migration.status(accountId)
   })
 
   app.post('/v1/migration/upload', async (request) => {
     enforceWriteLimit(request, limiter, 'migration')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return migration.upload(accountId, parseUpload(request.body))
   })
 
   app.post('/v1/migration/confirm', async (request) => {
     enforceWriteLimit(request, limiter, 'migration')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return migration.confirm(accountId)
   })
 
   app.get('/v1/households/:householdId/board', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     return board.board(accountId, params.householdId)
   })
 
   app.get('/v1/households/:householdId/changes', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const query = parse(z.object({ cursor: z.coerce.number().int().nonnegative().optional() }), request.query)
     return board.changes(accountId, params.householdId, query.cursor ?? 0)
@@ -369,7 +407,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.post('/v1/households/:householdId/mutations', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const idempotencyKey = headerValue(request.headers['idempotency-key'])
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
@@ -383,33 +421,33 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   })
 
   app.get('/v1/notifications/preferences', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return notifications.preferences(accountId)
   })
 
   app.put('/v1/notifications/preferences', async (request) => {
     enforceWriteLimit(request, limiter, 'notifications')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const body = parse(preferenceBody, request.body)
     await notifications.savePreferences(accountId, body)
     return body
   })
 
   app.get('/v1/notifications/tokens', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return { tokens: await notifications.listTokens(accountId) }
   })
 
   app.post('/v1/notifications/tokens', async (request) => {
     enforceWriteLimit(request, limiter, 'notifications')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const body = parse(tokenBody, request.body)
     await notifications.registerToken(accountId, body.token, body.platform)
     return { ok: true }
   })
 
   app.delete('/v1/notifications/tokens', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const body = parse(tokenDeleteBody, request.body)
     await notifications.unregisterToken(accountId, body.token)
     return { ok: true }
@@ -417,7 +455,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.post('/v1/households/:householdId/notifications', async (request) => {
     enforceWriteLimit(request, limiter, 'notifications')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     const role = await options.repo.membership(params.householdId, accountId)
     if (!role) throw new AppError('not_found', 404)
@@ -427,24 +465,24 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   })
 
   app.get('/v1/notifications/outbox', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     return { batches: await notifications.listBatches(accountId) }
   })
 
   app.post('/v1/notifications/dispatch', async (request) => {
-    await requireAccount(request, config)
+    await requireAccount(request, options)
     return { sent: await notifications.dispatch() }
   })
 
   app.put('/v1/households/:householdId/board', async (request) => {
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     return board.board(accountId, params.householdId)
   })
 
   app.delete('/v1/households/:householdId', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
-    const accountId = await requireAccount(request, config)
+    const accountId = await requireAccount(request, options)
     const params = parse(householdParams, request.params)
     return households.deleteHousehold(accountId, params.householdId)
   })
@@ -498,20 +536,23 @@ async function notifyOthers(
   }
 }
 
-async function requireAccount(request: FastifyRequest, config: AppConfig): Promise<string> {
+async function requireAccount(request: FastifyRequest, options: BuildAppOptions): Promise<string> {
   const header = request.headers.authorization
   if (!header?.startsWith('Bearer ')) throw new AppError('session_expired', 401)
   try {
-    const token = await verifyAccessToken(header.slice('Bearer '.length), config.jwtSecret)
+    const token = await verifyAccessToken(header.slice('Bearer '.length), options.config.jwtSecret)
+    const account = await options.repo.getAccount(token.accountId)
+    if (!account) throw new AppError('session_expired', 401)
     request.accountId = token.accountId
     return token.accountId
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError) throw error
     throw new AppError('session_expired', 401)
   }
 }
 
-async function assertMember(request: FastifyRequest, options: BuildAppOptions, config: AppConfig): Promise<void> {
-  const accountId = await requireAccount(request, config)
+async function assertMember(request: FastifyRequest, options: BuildAppOptions): Promise<void> {
+  const accountId = await requireAccount(request, options)
   const params = parse(householdParams, request.params)
   const role = await options.repo.membership(params.householdId, accountId)
   if (!role) throw new AppError('not_found', 404)

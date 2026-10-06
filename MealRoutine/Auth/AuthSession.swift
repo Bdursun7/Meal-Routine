@@ -12,6 +12,7 @@ final class AuthSession {
     var showsSessionExpired = false
     var statusMessage: String?
     var isWorking = false
+    var exportedFile: URL?
     private var pendingGoogleToken: String?
     private var didInstallExpiry = false
 
@@ -135,6 +136,33 @@ final class AuthSession {
             let session = try await self.repository().unlink(provider: provider)
             self.apply(session)
             self.statusMessage = "\(AuthProviderLabel.title(provider)) bağlantısı kaldırıldı."
+        }
+    }
+
+    func exportAccount() async {
+        await run {
+            let data = try await self.repository().exportData()
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("mealroutine-verilerim.json")
+            try data.write(to: url, options: .atomic)
+            self.exportedFile = url
+            self.statusMessage = AccountPrivacyCopy.exported
+        }
+    }
+
+    func deleteAccount() async {
+        await run {
+            await NotificationSync.shared.unregisterCurrentToken()
+            _ = try await self.repository().deleteAccount()
+            AccountPrivacySession.clearTokens(AuthServices.sharedTokens)
+            self.account = nil
+            self.identities = []
+            self.pendingGoogleToken = nil
+            self.showsSessionExpired = false
+            self.exportedFile = nil
+            if !HouseholdTestMode.shared.isEnabled {
+                HouseholdSession.shared.dropAccount(message: AccountPrivacyCopy.deleted)
+            }
+            self.statusMessage = AccountPrivacyCopy.deleted
         }
     }
 

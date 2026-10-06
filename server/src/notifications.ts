@@ -72,6 +72,7 @@ export interface NotificationStore {
   saveBatch(batch: NotificationBatch): Promise<void>
   dueBatches(now: Date): Promise<NotificationBatch[]>
   listBatches(accountId: string): Promise<NotificationBatch[]>
+  revokeAllTokens(accountId: string): Promise<void>
 }
 
 export function defaultPreferences(): NotificationPreferences {
@@ -387,6 +388,15 @@ export function createMemoryNotificationStore(): NotificationStore {
     async listBatches(accountId) {
       return [...batches.values()].filter((batch) => batch.accountId === accountId)
     },
+    async revokeAllTokens(accountId) {
+      for (const [key, row] of tokens) {
+        if (row.accountId === accountId) tokens.set(key, { ...row, disabled: true })
+      }
+      prefs.delete(accountId)
+      for (const [id, batch] of batches) {
+        if (batch.accountId === accountId) batches.delete(id)
+      }
+    },
   }
 }
 
@@ -491,6 +501,14 @@ export function createPgNotificationStore(pool: Pool): NotificationStore {
         [new Date(clock.getTime() - GROUP_WINDOW_MS)],
       )
       return result.rows.map(batchFrom)
+    },
+    async revokeAllTokens(accountId) {
+      await pool.query(
+        `UPDATE device_push_tokens SET disabled_at = now() WHERE account_id = $1 AND disabled_at IS NULL`,
+        [accountId],
+      )
+      await pool.query(`DELETE FROM notification_preferences WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM notification_batches WHERE account_id = $1`, [accountId])
     },
     async listBatches(accountId) {
       const result = await pool.query(

@@ -1,12 +1,15 @@
 const sensitiveKeys = new Set([
   'identitytoken',
   'refreshtoken',
+  'accesstoken',
   'authorization',
   'email',
   'givenname',
   'familyname',
   'displayname',
   'token',
+  'devicetoken',
+  'tokenhash',
   'name',
 ])
 

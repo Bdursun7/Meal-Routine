@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import type { BoardStore } from './boardTypes.js'
 import { AppError } from './errors.js'
@@ -251,6 +252,34 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
             AND revoked_at IS NULL`,
         [hash, now],
       )
+    },
+    async closeAccount(accountId, householdOutcome, now) {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query(
+          `UPDATE sessions SET revoked_at = $2 WHERE account_id = $1 AND revoked_at IS NULL`,
+          [accountId, now],
+        )
+        await client.query(`DELETE FROM auth_identities WHERE account_id = $1`, [accountId])
+        await client.query(
+          `UPDATE accounts
+              SET display_name = '', given_name = '', family_name = '', deleted_at = $2, updated_at = $2
+            WHERE id = $1 AND deleted_at IS NULL`,
+          [accountId, now],
+        )
+        await client.query(
+          `INSERT INTO account_deletions (id, account_id, deleted_at, household_outcome)
+           VALUES ($1, $2, $3, $4)`,
+          [randomUUID(), accountId, now, householdOutcome],
+        )
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
     },
     async membership(householdId, accountId) {
       const result = await pool.query<{ role: MemberRole }>(

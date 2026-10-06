@@ -1,6 +1,6 @@
 # MealRoutine veritabanı
 
-Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0008` değişmez. Bu sürümün yeni şeması `0009_notification_delivery.sql` dosyasıdır.
+Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0009` değişmez. Hesap silme kaydı `0010_account_deletion.sql` dosyasındadır.
 
 Postgres 14 veya daha yeni olmalı.
 
@@ -38,7 +38,7 @@ cd server
 cp .env.example .env
 ```
 
-`.env` içinde `JWT_SECRET` değerini en az 32 karakterlik rastgele bir metinle değiştir. `GOOGLE_CLIENT_ID_IOS` boş kalabilir; Google ile giriş ancak bu kimlik doluyken çalışır. `APPLE_BUNDLE_ID` `com.mealroutine.app` olarak kalır.
+`.env` içinde `JWT_SECRET` değerini en az 32 karakterlik rastgele bir metinle değiştir. Sunucu bu sırrı kodun içine gömmez; boşsa açılmaz. `GOOGLE_CLIENT_ID_IOS` boş kalabilir; Google ile giriş ancak bu kimlik doluyken çalışır. `APPLE_BUNDLE_ID` `com.mealroutine.app` olarak kalır. `CORS_ORIGIN` iOS uygulaması için boş kalır. Tarayıcıdan çağrı varsa tam bir origin yaz; `*` kabul edilmez.
 
 ## 4. Şemayı kur
 

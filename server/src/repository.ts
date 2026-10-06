@@ -13,6 +13,7 @@ export interface AccountRow {
   givenName: string
   familyName: string
   createdAt: Date
+  deletedAt?: Date | null
 }
 
 export interface IdentityRow {
@@ -61,10 +62,13 @@ export interface AuthRepository {
   rotateSession(oldHash: string, now: Date, build: (current: SessionDraft) => SessionRow): Promise<RotateResult>
   revokeFamilyByHash(hash: string, now: Date): Promise<void>
   membership(householdId: string, accountId: string): Promise<MemberRole | null>
+  /** Revokes every session, drops identities, and anonymizes the account row. */
+  closeAccount(accountId: string, householdOutcome: 'none' | 'left' | 'deleted', now: Date): Promise<void>
 }
 
 export interface MemoryRepository extends AuthRepository, HouseholdStore, BoardStore {
   seedMember(householdId: string, accountId: string, role: MemberRole): void
+  deletionAudits(): { accountId: string; householdOutcome: 'none' | 'left' | 'deleted' }[]
 }
 
 function sameEmail(left: string | null, right: string): boolean {
@@ -76,6 +80,7 @@ export function createMemoryRepository(): MemoryRepository {
   const identities: IdentityRow[] = []
   const sessions = new Map<string, SessionRow>()
   const members = new Map<string, Map<string, MemberRole>>()
+  const deletions: { accountId: string; householdOutcome: 'none' | 'left' | 'deleted' }[] = []
   const household = createHouseholdMemory(accounts, (householdId, accountId, role) => {
     const rows = members.get(householdId) ?? new Map<string, MemberRole>()
     if (role) rows.set(accountId, role)
@@ -106,7 +111,9 @@ export function createMemoryRepository(): MemoryRepository {
       return identities.filter((row) => row.accountId === accountId)
     },
     async getAccount(id) {
-      return accounts.get(id) ?? null
+      const account = accounts.get(id)
+      if (!account || account.deletedAt) return null
+      return account
     },
     async insertAccountAndIdentity(account, identity) {
       if (identities.some((row) => row.provider === identity.provider && row.subject === identity.subject)) {
@@ -167,6 +174,25 @@ export function createMemoryRepository(): MemoryRepository {
     },
     async membership(householdId, accountId) {
       return members.get(householdId)?.get(accountId) ?? null
+    },
+    async closeAccount(accountId, householdOutcome, now) {
+      for (const row of sessions.values()) {
+        if (row.accountId === accountId && !row.revokedAt) row.revokedAt = now
+      }
+      for (let index = identities.length - 1; index >= 0; index -= 1) {
+        if (identities[index]?.accountId === accountId) identities.splice(index, 1)
+      }
+      const account = accounts.get(accountId)
+      if (account) {
+        account.displayName = ''
+        account.givenName = ''
+        account.familyName = ''
+        account.deletedAt = now
+      }
+      deletions.push({ accountId, householdOutcome })
+    },
+    deletionAudits() {
+      return deletions.map((row) => ({ ...row }))
     },
     seedMember(householdId, accountId, role) {
       const rows = members.get(householdId) ?? new Map<string, MemberRole>()

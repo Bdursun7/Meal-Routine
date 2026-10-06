@@ -91,6 +91,27 @@ struct APIErrorDTO: Codable, Equatable, Sendable {
     var existingProviders: [String]?
 }
 
+struct AccountDeletionResult: Codable, Equatable, Sendable {
+    var deleted: Bool
+    var household: String
+}
+
+enum AccountPrivacyCopy {
+    static let confirmTitle = "Hesabını silmek istiyor musun?"
+    static let confirmBody = "Kişisel tariflerin, yemek hafızan ve girişlerin silinir. Ortak evde bir partner kalırsa ev ona kalır. Son üye ev halkını da kapatır. Bu işlem geri alınamaz. Telefondaki plan, sunucu silinse de yerel sıfırlamaya kadar durur."
+    static let deleteButton = "Hesabımı sil"
+    static let cancelButton = "Vazgeç"
+    static let exportButton = "Verilerimi indir"
+    static let deleted = "Hesabın silindi. Kişisel verilerin sunucudan kaldırıldı."
+    static let exported = "Verilerin hazır. Paylaşmak için dosyayı aç."
+}
+
+enum AccountPrivacySession {
+    static func clearTokens(_ tokens: any TokenStoring) {
+        tokens.clear()
+    }
+}
+
 enum DevSubjectStore {
     private static let key = "mealroutine.devSubject"
 

@@ -7,6 +7,7 @@ struct AccountView: View {
     @State private var auth = AuthSession.shared
     @State private var migration = LocalMigrationCenter.shared
     @State private var providerPendingUnlink: String?
+    @State private var confirmsDeletion = false
 
     var body: some View {
         Form {
@@ -73,6 +74,7 @@ struct AccountView: View {
                     }
                     .accessibilityIdentifier("account.signOut")
                 }
+                privacySection
                 migrationSection
             }
             if auth.account == nil, HouseholdTestMode.shared.isEnabled {
@@ -99,9 +101,46 @@ struct AccountView: View {
                 providerPendingUnlink = nil
             }
         }
+        .confirmationDialog(
+            AccountPrivacyCopy.confirmTitle,
+            isPresented: $confirmsDeletion,
+            titleVisibility: .visible
+        ) {
+            Button(AccountPrivacyCopy.deleteButton, role: .destructive) {
+                Task { await auth.deleteAccount() }
+            }
+            .accessibilityIdentifier("account.deleteConfirm")
+            Button(AccountPrivacyCopy.cancelButton, role: .cancel) {}
+        } message: {
+            Text(AccountPrivacyCopy.confirmBody)
+        }
         .task {
             await auth.restore()
             await migration.runIfNeeded(in: modelContext)
+        }
+    }
+
+    @ViewBuilder
+    private var privacySection: some View {
+        Section {
+            Button(AccountPrivacyCopy.exportButton) {
+                Task { await auth.exportAccount() }
+            }
+            .accessibilityIdentifier("account.export")
+            if let url = auth.exportedFile {
+                ShareLink(item: url) {
+                    Text("Dışa aktarılan dosyayı paylaş")
+                }
+                .accessibilityIdentifier("account.exportShare")
+            }
+            Button(AccountPrivacyCopy.deleteButton, role: .destructive) {
+                confirmsDeletion = true
+            }
+            .accessibilityIdentifier("account.delete")
+        } header: {
+            Text("Veriler ve hesap")
+        } footer: {
+            Text(AccountPrivacyCopy.confirmBody)
         }
     }
 
