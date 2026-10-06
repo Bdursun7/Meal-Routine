@@ -366,6 +366,7 @@ struct ProductEventUploader {
     }
 }
 
+@MainActor
 enum ProductEventSync {
     static func installIfNeeded() {
         guard !HouseholdTestMode.shared.isEnabled else {

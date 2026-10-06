@@ -264,7 +264,8 @@ final class AuthTokenTests: XCTestCase {
         XCTAssertEqual(ProductEventQueue.pending(defaults: defaults).map(\.name), ["sync_failed"])
 
         DiagnosticQueue.setUploadEnabled(false, defaults: defaults)
-        XCTAssertEqual(await uploader.flushDiagnostics(), 0)
+        let disabledCount = await uploader.flushDiagnostics()
+        XCTAssertEqual(disabledCount, 0)
         DiagnosticQueue.setUploadEnabled(true, defaults: defaults)
         DiagnosticQueue.enqueue(DiagnosticReport(kind: "crash", count: 1, exceptionType: "SIGSEGV", signal: "11"), defaults: defaults)
         StubURLProtocol.handler = { request in
@@ -273,7 +274,8 @@ final class AuthTokenTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer privacy-access")
             return Self.json(Data(#"{"accepted":1}"#.utf8), status: 200)
         }
-        XCTAssertEqual(await uploader.flushDiagnostics(), 1)
+        let sentCount = await uploader.flushDiagnostics()
+        XCTAssertEqual(sentCount, 1)
         XCTAssertTrue(DiagnosticQueue.pending(defaults: defaults).isEmpty)
     }
 
@@ -463,8 +465,20 @@ private final class RequestLog: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return items.map { request in
-            guard let body = request.httpBody else { return "" }
-            return String(decoding: body, as: UTF8.self)
+            if let body = request.httpBody {
+                return String(decoding: body, as: UTF8.self)
+            }
+            guard let stream = request.httpBodyStream else { return "" }
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let read = stream.read(&buffer, maxLength: buffer.count)
+                if read <= 0 { break }
+                data.append(buffer, count: read)
+            }
+            return String(decoding: data, as: UTF8.self)
         }
     }
 }
