@@ -1,8 +1,11 @@
 import AuthenticationServices
+import SwiftData
 import SwiftUI
 
 struct AccountView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var auth = AuthSession.shared
+    @State private var migration = LocalMigrationCenter.shared
     @State private var providerPendingUnlink: String?
 
     var body: some View {
@@ -70,6 +73,10 @@ struct AccountView: View {
                     }
                     .accessibilityIdentifier("account.signOut")
                 }
+                migrationSection
+            }
+            if auth.account == nil, HouseholdTestMode.shared.isEnabled {
+                migrationSection
             }
         }
         .navigationTitle("Hesap")
@@ -94,6 +101,32 @@ struct AccountView: View {
         }
         .task {
             await auth.restore()
+            await migration.runIfNeeded(in: modelContext)
+        }
+    }
+
+    @ViewBuilder
+    private var migrationSection: some View {
+        Section {
+            Text(migration.record.headline)
+                .accessibilityIdentifier("migration.progress")
+            Text("Tarif: \(migration.record.recipes)")
+            Text("Yemek hafızası: \(migration.record.memories)")
+            Text("Geçmiş: \(migration.record.history)")
+            if migration.record.phase == .failed {
+                Button("Yeniden dene") {
+                    Task { await migration.runIfNeeded(in: modelContext) }
+                }
+                .accessibilityIdentifier("migration.retry")
+            }
+            if HouseholdTestMode.shared.isEnabled {
+                Button("Test aktarımını dene") {
+                    Task { await migration.runFake(in: modelContext) }
+                }
+                .accessibilityIdentifier("migration.testRun")
+            }
+        } header: {
+            Text("Aktarım")
         }
     }
 

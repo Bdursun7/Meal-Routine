@@ -140,6 +140,9 @@
 		V43B43A0000000000000001 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = V43F43A0000000000000001 /* SyncEngine.swift */; };
 		V43B43A0000000000000002 /* BoardSyncClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = V43F43A0000000000000002 /* BoardSyncClient.swift */; };
 		V43B43A0000000000000003 /* SyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V43F43A0000000000000003 /* SyncEngineTests.swift */; };
+		V44B44A0000000000000001 /* LocalMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000001 /* LocalMigration.swift */; };
+		V44B44A0000000000000002 /* LocalMigrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000002 /* LocalMigrationView.swift */; };
+		V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000003 /* LocalMigrationTests.swift */; };
 		V41B41A000000000000000B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = V41P41A0000000000000002 /* GoogleSignIn */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
@@ -304,6 +307,9 @@
 		V43F43A0000000000000001 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		V43F43A0000000000000002 /* BoardSyncClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardSyncClient.swift; sourceTree = "<group>"; };
 		V43F43A0000000000000003 /* SyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngineTests.swift; sourceTree = "<group>"; };
+		V44F44A0000000000000001 /* LocalMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigration.swift; sourceTree = "<group>"; };
+		V44F44A0000000000000002 /* LocalMigrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigrationView.swift; sourceTree = "<group>"; };
+		V44F44A0000000000000003 /* LocalMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigrationTests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
@@ -434,6 +440,7 @@
 				FA107E944F1DC3099FA8FFD0 /* ProfileViewModel.swift */,
 				FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */,
 				V41F41A0000000000000008 /* AccountView.swift */,
+				V44F44A0000000000000002 /* LocalMigrationView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -631,6 +638,7 @@
 				V41F41A0000000000000009 /* AuthTokenTests.swift */,
 				V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */,
 				V43F43A0000000000000003 /* SyncEngineTests.swift */,
+				V44F44A0000000000000003 /* LocalMigrationTests.swift */,
 			);
 			path = MealRoutineTests;
 			sourceTree = "<group>";
@@ -656,6 +664,7 @@
 				V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */,
 				V42F42A0000000000000001 /* HouseholdLifecycleClient.swift */,
 				V43F43A0000000000000002 /* BoardSyncClient.swift */,
+				V44F44A0000000000000001 /* LocalMigration.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -973,6 +982,8 @@
 				V41B41A0000000000000007 /* HTTPHouseholdTransport.swift in Sources */,
 				V42B42A0000000000000001 /* HouseholdLifecycleClient.swift in Sources */,
 				V43B43A0000000000000002 /* BoardSyncClient.swift in Sources */,
+				V44B44A0000000000000001 /* LocalMigration.swift in Sources */,
+				V44B44A0000000000000002 /* LocalMigrationView.swift in Sources */,
 				V41B41A0000000000000008 /* AccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -994,6 +1005,7 @@
 				V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */,
 				V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */,
 				V43B43A0000000000000003 /* SyncEngineTests.swift in Sources */,
+				V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
