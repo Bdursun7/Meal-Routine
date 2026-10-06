@@ -10,6 +10,8 @@ import { createHouseholdService } from './householdService.js'
 import type { HouseholdStore } from './householdTypes.js'
 import type { IdentityVerifier } from './jwks.js'
 import { redactSensitive } from './log.js'
+import { createMemoryMigration } from './memoryMigration.js'
+import { createMigrationService, parseUpload, type MigrationStore } from './migrationService.js'
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
 import type { AuthRepository } from './repository.js'
 import { verifyAccessToken } from './tokens.js'
@@ -79,6 +81,7 @@ export interface BuildAppOptions {
   now?: () => Date
   householdNow?: () => Date
   rateLimiter?: RateLimiter
+  migration?: MigrationStore
   logger?: boolean
   logStream?: Writable
 }
@@ -101,6 +104,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     createRateLimiter({ windowMs: config.rateLimitWindowMs, max: config.rateLimitMax })
   const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
   const board = createBoardService(options.repo, options.repo, options.householdNow ?? options.now ?? (() => new Date()))
+  const migration = createMigrationService(options.migration ?? createMemoryMigration())
 
   const app = Fastify({
     logger: options.logStream
@@ -289,6 +293,23 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const params = parse(householdParams, request.params)
     const body = parse(transferBody, request.body)
     return households.transfer(accountId, params.householdId, body.accountId)
+  })
+
+  app.get('/v1/migration', async (request) => {
+    const accountId = await requireAccount(request, config)
+    return migration.status(accountId)
+  })
+
+  app.post('/v1/migration/upload', async (request) => {
+    enforceWriteLimit(request, limiter, 'migration')
+    const accountId = await requireAccount(request, config)
+    return migration.upload(accountId, parseUpload(request.body))
+  })
+
+  app.post('/v1/migration/confirm', async (request) => {
+    enforceWriteLimit(request, limiter, 'migration')
+    const accountId = await requireAccount(request, config)
+    return migration.confirm(accountId)
   })
 
   app.get('/v1/households/:householdId/board', async (request) => {

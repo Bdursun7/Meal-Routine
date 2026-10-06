@@ -15,23 +15,28 @@ struct HouseholdSettingsView: View {
     @State private var avoided = ""
     @State private var renameName = ""
     @State private var pendingAction: HouseholdDestructiveAction?
+    @State private var migration = LocalMigrationCenter.shared
 
     var body: some View {
         Form {
             HouseholdTestModeSection(session: session, testMode: testMode)
-            statusSection
-            if session.account == nil {
-                signInSection
-            } else if !session.hasHousehold {
-                createSection
-                joinSection
+            if migrationHoldsHousehold {
+                migrationHoldSection
             } else {
-                membersSection
-                inviteSection
-                planSection
-                preferenceSection
-                activitySection
-                dangerSection
+                statusSection
+                if session.account == nil {
+                    signInSection
+                } else if !session.hasHousehold {
+                    createSection
+                    joinSection
+                } else {
+                    membersSection
+                    inviteSection
+                    planSection
+                    preferenceSection
+                    activitySection
+                    dangerSection
+                }
             }
         }
         .navigationTitle("Ev halkı")
@@ -43,7 +48,10 @@ struct HouseholdSettingsView: View {
                 }
             }
         }
-        .onAppear(perform: loadPreference)
+        .onAppear {
+            loadPreference()
+            migration.refresh(accountId: session.account?.id, in: modelContext)
+        }
         .onChange(of: session.snapshot.household?.name) { _, name in
             renameName = name ?? ""
         }
@@ -83,6 +91,31 @@ struct HouseholdSettingsView: View {
             session.deleteHousehold(in: modelContext)
         case .transfer(let userId, _):
             session.transferOwnership(to: userId, in: modelContext)
+        }
+    }
+
+    private var migrationHoldsHousehold: Bool {
+        LocalMigrationGate.blocksHousehold(
+            testMode: testMode.isEnabled,
+            apiConfigured: MealRoutineConfig.apiBaseURL != nil,
+            signedIn: session.account != nil,
+            phase: migration.record.phase,
+            hasEligibleData: migration.hasEligibleData
+        )
+    }
+
+    private var migrationHoldSection: some View {
+        Section {
+            Text("Ev halkı, kişisel veriler hesaba aktarıldıktan sonra açılır.")
+            Text(migration.record.headline)
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+            NavigationLink("Aktarımı sürdür") {
+                LocalMigrationView()
+            }
+            .accessibilityIdentifier("migration.open")
+        } header: {
+            Text("Aktarım")
         }
     }
 

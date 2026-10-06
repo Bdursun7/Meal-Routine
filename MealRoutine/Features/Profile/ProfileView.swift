@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showsProfile = false
     @State private var testMode = HouseholdTestMode.shared
+    @State private var migration = LocalMigrationCenter.shared
 
     var body: some View {
         NavigationStack {
@@ -31,8 +32,20 @@ struct ProfileView: View {
             await Task.yield()
             guard !Task.isCancelled else { return }
             viewModel.load(prefs.min { $0.createdAt < $1.createdAt })
+            migration.refresh(accountId: AuthSession.shared.account?.id, in: modelContext)
             showsProfile = true
+            await migration.runIfNeeded(in: modelContext)
         }
+    }
+
+    private var migrationHoldsHousehold: Bool {
+        LocalMigrationGate.blocksHousehold(
+            testMode: testMode.isEnabled,
+            apiConfigured: MealRoutineConfig.apiBaseURL != nil,
+            signedIn: AuthSession.shared.account != nil,
+            phase: migration.record.phase,
+            hasEligibleData: migration.hasEligibleData
+        )
     }
 
     private var profileForm: some View {
@@ -50,7 +63,11 @@ struct ProfileView: View {
 
                 Section("Ev halkı") {
                     NavigationLink {
-                        HouseholdSettingsView()
+                        if migrationHoldsHousehold {
+                            LocalMigrationView()
+                        } else {
+                            HouseholdSettingsView()
+                        }
                     } label: {
                         HStack {
                             Text("Birlikte planla")
@@ -62,7 +79,9 @@ struct ProfileView: View {
                     }
                     .accessibilityIdentifier("household.open")
                     .accessibilityHint("Ev halkı, davet ve ortak hafta")
-                    Text("Apple ile girişten sonra en fazla iki kişi aynı haftayı seçer. Kişisel yemek hafızan ev halkına taşınmaz.")
+                    Text(migrationHoldsHousehold
+                         ? "Ev halkı, kişisel veriler hesaba aktarıldıktan sonra açılır."
+                         : "Apple ile girişten sonra en fazla iki kişi aynı haftayı seçer. Kişisel yemek hafızan ev halkına taşınmaz.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
