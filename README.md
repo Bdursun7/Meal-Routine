@@ -23,6 +23,10 @@ The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It w
 
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 
+## V4.1 API
+
+Shared household data is server-authoritative. The database is Postgres on your Mac, not a hosted service. Schema files are `server/db/migrations/`. Setup commands are in `server/db/README.md`. The **MealRoutine Local** scheme still uses test mode (`FakeHouseholdBackend`) and, when test mode is off, calls `http://localhost:8080`. That local Info.plist allows cleartext only on the local network so the simulator can reach the API.
+
 ## V4 Household
 
 Optional Sign in with Apple and CloudKit. Without a household, This Week stays the personal plan. With one, two people share the week, reactions, a this-week veto (not Never Again), the grocery checks, and a short decision history. Personal meal memory is not copied. See `docs/v4-household.md`.

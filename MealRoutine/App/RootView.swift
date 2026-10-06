@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var prefs: [UserPrefs]
     @State private var household = HouseholdSession.shared
+    @State private var auth = AuthSession.shared
     @State private var testMode = HouseholdTestMode.shared
     @State private var seedAttempt = 0
     @State private var isSeeding = true
@@ -52,6 +53,14 @@ struct RootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas.ignoresSafeArea())
         .mealAppearance()
+        .alert("Oturum sona erdi", isPresented: Binding(
+            get: { auth.showsSessionExpired },
+            set: { auth.showsSessionExpired = $0 }
+        )) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text("Tekrar giriş yapman gerekiyor. Bu telefondaki kişisel verin durur.")
+        }
         .task(id: seedAttempt) {
             await seedCatalog()
         }
@@ -88,6 +97,7 @@ struct RootView: View {
             try CatalogIndexCache.warm(in: modelContext)
             isSeeding = false
             drainCaptures()
+            await AuthSession.shared.restore()
             await HouseholdSession.shared.start(in: modelContext)
         } catch {
             seedError = error.localizedDescription

@@ -1,0 +1,105 @@
+import Foundation
+
+struct AuthTokenSet: Codable, Equatable, Sendable {
+    var accessToken: String
+    var refreshToken: String
+    var accessExpiresAt: Date
+    var accountId: String
+    var displayName: String
+}
+
+enum TokenRefreshPolicy {
+    /// Refresh a little before the access token actually expires.
+    static let skew: TimeInterval = 60
+
+    static func needsRefresh(accessExpiresAt: Date, now: Date, skew: TimeInterval = TokenRefreshPolicy.skew) -> Bool {
+        accessExpiresAt.timeIntervalSince(now) <= skew
+    }
+}
+
+enum AuthAPIError: Error, Equatable {
+    case linkRequired(existingProviders: [String])
+    case sessionExpired
+    case rateLimited
+    case googleClientMissing
+    case server(String)
+    case transport
+
+    var message: String {
+        switch self {
+        case .linkRequired(let providers):
+            let names = providers.map(AuthProviderLabel.title).joined(separator: ", ")
+            if names.isEmpty {
+                return "Bu giriş mevcut bir MealRoutine hesabıyla eşleşiyor. Önce o hesapla gir, sonra diğerini Hesap ekranından bağla."
+            }
+            return "Bu e-posta \(names) hesabına ait. Önce onunla gir, sonra diğer sağlayıcıyı Hesap ekranından bağla. İkinci hesap açılmaz."
+        case .sessionExpired:
+            return "Oturumun sona erdi. Tekrar giriş yap."
+        case .rateLimited:
+            return "Çok fazla deneme oldu. Bir dakika sonra tekrar dene."
+        case .googleClientMissing:
+            return MealRoutineConfig.googleClientMissingMessage
+        case .server(let detail):
+            return detail
+        case .transport:
+            return "Sunucuya ulaşılamadı."
+        }
+    }
+}
+
+enum AuthProviderLabel {
+    static func title(_ provider: String) -> String {
+        switch provider {
+        case "apple": "Apple"
+        case "google": "Google"
+        case "dev": "Yerel test"
+        default: provider
+        }
+    }
+}
+
+struct AuthAccountDTO: Codable, Equatable, Sendable {
+    var id: String
+    var displayName: String
+    var givenName: String
+    var familyName: String
+}
+
+struct AuthIdentityDTO: Codable, Equatable, Sendable, Identifiable {
+    var provider: String
+    var email: String?
+    var isPrivateRelay: Bool
+
+    var id: String { provider }
+}
+
+struct AuthSessionDTO: Codable, Equatable, Sendable {
+    var accessToken: String
+    var refreshToken: String
+    var expiresIn: Int
+    var account: AuthAccountDTO
+    var identities: [AuthIdentityDTO]
+}
+
+struct AuthMeDTO: Codable, Equatable, Sendable {
+    var account: AuthAccountDTO
+    var identities: [AuthIdentityDTO]
+}
+
+struct APIErrorDTO: Codable, Equatable, Sendable {
+    var error: String
+    var existingProviders: [String]?
+}
+
+enum DevSubjectStore {
+    private static let key = "mealroutine.devSubject"
+
+    static func subject(defaults: UserDefaults = .standard) -> String {
+        if let existing = defaults.string(forKey: key), existing.count >= 3 {
+            return existing
+        }
+        let created = "dev-\(UUID().uuidString.lowercased())"
+        defaults.set(created, forKey: key)
+        return created
+    }
+}

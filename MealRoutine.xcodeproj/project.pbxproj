@@ -126,6 +126,16 @@
 		V4B000000000000000000A /* HouseholdTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000A /* HouseholdTestMode.swift */; };
 		V4B000000000000000000B /* HouseholdTestControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000B /* HouseholdTestControls.swift */; };
 		V4B000000000000000000C /* HouseholdTestModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V4F000000000000000000C /* HouseholdTestModeTests.swift */; };
+		V41B41A0000000000000001 /* MealRoutineConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000001 /* MealRoutineConfig.swift */; };
+		V41B41A0000000000000002 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000002 /* AuthModels.swift */; };
+		V41B41A0000000000000003 /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000003 /* TokenStore.swift */; };
+		V41B41A0000000000000004 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000004 /* APIClient.swift */; };
+		V41B41A0000000000000005 /* AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000005 /* AuthSession.swift */; };
+		V41B41A0000000000000006 /* GoogleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000006 /* GoogleSignInCoordinator.swift */; };
+		V41B41A0000000000000007 /* HTTPHouseholdTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */; };
+		V41B41A0000000000000008 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000008 /* AccountView.swift */; };
+		V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000009 /* AuthTokenTests.swift */; };
+		V41B41A000000000000000B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = V41P41A0000000000000002 /* GoogleSignIn */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 /* End PBXBuildFile section */
@@ -275,6 +285,15 @@
 		V4F000000000000000000A /* HouseholdTestMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestMode.swift; sourceTree = "<group>"; };
 		V4F000000000000000000B /* HouseholdTestControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestControls.swift; sourceTree = "<group>"; };
 		V4F000000000000000000C /* HouseholdTestModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdTestModeTests.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000001 /* MealRoutineConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRoutineConfig.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000002 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000003 /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000004 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000005 /* AuthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSession.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000006 /* GoogleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInCoordinator.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPHouseholdTransport.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000008 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		V41F41A0000000000000009 /* AuthTokenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenTests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
@@ -289,6 +308,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				V41B41A000000000000000B /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,6 +358,7 @@
 				CAEE345BB75ECE9630EEFA79 /* Services */,
 				CA1F34867F9C14EB179064F8 /* Support */,
 				V4GRP0000000000000001 /* Household */,
+				V41G41A0000000000000001 /* Auth */,
 			);
 			path = MealRoutine;
 			sourceTree = "<group>";
@@ -402,6 +423,7 @@
 				FADD987C968552E5F25E8C68 /* ProfileView.swift */,
 				FA107E944F1DC3099FA8FFD0 /* ProfileViewModel.swift */,
 				FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */,
+				V41F41A0000000000000008 /* AccountView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -596,6 +618,7 @@
 				V3F0000000000000000007 /* RecipeImportTests.swift */,
 				V4F0000000000000000007 /* HouseholdPlanningTests.swift */,
 				V4F000000000000000000C /* HouseholdTestModeTests.swift */,
+				V41F41A0000000000000009 /* AuthTokenTests.swift */,
 			);
 			path = MealRoutineTests;
 			sourceTree = "<group>";
@@ -609,6 +632,20 @@
 			sourceTree = "<group>";
 		};
 
+		V41G41A0000000000000001 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				V41F41A0000000000000001 /* MealRoutineConfig.swift */,
+				V41F41A0000000000000002 /* AuthModels.swift */,
+				V41F41A0000000000000003 /* TokenStore.swift */,
+				V41F41A0000000000000004 /* APIClient.swift */,
+				V41F41A0000000000000005 /* AuthSession.swift */,
+				V41F41A0000000000000006 /* GoogleSignInCoordinator.swift */,
+				V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
 		V4GRP0000000000000001 /* Household */ = {
 			isa = PBXGroup;
 			children = (
@@ -667,6 +704,9 @@
 			buildRules = (
 			);
 			name = MealRoutine;
+			packageProductDependencies = (
+				V41P41A0000000000000002 /* GoogleSignIn */,
+			);
 			productName = MealRoutine;
 			productReference = A10000000000000000000002 /* MealRoutine.app */;
 			productType = "com.apple.product-type.application";
@@ -761,6 +801,9 @@
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
 			productRefGroup = A10000000000000000000005 /* Products */;
+			packageReferences = (
+				V41P41A0000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -905,6 +948,14 @@
 				V4B0000000000000000009 /* FakeHouseholdBackend.swift in Sources */,
 				V4B000000000000000000A /* HouseholdTestMode.swift in Sources */,
 				V4B000000000000000000B /* HouseholdTestControls.swift in Sources */,
+				V41B41A0000000000000001 /* MealRoutineConfig.swift in Sources */,
+				V41B41A0000000000000002 /* AuthModels.swift in Sources */,
+				V41B41A0000000000000003 /* TokenStore.swift in Sources */,
+				V41B41A0000000000000004 /* APIClient.swift in Sources */,
+				V41B41A0000000000000005 /* AuthSession.swift in Sources */,
+				V41B41A0000000000000006 /* GoogleSignInCoordinator.swift in Sources */,
+				V41B41A0000000000000007 /* HTTPHouseholdTransport.swift in Sources */,
+				V41B41A0000000000000008 /* AccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -922,6 +973,7 @@
 				V3B0000000000000000007 /* RecipeImportTests.swift in Sources */,
 				V4B0000000000000000007 /* HouseholdPlanningTests.swift in Sources */,
 				V4B000000000000000000C /* HouseholdTestModeTests.swift in Sources */,
+				V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1375,6 +1427,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		V41P41A0000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 10.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		V41P41A0000000000000002 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = V41P41A0000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 	};
 	rootObject = A10000000000000000000007 /* Project object */;

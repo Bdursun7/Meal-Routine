@@ -4,3 +4,8 @@
 // This configuration does not. Use the MealRoutine Local scheme.
 
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG HOUSEHOLD_LOCAL
+
+// http:// is written with $() so the slashes are not an xcconfig comment.
+MEALROUTINE_API_BASE_URL = http:/$()/localhost:8080
+GOOGLE_IOS_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =

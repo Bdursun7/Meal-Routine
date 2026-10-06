@@ -12,7 +12,7 @@ final class HouseholdTestModeTests: XCTestCase {
         let production = HouseholdSyncRouting.makeTransport(testMode: false)
         XCTAssertFalse(production is FakeHouseholdBackend)
         #if HOUSEHOLD_LOCAL
-        XCTAssertTrue(production is OfflineHouseholdTransport)
+        XCTAssertTrue(production is HTTPHouseholdTransport)
         #else
         XCTAssertTrue(production is CloudKitHouseholdBackend)
         #endif

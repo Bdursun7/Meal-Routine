@@ -1,3 +1,4 @@
+import GoogleSignIn
 import SwiftData
 import SwiftUI
 import UIKit
@@ -19,6 +20,9 @@ struct MealRoutineApp: App {
         WindowGroup {
             RootView()
                 .onOpenURL { url in
+                    if GIDSignIn.sharedInstance.handle(url) {
+                        return
+                    }
                     if let code = HouseholdInviteLink.code(from: url) {
                         HouseholdSession.shared.queueInvite(code)
                         return
@@ -35,6 +39,7 @@ final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        GoogleSignInCoordinator.configureIfNeeded()
         if HouseholdTestLaunch.allowsAppleServices {
             application.registerForRemoteNotifications()
         }
