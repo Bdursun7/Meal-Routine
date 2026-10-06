@@ -24,6 +24,14 @@ Ortak evde partnerin gördüğü veri ortak plandır: haftalık plan, yemek tepk
 
 Konum istenmez. Reklam kimliği toplanmaz. Veri satılmaz ve reklam ağlarıyla paylaşılmaz.
 
+## İstatistik ve çökme özeti
+
+Profilde **Ürün istatistikleri** açıktır ve kapatılabilir. Açıkken kendi sunucumuza yalnızca kısa olay adları gider: kurulum bitti, plan kuruldu, yemek pişirildi, atlandı veya veto edildi, hızlı kayıt, ev kuruldu veya katılındı, aktarım bitti, giriş, davet ve eşitleme sonucu. Tarif adı, not, adres ve e-posta gitmez. Kapatınca bekleyen kayıtlar silinir.
+
+**Çökme raporları** kapalı başlar. Açılırsa MetricKit özeti kendi sunucumuza gider: tür, sayı ve kısa hata kodu. Yığın izi gönderilmez.
+
+Bu kayıtlar 30 gün sonra silinir. Ücretli bir izleme servisi gerekmez. `SENTRY_DSN` boşsa sunucu hataları dışarı çıkmaz.
+
 ## Jetonlar
 
 Erişim ve yenileme jetonları yalnızca bu cihazın anahtar zincirinde durur (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`). Kullanıcı varsayılanlarına yazılmaz. Sunucu ve uygulama günlükleri jeton, e-posta ve ad alanlarını maskeler.

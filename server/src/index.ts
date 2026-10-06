@@ -5,7 +5,9 @@ import { loadEnvFile } from './env.js'
 import { createJwksVerifier } from './jwks.js'
 import { migrate } from './migrate.js'
 import { createPgNotificationStore, createPushSender } from './notifications.js'
+import { createErrorReporter } from './observability.js'
 import { createPgMigrationStore } from './pgMigration.js'
+import { createPgObservability } from './pgObservability.js'
 import { createPgRepository } from './pgRepository.js'
 
 async function main(): Promise<void> {
@@ -19,6 +21,16 @@ async function main(): Promise<void> {
     migration: createPgMigrationStore(pool),
     notifications: createPgNotificationStore(pool),
     sender: createPushSender(),
+    observability: createPgObservability(pool),
+    errorReporter: createErrorReporter(config.sentryDsn),
+    readiness: async () => {
+      try {
+        await pool.query('SELECT 1')
+        return true
+      } catch {
+        return false
+      }
+    },
     config,
     verifier: createJwksVerifier(config),
     logger: true,

@@ -169,6 +169,114 @@ final class AuthTokenTests: XCTestCase {
         }
     }
 
+    func testProductEventsBatchOfflineAndOptOutDropsThem() async throws {
+        let suite = "mealroutine.product.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        defer {
+            Analytics.resetProductSinkForTests()
+            defaults.removePersistentDomain(forName: suite)
+        }
+        Analytics.setProductSink { name, properties in
+            ProductEventQueue.enqueue(name: name, properties: properties, defaults: defaults)
+        }
+        Analytics.track(.planGenerated)
+        Analytics.track(.recipeQuickSaved, properties: ["title": "Menemen", "rating": "loved", "email": "ada@example.com"])
+        Analytics.track(.appOpened)
+        var pending = ProductEventQueue.pending(defaults: defaults)
+        XCTAssertEqual(ProductEventQueue.optOutKey, "mealroutine.analyticsOptOut")
+        XCTAssertEqual(DiagnosticQueue.crashOptInKey, "mealroutine.crashReportsOptIn")
+        XCTAssertEqual(pending.map(\.name), ["plan_generated", "quick_save"])
+        XCTAssertEqual(pending[1].properties["rating"], "loved")
+        XCTAssertNil(pending[1].properties["title"])
+        XCTAssertNil(pending[1].properties["email"])
+        XCTAssertFalse(pending.contains { event in
+            event.properties.values.contains { $0.contains("Menemen") }
+        })
+
+        for index in 0..<23 {
+            ProductEventQueue.enqueue(name: "meal_cooked", id: "event-\(index)", defaults: defaults)
+        }
+        let batch = ProductEventQueue.nextBatch(defaults: defaults)
+        XCTAssertEqual(batch.count, ProductEventQueue.batchSize)
+        ProductEventQueue.markSent(batch.map(\.id), defaults: defaults)
+        pending = ProductEventQueue.pending(defaults: defaults)
+        XCTAssertEqual(pending.count, 5)
+
+        ProductEventQueue.setOptedOut(true, defaults: defaults)
+        XCTAssertTrue(ProductEventQueue.pending(defaults: defaults).isEmpty)
+        ProductEventQueue.enqueue(name: "meal_skipped", defaults: defaults)
+        XCTAssertTrue(ProductEventQueue.pending(defaults: defaults).isEmpty)
+        XCTAssertFalse(DiagnosticQueue.allowsUpload(defaults: defaults))
+        DiagnosticQueue.enqueue(DiagnosticReport(kind: "crash", count: 1, exceptionType: String(repeating: "A", count: 80), signal: "11"), defaults: defaults)
+        XCTAssertTrue(DiagnosticQueue.pending(defaults: defaults).isEmpty)
+        DiagnosticQueue.setUploadEnabled(true, defaults: defaults)
+        DiagnosticQueue.enqueue(
+            DiagnosticReport(kind: "crash", count: 1, exceptionType: String(repeating: "B", count: 80), signal: "11"),
+            defaults: defaults
+        )
+        let reports = DiagnosticQueue.pending(defaults: defaults)
+        XCTAssertEqual(reports.count, 1)
+        XCTAssertEqual(reports[0].exceptionType?.count, 40)
+        XCTAssertEqual(reports[0].signal, "11")
+        XCTAssertEqual(reports[0].kind, "crash")
+        let encoded = try JSONEncoder().encode(DiagnosticBatch(reports: reports))
+        XCTAssertFalse(String(decoding: encoded, as: UTF8.self).contains("stack"))
+    }
+
+    func testProductEventUploadUsesBearerAndKeepsTheBatchWhenTheServerRejectsIt() async throws {
+        let suite = "mealroutine.upload.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.save(sampleTokens(access: "privacy-access", refresh: "privacy-refresh", expiresIn: 900))
+        ProductEventQueue.setOptedOut(false, defaults: defaults)
+        ProductEventQueue.enqueue(name: "onboarding_completed", id: "11111111-1111-4111-8111-111111111111", defaults: defaults)
+        ProductEventQueue.enqueue(name: "migration_done", properties: ["title": "Mantı"], id: "22222222-2222-4222-8222-222222222222", defaults: defaults)
+        let requests = RequestLog()
+        StubURLProtocol.handler = { request in
+            requests.add(request)
+            if request.url?.path.hasSuffix("/v1/analytics/events") == true {
+                return Self.json(Data(#"{"accepted":2}"#.utf8), status: 200)
+            }
+            return Self.json(Data(#"{"error":"invalid_request"}"#.utf8), status: 500)
+        }
+        let uploader = ProductEventUploader(client: client(), defaults: defaults)
+        let sent = await uploader.flushEvents()
+        XCTAssertEqual(sent, 2)
+        XCTAssertTrue(ProductEventQueue.pending(defaults: defaults).isEmpty)
+        XCTAssertEqual(requests.paths, ["/v1/analytics/events"])
+        XCTAssertEqual(requests.methods, ["POST"])
+        XCTAssertEqual(requests.authorizations, ["Bearer privacy-access"])
+        let body = requests.bodies.first ?? ""
+        XCTAssertTrue(body.contains("onboarding_completed"))
+        XCTAssertTrue(body.contains("migration_done"))
+        XCTAssertFalse(body.contains("Mantı"))
+        XCTAssertFalse(body.contains("privacy-refresh"))
+
+        ProductEventQueue.enqueue(name: "sync_failed", id: "33333333-3333-4333-8333-333333333333", defaults: defaults)
+        StubURLProtocol.handler = { request in
+            requests.add(request)
+            return Self.json(Data(#"{"error":"invalid_request"}"#.utf8), status: 500)
+        }
+        let failed = await uploader.flushEvents()
+        XCTAssertEqual(failed, 0)
+        XCTAssertEqual(ProductEventQueue.pending(defaults: defaults).map(\.name), ["sync_failed"])
+
+        DiagnosticQueue.setUploadEnabled(false, defaults: defaults)
+        XCTAssertEqual(await uploader.flushDiagnostics(), 0)
+        DiagnosticQueue.setUploadEnabled(true, defaults: defaults)
+        DiagnosticQueue.enqueue(DiagnosticReport(kind: "crash", count: 1, exceptionType: "SIGSEGV", signal: "11"), defaults: defaults)
+        StubURLProtocol.handler = { request in
+            requests.add(request)
+            XCTAssertEqual(request.url?.path, "/v1/diagnostics")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer privacy-access")
+            return Self.json(Data(#"{"accepted":1}"#.utf8), status: 200)
+        }
+        XCTAssertEqual(await uploader.flushDiagnostics(), 1)
+        XCTAssertTrue(DiagnosticQueue.pending(defaults: defaults).isEmpty)
+    }
+
     func testGoogleSignInLinkRequiredDoesNotStoreASession() async throws {
         StubURLProtocol.handler = { _ in
             Self.json(Data(#"{"error":"link_required","existingProviders":["apple"]}"#.utf8), status: 409)
@@ -349,6 +457,15 @@ private final class RequestLog: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return items.compactMap { $0.httpMethod }
+    }
+
+    var bodies: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return items.map { request in
+            guard let body = request.httpBody else { return "" }
+            return String(decoding: body, as: UTF8.self)
+        }
     }
 }
 

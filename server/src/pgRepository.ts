@@ -262,6 +262,8 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
           [accountId, now],
         )
         await client.query(`DELETE FROM auth_identities WHERE account_id = $1`, [accountId])
+        await client.query(`DELETE FROM analytics_events WHERE account_id = $1`, [accountId])
+        await client.query(`DELETE FROM client_diagnostics WHERE account_id = $1`, [accountId])
         await client.query(
           `UPDATE accounts
               SET display_name = '', given_name = '', family_name = '', deleted_at = $2, updated_at = $2

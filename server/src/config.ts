@@ -1,3 +1,5 @@
+import { parseSentryDsn } from './observability.js'
+
 export interface AppConfig {
   nodeEnv: string
   databaseUrl: string
@@ -12,6 +14,10 @@ export interface AppConfig {
   apiVersion: string
   /** Exact browser origin allowed to call the API. Empty disables CORS. */
   corsOrigin: string
+  /** Empty disables the Sentry hook. */
+  sentryDsn: string
+  /** Bearer token that allows /metrics from a non-localhost address. Empty keeps /metrics on localhost. */
+  metricsToken: string
 }
 
 function numberOr(raw: string | undefined, fallback: number): number {
@@ -34,6 +40,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimitWindowMs: numberOr(env.RATE_LIMIT_WINDOW_MS, 60_000),
     apiVersion: 'v1',
     corsOrigin: env.CORS_ORIGIN?.trim() ?? '',
+    sentryDsn: env.SENTRY_DSN?.trim() ?? '',
+    metricsToken: env.METRICS_TOKEN?.trim() ?? '',
   }
 }
 
@@ -46,5 +54,8 @@ export function assertRuntimeConfig(config: AppConfig): void {
   }
   if (config.corsOrigin === '*') {
     throw new Error('CORS_ORIGIN must be an exact origin. A wildcard is not allowed.')
+  }
+  if (config.sentryDsn && !parseSentryDsn(config.sentryDsn)) {
+    throw new Error('SENTRY_DSN must be a valid DSN. Leave it empty to disable error reporting.')
   }
 }

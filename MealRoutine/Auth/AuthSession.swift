@@ -226,12 +226,16 @@ final class AuthSession {
     }
 
     private func apply(_ session: AuthSessionDTO) {
+        let wasSignedOut = account == nil
         let stored = APIClient.tokenSet(from: session, now: .now)
         AuthServices.sharedTokens.save(stored)
         account = session.account
         identities = session.identities
         showsSessionExpired = false
         adoptHousehold(id: session.account.id, displayName: session.account.displayName)
+        if wasSignedOut {
+            Analytics.track(.signIn)
+        }
     }
 
     private func adoptHousehold(id: String, displayName: String) {
