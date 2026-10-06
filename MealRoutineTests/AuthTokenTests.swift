@@ -116,6 +116,59 @@ final class AuthTokenTests: XCTestCase {
         XCTAssertEqual(boardHits.value, 2)
     }
 
+    func testExportAndDeleteSendBearerAndClearTokensOnlyAfterSuccess() async throws {
+        store.save(sampleTokens(access: "privacy-access", refresh: "privacy-refresh", expiresIn: 900))
+        let requests = RequestLog()
+        StubURLProtocol.handler = { request in
+            requests.add(request)
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/v1/account/export") {
+                return Self.json(
+                    Data(#"{"account":{"id":"acct-1"},"personal":{"recipes":[{"nameTr":"Menemen"}]}}"#.utf8),
+                    status: 200
+                )
+            }
+            if request.httpMethod == "DELETE", path.hasSuffix("/v1/account") {
+                return Self.json(Data(#"{"deleted":true,"household":"left"}"#.utf8), status: 200)
+            }
+            return Self.json(Data(#"{"error":"invalid_request"}"#.utf8), status: 404)
+        }
+        let repository = AccountRepository(client: client())
+        let exported = try await repository.exportData()
+        let exportText = String(decoding: exported, as: UTF8.self)
+        XCTAssertTrue(exportText.contains("Menemen"))
+        XCTAssertFalse(exportText.contains("privacy-refresh"))
+        XCTAssertFalse(exportText.contains("privacy-access"))
+        XCTAssertNotNil(store.load())
+        let removed = try await repository.deleteAccount()
+        XCTAssertEqual(removed, AccountDeletionResult(deleted: true, household: "left"))
+        XCTAssertNotNil(store.load())
+        AccountPrivacySession.clearTokens(store)
+        XCTAssertNil(store.load())
+        XCTAssertEqual(requests.paths, ["/v1/account/export", "/v1/account"])
+        XCTAssertEqual(requests.methods, ["GET", "DELETE"])
+        XCTAssertEqual(requests.authorizations, ["Bearer privacy-access", "Bearer privacy-access"])
+        XCTAssertEqual(AccountPrivacyCopy.confirmTitle, "Hesabını silmek istiyor musun?")
+        XCTAssertEqual(AccountPrivacyCopy.deleteButton, "Hesabımı sil")
+        XCTAssertEqual(AccountPrivacyCopy.cancelButton, "Vazgeç")
+        XCTAssertEqual(AccountPrivacyCopy.exportButton, "Verilerimi indir")
+        XCTAssertTrue(AccountPrivacyCopy.deleted.contains("silindi"))
+    }
+
+    func testFailedDeleteLeavesTheTokenStoreUntouched() async throws {
+        store.save(sampleTokens(access: "privacy-access", refresh: "privacy-refresh", expiresIn: 900))
+        StubURLProtocol.handler = { _ in
+            Self.json(Data(#"{"error":"invalid_request"}"#.utf8), status: 500)
+        }
+        let repository = AccountRepository(client: client())
+        do {
+            _ = try await repository.deleteAccount()
+            XCTFail("expected the delete to fail")
+        } catch {
+            XCTAssertNotNil(store.load()?.refreshToken)
+        }
+    }
+
     func testGoogleSignInLinkRequiredDoesNotStoreASession() async throws {
         StubURLProtocol.handler = { _ in
             Self.json(Data(#"{"error":"link_required","existingProviders":["apple"]}"#.utf8), status: 409)
@@ -290,6 +343,12 @@ private final class RequestLog: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return items.compactMap { $0.value(forHTTPHeaderField: "Authorization") }
+    }
+
+    var methods: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return items.compactMap { $0.httpMethod }
     }
 }
 

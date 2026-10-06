@@ -27,6 +27,16 @@ export function createMemoryMigration(): MigrationStore {
     async claimFeedback(accountId, ids) {
       return claim(feedbackOwner, accountId, ids)
     },
+    async erase(accountId) {
+      bundles.delete(accountId)
+      statuses.delete(accountId)
+      for (const [id, owner] of historyOwner) {
+        if (owner === accountId) historyOwner.delete(id)
+      }
+      for (const [id, owner] of feedbackOwner) {
+        if (owner === accountId) feedbackOwner.delete(id)
+      }
+    },
   }
 }
 

@@ -10,6 +10,8 @@ export interface AppConfig {
   rateLimitMax: number
   rateLimitWindowMs: number
   apiVersion: string
+  /** Exact browser origin allowed to call the API. Empty disables CORS. */
+  corsOrigin: string
 }
 
 function numberOr(raw: string | undefined, fallback: number): number {
@@ -31,6 +33,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     rateLimitMax: numberOr(env.RATE_LIMIT_AUTH_MAX, 30),
     rateLimitWindowMs: numberOr(env.RATE_LIMIT_WINDOW_MS, 60_000),
     apiVersion: 'v1',
+    corsOrigin: env.CORS_ORIGIN?.trim() ?? '',
   }
 }
 
@@ -40,5 +43,8 @@ export function assertRuntimeConfig(config: AppConfig): void {
   }
   if (config.jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters.')
+  }
+  if (config.corsOrigin === '*') {
+    throw new Error('CORS_ORIGIN must be an exact origin. A wildcard is not allowed.')
   }
 }

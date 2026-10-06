@@ -22,6 +22,7 @@ export interface MigrationStore {
   save(accountId: string, bundle: PersonalBundle, status: MigrationStatus['status']): Promise<void>
   claimHistory(accountId: string, ids: string[]): Promise<Set<string>>
   claimFeedback(accountId: string, ids: string[]): Promise<Set<string>>
+  erase(accountId: string): Promise<void>
 }
 
 export function createMigrationService(store: MigrationStore) {

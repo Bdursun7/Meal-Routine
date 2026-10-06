@@ -17,6 +17,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     rateLimitMax: 100,
     rateLimitWindowMs: 60_000,
     apiVersion: 'v1',
+    corsOrigin: '',
     ...overrides,
   }
 }

@@ -31,6 +31,15 @@ export function createPgMigrationStore(pool: Pool): MigrationStore {
     async claimFeedback(accountId, ids) {
       return claim(pool, 'recipe_feedback', accountId, ids)
     },
+    async erase(accountId) {
+      await pool.query(`DELETE FROM personal_recipes WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM meal_memory WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM favorites WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM cooking_history WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM recipe_feedback WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM personal_preferences WHERE account_id = $1`, [accountId])
+      await pool.query(`DELETE FROM personal_migrations WHERE account_id = $1`, [accountId])
+    },
   }
 }
 
