@@ -114,6 +114,64 @@ final class LocalMigrationTests: XCTestCase {
         MigrationURLProtocol.reset()
     }
 
+    func testNilOptionalsEncodeAsJSONNull() throws {
+        var payload = samplePayload()
+        let recipeID = StableClientID.recipe(slug: "menemen")
+        payload.recipes[0].ingredients = [
+            MigrationIngredientPayload(
+                id: StableClientID.child(parent: recipeID, kind: "ingredient", index: 0).uuidString.lowercased(),
+                sortIndex: 0,
+                ingredientId: "import:kiyma",
+                nameTr: "kıyma",
+                nameEn: "",
+                quantity: nil,
+                unit: "",
+                noteTr: "",
+                isOptional: false,
+                includeInGrocery: false
+            ),
+        ]
+        payload.recipes[0].steps = [
+            MigrationStepPayload(
+                id: StableClientID.child(parent: recipeID, kind: "step", index: 0).uuidString.lowercased(),
+                sortIndex: 0,
+                textTr: "Yoğur",
+                textEn: "",
+                minutes: nil
+            ),
+        ]
+
+        let data = try JSONEncoder().encode(payload)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let memory = try XCTUnwrap((object["memories"] as? [[String: Any]])?.first)
+        expectJSONNull(memory["lastCookedAt"])
+        expectJSONNull(memory["lastSelectedAt"])
+        let event = try XCTUnwrap((object["history"] as? [[String: Any]])?.first)
+        expectJSONNull(event["planWeekId"])
+        expectJSONNull(event["plannedMealId"])
+        let recipe = try XCTUnwrap((object["recipes"] as? [[String: Any]])?.first)
+        let ingredient = try XCTUnwrap((recipe["ingredients"] as? [[String: Any]])?.first)
+        expectJSONNull(ingredient["quantity"])
+        let step = try XCTUnwrap((recipe["steps"] as? [[String: Any]])?.first)
+        expectJSONNull(step["minutes"])
+
+        let roundTrip = try JSONDecoder().decode(MigrationPayload.self, from: data)
+        XCTAssertEqual(roundTrip, payload)
+
+        let legacy = Data(
+            #"""
+            {"recipes":[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","slug":"menemen","updatedAt":"2024-02-01T00:00:00Z","nameTr":"Menemen","nameEn":"","summaryTr":"","origin":"manual","collectionState":"savedToTry","sourceUrl":"","sourceKey":"","sourcePlatform":"","sourceTitle":"","userNotes":"","baseServings":2,"prepMinutes":0,"cookMinutes":0,"totalMinutes":0,"timeIsUnknown":false,"servingsUnspecified":false,"difficulty":"easy","category":"","country":"TR","diets":[],"tags":[],"photoUrl":"","ingredients":[{"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","sortIndex":0,"ingredientId":"yumurta","nameTr":"Yumurta","nameEn":"","unit":"","noteTr":"","isOptional":false,"includeInGrocery":false}],"steps":[{"id":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","sortIndex":0,"textTr":"Pişir","textEn":""}]}],"memories":[{"recipeSlug":"menemen","updatedAt":"2024-02-01T00:00:00Z","timesCooked":0,"timesReplaced":0,"timesSkipped":0,"lovedCount":0,"okayCount":0,"latestRating":"","neverAgain":false,"timeConcernCount":0,"difficultyConcernCount":0,"portionConcernCount":0,"missingIngredientCount":0,"tooManyIngredientCount":0,"wouldMakeAgainCount":0,"isFavorite":false,"discoveryStatus":"unknown","confidence":"low"}],"favorites":[],"history":[{"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","recipeSlug":"menemen","eventType":"selected","replacementReason":"","createdAt":"2024-02-01T00:00:00Z"}],"feedback":[]}
+            """#.utf8
+        )
+        let decodedLegacy = try JSONDecoder().decode(MigrationPayload.self, from: legacy)
+        XCTAssertNil(decodedLegacy.memories[0].lastCookedAt)
+        XCTAssertNil(decodedLegacy.memories[0].lastSelectedAt)
+        XCTAssertNil(decodedLegacy.history[0].planWeekId)
+        XCTAssertNil(decodedLegacy.history[0].plannedMealId)
+        XCTAssertNil(decodedLegacy.recipes[0].ingredients[0].quantity)
+        XCTAssertNil(decodedLegacy.recipes[0].steps[0].minutes)
+    }
+
     func testHouseholdStaysClosedUntilMigrationFinishes() {
         XCTAssertTrue(LocalMigrationGate.blocksHousehold(
             testMode: false,
@@ -150,6 +208,14 @@ final class LocalMigrationTests: XCTestCase {
             phase: .notStarted,
             hasEligibleData: false
         ))
+    }
+
+    private func expectJSONNull(_ value: Any?) {
+        guard let value else {
+            XCTFail("expected JSON null")
+            return
+        }
+        XCTAssertTrue(value is NSNull)
     }
 
     private func suite() -> UserDefaults {

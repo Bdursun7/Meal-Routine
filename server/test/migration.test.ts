@@ -189,6 +189,48 @@ describe('personal migration', () => {
     expect(builtin.json().counts.recipes).toBe(1)
     await app.close()
   })
+
+  it('accepts a local signup upload when nullable fields are JSON null', async () => {
+    const app = buildApp({ repo: memoryRepo(), config: testConfig(), verifier: testVerifier() })
+    const dev = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/dev',
+      payload: { subject: 'local-dev-signup', displayName: 'Yerel test' },
+    })
+    expect(dev.statusCode).toBe(200)
+    const token = dev.json().accessToken as string
+
+    const omitted = JSON.parse(JSON.stringify(localSignupBody())) as {
+      memories: Array<Record<string, unknown>>
+      recipes: Array<{ ingredients: Array<Record<string, unknown>>; steps: Array<Record<string, unknown>> }>
+    }
+    delete omitted.memories[0].lastCookedAt
+    delete omitted.recipes[0].ingredients[0].quantity
+    delete omitted.recipes[0].steps[0].minutes
+    const rejected = await upload(app, token, omitted)
+    expect(rejected.statusCode).toBe(400)
+    expect(rejected.json()).toEqual({ error: 'invalid_request' })
+
+    const saved = await upload(app, token, localSignupBody())
+    expect(saved.statusCode).toBe(200)
+    expect(saved.json()).toEqual({
+      status: 'uploaded',
+      counts: { recipes: 1, memories: 1, favorites: 0, history: 1, feedback: 1 },
+    })
+
+    const again = await upload(app, token, localSignupBody())
+    expect(again.statusCode).toBe(200)
+    expect(again.json().counts).toEqual(saved.json().counts)
+
+    const confirmed = await app.inject({
+      method: 'POST',
+      url: '/v1/migration/confirm',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(confirmed.statusCode).toBe(200)
+    expect(confirmed.json().status).toBe('confirmed')
+    await app.close()
+  })
 })
 
 async function signIn(app: ReturnType<typeof buildApp>, subject: string, email?: string) {
@@ -308,6 +350,110 @@ function recipe(nameTr: string, updatedAt: string, ingredients: ReturnType<typeo
     photoUrl: '',
     ingredients,
     steps: [],
+  }
+}
+
+function localSignupBody() {
+  return {
+    preferences: {
+      updatedAt: '2026-10-06T12:00:00Z',
+      householdSize: 2,
+      eveningsPerWeek: 7,
+      maxCookMinutes: 60,
+      dislikedIngredientIds: [],
+      discoveryLevel: 'balanced',
+      repeatPreference: 'balanced',
+      difficultyPreference: 'mostlyEasy',
+      weekdayStyle: 'mostlyQuick',
+      dismissedPatternIds: [],
+      hasCompletedOnboarding: true,
+    },
+    recipes: [{
+      id: recipeId,
+      slug: 'kayit-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      updatedAt: '2026-10-06T12:00:00Z',
+      nameTr: 'Mantı',
+      nameEn: '',
+      summaryTr: '',
+      origin: 'savedExternal',
+      collectionState: 'savedToTry',
+      sourceUrl: '',
+      sourceKey: '',
+      sourcePlatform: 'instagram',
+      sourceTitle: '',
+      userNotes: '',
+      baseServings: 1,
+      prepMinutes: 0,
+      cookMinutes: 0,
+      totalMinutes: 0,
+      timeIsUnknown: true,
+      servingsUnspecified: false,
+      difficulty: 'unknown',
+      category: '',
+      country: '',
+      diets: [],
+      tags: [],
+      photoUrl: '',
+      ingredients: [{
+        id: lineId,
+        sortIndex: 0,
+        ingredientId: 'import:kiyma',
+        nameTr: 'kıyma',
+        nameEn: '',
+        quantity: null,
+        unit: '',
+        noteTr: '',
+        isOptional: false,
+        includeInGrocery: false,
+      }],
+      steps: [{
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        sortIndex: 0,
+        textTr: 'Yoğur',
+        textEn: '',
+        minutes: null,
+      }],
+    }],
+    memories: [{
+      recipeSlug: 'menemen',
+      updatedAt: '2026-10-06T12:00:00Z',
+      timesCooked: 0,
+      timesReplaced: 0,
+      timesSkipped: 0,
+      lastCookedAt: null,
+      lastSelectedAt: '2026-10-06T12:00:00Z',
+      lovedCount: 0,
+      okayCount: 0,
+      latestRating: '',
+      neverAgain: false,
+      timeConcernCount: 0,
+      difficultyConcernCount: 0,
+      portionConcernCount: 0,
+      missingIngredientCount: 0,
+      tooManyIngredientCount: 0,
+      wouldMakeAgainCount: 0,
+      isFavorite: false,
+      discoveryStatus: 'unknown',
+      confidence: 'low',
+    }],
+    favorites: [],
+    history: [{
+      id: historyId,
+      recipeSlug: 'menemen',
+      eventType: 'selected',
+      planWeekId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      plannedMealId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      replacementReason: '',
+      createdAt: '2026-10-06T12:00:00Z',
+    }],
+    feedback: [{
+      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      recipeSlug: 'menemen',
+      rating: 'loved',
+      cooked: false,
+      reasons: [],
+      createdAt: '2026-10-06T12:00:00Z',
+    }],
   }
 }
 

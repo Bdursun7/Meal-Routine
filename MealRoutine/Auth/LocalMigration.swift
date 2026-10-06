@@ -154,7 +154,7 @@ struct MigrationRecipePayload: Codable, Equatable, Sendable {
     var steps: [MigrationStepPayload]
 }
 
-struct MigrationIngredientPayload: Codable, Equatable, Sendable {
+struct MigrationIngredientPayload: Equatable, Sendable {
     var id: String
     var sortIndex: Int
     var ingredientId: String
@@ -167,7 +167,41 @@ struct MigrationIngredientPayload: Codable, Equatable, Sendable {
     var includeInGrocery: Bool
 }
 
-struct MigrationStepPayload: Codable, Equatable, Sendable {
+extension MigrationIngredientPayload: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case id, sortIndex, ingredientId, nameTr, nameEn, quantity, unit, noteTr, isOptional, includeInGrocery
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        sortIndex = try container.decode(Int.self, forKey: .sortIndex)
+        ingredientId = try container.decode(String.self, forKey: .ingredientId)
+        nameTr = try container.decode(String.self, forKey: .nameTr)
+        nameEn = try container.decode(String.self, forKey: .nameEn)
+        quantity = try container.decodeIfPresent(Double.self, forKey: .quantity)
+        unit = try container.decode(String.self, forKey: .unit)
+        noteTr = try container.decode(String.self, forKey: .noteTr)
+        isOptional = try container.decode(Bool.self, forKey: .isOptional)
+        includeInGrocery = try container.decode(Bool.self, forKey: .includeInGrocery)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(sortIndex, forKey: .sortIndex)
+        try container.encode(ingredientId, forKey: .ingredientId)
+        try container.encode(nameTr, forKey: .nameTr)
+        try container.encode(nameEn, forKey: .nameEn)
+        try container.encodeNilAsNull(quantity, forKey: .quantity)
+        try container.encode(unit, forKey: .unit)
+        try container.encode(noteTr, forKey: .noteTr)
+        try container.encode(isOptional, forKey: .isOptional)
+        try container.encode(includeInGrocery, forKey: .includeInGrocery)
+    }
+}
+
+struct MigrationStepPayload: Equatable, Sendable {
     var id: String
     var sortIndex: Int
     var textTr: String
@@ -175,7 +209,31 @@ struct MigrationStepPayload: Codable, Equatable, Sendable {
     var minutes: Int?
 }
 
-struct MigrationMemoryPayload: Codable, Equatable, Sendable {
+extension MigrationStepPayload: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case id, sortIndex, textTr, textEn, minutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        sortIndex = try container.decode(Int.self, forKey: .sortIndex)
+        textTr = try container.decode(String.self, forKey: .textTr)
+        textEn = try container.decode(String.self, forKey: .textEn)
+        minutes = try container.decodeIfPresent(Int.self, forKey: .minutes)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(sortIndex, forKey: .sortIndex)
+        try container.encode(textTr, forKey: .textTr)
+        try container.encode(textEn, forKey: .textEn)
+        try container.encodeNilAsNull(minutes, forKey: .minutes)
+    }
+}
+
+struct MigrationMemoryPayload: Equatable, Sendable {
     var recipeSlug: String
     var updatedAt: String
     var timesCooked: Int
@@ -198,12 +256,70 @@ struct MigrationMemoryPayload: Codable, Equatable, Sendable {
     var confidence: String
 }
 
+extension MigrationMemoryPayload: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case recipeSlug, updatedAt, timesCooked, timesReplaced, timesSkipped
+        case lastCookedAt, lastSelectedAt, lovedCount, okayCount, latestRating, neverAgain
+        case timeConcernCount, difficultyConcernCount, portionConcernCount
+        case missingIngredientCount, tooManyIngredientCount, wouldMakeAgainCount
+        case isFavorite, discoveryStatus, confidence
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        recipeSlug = try container.decode(String.self, forKey: .recipeSlug)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        timesCooked = try container.decode(Int.self, forKey: .timesCooked)
+        timesReplaced = try container.decode(Int.self, forKey: .timesReplaced)
+        timesSkipped = try container.decode(Int.self, forKey: .timesSkipped)
+        lastCookedAt = try container.decodeIfPresent(String.self, forKey: .lastCookedAt)
+        lastSelectedAt = try container.decodeIfPresent(String.self, forKey: .lastSelectedAt)
+        lovedCount = try container.decode(Int.self, forKey: .lovedCount)
+        okayCount = try container.decode(Int.self, forKey: .okayCount)
+        latestRating = try container.decode(String.self, forKey: .latestRating)
+        neverAgain = try container.decode(Bool.self, forKey: .neverAgain)
+        timeConcernCount = try container.decode(Int.self, forKey: .timeConcernCount)
+        difficultyConcernCount = try container.decode(Int.self, forKey: .difficultyConcernCount)
+        portionConcernCount = try container.decode(Int.self, forKey: .portionConcernCount)
+        missingIngredientCount = try container.decode(Int.self, forKey: .missingIngredientCount)
+        tooManyIngredientCount = try container.decode(Int.self, forKey: .tooManyIngredientCount)
+        wouldMakeAgainCount = try container.decode(Int.self, forKey: .wouldMakeAgainCount)
+        isFavorite = try container.decode(Bool.self, forKey: .isFavorite)
+        discoveryStatus = try container.decode(String.self, forKey: .discoveryStatus)
+        confidence = try container.decode(String.self, forKey: .confidence)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recipeSlug, forKey: .recipeSlug)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(timesCooked, forKey: .timesCooked)
+        try container.encode(timesReplaced, forKey: .timesReplaced)
+        try container.encode(timesSkipped, forKey: .timesSkipped)
+        try container.encodeNilAsNull(lastCookedAt, forKey: .lastCookedAt)
+        try container.encodeNilAsNull(lastSelectedAt, forKey: .lastSelectedAt)
+        try container.encode(lovedCount, forKey: .lovedCount)
+        try container.encode(okayCount, forKey: .okayCount)
+        try container.encode(latestRating, forKey: .latestRating)
+        try container.encode(neverAgain, forKey: .neverAgain)
+        try container.encode(timeConcernCount, forKey: .timeConcernCount)
+        try container.encode(difficultyConcernCount, forKey: .difficultyConcernCount)
+        try container.encode(portionConcernCount, forKey: .portionConcernCount)
+        try container.encode(missingIngredientCount, forKey: .missingIngredientCount)
+        try container.encode(tooManyIngredientCount, forKey: .tooManyIngredientCount)
+        try container.encode(wouldMakeAgainCount, forKey: .wouldMakeAgainCount)
+        try container.encode(isFavorite, forKey: .isFavorite)
+        try container.encode(discoveryStatus, forKey: .discoveryStatus)
+        try container.encode(confidence, forKey: .confidence)
+    }
+}
+
 struct MigrationFavoritePayload: Codable, Equatable, Sendable {
     var recipeSlug: String
     var createdAt: String
 }
 
-struct MigrationHistoryPayload: Codable, Equatable, Sendable {
+struct MigrationHistoryPayload: Equatable, Sendable {
     var id: String
     var recipeSlug: String
     var eventType: String
@@ -211,6 +327,45 @@ struct MigrationHistoryPayload: Codable, Equatable, Sendable {
     var plannedMealId: String?
     var replacementReason: String
     var createdAt: String
+}
+
+extension MigrationHistoryPayload: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case id, recipeSlug, eventType, planWeekId, plannedMealId, replacementReason, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        recipeSlug = try container.decode(String.self, forKey: .recipeSlug)
+        eventType = try container.decode(String.self, forKey: .eventType)
+        planWeekId = try container.decodeIfPresent(String.self, forKey: .planWeekId)
+        plannedMealId = try container.decodeIfPresent(String.self, forKey: .plannedMealId)
+        replacementReason = try container.decode(String.self, forKey: .replacementReason)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(recipeSlug, forKey: .recipeSlug)
+        try container.encode(eventType, forKey: .eventType)
+        try container.encodeNilAsNull(planWeekId, forKey: .planWeekId)
+        try container.encodeNilAsNull(plannedMealId, forKey: .plannedMealId)
+        try container.encode(replacementReason, forKey: .replacementReason)
+        try container.encode(createdAt, forKey: .createdAt)
+    }
+}
+
+extension KeyedEncodingContainer {
+    /// The upload schema requires these keys. A missing key is `invalid_request`; JSON null is accepted.
+    mutating func encodeNilAsNull<Value: Encodable>(_ value: Value?, forKey key: Key) throws {
+        if let value {
+            try encode(value, forKey: key)
+        } else {
+            try encodeNil(forKey: key)
+        }
+    }
 }
 
 struct MigrationFeedbackPayload: Codable, Equatable, Sendable {
