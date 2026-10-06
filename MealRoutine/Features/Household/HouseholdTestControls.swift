@@ -33,13 +33,13 @@ struct HouseholdTestBanner: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Button("Kapat", action: onDismiss)
                 .font(.caption.weight(.semibold))
+                .accessibilityIdentifier("household.testBanner.dismiss")
                 .accessibilityLabel("Bildirimi kapat")
         }
         .padding(12)
         .mealCardSurface()
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("household.testBanner")
-        .accessibilityLabel(notice.bannerText)
     }
 }
 
@@ -64,24 +64,21 @@ struct HouseholdTestModeSection: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                 if session.showsPartnerControls {
-                    Text("Test Partner evde. Tepkiler Bu Hafta kartında, market işareti Market’te.")
+                    Text("Test Partner evde. Tepkiler ortak haftanın yemeklerinde ve Bu Hafta kartında. Market işareti Market’te.")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
+                    if session.snapshot.plan?.meals.isEmpty == false {
+                        Button("Test Partner marketi işaretlesin") {
+                            Task { await session.partnerCheckNextGrocery(in: modelContext) }
+                        }
+                        .accessibilityIdentifier("household.partner.grocery")
+                    }
                 } else if session.hasHousehold, session.snapshot.members.count < HouseholdLimits.maxMembers {
                     Button("Test Partner katılsın") {
                         Task { await session.simulatePartnerJoin(in: modelContext) }
                     }
                     .accessibilityIdentifier("household.partnerJoin")
                     .accessibilityHint("Davet kodunu ikinci üye olarak kabul eder")
-                }
-                if session.showsPartnerControls, let plan = session.snapshot.plan, !plan.meals.isEmpty {
-                    ForEach(plan.meals.sorted { $0.dayOffset < $1.dayOffset }) { meal in
-                        partnerMeal(meal)
-                    }
-                    Button("Test Partner marketi işaretlesin") {
-                        Task { await session.partnerCheckNextGrocery(in: modelContext) }
-                    }
-                    .accessibilityIdentifier("household.partner.grocery")
                 }
                 if !testMode.notices.isEmpty {
                     ForEach(testMode.notices.prefix(8)) { notice in
@@ -109,29 +106,6 @@ struct HouseholdTestModeSection: View {
             Text("Test modu")
         }
     }
-
-    private func partnerMeal(_ meal: SharedMeal) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(meal.title)
-                .font(.subheadline.weight(.semibold))
-            HStack(spacing: 8) {
-                ForEach(MealReactionKind.allCases) { kind in
-                    Button(kind.title) {
-                        Task { await session.partnerSetReaction(kind, mealID: meal.id, in: modelContext) }
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier(kind == .veto ? "household.partner.veto" : "household.partner.\(kind.rawValue)")
-                    .accessibilityLabel("Test Partner, \(kind.title)")
-                }
-            }
-            if HouseholdConflict.needsDecision(meal.reactions) {
-                Button("Partner yerine koysun") {
-                    Task { await session.partnerSuggestReplacement(mealID: meal.id, in: modelContext) }
-                }
-                .accessibilityIdentifier("household.partner.replace")
-            }
-        }
-    }
 }
 
 struct HouseholdPartnerMealControls: View {
@@ -144,7 +118,7 @@ struct HouseholdPartnerMealControls: View {
             Text("Test Partner")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.secondaryText)
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 ForEach(MealReactionKind.allCases) { kind in
                     Button(kind.title) {
                         Task { await session.partnerSetReaction(kind, mealID: mealID, in: modelContext) }
@@ -159,6 +133,7 @@ struct HouseholdPartnerMealControls: View {
                 Button("Partner yerine koysun") {
                     Task { await session.partnerSuggestReplacement(mealID: mealID, in: modelContext) }
                 }
+                .buttonStyle(.bordered)
                 .accessibilityIdentifier("household.partner.replace")
             }
         }

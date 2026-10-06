@@ -44,33 +44,53 @@ final class HouseholdFlowUITests: XCTestCase {
         XCTAssertTrue(join.waitForExistence(timeout: 5))
         join.tap()
         reveal(app.buttons["household.generateWeek"], in: app).tap()
+        dismissTestBanner(in: app)
 
-        let veto = app.buttons["household.partner.veto"].firstMatch
-        XCTAssertTrue(veto.waitForExistence(timeout: 20))
-        veto.tap()
+        tapControl("household.partner.veto", in: app)
         XCTAssertTrue(app.staticTexts["Karar gerekiyor"].firstMatch.waitForExistence(timeout: 5))
 
-        if app.buttons["Kapat"].waitForExistence(timeout: 2) {
-            app.buttons["Kapat"].tap()
-        }
-        let replace = app.buttons["household.partner.replace"].firstMatch
-        XCTAssertTrue(replace.waitForExistence(timeout: 5))
-        replace.tap()
-        let banner = app.otherElements["household.testBanner"].firstMatch
-        let notice = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "yerine")).firstMatch
-        let otherNotice = app.otherElements.containing(NSPredicate(format: "label CONTAINS %@", "yerine")).firstMatch
+        dismissTestBanner(in: app)
+        tapControl("household.partner.replace", in: app)
+        let notice = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "yerine")).firstMatch
+        let otherNotice = app.otherElements.containing(NSPredicate(format: "label CONTAINS[c] %@", "yerine")).firstMatch
         XCTAssertTrue(
-            banner.waitForExistence(timeout: 8)
-                || notice.waitForExistence(timeout: 2)
-                || otherNotice.waitForExistence(timeout: 2)
+            notice.waitForExistence(timeout: 8) || otherNotice.waitForExistence(timeout: 2)
         )
+    }
+
+    private func dismissTestBanner(in app: XCUIApplication) {
+        let button = app.buttons["household.testBanner.dismiss"]
+        guard button.waitForExistence(timeout: 3), button.isHittable else { return }
+        button.tap()
+    }
+
+    /// Picks a visible control. The same identifier also exists on Bu Hafta cards, which may be off this screen.
+    private func tapControl(_ identifier: String, in app: XCUIApplication) {
+        let query = app.buttons.matching(identifier: identifier)
+        XCTAssertTrue(query.firstMatch.waitForExistence(timeout: 20))
+        for _ in 0..<5 {
+            for index in 0..<query.count {
+                let element = query.element(boundBy: index)
+                if element.exists, element.isHittable {
+                    element.tap()
+                    return
+                }
+            }
+            app.swipeUp()
+        }
+        XCTFail("\(identifier) never became tappable")
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
         if element.waitForExistence(timeout: 2), element.isHittable {
             return element
         }
-        app.swipeUp()
+        for _ in 0..<4 {
+            app.swipeUp()
+            if element.exists, element.isHittable {
+                return element
+            }
+        }
         XCTAssertTrue(element.waitForExistence(timeout: 5))
         return element
     }

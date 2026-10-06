@@ -222,6 +222,7 @@ struct HouseholdSettingsView: View {
         Section {
             if let plan = session.snapshot.plan {
                 Text(plan.status.title)
+                    .accessibilityIdentifier("household.planStatus")
                 if plan.status == .needsDecisions {
                     Text("Bir akşam veto edildi. Başka yemek seçmeden plan kapanmaz.")
                         .font(.footnote)
@@ -237,9 +238,35 @@ struct HouseholdSettingsView: View {
             }
             .accessibilityIdentifier("household.generateWeek")
             .accessibilityHint("İki kişinin hafızasına ve bu haftanın vetolarına göre plan kurar")
+            if let plan = session.snapshot.plan {
+                ForEach(plan.meals.sorted { $0.dayOffset < $1.dayOffset }) { meal in
+                    sharedMealRow(meal)
+                }
+            }
         } header: {
             Text("Bu hafta")
         }
+    }
+
+    private func sharedMealRow(_ meal: SharedMeal) -> some View {
+        let label = HouseholdConflict.label(
+            reactions: meal.reactions,
+            memberIds: session.snapshot.members.map(\.userId)
+        )
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(WeekCalendar.dayTitle(offset: meal.dayOffset))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.secondaryText)
+            Text(meal.title)
+                .font(.subheadline.weight(.semibold))
+            Text(label.title)
+                .font(.footnote)
+                .foregroundStyle(label == .needsDecision ? Theme.accent : Theme.secondaryText)
+            if session.showsPartnerControls {
+                HouseholdPartnerMealControls(mealID: meal.id, session: session)
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private var preferenceSection: some View {
