@@ -33,7 +33,7 @@ describe('migrations', () => {
   it('lists versioned SQL files in order and creates the phase-0 tables', async () => {
     const dir = migrationsDirectory()
     const files = await listMigrationFiles(dir)
-    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011'])
+    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012'])
     const sql = (
       await Promise.all(files.map((file) => readFile(path.join(dir, file), 'utf8')))
     ).join('\n')

@@ -77,6 +77,7 @@
 		BA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */; };
 		BA0A11A1A11A11A11A11A006 /* MealReplacementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A006 /* MealReplacementView.swift */; };
 		BA0A11A1A11A11A11A11A007 /* PrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */; };
+		BA0A11A1A11A11A11A11A008 /* PantryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A11A1A11A11A11A11A008 /* PantryView.swift */; };
 		BAA3BC739E766D6D3DF2263E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA9B309E6853B11B906A5077 /* Assets.xcassets */; };
 		BAE79929CB2D00C1135A093F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA4E801F3A031C2E9BA55415 /* PrivacyInfo.xcprivacy */; };
 		BA460A646DD6DDF48F7CA56B /* ingredient-aliases.tr.json in Resources */ = {isa = PBXBuildFile; fileRef = FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */; };
@@ -320,6 +321,7 @@
 		V45F45A0000000000000002 /* NotificationSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSync.swift; sourceTree = "<group>"; };
 		V45F45A0000000000000003 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		V45F45A0000000000000004 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
+		FA0A11A1A11A11A11A11A008 /* PantryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryView.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
@@ -452,6 +454,7 @@
 				V41F41A0000000000000008 /* AccountView.swift */,
 				V44F44A0000000000000002 /* LocalMigrationView.swift */,
 				V45F45A0000000000000003 /* NotificationsView.swift */,
+				FA0A11A1A11A11A11A11A008 /* PantryView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -898,6 +901,7 @@
 				BA59788FCE85533EE92FC3A4 /* OnboardingView.swift in Sources */,
 				BAEABF30DE4A8763C125D7CB /* OnboardingViewModel.swift in Sources */,
 				BA3D18A2DE73D508D0B16541 /* ProfileView.swift in Sources */,
+				BA0A11A1A11A11A11A11A008 /* PantryView.swift in Sources */,
 				BAE6D534FD327DC3BB5055C9 /* ProfileViewModel.swift in Sources */,
 				BA97291A0B8D6638C81BDE54 /* CookRatingPrompt.swift in Sources */,
 				BADA3DFFFD518B7B6671696E /* RecipeDetailView.swift in Sources */,

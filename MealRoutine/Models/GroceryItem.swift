@@ -82,3 +82,35 @@ final class IngredientCheck {
         self.unit = unit
     }
 }
+
+enum PantryLocation: String, CaseIterable, Codable, Identifiable {
+    case pantry, refrigerator, freezer, other
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .pantry: "Kiler"; case .refrigerator: "Buzdolabı"; case .freezer: "Dondurucu"; case .other: "Diğer" }
+    }
+}
+
+@Model
+final class PantryItem {
+    @Attribute(.unique) var uuid: UUID
+    var householdID: UUID?
+    var ingredientID: String
+    var displayName: String
+    var quantity: Double
+    var unit: String
+    var locationRaw: String
+    var minimumQuantity: Double?
+    var bestBefore: Date?
+    var revision: Int
+    var updatedAt: Date
+
+    init(uuid: UUID = UUID(), householdID: UUID?, ingredientID: String, displayName: String, quantity: Double, unit: String, location: PantryLocation = .pantry, minimumQuantity: Double? = nil, bestBefore: Date? = nil, revision: Int = 1, updatedAt: Date = .now) {
+        self.uuid = uuid; self.householdID = householdID; self.ingredientID = ingredientID; self.displayName = displayName
+        self.quantity = quantity; self.unit = unit; self.locationRaw = location.rawValue; self.minimumQuantity = minimumQuantity
+        self.bestBefore = bestBefore; self.revision = revision; self.updatedAt = updatedAt
+    }
+    var location: PantryLocation { get { PantryLocation(rawValue: locationRaw) ?? .other } set { locationRaw = newValue.rawValue } }
+    var isLowStock: Bool { minimumQuantity.map { quantity <= $0 } ?? false }
+    var isExpiredOrNear: Bool { guard let bestBefore else { return false }; return bestBefore < Calendar.current.date(byAdding: .day, value: 2, to: .now)! }
+}

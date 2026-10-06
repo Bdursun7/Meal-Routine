@@ -3,6 +3,8 @@ import { AppError } from './errors.js'
 import type { HouseholdStore } from './householdTypes.js'
 import { createMemoryBoard } from './memoryBoard.js'
 import { createHouseholdMemory } from './memoryHousehold.js'
+import { createMemoryPantry } from './memoryPantry.js'
+import type { PantryStore } from './pantryTypes.js'
 
 export type ProviderName = 'apple' | 'google' | 'dev'
 export type MemberRole = 'owner' | 'member'
@@ -66,7 +68,7 @@ export interface AuthRepository {
   closeAccount(accountId: string, householdOutcome: 'none' | 'left' | 'deleted', now: Date): Promise<void>
 }
 
-export interface MemoryRepository extends AuthRepository, HouseholdStore, BoardStore {
+export interface MemoryRepository extends AuthRepository, HouseholdStore, BoardStore, PantryStore {
   seedMember(householdId: string, accountId: string, role: MemberRole): void
   deletionAudits(): { accountId: string; householdOutcome: 'none' | 'left' | 'deleted' }[]
 }
@@ -88,6 +90,7 @@ export function createMemoryRepository(): MemoryRepository {
     members.set(householdId, rows)
   })
   const board = createMemoryBoard()
+  const pantry = createMemoryPantry(members, (accountId) => [...members.entries()].filter(([, rows]) => rows.has(accountId)).map(([id]) => id))
 
   function requireAccount(id: string): AccountRow {
     const account = accounts.get(id)
@@ -202,5 +205,6 @@ export function createMemoryRepository(): MemoryRepository {
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
     boardTransaction: board.boardTransaction,
+    ...pantry,
   }
 }

@@ -299,6 +299,38 @@ struct AccountRepository {
     }
 }
 
+struct PantryRemoteItem: Codable, Sendable {
+    var id: UUID; var householdId: UUID; var ingredientId: String; var displayName: String
+    var quantity: Double; var unit: String; var location: PantryLocation; var minimumQuantity: Double?
+    var bestBefore: String?; var revision: Int; var createdAt: Date?; var updatedAt: Date?
+}
+struct PantryListDTO: Codable, Sendable { var items: [PantryRemoteItem]; var serverTime: Date? }
+
+struct PantryRepository {
+    var client: APIClient
+    func list(householdId: UUID) async throws -> [PantryRemoteItem] {
+        let (data, response) = try await client.request(method: "GET", path: "/v1/households/\(householdId.uuidString)/pantry", body: nil, authenticated: true)
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder.mealRoutine.decode(PantryListDTO.self, from: data).items
+    }
+    func create(householdId: UUID, item: PantryRemoteItem) async throws -> PantryRemoteItem { try await mutate("POST", "/v1/households/\(householdId.uuidString)/pantry/items", item, baseRevision: nil) }
+    func update(householdId: UUID, item: PantryRemoteItem) async throws -> PantryRemoteItem { try await mutate("PATCH", "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)", item, baseRevision: max(1, item.revision)) }
+    func delete(householdId: UUID, item: PantryRemoteItem) async throws {
+        let (data, response) = try await client.request(method: "DELETE", path: "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)?baseRevision=\(item.revision)", body: nil, authenticated: true, headers: ["Idempotency-Key": UUID().uuidString])
+        try client.validateAuth(response, data: data, authenticated: true)
+    }
+    private func mutate(_ method: String, _ path: String, _ item: PantryRemoteItem, baseRevision: Int?) async throws -> PantryRemoteItem {
+        let body = try JSONEncoder.mealRoutine.encode(item)
+        var fullPath = path; if let baseRevision { fullPath += "?baseRevision=\(baseRevision)" }
+        let (data, response) = try await client.request(method: method, path: fullPath, body: body, authenticated: true, headers: ["Idempotency-Key": UUID().uuidString])
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder.mealRoutine.decode(PantryRemoteItem.self, from: data)
+    }
+}
+
+private extension JSONEncoder { static var mealRoutine: JSONEncoder { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e } }
+private extension JSONDecoder { static var mealRoutine: JSONDecoder { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d } }
+
 private struct AppleSignInBody: Encodable {
     var identityToken: String
     var givenName: String?
