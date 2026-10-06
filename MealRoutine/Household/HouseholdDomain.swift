@@ -124,6 +124,7 @@ enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
     case noAlternative
     case planNotReady
     case notSignedIn
+    case sessionExpired
     case offline
     case syncFailed(String)
 
@@ -157,6 +158,8 @@ enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
             "Plan henüz netleşmedi. Önce veto edilen akşamları çözün."
         case .notSignedIn:
             "Ev halkı için Apple ile giriş gerekir."
+        case .sessionExpired:
+            "Oturumun sona erdi. Tekrar giriş yap."
         case .offline:
             "iCloud şu an yok. Değişiklik bu telefonda duruyor."
         case .syncFailed(let detail):

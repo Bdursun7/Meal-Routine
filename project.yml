@@ -4,6 +4,10 @@ configs:
   Debug: debug
   Debug-Local: debug
   Release: release
+packages:
+  GoogleSignIn-iOS:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 10.0.0
 options:
   bundleIdPrefix: com.mealroutine
   deploymentTarget:
@@ -56,6 +60,8 @@ targets:
     dependencies:
       - target: MealRoutineShare
         embed: true
+      - package: GoogleSignIn-iOS
+        product: GoogleSignIn
   MealRoutineShare:
     type: app-extension
     platform: iOS

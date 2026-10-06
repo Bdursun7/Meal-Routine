@@ -16,6 +16,18 @@
 				<string>mealroutine</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>google-sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>MealRoutineAPIBaseURL</key>
+	<string>$(MEALROUTINE_API_BASE_URL)</string>
 </dict>
 </plist>

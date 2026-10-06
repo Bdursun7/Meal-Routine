@@ -17,3 +17,8 @@ xcuserdata/
 .swiftpm/
 .build/
 Package.resolved
+
+# MealRoutine API
+server/node_modules/
+server/dist/
+server/.env

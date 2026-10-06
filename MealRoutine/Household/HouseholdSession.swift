@@ -60,6 +60,10 @@ final class HouseholdSession {
         await consumePendingInvite(in: context)
     }
 
+    func adoptAccount(id: String, displayName: String?) {
+        adoptAppleUser(id: id, displayName: displayName)
+    }
+
     func adoptAppleUser(id: String, displayName: String?) {
         let trimmed = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let existing = account?.displayName ?? ""
@@ -86,9 +90,18 @@ final class HouseholdSession {
     func signOut(in context: ModelContext) {
         account = nil
         HouseholdAccountStore.clear(testMode: isTestMode)
+        if !isTestMode {
+            Task { await AuthSession.shared.signOutTokensOnly() }
+        }
         statusMessage = isTestMode
             ? "Test oturumu kapatıldı. Ev verisi bu telefonda duruyor."
-            : "Bu telefonda Apple oturumu kapatıldı. Ev halkı iCloud'da durur."
+            : "Bu telefonda oturum kapatıldı."
+    }
+
+    func dropAccount(message: String) {
+        account = nil
+        HouseholdAccountStore.clear(testMode: isTestMode)
+        statusMessage = message
     }
 
     func setTestMode(_ enabled: Bool, in context: ModelContext) async {
@@ -530,12 +543,12 @@ final class HouseholdSession {
     }
 
     private func pushThrowing() async throws -> HouseholdSnapshot {
-        let transport = activeTransport()
+        let repository = HouseholdRepository(transport: activeTransport())
         do {
-            return try await transport.push(snapshot)
+            return try await repository.push(snapshot)
         } catch let conflict as HouseholdServerConflict {
             snapshot = HouseholdConflictResolver.merge(local: snapshot, server: conflict.server)
-            let pushed = try await transport.push(snapshot)
+            let pushed = try await repository.push(snapshot)
             statusMessage = "Sunucudaki plan uygulandı."
             return pushed
         }

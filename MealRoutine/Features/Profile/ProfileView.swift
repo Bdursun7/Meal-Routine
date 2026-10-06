@@ -37,7 +37,17 @@ struct ProfileView: View {
 
     private var profileForm: some View {
         @Bindable var viewModel = self.viewModel
-        return Form {
+            return Form {
+                Section("Hesap") {
+                    NavigationLink {
+                        AccountView()
+                    } label: {
+                        Text("Hesap")
+                    }
+                    .accessibilityIdentifier("account.open")
+                    .accessibilityHint("Bağlı girişler, çıkış ve oturum")
+                }
+
                 Section("Ev halkı") {
                     NavigationLink {
                         HouseholdSettingsView()
@@ -180,7 +190,7 @@ struct ProfileView: View {
 
                 Section("Katalog") {
                     Text("\(recipes.count) akşam tarifi yerelde yüklü.")
-                    Text("Öneri motoru süreye, sevmediğin malzemeye, yemek hafızana ve haftanın çeşitliliğine bakar. Ev halkı isteğe bağlıdır ve yalnızca Apple ile giriş kullanır.")
+                    Text("Öneri motoru süreye, sevmediğin malzemeye, yemek hafızana ve haftanın çeşitliliğine bakar. Ev halkı isteğe bağlıdır. Giriş Apple veya Google ile yapılır.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -1,4 +1,3 @@
-import AuthenticationServices
 import SwiftData
 import SwiftUI
 import UIKit
@@ -82,34 +81,11 @@ struct HouseholdSettingsView: View {
                 }
                 .accessibilityIdentifier("household.testSignIn")
                 .accessibilityLabel("Test olarak gir")
-            } else if HouseholdTestLaunch.allowsAppleServices {
-                Text("İki kişi aynı haftayı seçebilsin diye Apple ile giriş yeter. Google, e-posta veya telefon yok.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.secondaryText)
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName]
-                } onCompletion: { result in
-                    switch result {
-                    case .success(let authorization):
-                        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else { return }
-                        let name = credential.fullName.flatMap { PersonNameComponentsFormatter().string(from: $0) }
-                        session.adoptAppleUser(id: credential.user, displayName: name)
-                        Task {
-                            await session.refresh(in: modelContext)
-                            if let code = session.pendingInviteCode {
-                                await session.acceptInvite(code: code, in: modelContext)
-                            }
-                        }
-                    case .failure:
-                        session.statusMessage = "Apple ile giriş tamamlanamadı."
-                    }
-                }
-                .frame(height: 44)
-                .accessibilityLabel("Apple ile giriş yap")
             } else {
-                Text("Bu derleme Apple ile girişi, iCloud’u ve bildirimi imzalamaz. Ev halkını denemek için Test modunu aç.")
+                Text("Apple veya Google ile giriş. Ev halkı en fazla iki kişidir.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
+                AccountSignInButtons()
             }
         } header: {
             Text("Hesap")
@@ -359,7 +335,7 @@ struct HouseholdSettingsView: View {
                     session.leave(in: modelContext)
                 }
             }
-            Button(session.isTestMode ? "Test oturumunu kapat" : "Apple oturumunu kapat") {
+            Button(session.isTestMode ? "Test oturumunu kapat" : "Oturumu kapat") {
                 session.signOut(in: modelContext)
             }
         }
