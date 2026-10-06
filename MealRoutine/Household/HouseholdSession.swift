@@ -548,7 +548,7 @@ final class HouseholdSession {
             return try await repository.push(snapshot)
         } catch let conflict as HouseholdServerConflict {
             snapshot = HouseholdConflictResolver.merge(local: snapshot, server: conflict.server)
-            let pushed = try await transport.push(snapshot)
+            let pushed = try await repository.push(snapshot)
             statusMessage = "Sunucudaki plan uygulandı."
             return pushed
         }
