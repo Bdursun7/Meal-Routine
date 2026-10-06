@@ -223,12 +223,86 @@ struct HouseholdPreference: Codable, Equatable, Sendable, Identifiable {
     var baseRevision: Int
 }
 
-struct MealReaction: Codable, Equatable, Sendable, Identifiable {
+struct MealReaction: Equatable, Sendable, Identifiable {
     var id: UUID
     var sharedMealId: UUID
     var userId: String
     var reaction: MealReactionKind
     var createdAt: Date
+    /// Server reaction revision. Missing on snapshots saved before sync, so decoding defaults to 0.
+    var revision: Int
+
+    init(
+        id: UUID,
+        sharedMealId: UUID,
+        userId: String,
+        reaction: MealReactionKind,
+        createdAt: Date,
+        revision: Int = 0
+    ) {
+        self.id = id
+        self.sharedMealId = sharedMealId
+        self.userId = userId
+        self.reaction = reaction
+        self.createdAt = createdAt
+        self.revision = revision
+    }
+}
+
+extension MealReaction: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case id, sharedMealId, userId, reaction, createdAt, revision
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        sharedMealId = try container.decode(UUID.self, forKey: .sharedMealId)
+        userId = try container.decode(String.self, forKey: .userId)
+        reaction = try container.decode(MealReactionKind.self, forKey: .reaction)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(sharedMealId, forKey: .sharedMealId)
+        try container.encode(userId, forKey: .userId)
+        try container.encode(reaction, forKey: .reaction)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(revision, forKey: .revision)
+    }
+}
+
+enum MealReactionRevisions {
+    /// The fake server assigns a revision when an older snapshot still has 0.
+    /// A revision the client already bumped is left alone.
+    static func bumpForServerPush(_ incoming: inout HouseholdSnapshot, server: HouseholdSnapshot?) {
+        guard var plan = incoming.plan else { return }
+        var serverMeals: [UUID: SharedMeal] = [:]
+        for meal in server?.plan?.meals ?? [] {
+            serverMeals[meal.id] = meal
+        }
+        for mealIndex in plan.meals.indices {
+            var previous: [String: MealReaction] = [:]
+            for reaction in serverMeals[plan.meals[mealIndex].id]?.reactions ?? [] {
+                previous[reaction.userId] = reaction
+            }
+            for reactionIndex in plan.meals[mealIndex].reactions.indices {
+                var reaction = plan.meals[mealIndex].reactions[reactionIndex]
+                if let prior = previous[reaction.userId] {
+                    if reaction.revision <= prior.revision {
+                        reaction.revision = reaction.reaction == prior.reaction ? prior.revision : prior.revision + 1
+                    }
+                } else if reaction.revision < 1 {
+                    reaction.revision = 1
+                }
+                plan.meals[mealIndex].reactions[reactionIndex] = reaction
+            }
+        }
+        incoming.plan = plan
+    }
 }
 
 struct SharedMeal: Codable, Equatable, Sendable, Identifiable {
@@ -1053,13 +1127,15 @@ enum HouseholdReducer {
             throw HouseholdError.mealNotFound
         }
         var meal = plan.meals[index]
+        let previousRevision = meal.reactions.first { $0.userId == user.id }?.revision ?? 0
         meal.reactions.removeAll { $0.userId == user.id }
         let stored = MealReaction(
             id: reactionId,
             sharedMealId: mealId,
             userId: user.id,
             reaction: reaction,
-            createdAt: now
+            createdAt: now,
+            revision: previousRevision + 1
         )
         meal.reactions.append(stored)
         meal.revision += 1

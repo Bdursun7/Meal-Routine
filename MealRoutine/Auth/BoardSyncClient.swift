@@ -1,9 +1,76 @@
 import Foundation
 
 enum BoardSyncFailure: Error, Equatable {
-    case conflict
+    case conflict(BoardMealEntity?)
     case retry
     case offline
+}
+
+struct BoardMealEntity: Decodable, Equatable, Sendable {
+    var id: UUID
+    var revision: Int
+    var reactions: [BoardReactionEntity]
+}
+
+struct BoardReactionEntity: Decodable, Equatable, Sendable {
+    var id: UUID?
+    var accountId: String
+    var reaction: String
+    var revision: Int
+}
+
+struct BoardMutationResult: Decodable, Equatable, Sendable {
+    var cursor: Int
+    var entityType: String
+    var entityId: String
+    var revision: Int
+    var meal: BoardMealEntity?
+
+    private enum CodingKeys: String, CodingKey {
+        case cursor, entityType, entityId, revision, entity
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        cursor = try container.decode(Int.self, forKey: .cursor)
+        entityType = try container.decode(String.self, forKey: .entityType)
+        entityId = try container.decode(String.self, forKey: .entityId)
+        revision = try container.decode(Int.self, forKey: .revision)
+        meal = try? container.decode(BoardMealEntity.self, forKey: .entity)
+    }
+}
+
+enum BoardReactionSync {
+    /// Copies server reaction revisions onto the local meal. A higher local revision is kept
+    /// so an edit that has not reached the server yet is not reset to 0.
+    static func apply(_ meal: BoardMealEntity, to snapshot: inout HouseholdSnapshot) {
+        guard var plan = snapshot.plan, let index = plan.meals.firstIndex(where: { $0.id == meal.id }) else { return }
+        if meal.revision >= plan.meals[index].revision {
+            plan.meals[index].revision = meal.revision
+            plan.meals[index].baseRevision = meal.revision
+        }
+        for remote in meal.reactions {
+            if let existing = plan.meals[index].reactions.firstIndex(where: { $0.userId == remote.accountId }) {
+                guard remote.revision >= plan.meals[index].reactions[existing].revision else { continue }
+                plan.meals[index].reactions[existing].revision = remote.revision
+                if let kind = MealReactionKind(rawValue: remote.reaction) {
+                    plan.meals[index].reactions[existing].reaction = kind
+                }
+            } else if let kind = MealReactionKind(rawValue: remote.reaction) {
+                plan.meals[index].reactions.append(
+                    MealReaction(
+                        id: remote.id ?? UUID(),
+                        sharedMealId: meal.id,
+                        userId: remote.accountId,
+                        reaction: kind,
+                        createdAt: .now,
+                        revision: remote.revision
+                    )
+                )
+            }
+        }
+        snapshot.plan = plan
+    }
 }
 
 struct BoardChangePage: Decodable, Equatable, Sendable {
@@ -17,23 +84,47 @@ struct BoardChangeRow: Decodable, Equatable, Sendable {
     var entityId: String
     var operationType: String
     var revision: Int
+    var meal: BoardMealEntity?
+
+    private enum CodingKeys: String, CodingKey {
+        case cursor, entityType, entityId, operationType, revision, payload
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        cursor = try container.decode(Int.self, forKey: .cursor)
+        entityType = try container.decode(String.self, forKey: .entityType)
+        entityId = try container.decode(String.self, forKey: .entityId)
+        operationType = try container.decode(String.self, forKey: .operationType)
+        revision = try container.decode(Int.self, forKey: .revision)
+        meal = try? container.decode(BoardMealEntity.self, forKey: .payload)
+    }
 }
 
 /// Shared-data mutations. The same Idempotency-Key is sent on every retry.
 struct BoardSyncClient: Sendable {
     var client: APIClient
 
-    func mutate(householdId: UUID, idempotencyKey: String, body: Data) async throws {
+    @discardableResult
+    func mutate(householdId: UUID, idempotencyKey: String, body: Data) async throws -> BoardMutationResult {
         let (data, http) = try await perform(
             method: "POST",
             path: "/v1/households/\(householdId.uuidString)/mutations",
             body: body,
             headers: ["Idempotency-Key": idempotencyKey]
         )
-        if (200..<300).contains(http.statusCode) { return }
+        if (200..<300).contains(http.statusCode) {
+            guard let result = try? JSONDecoder().decode(BoardMutationResult.self, from: data) else {
+                throw BoardSyncFailure.retry
+            }
+            return result
+        }
         if http.statusCode == 409 {
             let code = (try? JSONDecoder().decode(BoardErrorBody.self, from: data))?.error
-            if code == "version_conflict" { throw BoardSyncFailure.conflict }
+            if code == "version_conflict" {
+                let meal = (try? JSONDecoder().decode(BoardConflictEnvelope.self, from: data))?.server
+                throw BoardSyncFailure.conflict(meal)
+            }
         }
         throw BoardSyncFailure.retry
     }
@@ -193,4 +284,17 @@ enum BoardMutationEncoder {
 
 private struct BoardErrorBody: Decodable {
     var error: String
+}
+
+private struct BoardConflictEnvelope: Decodable {
+    var server: BoardMealEntity?
+
+    private enum CodingKeys: String, CodingKey {
+        case server
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        server = try? container.decode(BoardMealEntity.self, forKey: .server)
+    }
 }

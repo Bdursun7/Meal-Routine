@@ -1049,9 +1049,17 @@ final class HouseholdSession {
         let jitter = Double.random(in: 0...1)
         let updated = await SyncDrainer.drain(items: queued, online: true, now: now, jitterUnit: jitter) { item in
             do {
-                try await api.mutate(householdId: householdId, idempotencyKey: item.idempotencyKey, body: item.payload)
+                let result = try await api.mutate(householdId: householdId, idempotencyKey: item.idempotencyKey, body: item.payload)
+                if let meal = result.meal {
+                    BoardReactionSync.apply(meal, to: &self.snapshot)
+                    self.persist(in: context)
+                }
                 return .applied
-            } catch BoardSyncFailure.conflict {
+            } catch BoardSyncFailure.conflict(let meal) {
+                if let meal {
+                    BoardReactionSync.apply(meal, to: &self.snapshot)
+                    self.persist(in: context)
+                }
                 return .conflict
             } catch {
                 return .retry
@@ -1088,8 +1096,18 @@ final class HouseholdSession {
         ) else { return false }
         BoardSyncCursor.save(page.cursor, householdId: householdId)
         var revisions: [String: Int] = [:]
-        for change in page.changes where change.entityType == "meal" {
-            revisions[change.entityId.lowercased()] = change.revision
+        var appliedMeal = false
+        for change in page.changes {
+            if change.entityType == "meal" {
+                revisions[change.entityId.lowercased()] = change.revision
+            }
+            if let meal = change.meal {
+                BoardReactionSync.apply(meal, to: &snapshot)
+                appliedMeal = true
+            }
+        }
+        if appliedMeal {
+            persist(in: context)
         }
         let overridden = Set(BoardDeltaMerge.overriddenMealIDs(pending: pending, remoteRevisions: revisions))
         guard !overridden.isEmpty else { return false }

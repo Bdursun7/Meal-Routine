@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 @testable import MealRoutine
 
@@ -138,7 +139,7 @@ final class SyncEngineTests: XCTestCase {
         do {
             try await api.mutate(householdId: householdId, idempotencyKey: key, body: body)
             XCTFail("expected conflict")
-        } catch BoardSyncFailure.conflict {
+        } catch BoardSyncFailure.conflict(_) {
         }
         try await api.mutate(householdId: householdId, idempotencyKey: key, body: body)
         let page = try await api.changes(householdId: householdId, cursor: 3)
@@ -164,6 +165,52 @@ final class SyncEngineTests: XCTestCase {
         backend.setOffline(false)
         let again = try await backend.push(snapshot)
         XCTAssertEqual(again.household?.name, "Ev")
+    }
+
+    func testReactionRevisionDefaultsToZeroAndAdvancesOnTheServer() async throws {
+        let reactionId = UUID()
+        let mealId = UUID()
+        let raw = """
+        {"id":"\(reactionId.uuidString)","sharedMealId":"\(mealId.uuidString)","userId":"owner","reaction":"want","createdAt":"2024-01-01T00:00:00Z"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(MealReaction.self, from: Data(raw.utf8))
+        XCTAssertEqual(decoded.revision, 0)
+
+        let backend = FakeHouseholdBackend()
+        let owner = HouseholdUser(id: "owner", displayName: "Ada", createdAt: now)
+        var snapshot = try HouseholdReducer.createHousehold(user: owner, name: "Ev", now: now)
+        try HouseholdReducer.installPlan(
+            snapshot: &snapshot,
+            drafts: [HouseholdMealDraft(dayOffset: 0, recipeSlug: "corba", title: "Çorba", recipeOwnerUserId: nil)],
+            weekStart: now,
+            actor: owner,
+            now: now,
+            mealIds: [mealId]
+        )
+        try HouseholdReducer.setReaction(snapshot: &snapshot, mealId: mealId, user: owner, reaction: .want, now: now)
+        XCTAssertEqual(snapshot.plan?.meals.first?.reactions.first?.revision, 1)
+        snapshot.plan?.meals[0].reactions[0].revision = 0
+        snapshot = try await backend.push(snapshot)
+        let storedBase = try XCTUnwrap(snapshot.plan?.meals.first?.reactions.first?.revision)
+        XCTAssertEqual(storedBase, 1)
+
+        try HouseholdReducer.setReaction(snapshot: &snapshot, mealId: mealId, user: owner, reaction: .okay, now: now)
+        XCTAssertEqual(snapshot.plan?.meals.first?.reactions.first?.revision, storedBase + 1)
+        snapshot = try await backend.push(snapshot)
+        XCTAssertEqual(snapshot.plan?.meals.first?.reactions.first?.revision, 2)
+
+        let serverMealId = try XCTUnwrap(snapshot.plan?.meals.first?.id)
+        let pageJSON = """
+        {"cursor":2,"changes":[{"cursor":2,"entityType":"meal","entityId":"\(serverMealId.uuidString)","operationType":"set","revision":4,"payload":{"id":"\(serverMealId.uuidString)","revision":4,"reactions":[{"accountId":"owner","reaction":"veto","revision":5}]}}]}
+        """
+        let page = try JSONDecoder().decode(BoardChangePage.self, from: Data(pageJSON.utf8))
+        let remote = try XCTUnwrap(page.changes.first?.meal)
+        BoardReactionSync.apply(remote, to: &snapshot)
+        let nextBase = snapshot.plan?.meals.first?.reactions.first { $0.userId == owner.id }?.revision
+        XCTAssertEqual(nextBase, 5)
+        XCTAssertEqual(snapshot.plan?.meals.first?.reactions.first?.reaction, .veto)
     }
 
     func testPendingOperationRoundTripKeepsTheSpecFields() async throws {

@@ -205,6 +205,7 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
             return .failure(.conflict(server))
         }
         var synced = snapshot
+        MealReactionRevisions.bumpForServerPush(&synced, server: store.boards[household.id])
         HouseholdReducer.markSynced(&synced)
         store.boards[household.id] = synced
         for invite in synced.invites {
