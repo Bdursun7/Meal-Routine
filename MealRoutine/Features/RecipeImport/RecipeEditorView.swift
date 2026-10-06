@@ -89,7 +89,7 @@ struct RecipeEditorView: View {
                 }
                 Button("Düzenlemeye devam", role: .cancel) {}
             } message: {
-                Text("Aynı adres sessizce üzerine yazılmaz.")
+                Text("Aynı adres veya çok benzer bir ad sessizce üzerine yazılmaz.")
             }
             .alert("Kaydedilemedi", isPresented: errorIsPresented) {
                 Button("Tamam", role: .cancel) {}

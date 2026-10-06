@@ -353,7 +353,19 @@ enum MigrationCollector {
         )
     }
 
-    private static func recipePayload(_ recipe: Recipe) -> MigrationRecipePayload {
+    static func uploadPayload(for recipe: Recipe) -> MigrationPayload {
+        let recipes = MigrationSelection.includesRecipe(origin: recipe.originRaw) ? [recipePayload(recipe)] : []
+        return MigrationPayload(
+            preferences: nil,
+            recipes: recipes,
+            memories: [],
+            favorites: [],
+            history: [],
+            feedback: []
+        )
+    }
+
+    static func recipePayload(_ recipe: Recipe) -> MigrationRecipePayload {
         let id = StableClientID.recipe(slug: recipe.slug)
         let stamps = [recipe.savedAt, recipe.importedAt, recipe.lastImportedAt, recipe.completedAt].compactMap { $0 }
         let ingredients = recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }

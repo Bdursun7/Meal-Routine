@@ -1017,8 +1017,8 @@ final class HouseholdSession {
         }
         let now = Date()
         let queued = PendingOperationStore.items(in: context)
-        let ready = queued.contains { SyncQueueMachine.isReady($0, now: now) }
         if isTestMode {
+            let ready = queued.contains { SyncQueueMachine.isReady($0, now: now) }
             guard ready else { return }
             syncState = .syncing
             do {
@@ -1046,15 +1046,35 @@ final class HouseholdSession {
             }
             return
         }
-        guard usesHouseholdAPI, let householdId = snapshot.household?.id else { return }
+        let personal = queued.filter { PersonalRecipeSync.isPersonal($0) }
+        let board = queued.filter { !PersonalRecipeSync.isPersonal($0) }
+        let drainedPersonal = await PersonalRecipeSync.send(personal)
+        func storeBoard(_ items: [SyncWorkItem]) {
+            PendingOperationStore.replace(items + drainedPersonal, in: context)
+        }
+        guard usesHouseholdAPI, let householdId = snapshot.household?.id else {
+            if drainedPersonal != personal {
+                storeBoard(board)
+            }
+            return
+        }
+        let ready = board.contains { SyncQueueMachine.isReady($0, now: now) }
         guard ready else {
-            _ = await pullBoardChanges(householdId: householdId, pending: queued, in: context)
+            let pulled = await pullBoardChanges(
+                householdId: householdId,
+                pending: board,
+                preserving: drainedPersonal,
+                in: context
+            )
+            if !pulled && drainedPersonal != personal {
+                storeBoard(board)
+            }
             return
         }
         syncState = .syncing
         let api = BoardSyncClient(client: lifecycleAPI().client)
         let jitter = Double.random(in: 0...1)
-        let updated = await SyncDrainer.drain(items: queued, online: true, now: now, jitterUnit: jitter) { item in
+        let updated = await SyncDrainer.drain(items: board, online: true, now: now, jitterUnit: jitter) { item in
             do {
                 let result = try await api.mutate(householdId: householdId, idempotencyKey: item.idempotencyKey, body: item.payload)
                 if let meal = result.meal {
@@ -1072,8 +1092,13 @@ final class HouseholdSession {
                 return .retry
             }
         }
-        PendingOperationStore.replace(updated, in: context)
-        if await pullBoardChanges(householdId: householdId, pending: updated, in: context) {
+        storeBoard(updated)
+        if await pullBoardChanges(
+            householdId: householdId,
+            pending: updated,
+            preserving: drainedPersonal,
+            in: context
+        ) {
             return
         }
         let conflicted = updated.contains { item in
@@ -1095,7 +1120,12 @@ final class HouseholdSession {
     }
 
     /// Pulls the household delta and keeps a pending meal edit when the server revision moved.
-    private func pullBoardChanges(householdId: UUID, pending: [SyncWorkItem], in context: ModelContext) async -> Bool {
+    private func pullBoardChanges(
+        householdId: UUID,
+        pending: [SyncWorkItem],
+        preserving personal: [SyncWorkItem] = [],
+        in context: ModelContext
+    ) async -> Bool {
         let api = BoardSyncClient(client: lifecycleAPI().client)
         guard let page = try? await api.changes(
             householdId: householdId,
@@ -1124,7 +1154,7 @@ final class HouseholdSession {
             }
             return item
         }
-        PendingOperationStore.replace(resolved, in: context)
+        PendingOperationStore.replace(resolved + personal, in: context)
         statusMessage = SharedConflictNotice.mealUpdated
         syncState = .failed
         return true

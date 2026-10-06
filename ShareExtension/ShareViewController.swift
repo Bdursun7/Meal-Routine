@@ -48,7 +48,7 @@ final class ShareViewController: UIViewController {
             return
         }
         capture = assembled
-        duplicateSlug = RecipeCaptureStore.existingSlug(for: assembled.urlString)
+        duplicateSlug = RecipeCaptureStore.existingSlug(for: assembled)
         if duplicateSlug != nil {
             showDuplicate()
         } else {
@@ -82,7 +82,7 @@ final class ShareViewController: UIViewController {
         actions.append(button("Kapat", primary: false) { [weak self] in self?.finish() })
         replaceContent(
             title: "Bu kaynak zaten kayıtlı",
-            message: "Aynı adres sessizce üzerine yazılmaz.",
+            message: "Aynı adres veya çok benzer bir ad sessizce üzerine yazılmaz.",
             actions: actions
         )
     }

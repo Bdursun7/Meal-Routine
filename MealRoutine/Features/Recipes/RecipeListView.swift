@@ -171,7 +171,7 @@ struct RecipeListView: View {
                 }
             }
             if !trying.isEmpty {
-                Section("Denenecek") {
+                Section("Denenecek · \(trying.count)") {
                     recipeRows(trying, ratings: ratings, memoryBySlug: memoryBySlug)
                 }
             }

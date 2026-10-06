@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -16,6 +17,7 @@ enum TabSwitchTiming {
 }
 
 struct MainTabView: View {
+    @Query private var recipes: [Recipe]
     @State private var selectedTab: AppTab = .week
     /// Bu Hafta is the landing tab. The others are installed on first selection,
     /// after one turn, so their `@Query`s are not live during unrelated switches.
@@ -120,9 +122,16 @@ struct MainTabView: View {
                 Theme.canvas
             }
         }
+        .badge(tab == .recipes ? incompleteRecipeCount : 0)
         .tabItem {
             Label(title, systemImage: selectedTab == tab ? selectedSymbol : symbol)
         }
         .tag(tab)
+    }
+
+    private var incompleteRecipeCount: Int {
+        IncompleteRecipeQueue.count(recipes.map {
+            IncompleteRecipeSnapshot(originRaw: $0.originRaw, collectionStateRaw: $0.collectionStateRaw)
+        })
     }
 }
