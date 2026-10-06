@@ -3,7 +3,7 @@ import XCTest
 final class HouseholdFlowUITests: XCTestCase {
     func testTestModeWalksCreateJoinVetoAndReplacement() {
         let app = XCUIApplication()
-        app.launchArguments = [HouseholdTestLaunchArgument]
+        app.launchArguments = [HouseholdTestLaunchArgument, HouseholdTestResetArgument]
         app.launch()
 
         let start = app.buttons["Kuruluma başla"]
@@ -114,5 +114,6 @@ final class HouseholdFlowUITests: XCTestCase {
     }
 }
 
-/// Mirrors `HouseholdTestLaunch.argument` without linking the app target.
+/// Mirrors `HouseholdTestLaunch` without linking the app target.
 private let HouseholdTestLaunchArgument = "-HouseholdTestMode"
+private let HouseholdTestResetArgument = "-HouseholdTestReset"

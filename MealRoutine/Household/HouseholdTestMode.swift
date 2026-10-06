@@ -2,12 +2,19 @@ import Foundation
 import Observation
 
 /// Launch argument for UI tests and a fresh simulator run: `-HouseholdTestMode`.
+/// `-HouseholdTestReset` wipes the test household once at startup so a UI test
+/// does not reuse a household left on the simulator.
 enum HouseholdTestLaunch {
     static let argument = "-HouseholdTestMode"
+    static let resetArgument = "-HouseholdTestReset"
     static let storageKey = "mealroutine.householdTestMode"
 
     static var isRequestedByLaunch: Bool {
         ProcessInfo.processInfo.arguments.contains(argument)
+    }
+
+    static var isResetRequested: Bool {
+        ProcessInfo.processInfo.arguments.contains(resetArgument)
     }
 
     /// Apple sign-in, CloudKit, and push stay off for this process.

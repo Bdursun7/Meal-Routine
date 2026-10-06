@@ -49,10 +49,15 @@ final class HouseholdSession {
             HouseholdTestMode.shared.setEnabled(true)
         }
         if !isStarted {
-            account = HouseholdAccountStore.load(testMode: isTestMode)
-            snapshot = HouseholdCacheStore.load(in: context, key: clientCacheKey)
-            if isTestMode {
-                restoreTestServer(in: context)
+            if isTestMode, HouseholdTestLaunch.isResetRequested {
+                resetTestData(in: context)
+                statusMessage = nil
+            } else {
+                account = HouseholdAccountStore.load(testMode: isTestMode)
+                snapshot = HouseholdCacheStore.load(in: context, key: clientCacheKey)
+                if isTestMode {
+                    restoreTestServer(in: context)
+                }
             }
             isStarted = true
         }
@@ -749,7 +754,9 @@ final class HouseholdSession {
         } catch let conflict as HouseholdServerConflict {
             snapshot = HouseholdConflictResolver.merge(local: snapshot, server: conflict.server)
             let pushed = try await repository.push(snapshot)
-            statusMessage = "Sunucudaki plan uygulandı."
+            if !isTestMode {
+                statusMessage = "Sunucudaki plan uygulandı."
+            }
             return pushed
         }
     }
