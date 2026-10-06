@@ -145,6 +145,18 @@ struct ProfileView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Kiler") {
+                    NavigationLink {
+                        PantryView()
+                    } label: {
+                        Label("Pantry", systemImage: "shippingbox")
+                    }
+                    .accessibilityIdentifier("pantry.open")
+                    Text("Evde bulunan malzemeleri, miktarlarını ve son kullanma tarihlerini takip et.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Sevmediğin malzemeler") {
                     let names = viewModel.dislikedNames(in: recipes)
                     if names.isEmpty {
