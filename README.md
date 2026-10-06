@@ -23,6 +23,10 @@ The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It w
 
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 
+## V5 Smart Pantry
+
+Profil → Pantry. Ortak pantry sunucudadır (`0012_pantry`). Kişisel pantry, kullanıcı aktar veya kopyala demeden eve karışmaz. Market eksik miktarı pantry’den hesaplayabilir, stoktan düşebilir veya alınanı pantry’ye ekleyebilir. “Bitti” miktarı sıfırlar ve silmeden önce üç seçenek sorar. Ayrıntı: `docs/v5-smart-pantry.md`. Sürüm `5.0.0`.
+
 ## V4.1 API
 
 Shared household data is server-authoritative. The database is Postgres on your Mac, not a hosted service. Schema files are `server/db/migrations/`. Setup commands are in `server/db/README.md`. The **MealRoutine Local** scheme still uses test mode (`FakeHouseholdBackend`) and, when test mode is off, calls `http://localhost:8080`. That local Info.plist allows cleartext only on the local network so the simulator can reach the API.

@@ -52,6 +52,8 @@
 		BAD50FA18C39D690AB510429 /* RecipeCatalogLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9C8DD715C3065F4A296413 /* RecipeCatalogLoader.swift */; };
 		BA9ED1B35B8D4E4C8CFF152B /* FeedbackIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */; };
 		BA0E7E258B03828C5F96A42F /* GroceryListReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */; };
+		V50B50A0000000000000001 /* PantryRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000001 /* PantryRules.swift */; };
+		V50B50A0000000000000002 /* PantryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000002 /* PantryTests.swift */; };
 		BAA499CFD09FEC17DA10E029 /* GroceryListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */; };
 		BA53DA2735F01A502CCB6A94 /* GroceryMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */; };
 		BA8F52A872ACCF3DF45FA4C0 /* MealExposureLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */; };
@@ -227,6 +229,8 @@
 		FA9C8DD715C3065F4A296413 /* RecipeCatalogLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeCatalogLoader.swift; sourceTree = "<group>"; };
 		FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackIndex.swift; sourceTree = "<group>"; };
 		FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListReconciler.swift; sourceTree = "<group>"; };
+		V50F50A0000000000000001 /* PantryRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryRules.swift; sourceTree = "<group>"; };
+		V50F50A0000000000000002 /* PantryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryTests.swift; sourceTree = "<group>"; };
 		FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListService.swift; sourceTree = "<group>"; };
 		FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryMerger.swift; sourceTree = "<group>"; };
 		FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealExposureLog.swift; sourceTree = "<group>"; };
@@ -534,6 +538,7 @@
 				FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */,
 				FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */,
 				FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */,
+				V50F50A0000000000000001 /* PantryRules.swift */,
 				FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */,
 				FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */,
 				FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */,
@@ -653,6 +658,7 @@
 				V41F41A0000000000000009 /* AuthTokenTests.swift */,
 				V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */,
 				V43F43A0000000000000003 /* SyncEngineTests.swift */,
+				V50F50A0000000000000002 /* PantryTests.swift */,
 				V44F44A0000000000000003 /* LocalMigrationTests.swift */,
 				V45F45A0000000000000004 /* NotificationTests.swift */,
 			);
@@ -926,6 +932,7 @@
 				BAD50FA18C39D690AB510429 /* RecipeCatalogLoader.swift in Sources */,
 				BA9ED1B35B8D4E4C8CFF152B /* FeedbackIndex.swift in Sources */,
 				BA0E7E258B03828C5F96A42F /* GroceryListReconciler.swift in Sources */,
+				V50B50A0000000000000001 /* PantryRules.swift in Sources */,
 				BAA499CFD09FEC17DA10E029 /* GroceryListService.swift in Sources */,
 				BA53DA2735F01A502CCB6A94 /* GroceryMerger.swift in Sources */,
 				BA8F52A872ACCF3DF45FA4C0 /* MealExposureLog.swift in Sources */,
@@ -1028,6 +1035,7 @@
 				V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */,
 				V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */,
 				V43B43A0000000000000003 /* SyncEngineTests.swift in Sources */,
+				V50B50A0000000000000002 /* PantryTests.swift in Sources */,
 				V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */,
 				V45B45A0000000000000004 /* NotificationTests.swift in Sources */,
 			);
@@ -1121,7 +1129,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MealRoutine/Info.plist;
@@ -1136,7 +1144,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1152,7 +1160,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MealRoutine/Info.plist;
@@ -1167,7 +1175,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1182,7 +1190,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1190,7 +1198,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1206,7 +1214,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1214,7 +1222,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1232,7 +1240,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1241,7 +1249,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1256,7 +1264,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1265,7 +1273,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1304,7 +1312,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.Local.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MealRoutine/Info-Local.plist;
@@ -1319,7 +1327,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1333,7 +1341,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1341,7 +1349,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1357,7 +1365,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.Local.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -1366,7 +1374,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1380,10 +1388,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1398,10 +1406,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1416,10 +1424,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 4.1.0;
+				MARKETING_VERSION = 5.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mealroutine.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

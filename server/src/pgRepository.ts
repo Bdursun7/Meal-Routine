@@ -4,6 +4,8 @@ import type { BoardStore } from './boardTypes.js'
 import { AppError } from './errors.js'
 import { createPgBoard } from './pgBoard.js'
 import { createPgHouseholdStore } from './pgHousehold.js'
+import { createPgPantry } from './pgPantry.js'
+import type { PantryStore } from './pantryTypes.js'
 import type {
   AccountRow,
   AuthRepository,
@@ -57,9 +59,10 @@ function identityFrom(row: {
   }
 }
 
-export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore & BoardStore {
+export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore & BoardStore & PantryStore {
   const household = createPgHouseholdStore(pool)
   const board = createPgBoard(pool)
+  const pantry = createPgPantry(pool)
   return {
     async countAccounts() {
       const result = await pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM accounts')
@@ -299,6 +302,7 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
     boardTransaction: board.boardTransaction,
+    ...pantry,
   }
 }
 

@@ -299,12 +299,17 @@ struct AccountRepository {
     }
 }
 
-struct PantryRemoteItem: Codable, Sendable {
+struct PantryRemoteItem: Codable, Equatable, Sendable {
     var id: UUID; var householdId: UUID; var ingredientId: String; var displayName: String
     var quantity: Double; var unit: String; var location: PantryLocation; var minimumQuantity: Double?
     var bestBefore: String?; var revision: Int; var createdAt: Date?; var updatedAt: Date?
 }
 struct PantryListDTO: Codable, Sendable { var items: [PantryRemoteItem]; var serverTime: Date? }
+
+struct PantryReconcileResponse: Codable, Sendable {
+    var lines: [PantryReconcileLine]
+    var items: [PantryRemoteItem]
+}
 
 struct PantryRepository {
     var client: APIClient
@@ -313,19 +318,47 @@ struct PantryRepository {
         try client.validateAuth(response, data: data, authenticated: true)
         return try JSONDecoder.mealRoutine.decode(PantryListDTO.self, from: data).items
     }
-    func create(householdId: UUID, item: PantryRemoteItem) async throws -> PantryRemoteItem { try await mutate("POST", "/v1/households/\(householdId.uuidString)/pantry/items", item, baseRevision: nil) }
-    func update(householdId: UUID, item: PantryRemoteItem) async throws -> PantryRemoteItem { try await mutate("PATCH", "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)", item, baseRevision: max(1, item.revision)) }
-    func delete(householdId: UUID, item: PantryRemoteItem) async throws {
-        let (data, response) = try await client.request(method: "DELETE", path: "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)?baseRevision=\(item.revision)", body: nil, authenticated: true, headers: ["Idempotency-Key": UUID().uuidString])
-        try client.validateAuth(response, data: data, authenticated: true)
+    func create(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
+        try await mutate("POST", "/v1/households/\(householdId.uuidString)/pantry/items", item, baseRevision: nil, idempotencyKey: idempotencyKey, confirmSeparate: confirmSeparate)
     }
-    private func mutate(_ method: String, _ path: String, _ item: PantryRemoteItem, baseRevision: Int?) async throws -> PantryRemoteItem {
-        let body = try JSONEncoder.mealRoutine.encode(item)
+    func update(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString) async throws -> PantryRemoteItem {
+        try await mutate("PATCH", "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)", item, baseRevision: max(1, item.revision), idempotencyKey: idempotencyKey)
+    }
+    func delete(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString) async throws {
+        let (data, response) = try await client.request(method: "DELETE", path: "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)?baseRevision=\(item.revision)", body: nil, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+        try throwPantry(response, data: data)
+    }
+    func reconcile(householdId: UUID, operation: String, lines: [PantryReconcileLine], idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryReconcileResponse {
+        let body = try JSONEncoder.mealRoutine.encode(PantryReconcileBody(operation: operation, confirmSeparate: confirmSeparate, lines: lines))
+        let (data, response) = try await client.request(method: "POST", path: "/v1/households/\(householdId.uuidString)/pantry/reconcile-grocery", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+        try throwPantry(response, data: data)
+        return try JSONDecoder.mealRoutine.decode(PantryReconcileResponse.self, from: data)
+    }
+    private func mutate(_ method: String, _ path: String, _ item: PantryRemoteItem, baseRevision: Int?, idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
+        var body = try JSONEncoder.mealRoutine.encode(item)
+        if confirmSeparate, var object = try JSONSerialization.jsonObject(with: body) as? [String: Any] {
+            object["confirmSeparate"] = true
+            body = try JSONSerialization.data(withJSONObject: object)
+        }
         var fullPath = path; if let baseRevision { fullPath += "?baseRevision=\(baseRevision)" }
-        let (data, response) = try await client.request(method: method, path: fullPath, body: body, authenticated: true, headers: ["Idempotency-Key": UUID().uuidString])
-        try client.validateAuth(response, data: data, authenticated: true)
+        let (data, response) = try await client.request(method: method, path: fullPath, body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+        try throwPantry(response, data: data)
         return try JSONDecoder.mealRoutine.decode(PantryRemoteItem.self, from: data)
     }
+    private func throwPantry(_ response: HTTPURLResponse, data: Data) throws {
+        if response.statusCode == 409 {
+            let body = try? JSONDecoder().decode(APIErrorDTO.self, from: data)
+            if body?.error == "conflict" { throw PantrySyncError.conflict }
+            if body?.error == "pantry_unit_choice" { throw PantrySyncError.unitChoice }
+        }
+        try client.validateAuth(response, data: data, authenticated: true)
+    }
+}
+
+private struct PantryReconcileBody: Encodable {
+    var operation: String
+    var confirmSeparate: Bool
+    var lines: [PantryReconcileLine]
 }
 
 private extension JSONEncoder { static var mealRoutine: JSONEncoder { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e } }

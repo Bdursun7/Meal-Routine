@@ -49,6 +49,12 @@ describe('migrations', () => {
     expect(sql).toContain('account_deletions')
     expect(sql).toContain('analytics_events')
     expect(sql).toContain('client_diagnostics')
+    expect(sql).toContain('pantry_items')
+    expect(sql).toContain('pantry_idempotency')
+    for (const file of files.filter((name) => !name.startsWith('0012'))) {
+      const earlier = await readFile(path.join(dir, file), 'utf8')
+      expect(earlier).not.toContain('pantry_items')
+    }
     expect(sql).toContain("'pending', 'accepted', 'rejected', 'cancelled', 'expired'")
     expect(sql).not.toContain('DROP TABLE')
   })

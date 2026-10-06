@@ -94,6 +94,7 @@ final class ThisWeekViewModel {
         feedback: [RecipeFeedback],
         householdSize: Int,
         memories: [MealMemory] = [],
+        pantryStock: [PantryPlanningStock] = [],
         now: Date = .now
     ) -> [WeekMealPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
@@ -108,6 +109,7 @@ final class ThisWeekViewModel {
             indexKey: index.key,
             householdSize: householdSize,
             memories: memories,
+            pantryStock: pantryStock,
             now: now
         )
         if key == cachedMealsKey {
@@ -125,14 +127,16 @@ final class ThisWeekViewModel {
                 let date = WeekCalendar.date(weekStart: week.weekStart, dayOffset: meal.dayOffset)
                 let candidate = bySlug[meal.recipeSlug]
                 let memory = memoryMap[meal.recipeSlug]
-                let reason = candidate.flatMap {
+                let personal = candidate.flatMap {
                     RecommendationReasonService.personalReason(
                         for: $0,
                         memory: memory,
                         profile: taste,
                         catalogBySlug: bySlug
                     )
-                } ?? ""
+                }
+                let pantryNote = candidate.flatMap { PantryPlanningSignal.explanation(candidate: $0, stock: pantryStock, now: now) }
+                let reason = [personal, pantryNote].compactMap { $0 }.joined(separator: " · ")
                 let badge = RecommendationReasonService.badge(for: memory, hasHistory: hasHistory)
                 return WeekMealPresentation(
                     id: meal.uuid,
@@ -166,6 +170,7 @@ final class ThisWeekViewModel {
         indexKey: Int,
         householdSize: Int,
         memories: [MealMemory],
+        pantryStock: [PantryPlanningStock] = [],
         now: Date
     ) -> Int {
         var hasher = Hasher()
@@ -174,6 +179,11 @@ final class ThisWeekViewModel {
         hasher.combine(Calendar.current.startOfDay(for: now).timeIntervalSinceReferenceDate)
         hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
         hasher.combine(week.explanation)
+        for stock in pantryStock.sorted(by: { $0.ingredientId < $1.ingredientId }) {
+            hasher.combine(stock.ingredientId)
+            hasher.combine(stock.quantity)
+            hasher.combine(stock.bestBefore?.timeIntervalSinceReferenceDate ?? -1)
+        }
         for meal in week.meals {
             hasher.combine(meal.uuid)
             hasher.combine(meal.recipeSlug)

@@ -124,6 +124,9 @@ export function createPgPantry(pool: Pool): PantryStore {
     async clearAccountPantry(accountId) {
       await pool.query('DELETE FROM pantry_idempotency WHERE account_id = $1', [accountId])
     },
+    async deleteHouseholdPantry(householdId) {
+      await pool.query('DELETE FROM pantry_items WHERE household_id = $1', [householdId])
+    },
     async householdForPantryItem(itemId) {
       const result = await pool.query<{ household_id: string }>('SELECT household_id FROM pantry_items WHERE id = $1', [itemId])
       return result.rows[0]?.household_id ?? null

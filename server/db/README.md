@@ -1,6 +1,6 @@
 # MealRoutine veritabanı
 
-Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0010` değişmez. Ürün istatistikleri ve çökme özetleri `0011_observability.sql` dosyasındadır. Satırlar 30 gün sonra yeni kayıt sırasında silinir.
+Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0011` değişmez. Ürün istatistikleri ve çökme özetleri `0011_observability.sql` dosyasındadır. V5 pantry satırları ve idempotency kayıtları `0012_pantry.sql` dosyasındadır. Hesap silinince o hesabın idempotency satırı silinir; household pantry’si yalnız ev kapanınca silinir. Gözlem satırları 30 gün sonra yeni kayıt sırasında silinir.
 
 Postgres 14 veya daha yeni olmalı.
 

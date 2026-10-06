@@ -151,6 +151,7 @@ enum PersonalizedScoringService {
                 hasBehavior: taste.dataPointCount > 0
             )
         }
+        explanation = PantryPlanningSignal.annotated(explanation, candidates: chosen.chosen, stock: pantryStock, now: now)
         return (chosen.chosen.map(\.slug), explanation, chosen.scores)
     }
 

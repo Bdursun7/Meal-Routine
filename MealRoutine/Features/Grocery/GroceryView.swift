@@ -144,6 +144,15 @@ struct GroceryView: View {
                         value: Double(list.checkedCount),
                         total: Double(max(list.totalCount, 1))
                     )
+                    Button(viewModel.usesPantryCoverage ? PantryCopy.showFullNeed : PantryCopy.computeMissing) {
+                        viewModel.setPantryCoverage(!viewModel.usesPantryCoverage, in: modelContext)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    if let note = viewModel.pantryNote {
+                        Text(note)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
             .padding(.vertical, 6)
@@ -286,6 +295,17 @@ struct GroceryView: View {
             }
         }
         .swipeActions {
+            Button {
+                viewModel.consumeFromPantry(row.id, in: modelContext)
+            } label: {
+                Label(PantryCopy.consume, systemImage: "minus.circle")
+            }
+            .tint(Theme.sage)
+            Button {
+                viewModel.addToPantry(row.id, in: modelContext)
+            } label: {
+                Label(PantryCopy.restock, systemImage: "plus.circle")
+            }
             if row.isManual {
                 Button(role: .destructive) {
                     viewModel.delete(row.id, in: modelContext)
@@ -293,6 +313,10 @@ struct GroceryView: View {
                     Label("Sil", systemImage: "trash")
                 }
             }
+        }
+        .contextMenu {
+            Button(PantryCopy.consume) { viewModel.consumeFromPantry(row.id, in: modelContext) }
+            Button(PantryCopy.restock) { viewModel.addToPantry(row.id, in: modelContext) }
         }
     }
 

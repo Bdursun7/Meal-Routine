@@ -2,7 +2,9 @@
 
 **Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Meal Budget
 
-**Durum:** Yönerge hazır; foundation (model, UI, sync, planning signal, migration `0012`) V5.0 branch’te başladı. V4.1 tip’i (`#41` hero frame dahil) V5.0’a merge edildi. Kabul kapısı henüz kapanmadı.
+**Durum:** Kabul kapısındaki kod ve sunucu testleri kapandı. `MARKETING_VERSION` `5.0.0`. Migration `0012_pantry` (`0001`–`0011` değişmedi). Ayrıntılı kapı: `docs/v5-release-gate.md`. Yerel çalıştırma: `docs/v5-local-runbook.md`.
+
+Apple Sign in, APNs, fiziksel cihaz, TestFlight ve Mac’te iOS test koşusu bu ortamda yok; V5 blokeri değiller. VoiceOver, Dynamic Type ve Dark Mode görsel turu cihazsız doğrulanmadı.
 
 **V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı tamamlandı. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez.
 
@@ -376,23 +378,23 @@ Kullanıcı hesabını sildiğinde:
 
 ## 16. V5 kabul kapısı
 
-V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır:
+Durum `docs/v5-release-gate.md` içindedir. Kod ve sunucu testiyle kapanan maddeler:
 
 - Pantry CRUD testleri geçer.
 - Household authorization testleri geçer.
-- Başka household erişimi 403 veya tanımlı privacy davranışıyla reddedilir.
-- Uyumlu birimler doğru birleşir.
-- Uyumsuz birimler karıştırılmaz.
-- Eksik miktar hesabı doğru ve idempotent çalışır.
-- İşaretlenmiş market satırları korunur.
-- Offline queue bağlantı dönüşünde işlemleri çoğaltmadan gönderir.
-- Conflict server state ile deterministik çözülür.
-- Migration mevcut V1–V4.1 verisini silmez.
-- Account deletion pantry ownership kurallarına uyar.
-- V1–V4.1 regresyon testleri korunur.
+- Başka household erişimi 403 ile reddedilir.
+- Uyumlu birimler (g/kg, ml/L) birleşir.
+- Uyumsuz birimler otomatik karışmaz; kullanıcı ayrı satırı onaylar. Geçersiz birim reddedilir.
+- Eksik miktar hesabı idempotent çalışır. İşaretli market satırları korunur.
+- Offline kuyruk bağlantı dönüşünde pantry işlemini aynı idempotency anahtarıyla gönderir.
+- Conflict `requiresResolution` olur. Metin: “Bu malzeme başka bir cihazda güncellendi.”
+- Migration `0012` ekler; `0001`–`0011` değişmez.
+- Hesap silinince kişisel pantry ve idempotency kaydı gider. Son üye evi kapatınca pantry silinir. Partner kalırsa pantry kalır.
+- V1–V4.1 sunucu regresyonu korunur.
 - Loading, empty, error, offline ve conflict metinleri Türkçedir.
-- VoiceOver, Dynamic Type ve Dark Mode kontrol edilir.
-- API, migration ve local runbook güncellenir.
+- API, migration ve local runbook güncellendi.
+
+VoiceOver, Dynamic Type ve Dark Mode görsel kontrolü ile iOS XCTest koşusu Mac gerektirir. Bu ortamda koşulmadı. Apple Sign in, APNs ve TestFlight V5 kapısının dışında.
 
 ## 17. V5 sonunda beklenen ürün davranışı
 

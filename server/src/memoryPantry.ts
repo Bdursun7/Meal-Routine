@@ -5,7 +5,7 @@ import type { PantryDraft, PantryIdempotencyHit, PantryItem, PantryPatch, Pantry
 
 export function createMemoryPantry(
   members: Map<string, Map<string, MemberRole>>,
-  accountHouseholds: (accountId: string) => string[],
+  _accountHouseholds: (accountId: string) => string[],
 ): PantryStore {
   const items = new Map<string, PantryItem>()
   const idempotency = new Map<string, PantryIdempotencyHit & { accountId: string; key: string }>()
@@ -58,9 +58,10 @@ export function createMemoryPantry(
       idempotency.set(`${row.accountId}:${row.key}`, { ...row })
     },
     async clearAccountPantry(accountId) {
-      for (const householdId of accountHouseholds(accountId)) {
-        for (const [id, item] of items) if (item.householdId === householdId) items.delete(id)
-      }
+      for (const [key, row] of idempotency) if (row.accountId === accountId) idempotency.delete(key)
+    },
+    async deleteHouseholdPantry(householdId) {
+      for (const [id, item] of items) if (item.householdId === householdId) items.delete(id)
     },
     async householdForPantryItem(itemId) {
       return items.get(itemId)?.householdId ?? null
