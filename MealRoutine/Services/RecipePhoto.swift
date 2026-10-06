@@ -41,6 +41,28 @@ enum RecipePhoto {
     static let backdropMaxPixel = 800
     static let thumbnailMaxPixel = 320
 
+    /// True when the plate is the settled frame, so a bitmap can be drawn.
+    ///
+    /// List measures a hero before the row width is real. A bitmap in that pass is
+    /// clipped to a short or square slot and looks cut off; the next pass, often
+    /// when the credit line appears, shows the rest of the photo. A zero edge is
+    /// also the slot Core Animation refuses to create. Callers keep the placeholder
+    /// until this is true. `widerThanTall` is the detail hero: a square measurement
+    /// is not the full-bleed frame.
+    static func isReadyPhotoSlot(
+        width: Double,
+        height: Double,
+        minimumWidth: Double,
+        minimumHeight: Double,
+        widerThanTall: Bool
+    ) -> Bool {
+        guard width.isFinite, height.isFinite, minimumWidth > 1, minimumHeight > 1 else { return false }
+        guard width > 1, height > 1 else { return false }
+        guard width + 0.5 >= minimumWidth, height + 0.5 >= minimumHeight else { return false }
+        if widerThanTall, width <= height { return false }
+        return true
+    }
+
     /// HTTPS URL from the catalog photo field.
     /// HTTP, empty strings, credentials, and hosts outside `allowedHosts` stay placeholders.
     static func remoteURL(from string: String) -> URL? {
