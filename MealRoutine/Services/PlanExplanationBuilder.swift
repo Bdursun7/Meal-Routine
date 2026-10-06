@@ -6,6 +6,12 @@ enum PlanExplanationBuilder {
     static let noMemory = "Bu hafta süre sınırına ve sevmediğin malzemelere göre kuruldu."
     static let lovedLean = "Bu hafta daha önce sevdiğin yemeklere yaslanıyor, biraz çeşitlilikle."
     static let familiarRhythm = "Bu hafta alışık olduğun sürelere yakın yemeklerden kuruldu."
+    static let emptyPool = "Bu filtrelere uyan tarif kalmadı. Süre sınırını yükselt veya sevmediğin malzemeleri azalt."
+    static let lockedMeals = "Pişirilen akşamlar kilitli. Onların üzerine yazılmaz."
+
+    static func shortPool(filled: Int, requested: Int) -> String {
+        "Yeterli tarif yok. \(filled) akşam kurulabildi, \(requested) istendi."
+    }
 
     static func explain(picks: [PlannedPick], hasBehavior: Bool) -> String {
         guard hasBehavior, !picks.isEmpty else { return noMemory }

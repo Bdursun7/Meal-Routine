@@ -113,7 +113,7 @@ enum PersonalizedScoringService {
                     memories: memories,
                     blockedSlugs: blockedSlugs,
                     relaxLovedGap: true,
-                    relaxDifficulty: true,
+                    relaxDifficulty: false,
                     now: now
                 ),
                 limit: limit,
@@ -137,10 +137,17 @@ enum PersonalizedScoringService {
                 wasLoved: (memory?.lovedCount ?? 0) > 0
             )
         }
-        let explanation = PlanExplanationBuilder.explain(
-            picks: picks,
-            hasBehavior: taste.dataPointCount > 0
-        )
+        let explanation: String
+        if chosen.chosen.isEmpty {
+            explanation = PlanExplanationBuilder.emptyPool
+        } else if chosen.chosen.count < limit {
+            explanation = PlanExplanationBuilder.shortPool(filled: chosen.chosen.count, requested: limit)
+        } else {
+            explanation = PlanExplanationBuilder.explain(
+                picks: picks,
+                hasBehavior: taste.dataPointCount > 0
+            )
+        }
         return (chosen.chosen.map(\.slug), explanation, chosen.scores)
     }
 

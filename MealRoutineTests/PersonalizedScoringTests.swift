@@ -197,6 +197,137 @@ final class PersonalizedScoringTests: XCTestCase {
         XCTAssertEqual(prefs.planningPreferences.difficulty, .openToHard)
     }
 
+    func testSelectIsDeterministicAndCapsTheWeek() {
+        let pool = (0..<9).map { index in
+            TestFixtures.candidate("r\(index)", score: 40 + index, difficulty: "easy")
+        }
+        let first = PersonalizedScoringService.select(
+            candidates: pool,
+            evenings: 9,
+            preferences: TestFixtures.prefs(),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        let second = PersonalizedScoringService.select(
+            candidates: pool,
+            evenings: 9,
+            preferences: TestFixtures.prefs(),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertEqual(first.slugs, second.slugs)
+        XCTAssertEqual(first.slugs.count, MealRecommender.eveningCap)
+        XCTAssertEqual(Set(first.slugs).count, first.slugs.count)
+    }
+
+    func testEmptyAndShortPoolsUseTurkishCopyAndKeepHardOut() {
+        let hard = TestFixtures.candidate("zor", score: 99, difficulty: "hard")
+        let empty = PersonalizedScoringService.select(
+            candidates: [hard],
+            evenings: 3,
+            preferences: TestFixtures.prefs(difficulty: .mostlyEasy),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertTrue(empty.slugs.isEmpty)
+        XCTAssertEqual(empty.explanation, PlanExplanationBuilder.emptyPool)
+
+        let only = TestFixtures.candidate("tek", score: 40, difficulty: "easy")
+        let short = PersonalizedScoringService.select(
+            candidates: [hard, only],
+            evenings: 3,
+            preferences: TestFixtures.prefs(difficulty: .mostlyEasy),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertEqual(short.slugs, ["tek"])
+        XCTAssertEqual(short.explanation, PlanExplanationBuilder.shortPool(filled: 1, requested: 3))
+
+        let optedIn = PersonalizedScoringService.select(
+            candidates: [hard],
+            evenings: 1,
+            preferences: TestFixtures.prefs(difficulty: .openToHard),
+            memories: [:],
+            now: TestFixtures.now
+        )
+        XCTAssertEqual(optedIn.slugs, ["zor"])
+    }
+
+    func testPlannerLockKeepsTheCookedOffset() {
+        let merged = PlannerLock.merge(
+            locked: [PlannerLock.Slot(dayOffset: 1, slug: "pisirildi")],
+            filled: ["a", "b"],
+            evenings: 3
+        )
+        XCTAssertEqual(merged.map(\.dayOffset), [0, 1, 2])
+        XCTAssertEqual(merged.map(\.slug), ["a", "pisirildi", "b"])
+        XCTAssertEqual(PlannerLock.openCount(lockedOffsets: [1], evenings: 3), 2)
+        XCTAssertEqual(PlannerLock.openCount(lockedOffsets: [0, 1, 2], evenings: 3), 0)
+        XCTAssertEqual(PlannerLock.openCount(lockedOffsets: [], evenings: 9), MealRecommender.eveningCap)
+    }
+
+    func testHouseholdPlannerOmitsHardUnlessAsked() {
+        let easy = TestFixtures.candidate("kolay", score: 10, difficulty: "easy")
+        let hard = TestFixtures.candidate("zor", score: 99, difficulty: "hard")
+        let held = HouseholdPlanner.slugs(
+            candidates: [hard, easy],
+            evenings: 1,
+            dayOffsets: [0],
+            maxCookMinutes: 60,
+            weekdayCap: nil,
+            tastes: [],
+            memory: [],
+            vetoSlugs: [],
+            householdAvoided: [],
+            allowsHard: false
+        )
+        XCTAssertEqual(held, ["kolay"])
+        let open = HouseholdPlanner.slugs(
+            candidates: [hard, easy],
+            evenings: 1,
+            dayOffsets: [0],
+            maxCookMinutes: 60,
+            weekdayCap: nil,
+            tastes: [],
+            memory: [],
+            vetoSlugs: [],
+            householdAvoided: [],
+            allowsHard: true
+        )
+        XCTAssertEqual(open, ["zor"])
+    }
+
+    func testGroceryMergesCompatibleUnitsAndRounds() {
+        let lines = [
+            GrocerySourceLine(ingredientId: "un", nameTR: "Un", nameEN: "Flour", quantity: 500, unit: "g"),
+            GrocerySourceLine(ingredientId: "un", nameTR: "Un", nameEN: "Flour", quantity: 0.5, unit: "kg"),
+            GrocerySourceLine(ingredientId: "un", nameTR: "Un", nameEN: "Flour", quantity: 2, unit: "tbsp"),
+        ]
+        let merged = GroceryMerger.merge(lines)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertTrue(merged.allSatisfy(\.hasUnitConflict))
+        XCTAssertEqual(merged.first { $0.unit == "kg" }?.quantity, 1)
+        XCTAssertEqual(merged.first { $0.unit == "tbsp" }?.quantity, 2)
+
+        let pieces = GroceryMerger.merge([
+            GrocerySourceLine(ingredientId: "yumurta", nameTR: "Yumurta", nameEN: "Egg", quantity: 0.1, unit: "piece"),
+            GrocerySourceLine(ingredientId: "yumurta", nameTR: "Yumurta", nameEN: "Egg", quantity: 0.2, unit: "piece"),
+        ])
+        XCTAssertEqual(pieces.count, 1)
+        XCTAssertEqual(pieces.first?.quantity, 0.3)
+        XCTAssertEqual(pieces.first?.hasUnitConflict, false)
+
+        XCTAssertEqual(GrocerySyncQuantity.whole(nil), 1)
+        XCTAssertEqual(GrocerySyncQuantity.whole(0), 1)
+        XCTAssertEqual(GrocerySyncQuantity.whole(-2), 1)
+        XCTAssertEqual(GrocerySyncQuantity.whole(1.4), 1)
+        XCTAssertEqual(GrocerySyncQuantity.whole(1.5), 2)
+        XCTAssertFalse(GroceryMealAudit.shops(isSkipped: true, isVetoed: true))
+        XCTAssertFalse(GroceryMealAudit.shops(isSkipped: false, isVetoed: true))
+        XCTAssertTrue(GroceryMealAudit.shops(isSkipped: true, isVetoed: false))
+        XCTAssertTrue(GroceryMealAudit.shops(isSkipped: false, isVetoed: false))
+    }
+
     private func penalty(_ memory: MealMemorySnapshot, _ repetition: RepeatPreference) -> Int {
         PersonalizedScoringService.score(
             TestFixtures.candidate("tavuk", score: 50, protein: "poultry"),

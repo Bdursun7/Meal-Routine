@@ -462,48 +462,103 @@ final class HouseholdSession {
             tastes.append(contentsOf: snapshot.tasteProjections.filter { $0.userId != account.id }.map(MemberTasteProjectionBuilder.taste(from:)))
             let preference = snapshot.preference
             let avoided = Set((preference?.avoidedIngredients ?? []).map { $0.lowercased() })
-            let vetoes = Set((snapshot.plan?.meals ?? []).filter { HouseholdConflict.needsDecision($0.reactions) }.map(\.recipeSlug))
+            let weekStart = WeekCalendar.weekStart(containing: now)
+            let sameWeek = snapshot.plan.map { WeekCalendar.isSameDay($0.weekStart, weekStart) } ?? false
+            let locked = sameWeek ? (snapshot.plan?.meals.filter { $0.cookedAt != nil } ?? []) : []
+            var vetoes = Set((snapshot.plan?.meals ?? []).filter { HouseholdConflict.needsDecision($0.reactions) }.map(\.recipeSlug))
+            vetoes.formUnion(locked.map(\.recipeSlug))
             let evenings = min(max(prefs?.eveningsPerWeek ?? 5, 1), MealRecommender.eveningCap)
             let offsets = preference?.cookingDays ?? []
-            let slugs = HouseholdPlanner.slugs(
-                candidates: HouseholdPlanBridge.candidates(
-                    recipes: recipes,
-                    ratings: ratings,
-                    projections: snapshot.recipeProjections
-                ),
-                evenings: evenings,
-                dayOffsets: offsets,
-                maxCookMinutes: prefs?.maxCookMinutes ?? 60,
-                weekdayCap: preference?.maxWeekdayMinutes,
-                tastes: tastes,
-                memory: snapshot.memory,
-                vetoSlugs: vetoes,
-                householdAvoided: avoided,
-                preferredCategories: Set((preference?.preferredCategories ?? []).map { $0.lowercased() }),
-                preferredProteins: Set(preference?.preferredProteins ?? [])
-            )
-            guard !slugs.isEmpty else { throw HouseholdError.noAlternative }
+            let requestedOffsets = offsets.isEmpty ? Array(0..<evenings) : offsets
+            let lockedOffsets = Set(locked.map(\.dayOffset))
+            let openOffsets = requestedOffsets.filter { !lockedOffsets.contains($0) }
+            let allowsHard = (prefs?.difficultyPreference ?? .mostlyEasy) == .openToHard
+            let slugs: [String]
+            if openOffsets.isEmpty {
+                slugs = []
+            } else {
+                slugs = HouseholdPlanner.slugs(
+                    candidates: HouseholdPlanBridge.candidates(
+                        recipes: recipes,
+                        ratings: ratings,
+                        projections: snapshot.recipeProjections
+                    ),
+                    evenings: evenings,
+                    dayOffsets: openOffsets,
+                    maxCookMinutes: prefs?.maxCookMinutes ?? 60,
+                    weekdayCap: preference?.maxWeekdayMinutes,
+                    tastes: tastes,
+                    memory: snapshot.memory,
+                    vetoSlugs: vetoes,
+                    householdAvoided: avoided,
+                    preferredCategories: Set((preference?.preferredCategories ?? []).map { $0.lowercased() }),
+                    preferredProteins: Set(preference?.preferredProteins ?? []),
+                    allowsHard: allowsHard
+                )
+            }
+            if slugs.isEmpty, locked.isEmpty {
+                statusMessage = PlanExplanationBuilder.emptyPool
+                return
+            }
             let names = Dictionary(recipes.map { ($0.slug, $0.displayName) }, uniquingKeysWith: { first, _ in first })
             let owners = Dictionary(snapshot.recipeProjections.map { ($0.slug, $0.ownerUserId) }, uniquingKeysWith: { first, _ in first })
-            let days = offsets.isEmpty ? Array(slugs.indices) : Array(offsets.prefix(slugs.count))
-            let drafts = slugs.enumerated().map { index, slug in
-                HouseholdMealDraft(
-                    dayOffset: days[index],
-                    recipeSlug: slug,
-                    title: names[slug] ?? snapshot.recipeProjections.first { $0.slug == slug }?.title ?? slug,
-                    recipeOwnerUserId: owners[slug]
-                )
+            var placeOffsets = requestedOffsets
+            for meal in locked where !placeOffsets.contains(meal.dayOffset) {
+                placeOffsets.append(meal.dayOffset)
+            }
+            var slugIndex = 0
+            var drafts: [HouseholdMealDraft] = []
+            for offset in placeOffsets {
+                if let kept = locked.first(where: { $0.dayOffset == offset }) {
+                    drafts.append(
+                        HouseholdMealDraft(
+                            dayOffset: offset,
+                            recipeSlug: kept.recipeSlug,
+                            title: kept.title,
+                            recipeOwnerUserId: kept.recipeOwnerUserId,
+                            cookedAt: kept.cookedAt,
+                            preservedID: kept.id
+                        )
+                    )
+                } else if slugIndex < slugs.count {
+                    let slug = slugs[slugIndex]
+                    slugIndex += 1
+                    drafts.append(
+                        HouseholdMealDraft(
+                            dayOffset: offset,
+                            recipeSlug: slug,
+                            title: names[slug] ?? snapshot.recipeProjections.first { $0.slug == slug }?.title ?? slug,
+                            recipeOwnerUserId: owners[slug]
+                        )
+                    )
+                }
+            }
+            guard !drafts.isEmpty else {
+                statusMessage = PlanExplanationBuilder.emptyPool
+                return
             }
             try HouseholdReducer.installPlan(
                 snapshot: &snapshot,
                 drafts: drafts,
-                weekStart: WeekCalendar.weekStart(containing: now),
+                weekStart: weekStart,
                 actor: account,
                 now: now
             )
             try HouseholdPlanBridge.apply(snapshot: snapshot, in: context, now: now)
+            if openOffsets.isEmpty {
+                statusMessage = PlanExplanationBuilder.lockedMeals
+            } else if slugs.count < openOffsets.count {
+                statusMessage = PlanExplanationBuilder.shortPool(filled: drafts.count, requested: requestedOffsets.count)
+            } else {
+                statusMessage = "Ortak plan hazır. İkiniz de bakabilirsiniz."
+            }
+            if let message = statusMessage,
+               message != "Ortak plan hazır. İkiniz de bakabilirsiniz.",
+               let week = try WeekPlanService.currentWeek(in: context, now: now) {
+                week.explanation = message
+                try context.save()
+            }
             persist(in: context)
-            statusMessage = "Ortak plan hazır. İkiniz de bakabilirsiniz."
             notifyPartners()
             if let plan = snapshot.plan {
                 finishSharedEdit(
@@ -531,6 +586,8 @@ final class HouseholdSession {
         do {
             try HouseholdReducer.setReaction(snapshot: &snapshot, mealId: mealID, user: account, reaction: reaction, now: .now)
             persist(in: context)
+            GroceryListService.discardRebuildCache()
+            try? GroceryListService.rebuild(in: context)
             notifyPartners()
             finishSharedEdit(
                 entityType: "reaction",
@@ -653,7 +710,12 @@ final class HouseholdSession {
                 )
                 operationType = "check"
             } else {
-                body = BoardMutationEncoder.groceryAdd(id: item.uuid, itemKey: key, quantity: 1, baseRevision: 0)
+                body = BoardMutationEncoder.groceryAdd(
+                    id: item.uuid,
+                    itemKey: key,
+                    quantity: GrocerySyncQuantity.whole(item.quantity),
+                    baseRevision: 0
+                )
                 operationType = "add"
             }
             finishSharedEdit(

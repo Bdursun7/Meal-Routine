@@ -31,15 +31,25 @@ enum GroceryListService {
         guard let prefs = try UserPrefsStore.existing(in: context) else { return }
         let householdSize = prefs.householdSize
         let storedChecks = try context.fetch(FetchDescriptor<IngredientCheck>())
-        if inputFingerprint(week: week, householdSize: householdSize, checks: storedChecks) == appliedFingerprint {
+        if inputFingerprint(
+            week: week,
+            householdSize: householdSize,
+            checks: storedChecks,
+            vetoedMealIDs: vetoedMealIDs()
+        ) == appliedFingerprint {
             return
         }
 
+        let vetoed = vetoedMealIDs()
         let bySlug = try recipesBySlug(Set(week.meals.map(\.recipeSlug)), in: context)
 
         var sources: [GrocerySourceLine] = []
         var contributions: [GroceryContribution] = []
         for meal in week.meals {
+            guard GroceryMealAudit.shops(
+                isSkipped: meal.skippedAt != nil,
+                isVetoed: vetoed.contains(meal.uuid)
+            ) else { continue }
             guard let recipe = bySlug[meal.recipeSlug] else { continue }
             let servings = ActiveServings.resolve(
                 mealServings: meal.servings,
@@ -180,7 +190,8 @@ enum GroceryListService {
         appliedFingerprint = inputFingerprint(
             week: week,
             householdSize: householdSize,
-            checks: try context.fetch(FetchDescriptor<IngredientCheck>())
+            checks: try context.fetch(FetchDescriptor<IngredientCheck>()),
+            vetoedMealIDs: vetoedMealIDs()
         )
     }
 
@@ -561,18 +572,32 @@ enum GroceryListService {
         appliedFingerprint = inputFingerprint(
             week: week,
             householdSize: prefs.householdSize,
-            checks: checks
+            checks: checks,
+            vetoedMealIDs: vetoedMealIDs()
         )
+    }
+
+    @MainActor
+    private static func vetoedMealIDs() -> Set<UUID> {
+        guard HouseholdSession.shared.isHouseholdMode else { return [] }
+        return Set((HouseholdSession.shared.snapshot.plan?.meals ?? []).compactMap { meal in
+            let vetoed = meal.status == .vetoed || HouseholdConflict.needsDecision(meal.reactions)
+            return vetoed ? meal.id : nil
+        })
     }
 
     private static func inputFingerprint(
         week: PlanWeek,
         householdSize: Int,
-        checks: [IngredientCheck]
+        checks: [IngredientCheck],
+        vetoedMealIDs: Set<UUID>
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(householdSize)
         hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
+        for id in vetoedMealIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            hasher.combine(id.uuidString)
+        }
         for meal in week.meals.sorted(by: { $0.uuid.uuidString < $1.uuid.uuidString }) {
             hasher.combine(meal.uuid)
             hasher.combine(meal.recipeSlug)

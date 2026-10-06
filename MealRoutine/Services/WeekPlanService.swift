@@ -7,6 +7,7 @@ enum WeekPlanError: LocalizedError {
         case notPlannable
         case alreadyPlanned
         case noOpenEvening
+        case sharedWeek
 
     var errorDescription: String? {
         switch self {
@@ -20,7 +21,39 @@ enum WeekPlanError: LocalizedError {
             "Bu tarif bu haftada zaten var."
         case .noOpenEvening:
             "Bu haftanın açık akşamı kalmadı. Pişirilmiş akşamların üzerine yazılmaz."
+        case .sharedWeek:
+            "Bu hafta ortak plan. Kişisel plan onun üzerine yazılmaz."
         }
+    }
+}
+
+/// Cooked evenings stay put. New slugs fill only the open offsets, in order.
+enum PlannerLock {
+    struct Slot: Equatable, Sendable {
+        var dayOffset: Int
+        var slug: String
+    }
+
+    static func openCount(lockedOffsets: Set<Int>, evenings: Int) -> Int {
+        let span = min(max(evenings, 0), MealRecommender.eveningCap)
+        let locked = lockedOffsets.filter { (0..<span).contains($0) }.count
+        return max(0, span - locked)
+    }
+
+    static func merge(locked: [Slot], filled: [String], evenings: Int) -> [Slot] {
+        let span = min(max(evenings, 0), MealRecommender.eveningCap)
+        let lockedByOffset = Dictionary(locked.map { ($0.dayOffset, $0) }, uniquingKeysWith: { first, _ in first })
+        var filledIndex = 0
+        var result: [Slot] = []
+        for offset in 0..<span {
+            if let kept = lockedByOffset[offset] {
+                result.append(kept)
+            } else if filledIndex < filled.count {
+                result.append(Slot(dayOffset: offset, slug: filled[filledIndex]))
+                filledIndex += 1
+            }
+        }
+        return result.sorted { $0.dayOffset < $1.dayOffset }
     }
 }
 
@@ -48,6 +81,9 @@ enum WeekPlanService {
         guard let prefs = try UserPrefsStore.existing(in: context), prefs.hasCompletedOnboarding else {
             return nil
         }
+        if HouseholdSession.shared.isHouseholdMode {
+            return nil
+        }
         try MealMemoryService.backfillIfNeeded(in: context)
         return try replaceCurrentWeek(in: context, request: planRequest(from: prefs), now: now)
     }
@@ -58,6 +94,9 @@ enum WeekPlanService {
         request: PlanRequest,
         now: Date = .now
     ) throws -> PlanWeek {
+        if HouseholdSession.shared.isHouseholdMode {
+            throw WeekPlanError.sharedWeek
+        }
         try MealMemoryService.backfillIfNeeded(in: context)
         let recipes = try context.fetch(FetchDescriptor<Recipe>())
         let feedback = try context.fetch(FetchDescriptor<RecipeFeedback>())
@@ -68,7 +107,57 @@ enum WeekPlanService {
         var memories = try MealMemoryService.snapshots(in: context)
         overlayRecency(recent, onto: &memories)
         let prefs = try UserPrefsStore.existing(in: context)
-        if let existing = try currentWeek(in: context, now: now) {
+        let preferences = prefs?.planningPreferences ?? PlanningPreferences.standard(
+            maxCookMinutes: request.maxCookMinutes,
+            dislikedIngredientIds: request.dislikedIngredientIds
+        )
+        let existing = try currentWeek(in: context, now: now)
+        let lockedMeals = existing?.meals.filter { $0.cookedAt != nil } ?? []
+        if lockedMeals.isEmpty {
+            return try insertFreshWeek(
+                in: context,
+                request: request,
+                existing: existing,
+                candidates: candidates,
+                preferences: preferences,
+                memories: memories,
+                now: now
+            )
+        }
+        guard let existing else {
+            return try insertFreshWeek(
+                in: context,
+                request: request,
+                existing: nil,
+                candidates: candidates,
+                preferences: preferences,
+                memories: memories,
+                now: now
+            )
+        }
+        return try refillAroundLockedMeals(
+            existing,
+            in: context,
+            request: request,
+            lockedMeals: lockedMeals,
+            candidates: candidates,
+            preferences: preferences,
+            memories: memories,
+            now: now
+        )
+    }
+
+    @MainActor
+    private static func insertFreshWeek(
+        in context: ModelContext,
+        request: PlanRequest,
+        existing: PlanWeek?,
+        candidates: [PickerCandidate],
+        preferences: PlanningPreferences,
+        memories: [String: MealMemorySnapshot],
+        now: Date
+    ) throws -> PlanWeek {
+        if let existing {
             // Capture the outgoing plan before the week row (and its meals) is deleted.
             MealExposureLog.record(exposureSightings(in: existing), now: now)
             let retiredMealIDs = Set(existing.meals.map(\.uuid))
@@ -88,10 +177,6 @@ enum WeekPlanService {
             // leave the old cooked meals attached to the replacement week.
             try context.save()
         }
-        let preferences = prefs?.planningPreferences ?? PlanningPreferences.standard(
-            maxCookMinutes: request.maxCookMinutes,
-            dislikedIngredientIds: request.dislikedIngredientIds
-        )
         let selection = PersonalizedScoringService.select(
             candidates: candidates,
             evenings: request.evenings,
@@ -109,23 +194,13 @@ enum WeekPlanService {
         context.insert(week)
 
         for (offset, slug) in slugs.enumerated() {
-            let meal = PlannedMeal(
+            try insertPlannedMeal(
+                slug: slug,
                 dayOffset: offset,
-                recipeSlug: slug,
                 servings: request.householdSize,
-                cookedAt: nil
-            )
-            context.insert(meal)
-            meal.cookedAt = nil
-            meal.week = week
-            try BehaviorTrackingService.record(
-                .selected,
-                recipeSlug: slug,
-                at: now,
-                planWeekID: week.uuid,
-                plannedMealID: meal.uuid,
-                in: context,
-                saves: false
+                week: week,
+                now: now,
+                in: context
             )
         }
         try context.save()
@@ -133,6 +208,159 @@ enum WeekPlanService {
             Analytics.track(.planGenerated)
         }
         return week
+    }
+
+    /// Keeps cooked evenings and their checks. Skipped evenings are open and can change.
+    @MainActor
+    private static func refillAroundLockedMeals(
+        _ existing: PlanWeek,
+        in context: ModelContext,
+        request: PlanRequest,
+        lockedMeals: [PlannedMeal],
+        candidates: [PickerCandidate],
+        preferences: PlanningPreferences,
+        memories: [String: MealMemorySnapshot],
+        now: Date
+    ) throws -> PlanWeek {
+        let span = min(max(request.evenings, 0), MealRecommender.eveningCap)
+        let lockedOffsets = Set(lockedMeals.map(\.dayOffset)).filter { (0..<span).contains($0) }
+        let openOffsets = (0..<span).filter { !lockedOffsets.contains($0) }
+        let retiring = existing.meals.filter { $0.cookedAt == nil }
+        MealExposureLog.record(retiring.map { meal in
+            RecentMealSighting(
+                slug: meal.recipeSlug,
+                at: WeekCalendar.date(weekStart: existing.weekStart, dayOffset: meal.dayOffset),
+                wasCooked: false
+            )
+        }, now: now)
+        let retiringIDs = Set(retiring.map(\.uuid))
+        let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        for check in checks {
+            guard let mealUUID = check.mealUUID, retiringIDs.contains(mealUUID) else { continue }
+            context.delete(check)
+        }
+        for meal in retiring {
+            context.delete(meal)
+        }
+        for item in existing.groceries where !item.isManual {
+            context.delete(item)
+        }
+
+        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        var blocked = Set(lockedMeals.map(\.recipeSlug))
+        var anchors = lockedMeals.compactMap { bySlug[$0.recipeSlug] }
+        var filled: [String] = []
+        if !openOffsets.isEmpty {
+            for offset in openOffsets {
+                let selection = PersonalizedScoringService.select(
+                    candidates: candidates,
+                    evenings: 1,
+                    preferences: preferences,
+                    memories: memories,
+                    blockedSlugs: blocked,
+                    initialAnchors: anchors,
+                    startDayOffset: offset,
+                    now: now
+                )
+                guard let slug = selection.slugs.first else { break }
+                filled.append(slug)
+                blocked.insert(slug)
+                if let candidate = bySlug[slug] {
+                    anchors.append(candidate)
+                }
+            }
+        }
+        let slots = PlannerLock.merge(
+            locked: lockedMeals.map { PlannerLock.Slot(dayOffset: $0.dayOffset, slug: $0.recipeSlug) },
+            filled: filled,
+            evenings: request.evenings
+        )
+        let lockedIdentity = Set(lockedMeals.map { "\($0.dayOffset)|\($0.recipeSlug)" })
+        for slot in slots where !lockedIdentity.contains("\(slot.dayOffset)|\(slot.slug)") {
+            try insertPlannedMeal(
+                slug: slot.slug,
+                dayOffset: slot.dayOffset,
+                servings: request.householdSize,
+                week: existing,
+                now: now,
+                in: context
+            )
+        }
+        existing.householdSize = request.householdSize
+        existing.explanation = weekExplanation(
+            slots: slots,
+            filledNew: filled.count,
+            openCount: openOffsets.count,
+            requested: span,
+            candidates: candidates,
+            memories: memories
+        )
+        try context.save()
+        if !filled.isEmpty {
+            Analytics.track(.planGenerated)
+        }
+        return existing
+    }
+
+    @MainActor
+    private static func insertPlannedMeal(
+        slug: String,
+        dayOffset: Int,
+        servings: Int,
+        week: PlanWeek,
+        now: Date,
+        in context: ModelContext
+    ) throws {
+        let meal = PlannedMeal(
+            dayOffset: dayOffset,
+            recipeSlug: slug,
+            servings: servings,
+            cookedAt: nil
+        )
+        context.insert(meal)
+        meal.cookedAt = nil
+        meal.week = week
+        try BehaviorTrackingService.record(
+            .selected,
+            recipeSlug: slug,
+            at: now,
+            planWeekID: week.uuid,
+            plannedMealID: meal.uuid,
+            in: context,
+            saves: false
+        )
+    }
+
+    private static func weekExplanation(
+        slots: [PlannerLock.Slot],
+        filledNew: Int,
+        openCount: Int,
+        requested: Int,
+        candidates: [PickerCandidate],
+        memories: [String: MealMemorySnapshot]
+    ) -> String {
+        if openCount == 0 {
+            return PlanExplanationBuilder.lockedMeals
+        }
+        if filledNew == 0 {
+            return PlanExplanationBuilder.emptyPool
+        }
+        if filledNew < openCount {
+            return PlanExplanationBuilder.shortPool(filled: slots.count, requested: requested)
+        }
+        let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
+        let taste = PersonalizedScoringService.profile(memories: memories, candidates: candidates)
+        let picks = slots.map { slot in
+            let memory = memories[slot.slug]
+            return PlannedPick(
+                slug: slot.slug,
+                minutes: bySlug[slot.slug]?.totalMinutes ?? 0,
+                dayOffset: slot.dayOffset,
+                isNew: RecommendationReasonService.isNew(memory),
+                wasLoved: (memory?.lovedCount ?? 0) > 0
+            )
+        }
+        return PlanExplanationBuilder.explain(picks: picks, hasBehavior: taste.dataPointCount > 0)
     }
 
     @MainActor
@@ -182,7 +410,7 @@ enum WeekPlanService {
         try replaceMeal(uuid: uuid, with: slug, in: context)
     }
 
-    /// Swaps one evening for a chosen slug. Other evenings stay. Grocery rebuild is the caller's job.
+    /// Swaps one evening for a chosen slug. Other evenings stay. The grocery list is rebuilt.
     @MainActor
     static func replaceMeal(
         uuid: UUID,
@@ -256,6 +484,8 @@ enum WeekPlanService {
         )
         try context.save()
         Analytics.track(.mealReplaced)
+        GroceryListService.discardRebuildCache()
+        try GroceryListService.rebuild(in: context)
     }
 
     /// Puts one saved import on the current week because the cook chose it.
