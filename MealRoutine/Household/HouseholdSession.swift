@@ -58,6 +58,7 @@ final class HouseholdSession {
         }
         await refresh(in: context)
         await consumePendingInvite(in: context)
+        await drainPending(in: context)
     }
 
     func adoptAccount(id: String, displayName: String?) {
@@ -114,11 +115,13 @@ final class HouseholdSession {
         deliveredPushIDs = []
         snapshot = HouseholdCacheStore.load(in: context, key: clientCacheKey)
         account = HouseholdAccountStore.load(testMode: enabled)
+        PendingOperationStore.replace([], in: context)
         if enabled {
             restoreTestServer(in: context)
             statusMessage = "Test modu açık. Apple, iCloud ve bildirim yok."
             syncState = .idle
         } else {
+            FakeHouseholdBackend.shared.setOffline(false)
             statusMessage = "Test modu kapalı."
             #if canImport(UIKit)
             if HouseholdTestLaunch.allowsAppleServices {
@@ -133,12 +136,14 @@ final class HouseholdSession {
         guard isTestMode else { return }
         FakeHouseholdBackend.shared.reset()
         HouseholdTestMode.shared.clearNotices()
+        HouseholdTestMode.shared.clearSyncSimulation()
         HouseholdAccountStore.clear(testMode: true)
         HouseholdCacheStore.clear(in: context, key: HouseholdCacheBox.testClientKey)
         HouseholdCacheStore.clear(in: context, key: HouseholdCacheBox.testServerKey)
         account = nil
         snapshot = .empty()
         deliveredPushIDs = []
+        PendingOperationStore.replace([], in: context)
         syncState = .idle
         statusMessage = "Test verisi silindi."
     }
@@ -382,6 +387,10 @@ final class HouseholdSession {
         in context: ModelContext
     ) {
         guard let account else { return }
+        let preferenceBefore = snapshot.preference
+        let preferenceBase = preferenceBefore.map { preference in
+            preference.baseRevision == 0 ? preference.revision : preference.baseRevision
+        } ?? 1
         do {
             try HouseholdReducer.updatePreference(
                 snapshot: &snapshot,
@@ -394,7 +403,21 @@ final class HouseholdSession {
                 now: .now
             )
             persist(in: context)
-            enqueueTestSync { await self.push(in: context) }
+            finishSharedEdit(
+                entityType: "preference",
+                entityId: snapshot.household?.id.uuidString ?? account.id,
+                operationType: "update",
+                body: BoardMutationEncoder.preference(
+                    householdId: snapshot.household?.id ?? UUID(),
+                    baseRevision: preferenceBase,
+                    cookingDays: cookingDays,
+                    maxWeekdayMinutes: maxWeekdayMinutes,
+                    preferredCategories: split(preferredCategories),
+                    preferredProteins: split(preferredProteins),
+                    avoidedIngredients: split(avoidedIngredients)
+                ),
+                in: context
+            )
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -477,7 +500,15 @@ final class HouseholdSession {
             persist(in: context)
             statusMessage = "Ortak plan hazır. İkiniz de bakabilirsiniz."
             notifyPartners()
-            enqueueTestSync { await self.push(in: context) }
+            if let plan = snapshot.plan {
+                finishSharedEdit(
+                    entityType: "plan",
+                    entityId: plan.id.uuidString,
+                    operationType: "upsert",
+                    body: BoardMutationEncoder.plan(plan, baseRevision: 0),
+                    in: context
+                )
+            }
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -485,11 +516,29 @@ final class HouseholdSession {
 
     func setReaction(_ reaction: MealReactionKind, mealID: UUID, in context: ModelContext) {
         guard let account else { return }
+        if isTestMode, HouseholdTestMode.shared.simulatePartnerEdit {
+            recordPartnerMealConflict(mealID: mealID, in: context)
+            return
+        }
+        let meal = snapshot.plan?.meals.first { $0.id == mealID }
+        let mealRevision = meal?.revision ?? 0
+        let reactionBase = meal?.reactions.first { $0.userId == account.id }?.revision ?? 0
         do {
             try HouseholdReducer.setReaction(snapshot: &snapshot, mealId: mealID, user: account, reaction: reaction, now: .now)
             persist(in: context)
             notifyPartners()
-            enqueueTestSync { await self.push(in: context) }
+            finishSharedEdit(
+                entityType: "reaction",
+                entityId: mealID.uuidString,
+                operationType: "set",
+                body: BoardMutationEncoder.reaction(
+                    mealId: mealID,
+                    reactionBase: reactionBase,
+                    mealRevision: mealRevision,
+                    reaction: reaction.rawValue
+                ),
+                in: context
+            )
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -502,6 +551,11 @@ final class HouseholdSession {
             ?? snapshot.recipeProjections.first { $0.slug == slug }?.title
             ?? slug
         let owner = snapshot.recipeProjections.first { $0.slug == slug }?.ownerUserId
+        if isTestMode, HouseholdTestMode.shared.simulatePartnerEdit {
+            recordPartnerMealConflict(mealID: mealID, in: context)
+            return
+        }
+        let mealRevision = snapshot.plan?.meals.first { $0.id == mealID }?.revision ?? 0
         do {
             try HouseholdReducer.replaceMeal(
                 snapshot: &snapshot,
@@ -514,7 +568,13 @@ final class HouseholdSession {
             )
             persist(in: context)
             notifyPartners()
-            enqueueTestSync { await self.push(in: context) }
+            finishSharedEdit(
+                entityType: "meal",
+                entityId: mealID.uuidString,
+                operationType: "replace",
+                body: BoardMutationEncoder.replace(mealId: mealID, baseRevision: mealRevision, slug: slug, title: title),
+                in: context
+            )
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -523,9 +583,16 @@ final class HouseholdSession {
     func noteCooked(mealID: UUID, in context: ModelContext) {
         guard let account else { return }
         do {
+            let mealRevision = snapshot.plan?.meals.first { $0.id == mealID }?.revision ?? 0
             try HouseholdReducer.markCooked(snapshot: &snapshot, mealId: mealID, actor: account, now: .now, cooked: true)
             persist(in: context)
-            enqueueTestSync { await self.push(in: context) }
+            finishSharedEdit(
+                entityType: "meal",
+                entityId: mealID.uuidString,
+                operationType: "cook",
+                body: BoardMutationEncoder.cook(mealId: mealID, baseRevision: mealRevision),
+                in: context
+            )
         } catch {
             statusMessage = nil
         }
@@ -538,7 +605,15 @@ final class HouseholdSession {
             persist(in: context)
             notifyPartners()
             statusMessage = "Plan netleşti."
-            enqueueTestSync { await self.push(in: context) }
+            if let plan = snapshot.plan {
+                finishSharedEdit(
+                    entityType: "plan",
+                    entityId: plan.id.uuidString,
+                    operationType: "upsert",
+                    body: BoardMutationEncoder.plan(plan, baseRevision: max(0, plan.revision - 1)),
+                    in: context
+                )
+            }
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -553,6 +628,7 @@ final class HouseholdSession {
             isManual: item.isManual,
             uuid: item.uuid
         )
+        let previous = snapshot.groceryCompletions.first { $0.itemKey == key }
         do {
             try HouseholdReducer.setGrocery(
                 snapshot: &snapshot,
@@ -562,7 +638,26 @@ final class HouseholdSession {
                 now: .now
             )
             persist(in: context)
-            enqueueTestSync { await self.push(in: context) }
+            let body: Data
+            let operationType: String
+            if let previous {
+                body = BoardMutationEncoder.groceryCheck(
+                    id: item.uuid,
+                    baseRevision: previous.revision,
+                    isChecked: item.isChecked
+                )
+                operationType = "check"
+            } else {
+                body = BoardMutationEncoder.groceryAdd(id: item.uuid, itemKey: key, quantity: 1, baseRevision: 0)
+                operationType = "add"
+            }
+            finishSharedEdit(
+                entityType: "grocery",
+                entityId: item.uuid.uuidString,
+                operationType: operationType,
+                body: body,
+                in: context
+            )
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -894,6 +989,180 @@ final class HouseholdSession {
             ?? slug
         let owner = snapshot.recipeProjections.first { $0.slug == slug }?.ownerUserId
         return PartnerReplacementChoice(slug: slug, title: title, owner: owner)
+    }
+
+    func setSimulateOffline(_ offline: Bool, in context: ModelContext) {
+        guard isTestMode else { return }
+        HouseholdTestMode.shared.simulateOffline = offline
+        FakeHouseholdBackend.shared.setOffline(offline)
+        if offline {
+            syncState = .offline
+            return
+        }
+        Task { await self.drainPending(in: context) }
+    }
+
+    func drainPending(in context: ModelContext) async {
+        let simulatedOffline = isTestMode && HouseholdTestMode.shared.simulateOffline
+        if simulatedOffline || (usesHouseholdAPI && !SyncEngine.shared.online) {
+            syncState = .offline
+            return
+        }
+        let now = Date()
+        let queued = PendingOperationStore.items(in: context)
+        let ready = queued.contains { SyncQueueMachine.isReady($0, now: now) }
+        if isTestMode {
+            guard ready else { return }
+            syncState = .syncing
+            do {
+                _ = try await pushThrowing()
+                let updated = await SyncDrainer.drain(items: queued, online: true, now: now.addingTimeInterval(120)) { _ in
+                    .applied
+                }
+                PendingOperationStore.replace(updated, in: context)
+                syncState = .idle
+            } catch HouseholdError.offline {
+                syncState = .offline
+            } catch is HouseholdServerConflict {
+                let updated = queued.map { item -> SyncWorkItem in
+                    if item.status == .pending || item.status == .syncing {
+                        return SyncQueueMachine.markConflict(item)
+                    }
+                    return item
+                }
+                PendingOperationStore.replace(updated, in: context)
+                statusMessage = SharedConflictNotice.mealUpdated
+                syncState = .failed
+            } catch {
+                syncState = .failed
+                statusMessage = error.localizedDescription
+            }
+            return
+        }
+        guard usesHouseholdAPI, let householdId = snapshot.household?.id else { return }
+        guard ready else {
+            _ = await pullBoardChanges(householdId: householdId, pending: queued, in: context)
+            return
+        }
+        syncState = .syncing
+        let api = BoardSyncClient(client: lifecycleAPI().client)
+        let jitter = Double.random(in: 0...1)
+        let updated = await SyncDrainer.drain(items: queued, online: true, now: now, jitterUnit: jitter) { item in
+            do {
+                try await api.mutate(householdId: householdId, idempotencyKey: item.idempotencyKey, body: item.payload)
+                return .applied
+            } catch BoardSyncFailure.conflict {
+                return .conflict
+            } catch {
+                return .retry
+            }
+        }
+        PendingOperationStore.replace(updated, in: context)
+        if await pullBoardChanges(householdId: householdId, pending: updated, in: context) {
+            return
+        }
+        let conflicted = updated.contains { item in
+            item.status == .requiresResolution && queued.first { $0.id == item.id }?.status != .requiresResolution
+        }
+        let retried = updated.contains { item in
+            item.retryCount > (queued.first { $0.id == item.id }?.retryCount ?? 0)
+        }
+        if conflicted {
+            statusMessage = SharedConflictNotice.mealUpdated
+            syncState = .failed
+        } else if updated.contains(where: { $0.status == .failed }) {
+            syncState = .failed
+        } else if retried {
+            syncState = .offline
+        } else {
+            syncState = .idle
+        }
+    }
+
+    /// Pulls the household delta and keeps a pending meal edit when the server revision moved.
+    private func pullBoardChanges(householdId: UUID, pending: [SyncWorkItem], in context: ModelContext) async -> Bool {
+        let api = BoardSyncClient(client: lifecycleAPI().client)
+        guard let page = try? await api.changes(
+            householdId: householdId,
+            cursor: BoardSyncCursor.load(householdId: householdId)
+        ) else { return false }
+        BoardSyncCursor.save(page.cursor, householdId: householdId)
+        var revisions: [String: Int] = [:]
+        for change in page.changes where change.entityType == "meal" {
+            revisions[change.entityId.lowercased()] = change.revision
+        }
+        let overridden = Set(BoardDeltaMerge.overriddenMealIDs(pending: pending, remoteRevisions: revisions))
+        guard !overridden.isEmpty else { return false }
+        let resolved = pending.map { item -> SyncWorkItem in
+            if overridden.contains(item.entityId) && (item.status == .pending || item.status == .syncing) {
+                return SyncQueueMachine.markConflict(item)
+            }
+            return item
+        }
+        PendingOperationStore.replace(resolved, in: context)
+        statusMessage = SharedConflictNotice.mealUpdated
+        syncState = .failed
+        return true
+    }
+
+    private var queuesSharedEdits: Bool {
+        usesHouseholdAPI || (isTestMode && HouseholdTestMode.shared.simulateOffline)
+    }
+
+    private func finishSharedEdit(
+        entityType: String,
+        entityId: String,
+        operationType: String,
+        body: Data,
+        in context: ModelContext
+    ) {
+        guard queuesSharedEdits else {
+            enqueueTestSync { await self.push(in: context) }
+            return
+        }
+        let item = SyncWorkItem(
+            id: UUID(),
+            entityType: entityType,
+            entityId: entityId,
+            operationType: operationType,
+            payload: body,
+            createdAt: .now,
+            retryCount: 0,
+            status: .pending
+        )
+        PendingOperationStore.upsert(item, in: context)
+        if isTestMode && HouseholdTestMode.shared.simulateOffline {
+            syncState = .offline
+            return
+        }
+        Task { await self.drainPending(in: context) }
+    }
+
+    private func recordPartnerMealConflict(mealID: UUID, in context: ModelContext) {
+        guard var plan = snapshot.plan, let index = plan.meals.firstIndex(where: { $0.id == mealID }) else { return }
+        plan.meals[index].revision += 1
+        plan.meals[index].baseRevision = plan.meals[index].revision
+        snapshot.plan = plan
+        let payload = BoardMutationEncoder.replace(
+            mealId: mealID,
+            baseRevision: plan.meals[index].revision - 1,
+            slug: plan.meals[index].recipeSlug,
+            title: plan.meals[index].title
+        )
+        let item = SyncWorkItem(
+            id: UUID(),
+            entityType: "meal",
+            entityId: mealID.uuidString,
+            operationType: "replace",
+            payload: payload,
+            createdAt: .now,
+            retryCount: 0,
+            status: .requiresResolution
+        )
+        PendingOperationStore.upsert(item, in: context)
+        persist(in: context)
+        statusMessage = SharedConflictNotice.mealUpdated
+        syncState = .failed
     }
 
     private var usesHouseholdAPI: Bool {

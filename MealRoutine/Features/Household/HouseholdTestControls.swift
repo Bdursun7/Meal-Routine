@@ -60,6 +60,18 @@ struct HouseholdTestModeSection: View {
             .accessibilityHint("Apple hesabı, iCloud ve bildirim olmadan ev halkını bu telefonda dener")
             if testMode.isEnabled {
                 HouseholdTestBadge()
+                Toggle("Çevrimdışı simüle et", isOn: Binding(
+                    get: { testMode.simulateOffline },
+                    set: { offline in
+                        session.setSimulateOffline(offline, in: modelContext)
+                    }
+                ))
+                .accessibilityIdentifier("household.simulateOffline")
+                Toggle("Partner aynı yemeği değiştirsin", isOn: Binding(
+                    get: { testMode.simulatePartnerEdit },
+                    set: { testMode.simulatePartnerEdit = $0 }
+                ))
+                .accessibilityIdentifier("household.simulatePartnerEdit")
                 Text("Tek telefon. Test Partner senin yerine tepki verir. Gerçek CloudKit eşitlemesi ve push burada çalışmaz.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)

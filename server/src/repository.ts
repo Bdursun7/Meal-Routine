@@ -1,5 +1,7 @@
+import type { BoardStore } from './boardTypes.js'
 import { AppError } from './errors.js'
 import type { HouseholdStore } from './householdTypes.js'
+import { createMemoryBoard } from './memoryBoard.js'
 import { createHouseholdMemory } from './memoryHousehold.js'
 
 export type ProviderName = 'apple' | 'google' | 'dev'
@@ -61,7 +63,7 @@ export interface AuthRepository {
   membership(householdId: string, accountId: string): Promise<MemberRole | null>
 }
 
-export interface MemoryRepository extends AuthRepository, HouseholdStore {
+export interface MemoryRepository extends AuthRepository, HouseholdStore, BoardStore {
   seedMember(householdId: string, accountId: string, role: MemberRole): void
 }
 
@@ -80,6 +82,7 @@ export function createMemoryRepository(): MemoryRepository {
     else rows.delete(accountId)
     members.set(householdId, rows)
   })
+  const board = createMemoryBoard()
 
   function requireAccount(id: string): AccountRow {
     const account = accounts.get(id)
@@ -172,5 +175,6 @@ export function createMemoryRepository(): MemoryRepository {
     },
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
+    boardTransaction: board.boardTransaction,
   }
 }

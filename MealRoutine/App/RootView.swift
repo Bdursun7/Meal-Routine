@@ -75,6 +75,9 @@ struct RootView: View {
         }
         .onAppear {
             Analytics.trackOnce(.appOpened)
+            SyncEngine.shared.start {
+                Task { await HouseholdSession.shared.drainPending(in: modelContext) }
+            }
         }
     }
 

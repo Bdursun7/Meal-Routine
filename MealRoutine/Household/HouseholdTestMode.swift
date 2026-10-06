@@ -106,6 +106,10 @@ final class HouseholdTestMode {
     static let shared = HouseholdTestMode()
 
     private(set) var isEnabled: Bool
+    /// Keeps shared edits on this phone and skips the fake server.
+    var simulateOffline = false
+    /// The next meal edit is treated as losing to the other device.
+    var simulatePartnerEdit = false
     var notices: [HouseholdTestNotice] = []
     var banner: HouseholdTestNotice?
     private var deliveredNoticeIDs: Set<UUID> = []
@@ -125,6 +129,12 @@ final class HouseholdTestMode {
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
         defaults.set(enabled, forKey: HouseholdTestLaunch.storageKey)
+        if !enabled { clearSyncSimulation() }
+    }
+
+    func clearSyncSimulation() {
+        simulateOffline = false
+        simulatePartnerEdit = false
     }
 
     func record(_ pushes: [HouseholdPush], audience: HouseholdTestAudience) {

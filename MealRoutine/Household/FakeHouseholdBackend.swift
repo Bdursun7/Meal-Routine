@@ -30,6 +30,7 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
         var boards: [UUID: HouseholdSnapshot] = [:]
         var lookups: [String: FakeInviteRecord] = [:]
         var acceptedShareURLs: Set<String> = []
+        var offline = false
     }
 
     /// Carried out of `withLock` as a `Sendable` result, then thrown.
@@ -38,6 +39,7 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
         case conflict(HouseholdSnapshot)
         case notMember
         case inviteNotFound
+        case offline
     }
 
     private let state = OSAllocatedUnfairLock(initialState: Store())
@@ -45,6 +47,12 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
     func reset() {
         state.withLock { store in
             store = Store()
+        }
+    }
+
+    func setOffline(_ offline: Bool) {
+        state.withLock { store in
+            store.offline = offline
         }
     }
 
@@ -191,6 +199,7 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
         _ snapshot: HouseholdSnapshot,
         into store: inout Store
     ) -> Result<HouseholdSnapshot, LockedFailure> {
+        if store.offline { return .failure(.offline) }
         guard let household = snapshot.household else { return .success(snapshot) }
         if let server = store.boards[household.id], snapshot.baseRevision != server.revision {
             return .failure(.conflict(server))
@@ -218,6 +227,8 @@ final class FakeHouseholdBackend: Sendable, HouseholdSyncTransport {
             throw HouseholdError.notMember
         case .failure(.inviteNotFound):
             throw HouseholdError.inviteNotFound
+        case .failure(.offline):
+            throw HouseholdError.offline
         }
     }
 }

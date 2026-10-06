@@ -90,7 +90,7 @@ struct HouseholdSettingsView: View {
     private var statusSection: some View {
         if session.syncState == .offline {
             Section {
-                Label("Çevrimdışı. Değişiklik bu telefonda duruyor ve iCloud gelince gider.", systemImage: "icloud.slash")
+                Label("Çevrimdışı. Değişiklik bu telefonda duruyor ve bağlantı gelince gider.", systemImage: "icloud.slash")
                     .font(.footnote)
                     .accessibilityLabel("Çevrimdışı. Ev halkı bu telefonda duruyor.")
             }

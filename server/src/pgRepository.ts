@@ -1,5 +1,7 @@
 import type { Pool } from 'pg'
+import type { BoardStore } from './boardTypes.js'
 import { AppError } from './errors.js'
+import { createPgBoard } from './pgBoard.js'
 import { createPgHouseholdStore } from './pgHousehold.js'
 import type {
   AccountRow,
@@ -54,8 +56,9 @@ function identityFrom(row: {
   }
 }
 
-export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore {
+export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore & BoardStore {
   const household = createPgHouseholdStore(pool)
+  const board = createPgBoard(pool)
   return {
     async countAccounts() {
       const result = await pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM accounts')
@@ -264,6 +267,7 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
     },
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
+    boardTransaction: board.boardTransaction,
   }
 }
 
