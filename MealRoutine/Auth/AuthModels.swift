@@ -98,7 +98,7 @@ struct AccountDeletionResult: Codable, Equatable, Sendable {
 
 enum AccountPrivacyCopy {
     static let confirmTitle = "Hesabını silmek istiyor musun?"
-    static let confirmBody = "Kişisel tariflerin, yemek hafızan ve girişlerin silinir. Ortak evde bir partner kalırsa ev ona kalır. Son üye ev halkını da kapatır. Bu işlem geri alınamaz. Telefondaki plan, sunucu silinse de yerel sıfırlamaya kadar durur."
+    static let confirmBody = "Kişisel tariflerin, yemek hafızan, kişisel pantry ve girişlerin silinir. Ortak evde bir partner kalırsa ev ve pantry ona kalır. Son üye ev halkını kapatınca pantry de silinir. Bu işlem geri alınamaz."
     static let deleteButton = "Hesabımı sil"
     static let cancelButton = "Vazgeç"
     static let exportButton = "Verilerimi indir"

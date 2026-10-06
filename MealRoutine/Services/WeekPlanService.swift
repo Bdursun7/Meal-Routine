@@ -216,7 +216,7 @@ enum WeekPlanService {
         let householdID = HouseholdSession.shared.snapshot.household?.id
         let items = (try? context.fetch(FetchDescriptor<PantryItem>())) ?? []
         return items.filter { $0.householdID == householdID && $0.quantity > 0 }.map {
-            PantryPlanningStock(ingredientId: $0.ingredientID, quantity: $0.quantity, unit: $0.unit)
+            PantryPlanningStock(ingredientId: $0.ingredientID, quantity: $0.quantity, unit: $0.unit, bestBefore: $0.bestBefore)
         }
     }
 

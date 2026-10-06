@@ -3,6 +3,7 @@ import type { HouseholdStore } from './householdTypes.js'
 import { AppError } from './errors.js'
 import type { MigrationStore } from './migrationService.js'
 import type { NotificationStore } from './notifications.js'
+import type { PantryStore } from './pantryTypes.js'
 import type { AuthRepository } from './repository.js'
 
 export type HouseholdOutcome = 'none' | 'left' | 'deleted'
@@ -17,6 +18,7 @@ export function createPrivacyService(input: {
   households: HouseholdService
   migration: MigrationStore
   notifications: NotificationStore
+  pantry: PantryStore
   now?: () => Date
 }): PrivacyService {
   const now = input.now ?? (() => new Date())
@@ -52,6 +54,7 @@ export function createPrivacyService(input: {
         personal: personal.bundle,
         household,
         notificationPreferences: preferences,
+        pantry: membership && household ? await input.pantry.listPantry(membership.householdId) : [],
       }
     },
 
@@ -59,6 +62,7 @@ export function createPrivacyService(input: {
       const account = await input.repo.getAccount(accountId)
       if (!account) throw new AppError('not_found', 404)
       const membership = await input.repo.transaction(async (tx) => tx.activeMembership(accountId))
+      const householdId = membership?.householdId ?? null
       let household: HouseholdOutcome = 'none'
       if (membership) {
         const members = await input.repo.transaction(async (tx) => tx.members(membership.householdId))
@@ -81,6 +85,8 @@ export function createPrivacyService(input: {
       }
       await input.migration.erase(accountId)
       await input.notifications.revokeAllTokens(accountId)
+      await input.pantry.clearAccountPantry(accountId)
+      if (household === 'deleted' && householdId) await input.pantry.deleteHouseholdPantry(householdId)
       await input.repo.closeAccount(accountId, household, now())
       return { deleted: true, household }
     },

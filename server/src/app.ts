@@ -37,7 +37,7 @@ import {
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
 import type { AuthRepository } from './repository.js'
 import { createPantryService } from './pantryService.js'
-import type { PantryStore } from './pantryTypes.js'
+import type { PantryReconcileOperation, PantryStore } from './pantryTypes.js'
 import { verifyAccessToken } from './tokens.js'
 
 const appleBody = z.object({
@@ -123,7 +123,7 @@ const mutationBody = z.object({
 })
 
 export interface BuildAppOptions {
-  repo: AuthRepository & HouseholdStore & BoardStore
+  repo: AuthRepository & HouseholdStore & BoardStore & PantryStore
   config: AppConfig
   verifier: IdentityVerifier
   now?: () => Date
@@ -159,7 +159,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     createRateLimiter({ windowMs: config.rateLimitWindowMs, max: config.rateLimitMax })
   const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
   const board = createBoardService(options.repo, options.repo, options.householdNow ?? options.now ?? (() => new Date()))
-  const pantry = createPantryService(options.repo as unknown as PantryStore, options.repo)
+  const pantry = createPantryService(options.repo, options.repo)
   const migrationStore = options.migration ?? createMemoryMigration()
   const migration = createMigrationService(migrationStore)
   const clock = options.now ?? (() => new Date())
@@ -171,6 +171,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     households,
     migration: migrationStore,
     notifications: notificationStore,
+    pantry: options.repo,
     now: clock,
   })
   const observability = options.observability ?? createMemoryObservability()
@@ -185,8 +186,20 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     bodyLimit: options.bodyLimit ?? 1_048_576,
   })
 
-  const pantryItemBody = z.object({ ingredientId: z.string().min(1).max(120), displayName: z.string().min(1).max(160), quantity: z.number().nonnegative(), unit: z.string().min(1).max(20), location: z.enum(['pantry', 'refrigerator', 'freezer', 'other']), minimumQuantity: z.number().nonnegative().nullable().optional(), bestBefore: z.string().nullable().optional() })
+  const pantryItemBody = z.object({ ingredientId: z.string().min(1).max(120), displayName: z.string().min(1).max(160), quantity: z.number().nonnegative(), unit: z.string().min(1).max(40), location: z.enum(['pantry', 'refrigerator', 'freezer', 'other']), minimumQuantity: z.number().nonnegative().nullable().optional(), bestBefore: z.string().nullable().optional(), confirmSeparate: z.boolean().optional() })
   const pantryRevision = z.object({ baseRevision: z.coerce.number().int().nonnegative().optional() })
+  const pantryReconcileBody = z.object({
+    operation: z.enum(['compute-missing', 'consume', 'restock']),
+    confirmSeparate: z.boolean().optional(),
+    lines: z.array(z.object({
+      ingredientId: z.string().min(1).max(120),
+      displayName: z.string().min(1).max(160).optional(),
+      quantity: z.number().nonnegative(),
+      unit: z.string().min(1).max(40),
+      checked: z.boolean().optional(),
+      location: z.enum(['pantry', 'refrigerator', 'freezer', 'other']).optional(),
+    })).min(1).max(200),
+  })
   app.get('/v1/households/:householdId/pantry', async (request) => {
     const accountId = await requireAccount(request, options); const { householdId } = parse(householdParams, request.params)
     return { items: await pantry.list(accountId, householdId), serverTime: new Date().toISOString() }
@@ -194,12 +207,19 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.post('/v1/households/:householdId/pantry/items', async (request) => {
     const accountId = await requireAccount(request, options); const { householdId } = parse(householdParams, request.params)
     const key = String(request.headers['idempotency-key'] ?? ''); const body = parse(pantryItemBody, request.body)
-    return pantry.create(accountId, householdId, { ...body, minimumQuantity: body.minimumQuantity ?? null, bestBefore: body.bestBefore ?? null }, key, clock())
+    return pantry.create(accountId, householdId, { ingredientId: body.ingredientId, displayName: body.displayName, quantity: body.quantity, unit: body.unit, location: body.location, minimumQuantity: body.minimumQuantity ?? null, bestBefore: body.bestBefore ?? null }, key, clock(), { confirmSeparate: body.confirmSeparate === true })
+  })
+  app.post('/v1/households/:householdId/pantry/reconcile-grocery', async (request) => {
+    const accountId = await requireAccount(request, options); const { householdId } = parse(householdParams, request.params)
+    const key = String(request.headers['idempotency-key'] ?? ''); const body = parse(pantryReconcileBody, request.body)
+    return pantry.reconcile(accountId, householdId, { operation: body.operation as PantryReconcileOperation, lines: body.lines, confirmSeparate: body.confirmSeparate === true }, key, clock())
   })
   app.patch('/v1/households/:householdId/pantry/items/:itemId', async (request) => {
     const accountId = await requireAccount(request, options); const params = parse(householdParams.extend({ itemId: z.string().uuid() }), request.params)
     const { baseRevision } = parse(pantryRevision, request.query); const key = String(request.headers['idempotency-key'] ?? '')
-    return pantry.update(accountId, params.householdId, params.itemId, parse(pantryItemBody.partial(), request.body), baseRevision, key, clock())
+    const body = parse(pantryItemBody.partial(), request.body)
+    const { confirmSeparate, ...patch } = body
+    return pantry.update(accountId, params.householdId, params.itemId, patch, baseRevision, key, clock(), { confirmSeparate: confirmSeparate === true })
   })
   app.delete('/v1/households/:householdId/pantry/items/:itemId', async (request) => {
     const accountId = await requireAccount(request, options); const params = parse(householdParams.extend({ itemId: z.string().uuid() }), request.params)

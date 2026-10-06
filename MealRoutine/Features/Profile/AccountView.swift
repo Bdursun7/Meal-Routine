@@ -107,7 +107,12 @@ struct AccountView: View {
             titleVisibility: .visible
         ) {
             Button(AccountPrivacyCopy.deleteButton, role: .destructive) {
-                Task { await auth.deleteAccount() }
+                Task {
+                    await auth.deleteAccount()
+                    if auth.account == nil {
+                        PantryAccountPrivacy.eraseLocal(in: modelContext)
+                    }
+                }
             }
             .accessibilityIdentifier("account.deleteConfirm")
             Button(AccountPrivacyCopy.cancelButton, role: .cancel) {}

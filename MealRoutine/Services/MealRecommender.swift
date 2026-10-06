@@ -36,6 +36,7 @@ struct PantryPlanningStock: Equatable, Sendable {
     var ingredientId: String
     var quantity: Double
     var unit: String
+    var bestBefore: Date? = nil
 }
 
 enum PantryPlanningSignal {

@@ -26,18 +26,22 @@ enum GroceryListService {
     }
 
     @MainActor
-    static func rebuild(in context: ModelContext, now: Date = .now) throws {
-        guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return }
-        guard let prefs = try UserPrefsStore.existing(in: context) else { return }
+    @discardableResult
+    static func rebuild(in context: ModelContext, now: Date = .now, applyingPantry: Bool = false) throws -> PantryCoverageStamp {
+        guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return .idle }
+        guard let prefs = try UserPrefsStore.existing(in: context) else { return .idle }
         let householdSize = prefs.householdSize
         let storedChecks = try context.fetch(FetchDescriptor<IngredientCheck>())
+        let pantry = applyingPantry ? pantryCoverage(in: context) : []
         if inputFingerprint(
             week: week,
             householdSize: householdSize,
             checks: storedChecks,
-            vetoedMealIDs: vetoedMealIDs()
+            vetoedMealIDs: vetoedMealIDs(),
+            applyingPantry: applyingPantry,
+            pantry: pantry
         ) == appliedFingerprint {
-            return
+            return .idle
         }
 
         let vetoed = vetoedMealIDs()
@@ -95,6 +99,41 @@ enum GroceryListService {
 
         let merged = GroceryMerger.merge(sources)
         let autoItems = week.groceries.filter { !$0.isManual }
+        let preserved = Set(autoItems.filter { $0.isChecked || $0.quantityIsCustom }.map {
+            GroceryMerger.rowIdentity(ingredientId: $0.ingredientId, unit: $0.unit)
+        })
+        let coverage = applyingPantry ? PantryMarketCoverage.adjust(
+            merged.map { line in
+                let identity = GroceryMerger.rowIdentity(ingredientId: line.ingredientId, unit: line.unit)
+                let keep = preserved.contains(identity)
+                return PantryMarketLine(
+                    ingredientId: line.ingredientId,
+                    quantity: line.quantity,
+                    unit: line.unit,
+                    isChecked: keep,
+                    preserve: keep
+                )
+            },
+            pantry: pantry
+        ) : []
+        let planned: [MergedGroceryLine] = merged.enumerated().map { index, line in
+            guard applyingPantry, coverage.indices.contains(index) else { return line }
+            var copy = line
+            copy.quantity = coverage[index].quantity
+            return copy
+        }
+        let incompatibleCount = coverage.filter(\.incompatible).count
+        let needs = applyingPantry ? zip(merged, planned).compactMap { line, adjusted -> PantryReconcileLine? in
+            guard let quantity = line.quantity else { return nil }
+            let identity = GroceryMerger.rowIdentity(ingredientId: line.ingredientId, unit: line.unit)
+            return PantryReconcileLine(
+                ingredientId: line.ingredientId,
+                displayName: line.nameTR,
+                quantity: quantity,
+                unit: adjusted.unit,
+                checked: preserved.contains(identity)
+            )
+        } : []
         let plan = GroceryListReconciler.plan(
             existingAuto: autoItems.map {
                 AutoGroceryRow(
@@ -106,7 +145,7 @@ enum GroceryListService {
                     quantityIsCustom: $0.quantityIsCustom
                 )
             },
-            merged: merged
+            merged: planned
         )
         var byID: [UUID: GroceryItem] = [:]
         for item in autoItems {
@@ -116,7 +155,7 @@ enum GroceryListService {
 
         for update in plan.updates {
             guard let match = byID[update.existingID] else { continue }
-            let line = merged[update.mergedIndex]
+            let line = planned[update.mergedIndex]
             let normalizedUnit = GroceryMerger.normalize(line.unit)
             let nextQuantity = GroceryQuantityEdit.quantityToStore(
                 planned: line.quantity,
@@ -152,7 +191,8 @@ enum GroceryListService {
         }
 
         for index in plan.inserts {
-            let line = merged[index]
+            let line = planned[index]
+            if line.quantity == 0 { continue }
             let unit = GroceryMerger.normalize(line.unit)
             let resolution = resolution(
                 legacyKeepsCheck: false,
@@ -191,8 +231,20 @@ enum GroceryListService {
             week: week,
             householdSize: householdSize,
             checks: try context.fetch(FetchDescriptor<IngredientCheck>()),
-            vetoedMealIDs: vetoedMealIDs()
+            vetoedMealIDs: vetoedMealIDs(),
+            applyingPantry: applyingPantry,
+            pantry: pantry
         )
+        return PantryCoverageStamp(applying: applyingPantry, needs: needs, incompatibleCount: incompatibleCount)
+    }
+
+    @MainActor
+    private static func pantryCoverage(in context: ModelContext) -> [PantryCoverageLine] {
+        let householdID = HouseholdSession.shared.snapshot.household?.id
+        let items = (try? context.fetch(FetchDescriptor<PantryItem>())) ?? []
+        return items.filter { $0.householdID == householdID && $0.quantity > 0 }.map {
+            PantryCoverageLine(ingredientId: $0.ingredientID, quantity: $0.quantity, unit: $0.unit)
+        }
     }
 
     @MainActor
@@ -304,6 +356,7 @@ enum GroceryListService {
         name: String,
         quantity: Double?,
         unit: String,
+        ingredientId: String? = nil,
         in context: ModelContext,
         now: Date = .now
     ) throws {
@@ -313,7 +366,7 @@ enum GroceryListService {
             throw WeekPlanError.missingPreferences
         }
         let item = GroceryItem(
-            ingredientId: "manual:\(UUID().uuidString)",
+            ingredientId: ingredientId ?? "manual:\(UUID().uuidString)",
             nameTR: trimmed,
             nameEN: trimmed,
             quantity: quantity,
@@ -590,10 +643,20 @@ enum GroceryListService {
         week: PlanWeek,
         householdSize: Int,
         checks: [IngredientCheck],
-        vetoedMealIDs: Set<UUID>
+        vetoedMealIDs: Set<UUID>,
+        applyingPantry: Bool = false,
+        pantry: [PantryCoverageLine] = []
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(householdSize)
+        hasher.combine(applyingPantry)
+        if applyingPantry {
+            for line in pantry.sorted(by: { $0.ingredientId < $1.ingredientId }) {
+                hasher.combine(line.ingredientId)
+                hasher.combine(line.quantity)
+                hasher.combine(line.unit)
+            }
+        }
         hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
         for id in vetoedMealIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
             hasher.combine(id.uuidString)

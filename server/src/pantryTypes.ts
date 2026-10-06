@@ -44,6 +44,27 @@ export interface PantryIdempotencyHit {
   expiresAt: Date
 }
 
+export type PantryReconcileOperation = 'compute-missing' | 'consume' | 'restock'
+
+export interface PantryReconcileLine {
+  ingredientId: string
+  displayName?: string
+  quantity: number
+  unit: string
+  checked?: boolean
+  location?: PantryLocation
+}
+
+export interface PantryReconcileResultLine {
+  ingredientId: string
+  displayName: string
+  quantity: number
+  unit: string
+  checked: boolean
+  incompatible: boolean
+  applied: boolean
+}
+
 export interface PantryStore {
   listPantry(householdId: string): Promise<PantryItem[]>
   getPantryItem(householdId: string, itemId: string): Promise<PantryItem | null>
@@ -53,6 +74,7 @@ export interface PantryStore {
   readPantryIdempotency(accountId: string, key: string): Promise<PantryIdempotencyHit | null>
   writePantryIdempotency(row: PantryIdempotencyHit & { accountId: string; key: string }): Promise<void>
   clearAccountPantry(accountId: string): Promise<void>
+  deleteHouseholdPantry(householdId: string): Promise<void>
   householdForPantryItem(itemId: string): Promise<string | null>
   householdMembers(householdId: string): Promise<{ accountId: string; role: MemberRole }[]>
 }

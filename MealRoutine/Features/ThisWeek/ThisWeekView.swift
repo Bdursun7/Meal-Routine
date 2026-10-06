@@ -10,6 +10,7 @@ struct ThisWeekView: View {
     @Query private var feedback: [RecipeFeedback]
     @Query private var prefs: [UserPrefs]
     @Query private var memories: [MealMemory]
+    @Query private var pantryItems: [PantryItem]
     @State private var viewModel = ThisWeekViewModel()
     @State private var household = HouseholdSession.shared
     @State private var notifications = NotificationRouter.shared
@@ -20,6 +21,13 @@ struct ThisWeekView: View {
     /// Cleared when the tab is left, so a later return waits one turn.
     @State private var showsWeek = true
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var pantryStock: [PantryPlanningStock] {
+        let householdID = household.snapshot.household?.id
+        return pantryItems.filter { $0.householdID == householdID && $0.quantity > 0 }.map {
+            PantryPlanningStock(ingredientId: $0.ingredientID, quantity: $0.quantity, unit: $0.unit, bestBefore: $0.bestBefore)
+        }
+    }
 
     private var householdSize: Int {
         let stored = prefs.min { $0.createdAt < $1.createdAt }?.householdSize ?? 2
@@ -86,7 +94,8 @@ struct ThisWeekView: View {
             recipes: recipes,
             feedback: feedback,
             householdSize: householdSize,
-            memories: memories
+            memories: memories,
+            pantryStock: pantryStock
         )
         let meals = householdMeals(from: personalMeals)
         let planExplanation = viewModel.explanation(weeks: weeks)
