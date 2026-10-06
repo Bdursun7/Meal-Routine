@@ -54,7 +54,7 @@ enum GroceryMerger {
                         ingredientId: ingredientId,
                         nameTR: nameTR,
                         nameEN: nameEN,
-                        quantity: combined.quantity,
+                        quantity: roundedQuantity(combined.quantity),
                         unit: combined.code,
                         hasUnitConflict: hasConflict
                     )
@@ -67,6 +67,12 @@ enum GroceryMerger {
             if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
             return lhs.unit < rhs.unit
         }
+    }
+
+    /// Two decimal places. `0.1 + 0.2` becomes `0.3` instead of a binary tail.
+    static func roundedQuantity(_ quantity: Double?) -> Double? {
+        guard let quantity else { return nil }
+        return (quantity * 100).rounded() / 100
     }
 
     /// Canonical unit code. Safe to store and to compare across rebuilds.
@@ -89,5 +95,22 @@ enum GroceryMerger {
             return "family:\(family.rawValue)"
         }
         return "unit:\(unit.code)"
+    }
+}
+
+/// Vetoed evenings leave the shopping list. A skip keeps the recipe and its rows.
+enum GroceryMealAudit {
+    static func shops(isSkipped: Bool, isVetoed: Bool) -> Bool {
+        // A skip keeps the recipe on the list. Only a veto removes it.
+        if isSkipped { return !isVetoed }
+        return !isVetoed
+    }
+}
+
+/// Integer written to `shared_grocery_items.quantity` (migration 0008).
+enum GrocerySyncQuantity {
+    static func whole(_ quantity: Double?) -> Int {
+        guard let quantity, quantity > 0 else { return 1 }
+        return max(1, Int(quantity.rounded()))
     }
 }

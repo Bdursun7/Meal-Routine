@@ -156,7 +156,8 @@ enum HouseholdPlanBridge {
         guard WeekCalendar.isSameDay(plan.weekStart, WeekCalendar.weekStart(containing: now)) else { return }
         guard let prefs = try UserPrefsStore.existing(in: context) else { return }
         if let existing = try WeekPlanService.currentWeek(in: context, now: now) {
-            let retired = Set(existing.meals.map(\.uuid))
+            let kept = Set(plan.meals.map(\.id))
+            let retired = Set(existing.meals.map(\.uuid)).subtracting(kept)
             let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
             for check in checks {
                 guard let mealUUID = check.mealUUID, retired.contains(mealUUID) else { continue }
@@ -197,6 +198,8 @@ enum HouseholdPlanBridge {
         meal.titleSnapshot = title
         meal.cookedAt = nil
         try context.save()
+        GroceryListService.discardRebuildCache()
+        try GroceryListService.rebuild(in: context)
     }
 
     @MainActor

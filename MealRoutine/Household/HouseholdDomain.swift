@@ -699,6 +699,10 @@ struct HouseholdMealDraft: Equatable, Sendable {
     var recipeSlug: String
     var title: String
     var recipeOwnerUserId: String?
+    /// Set when a cooked evening is carried into the next shared plan.
+    var cookedAt: Date? = nil
+    /// Keeps the shared meal id so reactions and checks stay on that evening.
+    var preservedID: UUID? = nil
 }
 
 enum HouseholdReducer {
@@ -1065,7 +1069,7 @@ enum HouseholdReducer {
     ) throws {
         guard let household = snapshot.household else { throw HouseholdError.notMember }
         guard snapshot.member(actor.id) != nil else { throw HouseholdError.notMember }
-        let ids = mealIds.count == drafts.count ? mealIds : drafts.map { _ in UUID() }
+        let ids = mealIds.count == drafts.count ? mealIds : drafts.map { $0.preservedID ?? UUID() }
         let meals = drafts.enumerated().map { index, draft in
             SharedMeal(
                 id: ids[index],
@@ -1074,12 +1078,12 @@ enum HouseholdReducer {
                 recipeSlug: draft.recipeSlug,
                 title: draft.title,
                 recipeOwnerUserId: draft.recipeOwnerUserId,
-                status: .proposed,
+                status: draft.cookedAt == nil ? .proposed : .cooked,
                 reactions: [],
                 revision: 1,
                 baseRevision: 0,
                 updatedAt: now,
-                cookedAt: nil,
+                cookedAt: draft.cookedAt,
                 replacedAt: nil
             )
         }
@@ -1096,7 +1100,7 @@ enum HouseholdReducer {
         )
         HouseholdPlanRules.refresh(&plan, memberIds: snapshot.members.map(\.userId))
         snapshot.plan = plan
-        for draft in drafts {
+        for draft in drafts where draft.cookedAt == nil {
             var signal = snapshot.memory.first { $0.recipeSlug == draft.recipeSlug } ?? .empty(slug: draft.recipeSlug)
             signal.selectedCount += 1
             signal.revision += 1
@@ -1908,7 +1912,8 @@ enum HouseholdPlanner {
         vetoSlugs: Set<String>,
         householdAvoided: Set<String>,
         preferredCategories: Set<String> = [],
-        preferredProteins: Set<String> = []
+        preferredProteins: Set<String> = [],
+        allowsHard: Bool = true
     ) -> [String] {
         let offsets = dayOffsets.isEmpty ? Array(0..<max(0, evenings)) : dayOffsets
         var blocked: Set<String> = []
@@ -1919,6 +1924,7 @@ enum HouseholdPlanner {
             let ranked = candidates
                 .filter { candidate in
                     !blocked.contains(candidate.slug)
+                        && (allowsHard || candidate.difficulty.lowercased() != "hard")
                         && HouseholdRecommendation.exclusion(
                             for: candidate,
                             tastes: tastes,

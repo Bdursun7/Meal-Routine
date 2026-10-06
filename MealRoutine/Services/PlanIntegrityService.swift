@@ -84,6 +84,7 @@ enum PlanIntegrityService {
     @MainActor
     private static func canRegenerateCurrentWeek(in context: ModelContext) throws -> Bool {
         guard let prefs = try UserPrefsStore.existing(in: context) else { return false }
+        if HouseholdSession.shared.isHouseholdMode { return false }
         return prefs.hasCompletedOnboarding
     }
 
