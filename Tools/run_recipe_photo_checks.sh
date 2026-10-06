@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SWIFTC="${SWIFTC:-swiftc}"
 OUT="${TMPDIR:-/tmp}/meal-recipe-photo-checks"
 "$SWIFTC" -swift-version 5 -o "$OUT" \
+  "$ROOT/Tools/RecipeOriginCheckStub.swift" \
   "$ROOT/MealRoutine/Services/Catalog/CatalogIntegrity.swift" \
   "$ROOT/MealRoutine/Services/Catalog/RecipeCatalogDTO.swift" \
   "$ROOT/MealRoutine/Services/RecipePhoto.swift" \
