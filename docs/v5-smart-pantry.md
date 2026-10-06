@@ -2,7 +2,7 @@
 
 **Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Meal Budget
 
-**Durum:** Yönerge hazır, geliştirme başlamadı.
+**Durum:** Yönerge hazır; foundation (model, UI, sync, planning signal, migration `0012`) V5.0 branch’te başladı. V4.1 tip’i (`#41` hero frame dahil) V5.0’a merge edildi. Kabul kapısı henüz kapanmadı.
 
 **V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı tamamlandı. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez.
 
