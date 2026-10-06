@@ -1,0 +1,6 @@
+// Free personal team and iOS Simulator.
+// Debug and Release keep MealRoutine/MealRoutine.entitlements
+// (Sign in with Apple, iCloud/CloudKit, Push, App Groups).
+// This configuration does not. Use the MealRoutine Local scheme.
+
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG HOUSEHOLD_LOCAL

@@ -12,6 +12,7 @@ struct ThisWeekView: View {
     @Query private var memories: [MealMemory]
     @State private var viewModel = ThisWeekViewModel()
     @State private var household = HouseholdSession.shared
+    @State private var testMode = HouseholdTestMode.shared
     @State private var replacingMeal: ReplacingMeal?
     @State private var allowsPhotos = false
     /// True on the landing tab so the first screen is not a blank frame.
@@ -159,6 +160,9 @@ struct ThisWeekView: View {
                                             household.setReaction(kind, mealID: meal.id, in: modelContext)
                                         }
                                     )
+                                    if household.showsPartnerControls {
+                                        HouseholdPartnerMealControls(mealID: meal.id, session: household)
+                                    }
                                 }
                             }
                         }
@@ -178,12 +182,16 @@ struct ThisWeekView: View {
                 Text("Bu hafta")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
+                if testMode.isEnabled {
+                    HouseholdTestBadge()
+                }
                 if let status = household.snapshot.plan?.status {
                     Text(status.title)
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Theme.accent.opacity(0.15), in: Capsule())
+                        .accessibilityIdentifier("household.planStatus")
                 }
             }
             if household.snapshot.plan?.status == .ready, household.snapshot.plan?.isFinalized != true {

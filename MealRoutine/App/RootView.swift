@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var prefs: [UserPrefs]
     @State private var household = HouseholdSession.shared
+    @State private var testMode = HouseholdTestMode.shared
     @State private var seedAttempt = 0
     @State private var isSeeding = true
     @State private var seedError: String?
@@ -15,27 +16,38 @@ struct RootView: View {
     }
 
     var body: some View {
-        Group {
-            if isSeeding {
-                ProgressView("Tarifler yükleniyor…")
-                    .tint(Theme.accent)
-            } else if let seedError {
-                ContentUnavailableView {
-                    Label("Katalog açılamadı", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(seedError)
-                } actions: {
-                    Button("Tekrar dene") {
-                        seedAttempt += 1
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+        VStack(spacing: 0) {
+            if let notice = testMode.banner {
+                HouseholdTestBanner(notice: notice) {
+                    testMode.dismissBanner()
                 }
-            } else if didFinishOnboarding {
-                MainTabView()
-            } else {
-                OnboardingView()
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
             }
+            Group {
+                if isSeeding {
+                    ProgressView("Tarifler yükleniyor…")
+                        .tint(Theme.accent)
+                } else if let seedError {
+                    ContentUnavailableView {
+                        Label("Katalog açılamadı", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(seedError)
+                    } actions: {
+                        Button("Tekrar dene") {
+                            seedAttempt += 1
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                    }
+                } else if didFinishOnboarding {
+                    MainTabView()
+                } else {
+                    OnboardingView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas.ignoresSafeArea())

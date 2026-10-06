@@ -10,6 +10,7 @@ struct ProfileView: View {
     @Query private var feedback: [RecipeFeedback]
     @State private var viewModel = ProfileViewModel()
     @State private var showsProfile = false
+    @State private var testMode = HouseholdTestMode.shared
 
     var body: some View {
         NavigationStack {
@@ -41,8 +42,15 @@ struct ProfileView: View {
                     NavigationLink {
                         HouseholdSettingsView()
                     } label: {
-                        Text("Birlikte planla")
+                        HStack {
+                            Text("Birlikte planla")
+                            Spacer()
+                            if testMode.isEnabled {
+                                HouseholdTestBadge()
+                            }
+                        }
                     }
+                    .accessibilityIdentifier("household.open")
                     .accessibilityHint("Ev halkı, davet ve ortak hafta")
                     Text("Apple ile girişten sonra en fazla iki kişi aynı haftayı seçer. Kişisel yemek hafızan ev halkına taşınmaz.")
                         .font(.footnote)

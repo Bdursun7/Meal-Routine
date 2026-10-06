@@ -35,7 +35,9 @@ final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        application.registerForRemoteNotifications()
+        if HouseholdTestLaunch.allowsAppleServices {
+            application.registerForRemoteNotifications()
+        }
         return true
     }
 }

@@ -15,40 +15,50 @@ final class HouseholdCacheBox {
     }
 
     static let currentKey = "current"
+    /// Test-mode client board. Kept apart from the CloudKit cache.
+    static let testClientKey = "test-client"
+    /// Encoded `FakeHouseholdBackendState` for the test-mode server.
+    static let testServerKey = "test-server"
 }
 
 enum HouseholdAccountStore {
     private static let idKey = "mealroutine.appleUserID"
     private static let nameKey = "mealroutine.appleDisplayName"
     private static let createdKey = "mealroutine.appleCreatedAt"
+    private static let testIDKey = "mealroutine.testUserID"
+    private static let testNameKey = "mealroutine.testDisplayName"
+    private static let testCreatedKey = "mealroutine.testCreatedAt"
 
-    static func load() -> HouseholdUser? {
+    static func load(testMode: Bool = false) -> HouseholdUser? {
         let defaults = UserDefaults.standard
+        let idKey = testMode ? testIDKey : self.idKey
+        let nameKey = testMode ? testNameKey : self.nameKey
+        let createdKey = testMode ? testCreatedKey : self.createdKey
         guard let id = defaults.string(forKey: idKey), !id.isEmpty else { return nil }
         let name = defaults.string(forKey: nameKey) ?? ""
         let created = Date(timeIntervalSince1970: defaults.double(forKey: createdKey))
         return HouseholdUser(id: id, displayName: name, createdAt: created == .distantPast || defaults.double(forKey: createdKey) == 0 ? .now : created)
     }
 
-    static func save(_ user: HouseholdUser) {
+    static func save(_ user: HouseholdUser, testMode: Bool = false) {
         let defaults = UserDefaults.standard
-        defaults.set(user.id, forKey: idKey)
-        defaults.set(user.displayName, forKey: nameKey)
-        defaults.set(user.createdAt.timeIntervalSince1970, forKey: createdKey)
+        defaults.set(user.id, forKey: testMode ? testIDKey : idKey)
+        defaults.set(user.displayName, forKey: testMode ? testNameKey : nameKey)
+        defaults.set(user.createdAt.timeIntervalSince1970, forKey: testMode ? testCreatedKey : createdKey)
     }
 
-    static func clear() {
+    static func clear(testMode: Bool = false) {
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: idKey)
-        defaults.removeObject(forKey: nameKey)
-        defaults.removeObject(forKey: createdKey)
+        defaults.removeObject(forKey: testMode ? testIDKey : idKey)
+        defaults.removeObject(forKey: testMode ? testNameKey : nameKey)
+        defaults.removeObject(forKey: testMode ? testCreatedKey : createdKey)
     }
 }
 
 enum HouseholdCacheStore {
     @MainActor
-    static func load(in context: ModelContext) -> HouseholdSnapshot {
-        guard let box = existing(in: context),
+    static func load(in context: ModelContext, key: String = HouseholdCacheBox.currentKey) -> HouseholdSnapshot {
+        guard let box = existing(in: context, key: key),
               let snapshot = try? HouseholdCodec.decode(box.payload) else {
             return .empty()
         }
@@ -56,26 +66,43 @@ enum HouseholdCacheStore {
     }
 
     @MainActor
-    static func save(_ snapshot: HouseholdSnapshot, in context: ModelContext) {
+    static func save(_ snapshot: HouseholdSnapshot, in context: ModelContext, key: String = HouseholdCacheBox.currentKey) {
         do {
             let data = try HouseholdCodec.encode(snapshot)
-            if let box = existing(in: context) {
-                box.payload = data
-                box.updatedAt = snapshot.updatedAt
-            } else {
-                context.insert(HouseholdCacheBox(payload: data, updatedAt: snapshot.updatedAt))
-            }
-            try context.save()
+            saveData(data, updatedAt: snapshot.updatedAt, in: context, key: key)
         } catch {
             // The in-memory board stays usable when the cache row cannot be written.
         }
     }
 
     @MainActor
-    private static func existing(in context: ModelContext) -> HouseholdCacheBox? {
-        let key = HouseholdCacheBox.currentKey
+    static func loadData(in context: ModelContext, key: String) -> Data? {
+        existing(in: context, key: key)?.payload
+    }
+
+    @MainActor
+    static func saveData(_ data: Data, updatedAt: Date = .now, in context: ModelContext, key: String) {
+        if let box = existing(in: context, key: key) {
+            box.payload = data
+            box.updatedAt = updatedAt
+        } else {
+            context.insert(HouseholdCacheBox(key: key, payload: data, updatedAt: updatedAt))
+        }
+        try? context.save()
+    }
+
+    @MainActor
+    static func clear(in context: ModelContext, key: String) {
+        guard let box = existing(in: context, key: key) else { return }
+        context.delete(box)
+        try? context.save()
+    }
+
+    @MainActor
+    private static func existing(in context: ModelContext, key: String) -> HouseholdCacheBox? {
+        let storedKey = key
         var descriptor = FetchDescriptor<HouseholdCacheBox>(
-            predicate: #Predicate { $0.key == key }
+            predicate: #Predicate { $0.key == storedKey }
         )
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
