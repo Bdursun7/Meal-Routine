@@ -4,7 +4,7 @@ import Foundation
 actor RefreshGate {
     private var task: Task<AuthTokenSet, Error>?
 
-    func run(_ work: @Sendable () async throws -> AuthTokenSet) async throws -> AuthTokenSet {
+    func run(_ work: @escaping @Sendable () async throws -> AuthTokenSet) async throws -> AuthTokenSet {
         if let task {
             return try await task.value
         }
