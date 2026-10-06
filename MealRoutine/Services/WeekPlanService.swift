@@ -182,6 +182,7 @@ enum WeekPlanService {
             evenings: request.evenings,
             preferences: preferences,
             memories: memories,
+            pantryStock: pantryStock(in: context),
             now: now
         )
         let slugs = selection.slugs
@@ -208,6 +209,15 @@ enum WeekPlanService {
             Analytics.track(.planGenerated)
         }
         return week
+    }
+
+    @MainActor
+    private static func pantryStock(in context: ModelContext) -> [PantryPlanningStock] {
+        let householdID = HouseholdSession.shared.snapshot.household?.id
+        let items = (try? context.fetch(FetchDescriptor<PantryItem>())) ?? []
+        return items.filter { $0.householdID == householdID && $0.quantity > 0 }.map {
+            PantryPlanningStock(ingredientId: $0.ingredientID, quantity: $0.quantity, unit: $0.unit)
+        }
     }
 
     /// Keeps cooked evenings and their checks. Skipped evenings are open and can change.

@@ -79,6 +79,7 @@ enum PersonalizedScoringService {
         blockedSlugs: Set<String> = [],
         initialAnchors: [PickerCandidate] = [],
         startDayOffset: Int = 0,
+        pantryStock: [PantryPlanningStock] = [],
         now: Date = .now
     ) -> (slugs: [String], explanation: String, scores: [String: RecipeMemoryScore]) {
         let limit = min(max(evenings, 0), MealRecommender.eveningCap)
@@ -103,6 +104,7 @@ enum PersonalizedScoringService {
             candidates: candidates,
             initialAnchors: initialAnchors,
             startDayOffset: startDayOffset,
+            pantryStock: pantryStock,
             now: now
         )
         let chosen = picked.chosen.count < limit
@@ -123,6 +125,7 @@ enum PersonalizedScoringService {
                 candidates: candidates,
                 initialAnchors: initialAnchors,
                 startDayOffset: startDayOffset,
+                pantryStock: pantryStock,
                 now: now
             )
             : picked
@@ -235,6 +238,7 @@ enum PersonalizedScoringService {
         candidates: [PickerCandidate],
         initialAnchors: [PickerCandidate],
         startDayOffset: Int,
+        pantryStock: [PantryPlanningStock],
         now: Date
     ) -> (chosen: [PickerCandidate], scores: [String: RecipeMemoryScore]) {
         var remaining = pool
@@ -256,11 +260,12 @@ enum PersonalizedScoringService {
                         anchors: anchors,
                         dayOffset: offset,
                         now: now
-                    )
+                    ),
+                    PantryPlanningSignal.score(candidate: candidate, stock: pantryStock)
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.1.final != rhs.1.final { return lhs.1.final > rhs.1.final }
+                if lhs.1.final + lhs.2 != rhs.1.final + rhs.2 { return lhs.1.final + lhs.2 > rhs.1.final + rhs.2 }
                 return lhs.0.slug < rhs.0.slug
             }
             guard let next = ranked.first else { break }
