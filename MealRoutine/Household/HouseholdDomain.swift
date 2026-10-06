@@ -18,6 +18,7 @@ enum HouseholdInviteStatus: String, Codable, Sendable {
     case accepted
     case revoked
     case expired
+    case rejected
 }
 
 enum MealReactionKind: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -120,6 +121,7 @@ enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
     case inviteRevoked
     case inviteClosed
     case alreadyMember
+    case duplicateInvite
     case mealNotFound
     case noAlternative
     case planNotReady
@@ -150,6 +152,8 @@ enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
             "Bu davet kullanılmış."
         case .alreadyMember:
             "Zaten bu ev halkındasın."
+        case .duplicateInvite:
+            "Zaten açık bir davet var. Yeniden gönderebilir veya geri alabilirsin."
         case .mealNotFound:
             "Bu akşam planda yok."
         case .noAlternative:
@@ -690,6 +694,10 @@ enum HouseholdReducer {
         guard let household = snapshot.household else { throw HouseholdError.notMember }
         guard snapshot.role(of: user.id) == .owner else { throw HouseholdError.notOwner }
         guard snapshot.members.count < HouseholdLimits.maxMembers else { throw HouseholdError.householdFull }
+        expireStaleInvites(&snapshot, now: now)
+        if snapshot.invites.contains(where: { $0.status == .pending && $0.expiresAt > now }) {
+            throw HouseholdError.duplicateInvite
+        }
         let code = HouseholdInviteCode.make(seed: seed)
         let invite = HouseholdInvite(
             id: inviteId,
@@ -722,6 +730,104 @@ enum HouseholdReducer {
         touch(&snapshot, now: now)
     }
 
+    static func resendInvite(
+        snapshot: inout HouseholdSnapshot,
+        userId: String,
+        inviteId: UUID,
+        now: Date
+    ) throws -> HouseholdInvite {
+        guard snapshot.role(of: userId) == .owner else { throw HouseholdError.notOwner }
+        guard let index = snapshot.invites.firstIndex(where: { $0.id == inviteId }) else {
+            throw HouseholdError.inviteNotFound
+        }
+        switch snapshot.invites[index].status {
+        case .pending, .expired:
+            if snapshot.invites[index].status == .expired,
+               snapshot.invites.contains(where: { $0.id != inviteId && $0.status == .pending && $0.expiresAt > now }) {
+                throw HouseholdError.duplicateInvite
+            }
+            snapshot.invites[index].status = .pending
+            snapshot.invites[index].expiresAt = now.addingTimeInterval(HouseholdLimits.inviteLifetime)
+            snapshot.invites[index].revision += 1
+        case .revoked, .accepted, .rejected:
+            throw HouseholdError.inviteClosed
+        }
+        touch(&snapshot, now: now)
+        return snapshot.invites[index]
+    }
+
+    static func rejectInvite(
+        snapshot: inout HouseholdSnapshot,
+        code: String,
+        now: Date
+    ) throws {
+        guard snapshot.household != nil else { throw HouseholdError.inviteNotFound }
+        let normalized = HouseholdInviteCode.normalize(code)
+        guard let index = snapshot.invites.firstIndex(where: {
+            HouseholdInviteCode.normalize($0.inviteCode) == normalized
+        }) else {
+            throw HouseholdError.inviteNotFound
+        }
+        var invite = snapshot.invites[index]
+        switch invite.status {
+        case .revoked:
+            throw HouseholdError.inviteRevoked
+        case .accepted, .rejected:
+            throw HouseholdError.inviteClosed
+        case .expired:
+            throw HouseholdError.inviteExpired
+        case .pending:
+            break
+        }
+        if invite.expiresAt <= now {
+            snapshot.invites[index].status = .expired
+            snapshot.invites[index].revision += 1
+            touch(&snapshot, now: now)
+            throw HouseholdError.inviteExpired
+        }
+        invite.status = .rejected
+        invite.revision += 1
+        snapshot.invites[index] = invite
+        touch(&snapshot, now: now)
+    }
+
+    static func rename(
+        snapshot: inout HouseholdSnapshot,
+        userId: String,
+        name: String,
+        now: Date
+    ) throws {
+        guard snapshot.role(of: userId) == .owner else { throw HouseholdError.notOwner }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw HouseholdError.nameEmpty }
+        guard snapshot.household != nil else { throw HouseholdError.notMember }
+        snapshot.household?.name = trimmed
+        snapshot.household?.revision += 1
+        touch(&snapshot, now: now)
+    }
+
+    static func transferOwnership(
+        snapshot: inout HouseholdSnapshot,
+        actorId: String,
+        memberUserId: String,
+        now: Date
+    ) throws {
+        guard snapshot.role(of: actorId) == .owner else { throw HouseholdError.notOwner }
+        guard memberUserId != actorId else { throw HouseholdError.notOwner }
+        guard snapshot.member(memberUserId)?.role == .member else { throw HouseholdError.notMember }
+        guard let ownerIndex = snapshot.members.firstIndex(where: { $0.userId == actorId }),
+              let memberIndex = snapshot.members.firstIndex(where: { $0.userId == memberUserId }) else {
+            throw HouseholdError.notMember
+        }
+        snapshot.members[ownerIndex].role = .member
+        snapshot.members[ownerIndex].revision += 1
+        snapshot.members[memberIndex].role = .owner
+        snapshot.members[memberIndex].revision += 1
+        snapshot.household?.ownerId = memberUserId
+        snapshot.household?.revision += 1
+        touch(&snapshot, now: now)
+    }
+
     static func acceptInvite(
         snapshot: inout HouseholdSnapshot,
         user: HouseholdUser,
@@ -742,7 +848,7 @@ enum HouseholdReducer {
         switch invite.status {
         case .revoked:
             throw HouseholdError.inviteRevoked
-        case .accepted:
+        case .accepted, .rejected:
             throw HouseholdError.inviteClosed
         case .expired:
             throw HouseholdError.inviteExpired
@@ -812,7 +918,20 @@ enum HouseholdReducer {
         now: Date
     ) throws {
         guard let member = snapshot.member(userId) else { throw HouseholdError.notMember }
-        if member.role == .owner { throw HouseholdError.notOwner }
+        if member.role == .owner {
+            let others = snapshot.members.filter { $0.userId != userId }
+            if others.isEmpty {
+                snapshot = HouseholdSnapshot.empty(now: now)
+                return
+            }
+            let next = others[0]
+            snapshot.household?.ownerId = next.userId
+            snapshot.household?.revision += 1
+            if let index = snapshot.members.firstIndex(where: { $0.userId == next.userId }) {
+                snapshot.members[index].role = .owner
+                snapshot.members[index].revision += 1
+            }
+        }
         snapshot.members.removeAll { $0.userId == userId }
         append(
             &snapshot,
@@ -1173,6 +1292,13 @@ enum HouseholdReducer {
     static func displayName(_ user: HouseholdUser) -> String {
         let trimmed = user.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Partner" : trimmed
+    }
+
+    private static func expireStaleInvites(_ snapshot: inout HouseholdSnapshot, now: Date) {
+        for index in snapshot.invites.indices where snapshot.invites[index].status == .pending && snapshot.invites[index].expiresAt <= now {
+            snapshot.invites[index].status = .expired
+            snapshot.invites[index].revision += 1
+        }
     }
 
     private static func touch(_ snapshot: inout HouseholdSnapshot, now: Date) {

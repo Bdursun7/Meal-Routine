@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { createAuthService, type AuthService, type VerifiedIdentity } from './authService.js'
 import type { AppConfig } from './config.js'
 import { AppError } from './errors.js'
+import { createHouseholdService } from './householdService.js'
+import type { HouseholdStore } from './householdTypes.js'
 import type { IdentityVerifier } from './jwks.js'
 import { redactSensitive } from './log.js'
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
@@ -40,11 +42,32 @@ const householdParams = z.object({
   householdId: z.string().uuid(),
 })
 
+const inviteParams = householdParams.extend({
+  inviteId: z.string().uuid(),
+})
+
+const memberParams = householdParams.extend({
+  accountId: z.string().uuid(),
+})
+
+const nameBody = z.object({
+  name: z.string().min(1).max(80),
+})
+
+const transferBody = z.object({
+  accountId: z.string().uuid(),
+})
+
+const codeParams = z.object({
+  code: z.string().min(1).max(32),
+})
+
 export interface BuildAppOptions {
-  repo: AuthRepository
+  repo: AuthRepository & HouseholdStore
   config: AppConfig
   verifier: IdentityVerifier
   now?: () => Date
+  householdNow?: () => Date
   rateLimiter?: RateLimiter
   logger?: boolean
   logStream?: Writable
@@ -66,6 +89,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const limiter =
     options.rateLimiter ??
     createRateLimiter({ windowMs: config.rateLimitWindowMs, max: config.rateLimitMax })
+  const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
 
   const app = Fastify({
     logger: options.logStream
@@ -171,12 +195,89 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     return reply.send(await service.unlink(accountId, params.provider))
   })
 
+  app.get('/v1/households/current', async (request) => {
+    const accountId = await requireAccount(request, config)
+    return households.current(accountId)
+  })
+
+  app.post('/v1/households', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const body = parse(nameBody, request.body)
+    return households.create(accountId, body.name)
+  })
+
   app.get('/v1/households/:householdId', async (request) => {
     const accountId = await requireAccount(request, config)
     const params = parse(householdParams, request.params)
     const role = await options.repo.membership(params.householdId, accountId)
     if (!role) throw new AppError('not_found', 404)
     return { id: params.householdId, role }
+  })
+
+  app.patch('/v1/households/:householdId', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    const body = parse(nameBody, request.body)
+    return households.rename(accountId, params.householdId, body.name)
+  })
+
+  app.post('/v1/households/:householdId/invites', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    return households.createInvite(accountId, params.householdId)
+  })
+
+  app.post('/v1/households/:householdId/invites/:inviteId/resend', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(inviteParams, request.params)
+    return households.resendInvite(accountId, params.householdId, params.inviteId)
+  })
+
+  app.post('/v1/households/:householdId/invites/:inviteId/cancel', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(inviteParams, request.params)
+    return households.cancelInvite(accountId, params.householdId, params.inviteId)
+  })
+
+  app.post('/v1/invites/:code/accept', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(codeParams, request.params)
+    return households.acceptInvite(accountId, params.code)
+  })
+
+  app.post('/v1/invites/:code/reject', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(codeParams, request.params)
+    return households.rejectInvite(accountId, params.code)
+  })
+
+  app.delete('/v1/households/:householdId/members/:accountId', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(memberParams, request.params)
+    return households.removeMember(accountId, params.householdId, params.accountId)
+  })
+
+  app.post('/v1/households/:householdId/leave', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    return households.leave(accountId, params.householdId)
+  })
+
+  app.post('/v1/households/:householdId/transfer', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    const body = parse(transferBody, request.body)
+    return households.transfer(accountId, params.householdId, body.accountId)
   })
 
   app.put('/v1/households/:householdId/board', async (request) => {
@@ -190,8 +291,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   })
 
   app.delete('/v1/households/:householdId', async (request) => {
-    await assertMember(request, options, config)
-    throw new AppError('not_implemented', 501)
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    return households.deleteHousehold(accountId, params.householdId)
   })
 
   return app
@@ -204,8 +307,11 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 }
 
 function enforceRateLimit(request: FastifyRequest, limiter: RateLimiter): void {
-  const key = `${request.ip}:auth`
-  if (!limiter.allow(key)) throw new AppError('rate_limited', 429)
+  enforceWriteLimit(request, limiter, 'auth')
+}
+
+function enforceWriteLimit(request: FastifyRequest, limiter: RateLimiter, scope: string): void {
+  if (!limiter.allow(`${request.ip}:${scope}`)) throw new AppError('rate_limited', 429)
 }
 
 function enforceClientVersion(request: FastifyRequest): void {

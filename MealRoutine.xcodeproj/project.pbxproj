@@ -135,6 +135,8 @@
 		V41B41A0000000000000007 /* HTTPHouseholdTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */; };
 		V41B41A0000000000000008 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000008 /* AccountView.swift */; };
 		V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V41F41A0000000000000009 /* AuthTokenTests.swift */; };
+		V42B42A0000000000000001 /* HouseholdLifecycleClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = V42F42A0000000000000001 /* HouseholdLifecycleClient.swift */; };
+		V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */; };
 		V41B41A000000000000000B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = V41P41A0000000000000002 /* GoogleSignIn */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
@@ -294,6 +296,8 @@
 		V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPHouseholdTransport.swift; sourceTree = "<group>"; };
 		V41F41A0000000000000008 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		V41F41A0000000000000009 /* AuthTokenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenTests.swift; sourceTree = "<group>"; };
+		V42F42A0000000000000001 /* HouseholdLifecycleClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdLifecycleClient.swift; sourceTree = "<group>"; };
+		V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdLifecycleTests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
@@ -619,6 +623,7 @@
 				V4F0000000000000000007 /* HouseholdPlanningTests.swift */,
 				V4F000000000000000000C /* HouseholdTestModeTests.swift */,
 				V41F41A0000000000000009 /* AuthTokenTests.swift */,
+				V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */,
 			);
 			path = MealRoutineTests;
 			sourceTree = "<group>";
@@ -642,6 +647,7 @@
 				V41F41A0000000000000005 /* AuthSession.swift */,
 				V41F41A0000000000000006 /* GoogleSignInCoordinator.swift */,
 				V41F41A0000000000000007 /* HTTPHouseholdTransport.swift */,
+				V42F42A0000000000000001 /* HouseholdLifecycleClient.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -955,6 +961,7 @@
 				V41B41A0000000000000005 /* AuthSession.swift in Sources */,
 				V41B41A0000000000000006 /* GoogleSignInCoordinator.swift in Sources */,
 				V41B41A0000000000000007 /* HTTPHouseholdTransport.swift in Sources */,
+				V42B42A0000000000000001 /* HouseholdLifecycleClient.swift in Sources */,
 				V41B41A0000000000000008 /* AccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -974,6 +981,7 @@
 				V4B0000000000000000007 /* HouseholdPlanningTests.swift in Sources */,
 				V4B000000000000000000C /* HouseholdTestModeTests.swift in Sources */,
 				V41B41A0000000000000009 /* AuthTokenTests.swift in Sources */,
+				V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

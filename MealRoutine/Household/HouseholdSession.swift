@@ -156,6 +156,10 @@ final class HouseholdSession {
             statusMessage = HouseholdError.alreadyInHousehold.errorDescription
             return
         }
+        if usesHouseholdAPI {
+            Task { await self.createRemote(name: name, in: context) }
+            return
+        }
         do {
             snapshot = try HouseholdReducer.createHousehold(user: account, name: name, now: .now)
             statusMessage = "Ev halkı kuruldu. Partnerini davet edebilirsin."
@@ -169,6 +173,10 @@ final class HouseholdSession {
     func createInvite(in context: ModelContext) {
         guard let account else {
             statusMessage = signedInRequired
+            return
+        }
+        if usesHouseholdAPI {
+            Task { await self.inviteRemote(in: context) }
             return
         }
         do {
@@ -194,6 +202,13 @@ final class HouseholdSession {
         }
         if snapshot.hasHousehold, snapshot.member(account.id) == nil {
             statusMessage = HouseholdError.alreadyInHousehold.errorDescription
+            return
+        }
+        if usesHouseholdAPI {
+            await performRemote(in: context, success: "Ev halkına katıldın.") {
+                try await self.lifecycleAPI().accept(code: code)
+            }
+            pendingInviteCode = nil
             return
         }
         syncState = .syncing
@@ -226,6 +241,10 @@ final class HouseholdSession {
 
     func revoke(inviteId: UUID, in context: ModelContext) {
         guard let account else { return }
+        if usesHouseholdAPI {
+            Task { await self.cancelRemote(inviteId: inviteId, in: context) }
+            return
+        }
         do {
             try HouseholdReducer.revokeInvite(snapshot: &snapshot, userId: account.id, inviteId: inviteId, now: .now)
             persist(in: context)
@@ -237,6 +256,10 @@ final class HouseholdSession {
 
     func remove(memberId: String, in context: ModelContext) {
         guard let account else { return }
+        if usesHouseholdAPI {
+            Task { await self.removeRemote(memberId: memberId, in: context) }
+            return
+        }
         do {
             try HouseholdReducer.removeMember(snapshot: &snapshot, actorId: account.id, memberUserId: memberId, now: .now)
             persist(in: context)
@@ -248,10 +271,84 @@ final class HouseholdSession {
 
     func leave(in context: ModelContext) {
         guard let account else { return }
+        if usesHouseholdAPI {
+            let transferring = snapshot.role(of: account.id) == .owner && snapshot.members.count > 1
+            let message = transferring
+                ? "Ev sahipliği devredildi. Ortak plan evde kaldı. Kişisel verin duruyor."
+                : "Ev halkından ayrıldın. Kişisel verin duruyor."
+            Task { await self.leaveRemote(message: message, in: context) }
+            return
+        }
+        let householdId = snapshot.household?.id
+        let ownerAlone = snapshot.role(of: account.id) == .owner && snapshot.members.count <= 1
         do {
             try HouseholdReducer.leave(snapshot: &snapshot, userId: account.id, now: .now)
             persist(in: context)
+            if ownerAlone, let householdId {
+                let transport = activeTransport()
+                Task { try? await transport.deleteBoard(householdId: householdId) }
+            } else {
+                enqueueTestSync { await self.push(in: context) }
+            }
+            statusMessage = ownerAlone
+                ? "Ev halkı kapandı. Kişisel verin duruyor."
+                : "Ev halkından ayrıldın. Ortak plan evde kaldı."
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func renameHousehold(name: String, in context: ModelContext) {
+        guard let account else { return }
+        if usesHouseholdAPI {
+            Task { await self.renameRemote(name: name, in: context) }
+            return
+        }
+        do {
+            try HouseholdReducer.rename(snapshot: &snapshot, userId: account.id, name: name, now: .now)
+            persist(in: context)
             enqueueTestSync { await self.push(in: context) }
+            statusMessage = "Ev halkının adı güncellendi."
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func resendInvite(inviteId: UUID, in context: ModelContext) {
+        guard let account else { return }
+        if usesHouseholdAPI {
+            Task { await self.resendRemote(inviteId: inviteId, in: context) }
+            return
+        }
+        do {
+            let invite = try HouseholdReducer.resendInvite(snapshot: &snapshot, userId: account.id, inviteId: inviteId, now: .now)
+            persist(in: context)
+            enqueueTestSync { await self.publish(invite: invite, in: context) }
+            statusMessage = "Davet yeniden gönderildi. Kod \(invite.inviteCode)"
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func rejectInvite(code: String, in context: ModelContext) {
+        if usesHouseholdAPI {
+            Task { await self.rejectRemote(code: code, in: context) }
+            return
+        }
+        Task { await self.rejectOnFake(code: code, in: context) }
+    }
+
+    func transferOwnership(to memberId: String, in context: ModelContext) {
+        guard let account else { return }
+        if usesHouseholdAPI {
+            Task { await self.transferRemote(memberId: memberId, in: context) }
+            return
+        }
+        do {
+            try HouseholdReducer.transferOwnership(snapshot: &snapshot, actorId: account.id, memberUserId: memberId, now: .now)
+            persist(in: context)
+            enqueueTestSync { await self.push(in: context) }
+            statusMessage = "Ev sahipliği devredildi. Ortak plan evde kaldı."
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -259,6 +356,10 @@ final class HouseholdSession {
 
     func deleteHousehold(in context: ModelContext) {
         guard let account, let householdId = snapshot.household?.id else { return }
+        if usesHouseholdAPI {
+            Task { await self.deleteRemote(in: context) }
+            return
+        }
         do {
             snapshot = try HouseholdReducer.deleteHousehold(snapshot: &snapshot, userId: account.id)
             persist(in: context)
@@ -470,6 +571,10 @@ final class HouseholdSession {
     func refresh(in context: ModelContext) async {
         guard account != nil else { return }
         publishRecipesIfNeeded(in: context)
+        if usesHouseholdAPI {
+            await refreshFromAPI(in: context)
+            return
+        }
         syncState = .syncing
         do {
             let transport = activeTransport()
@@ -789,6 +894,173 @@ final class HouseholdSession {
             ?? slug
         let owner = snapshot.recipeProjections.first { $0.slug == slug }?.ownerUserId
         return PartnerReplacementChoice(slug: slug, title: title, owner: owner)
+    }
+
+    private var usesHouseholdAPI: Bool {
+        !isTestMode && MealRoutineConfig.apiBaseURL != nil
+    }
+
+    private func lifecycleAPI() -> HouseholdLifecycleAPI {
+        let base = MealRoutineConfig.apiBaseURL ?? URL(string: "http://127.0.0.1:8080")!
+        return HouseholdLifecycleAPI(
+            client: APIClient(
+                baseURL: base,
+                tokens: AuthServices.sharedTokens,
+                refreshGate: AuthServices.refreshGate,
+                expiry: AuthServices.expiry
+            )
+        )
+    }
+
+    private func performRemote(
+        in context: ModelContext,
+        success: String,
+        work: () async throws -> HouseholdRemoteState
+    ) async {
+        syncState = .syncing
+        do {
+            let state = try await work()
+            snapshot = HouseholdRemoteMerge.apply(state, to: snapshot, now: .now)
+            try? HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
+            persist(in: context)
+            statusMessage = success
+            syncState = .idle
+        } catch let error as HouseholdError {
+            syncState = error == .offline ? .offline : .failed
+            statusMessage = error.errorDescription
+        } catch {
+            syncState = .failed
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func createRemote(name: String, in context: ModelContext) async {
+        await performRemote(in: context, success: "Ev halkı kuruldu. Partnerini davet edebilirsin.") {
+            try await self.lifecycleAPI().create(name: name)
+        }
+    }
+
+    private func renameRemote(name: String, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Ev halkının adı güncellendi.") {
+            try await self.lifecycleAPI().rename(householdId: householdId, name: name)
+        }
+    }
+
+    private func inviteRemote(in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Davet hazır.") {
+            try await self.lifecycleAPI().createInvite(householdId: householdId)
+        }
+        guard syncState == .idle,
+              let code = snapshot.invites.last(where: { $0.status == .pending })?.inviteCode else { return }
+        statusMessage = "Davet kodu \(code)"
+    }
+
+    private func resendRemote(inviteId: UUID, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Davet yeniden gönderildi.") {
+            try await self.lifecycleAPI().resendInvite(householdId: householdId, inviteId: inviteId)
+        }
+        guard syncState == .idle,
+              let code = snapshot.invites.last(where: { $0.status == .pending })?.inviteCode else { return }
+        statusMessage = "Davet yeniden gönderildi. Kod \(code)"
+    }
+
+    private func cancelRemote(inviteId: UUID, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Davet geri alındı.") {
+            try await self.lifecycleAPI().cancelInvite(householdId: householdId, inviteId: inviteId)
+        }
+    }
+
+    private func removeRemote(memberId: String, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Üye çıkarıldı. Kişisel verisi duruyor. Ortak plan evde kaldı.") {
+            try await self.lifecycleAPI().removeMember(householdId: householdId, accountId: memberId)
+        }
+    }
+
+    private func leaveRemote(message: String, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: message) {
+            try await self.lifecycleAPI().leave(householdId: householdId)
+        }
+    }
+
+    private func transferRemote(memberId: String, in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Ev sahipliği devredildi. Ortak plan evde kaldı.") {
+            try await self.lifecycleAPI().transfer(householdId: householdId, accountId: memberId)
+        }
+    }
+
+    private func deleteRemote(in context: ModelContext) async {
+        guard let householdId = snapshot.household?.id else { return }
+        await performRemote(in: context, success: "Ev halkı silindi. Kişisel planın duruyor.") {
+            try await self.lifecycleAPI().deleteHousehold(householdId: householdId)
+        }
+    }
+
+    private func rejectRemote(code: String, in context: ModelContext) async {
+        syncState = .syncing
+        do {
+            try await lifecycleAPI().reject(code: code)
+            statusMessage = "Davet reddedildi."
+            syncState = .idle
+        } catch let error as HouseholdError {
+            syncState = error == .offline ? .offline : .failed
+            statusMessage = error.errorDescription
+        } catch {
+            syncState = .failed
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func rejectOnFake(code: String, in context: ModelContext) async {
+        let transport = activeTransport()
+        do {
+            if snapshot.invites.contains(where: { HouseholdInviteCode.normalize($0.inviteCode) == HouseholdInviteCode.normalize(code) }) {
+                try HouseholdReducer.rejectInvite(snapshot: &snapshot, code: code, now: .now)
+                persist(in: context)
+                enqueueTestSync { await self.push(in: context) }
+                statusMessage = "Davet reddedildi."
+                return
+            }
+            let lookup = try await transport.lookup(code: code)
+            guard let url = lookup.shareURL else { throw HouseholdError.inviteNotFound }
+            try await transport.acceptShare(url: url)
+            guard var remote = try await transport.pullShared(url: url) else { throw HouseholdError.inviteNotFound }
+            try HouseholdReducer.rejectInvite(snapshot: &remote, code: code, now: .now)
+            _ = try await transport.push(remote)
+            statusMessage = "Davet reddedildi."
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func refreshFromAPI(in context: ModelContext) async {
+        guard AuthServices.sharedTokens.load() != nil else {
+            syncState = .idle
+            return
+        }
+        syncState = .syncing
+        do {
+            let state = try await lifecycleAPI().current()
+            snapshot = HouseholdRemoteMerge.apply(state, to: snapshot, now: .now)
+            try? HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
+            persist(in: context)
+            syncState = .idle
+        } catch let error as HouseholdError where error == .notMember {
+            snapshot = .empty(now: .now)
+            persist(in: context)
+            syncState = .idle
+        } catch HouseholdError.offline {
+            syncState = .offline
+        } catch {
+            syncState = .failed
+            statusMessage = (error as? HouseholdError)?.errorDescription ?? error.localizedDescription
+        }
     }
 
     private var clientCacheKey: String {

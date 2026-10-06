@@ -13,6 +13,7 @@ enum HouseholdLogicChecks {
         }
         check("create invite accept") { try assertCreateInviteAccept() }
         check("invite edges") { try assertInviteEdges() }
+        check("lifecycle edges") { try assertLifecycleEdges() }
         check("veto is not never again") { try assertVetoIsNotNeverAgain() }
         check("conflict labels") { try assertConflictLabels() }
         check("replacement filters") { try assertReplacementFilters() }
@@ -79,6 +80,74 @@ enum HouseholdLogicChecks {
                 seed: 1
             )
         }
+    }
+
+    private static func assertLifecycleEdges() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let owner = HouseholdUser(id: "owner", displayName: "Berkay", createdAt: now)
+        let partner = HouseholdUser(id: "partner", displayName: "Ayşe", createdAt: now)
+        var personal = MealMemorySnapshot(recipeID: "corba")
+        personal.neverAgain = true
+        personal.lovedCount = 4
+
+        var snapshot = try HouseholdReducer.createHousehold(user: owner, name: "Ev", now: now)
+        let householdId = snapshot.household?.id
+        let preferenceId = snapshot.preference?.id
+        try expectThrows(HouseholdError.notOwner) {
+            try HouseholdReducer.rename(snapshot: &snapshot, userId: partner.id, name: "Başka", now: now)
+        }
+        try expectThrows(HouseholdError.nameEmpty) {
+            try HouseholdReducer.rename(snapshot: &snapshot, userId: owner.id, name: "   ", now: now)
+        }
+        try HouseholdReducer.rename(snapshot: &snapshot, userId: owner.id, name: " Yeni ev ", now: now)
+        try expect(snapshot.household?.name == "Yeni ev", "renamed")
+        try expect(snapshot.household?.id == householdId, "same household")
+        try expect(snapshot.preference?.id == preferenceId, "preference stays")
+
+        let invite = try HouseholdReducer.createInvite(snapshot: &snapshot, user: owner, now: now, seed: 11)
+        try expectThrows(HouseholdError.duplicateInvite) {
+            _ = try HouseholdReducer.createInvite(snapshot: &snapshot, user: owner, now: now, seed: 12)
+        }
+        let resent = try HouseholdReducer.resendInvite(snapshot: &snapshot, userId: owner.id, inviteId: invite.id, now: now.addingTimeInterval(60))
+        try expect(resent.expiresAt == now.addingTimeInterval(60).addingTimeInterval(HouseholdLimits.inviteLifetime), "resend expiry")
+        try expect(resent.inviteCode == invite.inviteCode, "same code")
+        try HouseholdReducer.rejectInvite(snapshot: &snapshot, code: invite.inviteCode, now: now.addingTimeInterval(120))
+        try expectThrows(HouseholdError.inviteClosed) {
+            try HouseholdReducer.acceptInvite(snapshot: &snapshot, user: partner, code: invite.inviteCode, now: now.addingTimeInterval(180))
+        }
+        try expectThrows(HouseholdError.inviteClosed) {
+            try HouseholdReducer.resendInvite(snapshot: &snapshot, userId: owner.id, inviteId: invite.id, now: now)
+        }
+
+        var open = try HouseholdReducer.createHousehold(user: owner, name: "Ev", now: now)
+        let live = try HouseholdReducer.createInvite(snapshot: &open, user: owner, now: now, seed: 3)
+        var stale = open
+        stale.invites[0].status = .expired
+        let renewed = try HouseholdReducer.resendInvite(snapshot: &stale, userId: owner.id, inviteId: live.id, now: now)
+        try expect(renewed.status == .pending, "expired invite can be resent")
+
+        try HouseholdReducer.acceptInvite(snapshot: &open, user: partner, code: live.inviteCode, now: now)
+        try HouseholdReducer.transferOwnership(snapshot: &open, actorId: owner.id, memberUserId: partner.id, now: now)
+        try expect(open.role(of: partner.id) == .owner, "partner owns")
+        try expect(open.role(of: owner.id) == .member, "former owner is a member")
+        try expect(open.household?.ownerId == partner.id, "owner id")
+        try expect(open.preference?.householdId == open.household?.id, "shared preference stays")
+        try expectThrows(HouseholdError.notOwner) {
+            _ = try HouseholdReducer.deleteHousehold(snapshot: &open, userId: owner.id)
+        }
+
+        try HouseholdReducer.leave(snapshot: &open, userId: partner.id, now: now)
+        try expect(open.role(of: owner.id) == .owner, "leave transfers ownership back")
+        try expect(open.member(partner.id) == nil, "partner left")
+        try expect(open.household != nil, "household remains")
+        try expect(open.preference != nil, "shared preference remains after leave")
+
+        var alone = try HouseholdReducer.createHousehold(user: owner, name: "Tek", now: now)
+        try HouseholdReducer.leave(snapshot: &alone, userId: owner.id, now: now)
+        try expect(alone.household == nil, "sole owner leave closes the household cache")
+        try expect(personal.neverAgain, "personal never-again stays")
+        try expect(personal.lovedCount == 4, "personal rating stays")
+        try expect(personal.recipeID == "corba", "personal recipe stays")
     }
 
     private static func assertVetoIsNotNeverAgain() throws {
