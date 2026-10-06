@@ -23,6 +23,17 @@ import {
   type NotificationStore,
   type PushSender,
 } from './notifications.js'
+import {
+  allowsMetrics,
+  analyticsBatchSchema,
+  createErrorReporter,
+  createMemoryObservability,
+  createMetrics,
+  diagnosticBatchSchema,
+  type ErrorReporter,
+  type Metrics,
+  type ObservabilityStore,
+} from './observability.js'
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
 import type { AuthRepository } from './repository.js'
 import { verifyAccessToken } from './tokens.js'
@@ -122,6 +133,10 @@ export interface BuildAppOptions {
   logger?: boolean
   logStream?: Writable
   bodyLimit?: number
+  readiness?: () => Promise<boolean>
+  observability?: ObservabilityStore
+  errorReporter?: ErrorReporter
+  metrics?: Metrics
 }
 
 declare module 'fastify' {
@@ -155,6 +170,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     notifications: notificationStore,
     now: clock,
   })
+  const observability = options.observability ?? createMemoryObservability()
+  const metrics = options.metrics ?? createMetrics()
+  const reporter = options.errorReporter ?? createErrorReporter(config.sentryDsn)
 
   const app = Fastify({
     logger: options.logStream
@@ -164,8 +182,26 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     bodyLimit: options.bodyLimit ?? 1_048_576,
   })
 
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header('X-Request-Id', request.id)
     if (request.url.startsWith('/v1')) enforceClientVersion(request)
+  })
+
+  app.addHook('onResponse', async (request, reply) => {
+    const path = request.url.split('?')[0]
+    metrics.record({ path, status: reply.statusCode, durationMs: Number(reply.elapsedTime) || 0 })
+    if (options.logger || options.logStream) {
+      request.log.info(
+        {
+          requestId: request.id,
+          method: request.method,
+          path,
+          status: reply.statusCode,
+          durationMs: Math.round(Number(reply.elapsedTime) || 0),
+        },
+        'request',
+      )
+    }
   })
 
   app.addHook('onSend', async (request, reply, payload) => {
@@ -197,13 +233,33 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       request.log.warn({ code: 'invalid_request' }, 'request failed')
       return reply.code(status).send({ error: 'invalid_request' })
     }
-    request.log.error({ code: 'internal' }, 'request failed')
+    request.log.error({ code: 'internal', requestId: request.id }, 'request failed')
+    reporter.capture(error, { requestId: request.id, path: request.url })
     return reply.code(500).send({ error: 'internal' })
   })
 
   app.options('*', async (_request, reply) => reply.code(204).send())
 
   app.get('/health', async () => ({ ok: true }))
+
+  app.get('/ready', async (_request, reply) => {
+    const probe = options.readiness ?? (async () => true)
+    try {
+      const ok = await probe()
+      if (!ok) return reply.code(503).send({ ok: false })
+      return { ok: true }
+    } catch {
+      return reply.code(503).send({ ok: false })
+    }
+  })
+
+  app.get('/metrics', async (request) => {
+    const authorization = headerValue(request.headers.authorization)
+    if (!allowsMetrics(request.ip, authorization || undefined, config.metricsToken)) {
+      throw new AppError('not_found', 404)
+    }
+    return metrics.snapshot()
+  })
 
   app.get('/v1/meta', async () => ({
     apiVersion: 'v1',
@@ -266,7 +322,32 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.delete('/v1/account', async (request) => {
     enforceWriteLimit(request, limiter, 'auth')
     const accountId = await requireAccount(request, options)
-    return privacy.deleteAccount(accountId)
+    const result = await privacy.deleteAccount(accountId)
+    await observability.erase(accountId)
+    return result
+  })
+
+  app.post('/v1/analytics/events', async (request) => {
+    enforceWriteLimit(request, limiter, 'analytics')
+    const accountId = await requireAccount(request, options)
+    const body = parse(analyticsBatchSchema, request.body)
+    const events = body.events.map((event) => ({
+      id: event.id,
+      name: event.name,
+      properties: event.properties ?? {},
+      occurredAt: event.occurredAt,
+    }))
+    await observability.insertEvents(accountId, events, clock())
+    for (const event of events) metrics.noteClientSignal(event.name)
+    return { accepted: body.events.length }
+  })
+
+  app.post('/v1/diagnostics', async (request) => {
+    enforceWriteLimit(request, limiter, 'analytics')
+    const accountId = await requireAccount(request, options)
+    const body = parse(diagnosticBatchSchema, request.body)
+    await observability.insertDiagnostics(accountId, body.reports, clock())
+    return { accepted: body.reports.length }
   })
 
   app.post('/v1/auth/link', async (request, reply) => {
@@ -321,7 +402,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const params = parse(householdParams, request.params)
     const created = await households.createInvite(accountId, params.householdId)
     const code = created.household?.invites[0]?.code ?? ''
-    await notifyOthers(options.repo, notifications, accountId, params.householdId, 'invite', '', code)
+    await notifyOthers(options.repo, notifications, metrics, accountId, params.householdId, 'invite', '', code)
     return created
   })
 
@@ -416,7 +497,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const body = parse(mutationBody, request.body)
     const result = await board.mutate(accountId, params.householdId, idempotencyKey, body)
     const event = kindForMutation(body)
-    if (event) await notifyOthers(options.repo, notifications, accountId, params.householdId, event.kind, event.mealId, '')
+    if (event) await notifyOthers(options.repo, notifications, metrics, accountId, params.householdId, event.kind, event.mealId, '')
     return result
   })
 
@@ -460,7 +541,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const role = await options.repo.membership(params.householdId, accountId)
     if (!role) throw new AppError('not_found', 404)
     const body = parse(eventBody, request.body)
-    await notifyOthers(options.repo, notifications, accountId, params.householdId, body.kind, body.mealId ?? '', body.inviteCode ?? '')
+    await notifyOthers(options.repo, notifications, metrics, accountId, params.householdId, body.kind, body.mealId ?? '', body.inviteCode ?? '')
     return { batches: await notifications.listBatches(accountId) }
   })
 
@@ -519,6 +600,7 @@ function enforceClientVersion(request: FastifyRequest): void {
 async function notifyOthers(
   repo: BuildAppOptions['repo'],
   notifications: ReturnType<typeof createNotificationService>,
+  metrics: Metrics,
   actorId: string,
   householdId: string,
   kind: NotificationKind,
@@ -532,7 +614,7 @@ async function notifyOthers(
       await notifications.enqueue(member.accountId, householdId, kind, mealId, inviteCode)
     }
   } catch {
-    // A missed push must not fail the household write.
+    metrics.notePushFailure()
   }
 }
 

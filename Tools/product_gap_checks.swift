@@ -312,6 +312,17 @@ private func checkAnalytics() {
         "recipe_added_to_plan",
         "saved_recipe_deleted",
         "saved_recipe_duplicate_detected",
+        "meal_skipped",
+        "meal_vetoed",
+        "household_created",
+        "household_joined",
+        "migration_done",
+        "sign_in",
+        "invite_sent",
+        "invite_accepted",
+        "plan_finalized",
+        "sync_failed",
+        "sync_recovered",
     ]
     check(Set(AnalyticsEvent.allCases.map(\.rawValue)) == expected, "checklist event names")
 

@@ -686,6 +686,7 @@ final class LocalMigrationCenter {
             let confirmed = try await transport.confirm()
             record = LocalMigrationMachine.verified(record, counts: confirmed)
             persist()
+            Analytics.track(.migrationDone)
         } catch {
             record = LocalMigrationMachine.failed(
                 record,

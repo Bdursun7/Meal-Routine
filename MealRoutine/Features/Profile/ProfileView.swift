@@ -12,6 +12,8 @@ struct ProfileView: View {
     @State private var showsProfile = false
     @State private var testMode = HouseholdTestMode.shared
     @State private var migration = LocalMigrationCenter.shared
+    @AppStorage("mealroutine.analyticsOptOut") private var analyticsOptOut = false
+    @AppStorage("mealroutine.crashReportsOptIn") private var crashReports = false
 
     var body: some View {
         NavigationStack {
@@ -36,6 +38,29 @@ struct ProfileView: View {
             showsProfile = true
             await migration.runIfNeeded(in: modelContext)
         }
+    }
+
+    private var analyticsEnabled: Binding<Bool> {
+        Binding(
+            get: { !analyticsOptOut },
+            set: { enabled in
+                analyticsOptOut = !enabled
+                ProductEventQueue.setOptedOut(!enabled)
+                if enabled {
+                    Task { await ProductEventSync.flushIfAllowed() }
+                }
+            }
+        )
+    }
+
+    private var crashReportsEnabled: Binding<Bool> {
+        Binding(
+            get: { crashReports },
+            set: { enabled in
+                crashReports = enabled
+                DiagnosticQueue.setUploadEnabled(enabled)
+            }
+        )
     }
 
     private var migrationHoldsHousehold: Bool {
@@ -241,6 +266,19 @@ struct ProfileView: View {
                         viewModel.isConfirmingReset = true
                     }
                     Text("Tercihler, haftalık plan, market listesi, yemek hafızası ve puanlar silinir. Tarif kataloğu kalır.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("İstatistik") {
+                    Toggle("Ürün istatistikleri", isOn: analyticsEnabled)
+                        .accessibilityIdentifier("analytics.optOut")
+                    Text("Açıkken kurulum, plan, pişirme, hızlı kayıt, ev ve aktarım sayıları kendi sunucumuza gider. Tarif adı ve kişisel bilgi gitmez. Kapatınca bekleyen kayıtlar silinir.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Toggle("Çökme raporları", isOn: crashReportsEnabled)
+                        .accessibilityIdentifier("diagnostics.optIn")
+                    Text("Kapalıyken çökme raporu gönderilmez. Açıkken yalnızca sayı ve hata türü gider. Yığın izi ve tarif metni gitmez.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

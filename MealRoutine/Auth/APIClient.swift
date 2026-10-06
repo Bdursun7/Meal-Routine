@@ -1,4 +1,5 @@
 import Foundation
+import MetricKit
 
 /// One in-flight refresh so parallel API calls do not rotate the token twice.
 actor RefreshGate {
@@ -318,4 +319,120 @@ private struct LinkBody: Encodable {
     var identityToken: String
     var givenName: String?
     var familyName: String?
+}
+
+struct ProductEventUploader {
+    var client: APIClient
+    var defaults: UserDefaults
+
+    func flushEvents() async -> Int {
+        guard !ProductEventQueue.isOptedOut(defaults: defaults) else { return 0 }
+        let batch = ProductEventQueue.nextBatch(defaults: defaults)
+        guard !batch.isEmpty else { return 0 }
+        do {
+            let body = try JSONEncoder().encode(ProductEventBatch(events: batch))
+            let (data, response) = try await client.request(
+                method: "POST",
+                path: "/v1/analytics/events",
+                body: body,
+                authenticated: true
+            )
+            try client.validateAuth(response, data: data, authenticated: true)
+            ProductEventQueue.markSent(batch.map(\.id), defaults: defaults)
+            return batch.count
+        } catch {
+            return 0
+        }
+    }
+
+    func flushDiagnostics() async -> Int {
+        guard DiagnosticQueue.allowsUpload(defaults: defaults) else { return 0 }
+        let reports = DiagnosticQueue.pending(defaults: defaults)
+        guard !reports.isEmpty else { return 0 }
+        do {
+            let body = try JSONEncoder().encode(DiagnosticBatch(reports: reports))
+            let (data, response) = try await client.request(
+                method: "POST",
+                path: "/v1/diagnostics",
+                body: body,
+                authenticated: true
+            )
+            try client.validateAuth(response, data: data, authenticated: true)
+            DiagnosticQueue.markSent(defaults: defaults)
+            return reports.count
+        } catch {
+            return 0
+        }
+    }
+}
+
+@MainActor
+enum ProductEventSync {
+    static func installIfNeeded() {
+        guard !HouseholdTestMode.shared.isEnabled else {
+            Analytics.resetProductSinkForTests()
+            return
+        }
+        Analytics.setProductSink { name, properties in
+            ProductEventQueue.enqueue(name: name, properties: properties)
+        }
+        CrashReportCollector.shared.start()
+    }
+
+    static func flushIfAllowed() async {
+        guard !HouseholdTestMode.shared.isEnabled else { return }
+        guard let baseURL = MealRoutineConfig.apiBaseURL else { return }
+        guard AuthServices.sharedTokens.load() != nil else { return }
+        let client = APIClient(
+            baseURL: baseURL,
+            tokens: AuthServices.sharedTokens,
+            refreshGate: AuthServices.refreshGate,
+            expiry: AuthServices.expiry
+        )
+        let uploader = ProductEventUploader(client: client, defaults: .standard)
+        _ = await uploader.flushEvents()
+        _ = await uploader.flushDiagnostics()
+    }
+}
+
+final class CrashReportCollector: NSObject, MXMetricManagerSubscriber {
+    static let shared = CrashReportCollector()
+    private var started = false
+
+    func start() {
+        guard !started else { return }
+        started = true
+        MXMetricManager.shared.add(self)
+    }
+
+    func didReceive(_ payloads: [MXMetricPayload]) {
+        guard DiagnosticQueue.allowsUpload() else { return }
+        guard !payloads.isEmpty else { return }
+        DiagnosticQueue.enqueue(DiagnosticReport(kind: "metric", count: min(payloads.count, 1_000), exceptionType: nil, signal: nil))
+    }
+
+    func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        guard DiagnosticQueue.allowsUpload() else { return }
+        for payload in payloads {
+            enqueue(kind: "crash", count: payload.crashDiagnostics?.count ?? 0, diagnostic: payload.crashDiagnostics?.first)
+            enqueueCount("hang", payload.hangDiagnostics?.count ?? 0)
+            enqueueCount("cpu", payload.cpuExceptionDiagnostics?.count ?? 0)
+            enqueueCount("disk", payload.diskWriteExceptionDiagnostics?.count ?? 0)
+        }
+    }
+
+    private func enqueue(kind: String, count: Int, diagnostic: MXCrashDiagnostic?) {
+        guard count > 0 else { return }
+        DiagnosticQueue.enqueue(DiagnosticReport(
+            kind: kind,
+            count: min(count, 1_000),
+            exceptionType: DiagnosticQueue.shortToken(diagnostic?.exceptionType?.stringValue),
+            signal: DiagnosticQueue.shortToken(diagnostic?.signal?.stringValue)
+        ))
+    }
+
+    private func enqueueCount(_ kind: String, _ count: Int) {
+        guard count > 0 else { return }
+        DiagnosticQueue.enqueue(DiagnosticReport(kind: kind, count: min(count, 1_000), exceptionType: nil, signal: nil))
+    }
 }

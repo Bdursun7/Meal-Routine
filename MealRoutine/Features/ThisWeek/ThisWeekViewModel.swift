@@ -215,6 +215,7 @@ final class ThisWeekViewModel {
         defer { isWorking = false }
         do {
             try WeekPlanService.markSkipped(uuid: uuid, in: context)
+            Analytics.track(.mealSkipped)
         } catch {
             alertMessage = error.localizedDescription
         }

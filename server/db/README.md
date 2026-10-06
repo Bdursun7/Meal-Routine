@@ -1,6 +1,6 @@
 # MealRoutine veritabanı
 
-Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0009` değişmez. Hesap silme kaydı `0010_account_deletion.sql` dosyasındadır.
+Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0010` değişmez. Ürün istatistikleri ve çökme özetleri `0011_observability.sql` dosyasındadır. Satırlar 30 gün sonra yeni kayıt sırasında silinir.
 
 Postgres 14 veya daha yeni olmalı.
 

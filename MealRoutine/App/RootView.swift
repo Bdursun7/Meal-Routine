@@ -79,10 +79,12 @@ struct RootView: View {
             Task { await HouseholdSession.shared.start(in: modelContext) }
         }
         .onAppear {
+            ProductEventSync.installIfNeeded()
             Analytics.trackOnce(.appOpened)
             SyncEngine.shared.start {
                 Task { await HouseholdSession.shared.drainPending(in: modelContext) }
             }
+            Task { await ProductEventSync.flushIfAllowed() }
         }
     }
 

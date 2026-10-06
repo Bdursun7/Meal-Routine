@@ -173,6 +173,7 @@ final class HouseholdSession {
         do {
             snapshot = try HouseholdReducer.createHousehold(user: account, name: name, now: .now)
             statusMessage = "Ev halkı kuruldu. Partnerini davet edebilirsin."
+            Analytics.track(.householdCreated)
             persist(in: context)
             enqueueTestSync { await self.push(in: context) }
         } catch {
@@ -197,6 +198,7 @@ final class HouseholdSession {
                 seed: UInt64.random(in: 1...9_999_999_999)
             )
             statusMessage = "Davet kodu \(invite.inviteCode)"
+            Analytics.track(.inviteSent)
             persist(in: context)
             enqueueTestSync { await self.publish(invite: invite, in: context) }
         } catch {
@@ -215,7 +217,7 @@ final class HouseholdSession {
             return
         }
         if usesHouseholdAPI {
-            await performRemote(in: context, success: "Ev halkına katıldın.") {
+            await performRemote(in: context, success: "Ev halkına katıldın.", event: .householdJoined) {
                 try await self.lifecycleAPI().accept(code: code)
             }
             pendingInviteCode = nil
@@ -238,6 +240,8 @@ final class HouseholdSession {
             try HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
             await push(in: context)
             statusMessage = "Ev halkına katıldın."
+            Analytics.track(.householdJoined)
+            Analytics.track(.inviteAccepted)
             pendingInviteCode = nil
             syncState = .idle
         } catch let error as HouseholdError where error == .offline {
@@ -585,6 +589,9 @@ final class HouseholdSession {
         let reactionBase = meal?.reactions.first { $0.userId == account.id }?.revision ?? 0
         do {
             try HouseholdReducer.setReaction(snapshot: &snapshot, mealId: mealID, user: account, reaction: reaction, now: .now)
+            if reaction == .veto {
+                Analytics.track(.mealVetoed)
+            }
             persist(in: context)
             GroceryListService.discardRebuildCache()
             try? GroceryListService.rebuild(in: context)
@@ -666,6 +673,7 @@ final class HouseholdSession {
             try HouseholdReducer.finalize(snapshot: &snapshot, actor: account, now: .now)
             persist(in: context)
             notifyPartners()
+            Analytics.track(.planFinalized)
             statusMessage = "Plan netleşti."
             if let plan = snapshot.plan {
                 finishSharedEdit(
@@ -1301,8 +1309,10 @@ final class HouseholdSession {
     private func performRemote(
         in context: ModelContext,
         success: String,
+        event: AnalyticsEvent? = nil,
         work: () async throws -> HouseholdRemoteState
     ) async {
+        let previous = syncState
         syncState = .syncing
         do {
             let state = try await work()
@@ -1311,17 +1321,30 @@ final class HouseholdSession {
             persist(in: context)
             statusMessage = success
             syncState = .idle
+            if let event {
+                Analytics.track(event)
+                if event == .householdJoined {
+                    Analytics.track(.inviteAccepted)
+                }
+            }
+            if previous == .failed {
+                Analytics.track(.syncRecovered)
+            }
         } catch let error as HouseholdError {
             syncState = error == .offline ? .offline : .failed
+            if error != .offline {
+                Analytics.track(.syncFailed)
+            }
             statusMessage = error.errorDescription
         } catch {
             syncState = .failed
+            Analytics.track(.syncFailed)
             statusMessage = error.localizedDescription
         }
     }
 
     private func createRemote(name: String, in context: ModelContext) async {
-        await performRemote(in: context, success: "Ev halkı kuruldu. Partnerini davet edebilirsin.") {
+        await performRemote(in: context, success: "Ev halkı kuruldu. Partnerini davet edebilirsin.", event: .householdCreated) {
             try await self.lifecycleAPI().create(name: name)
         }
     }
@@ -1335,7 +1358,7 @@ final class HouseholdSession {
 
     private func inviteRemote(in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Davet hazır.") {
+        await performRemote(in: context, success: "Davet hazır.", event: .inviteSent) {
             try await self.lifecycleAPI().createInvite(householdId: householdId)
         }
         guard syncState == .idle,
