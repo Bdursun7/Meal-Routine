@@ -147,6 +147,16 @@ private func checkURLPolicy() {
         RecipePhoto.deliveryURL(for: odd, maxPixel: 320).absoluteString == odd.absoluteString,
         "unrecognized commons path is left alone"
     )
+
+    let catalog = "https://upload.wikimedia.org/wikipedia/commons/d/d6/Joojeh-kabab.JPG"
+    check(RecipePhoto.hasCardPhoto(urlString: catalog, localImagePath: ""), "catalog url is a card photo")
+    check(RecipePhoto.hasCardPhoto(urlString: "", localImagePath: "RecipeImages/m.jpg"), "local file is a card photo")
+    check(!RecipePhoto.hasCardPhoto(urlString: "", localImagePath: "   "), "blank local path is not a card photo")
+    check(!RecipePhoto.hasCardPhoto(urlString: "https://example.com/a.jpg", localImagePath: ""), "rejected host is not a card photo")
+    check(
+        RecipePhoto.hasCardPhoto(urlString: "https://example.com/a.jpg", localImagePath: "RecipeImages/m.jpg"),
+        "local file still counts when the url is rejected"
+    )
 }
 
 private func checkImageSniff() {

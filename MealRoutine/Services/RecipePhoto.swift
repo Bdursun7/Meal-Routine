@@ -54,6 +54,15 @@ enum RecipePhoto {
         return url
     }
 
+    /// True when a meal card has a picture to show.
+    ///
+    /// Catalog rows use an allowed HTTPS url. Personal recipes leave that url empty
+    /// and keep the file in `sourceImagePath`. Detail already draws that file.
+    static func hasCardPhoto(urlString: String, localImagePath: String) -> Bool {
+        if remoteURL(from: urlString) != nil { return true }
+        return !localImagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// A smaller rendition of the same Commons file.
     ///
     /// Seventy-two catalog photos point at the original upload, often around 1 MB.

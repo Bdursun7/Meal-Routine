@@ -262,6 +262,8 @@ struct ReplacementChoicePresentation: Identifiable, Equatable {
     var photoURL: String
     var photoAuthor: String
     var photoLicense: String
+    /// Personal recipe file. Empty for catalog rows, which use `photoURL`.
+    var localImagePath: String
 
     var id: String { slug }
 }
@@ -326,7 +328,8 @@ enum ReplacementPresenter {
                 reason: choice.reason,
                 photoURL: recipe?.photoURL ?? "",
                 photoAuthor: recipe?.photoAuthor ?? "",
-                photoLicense: recipe?.photoLicense ?? ""
+                photoLicense: recipe?.photoLicense ?? "",
+                localImagePath: recipe?.sourceImagePath ?? ""
             )
         }
         return ReplacementBoard(currentName: currentName, choices: choices)

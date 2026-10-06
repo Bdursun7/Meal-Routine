@@ -75,6 +75,17 @@ final class PresentationRuleTests: XCTestCase {
         )
     }
 
+    func testWeekCardShowsAPersonalRecipeFile() {
+        let catalog = "https://upload.wikimedia.org/wikipedia/commons/d/d6/Joojeh-kabab.JPG"
+        XCTAssertTrue(RecipePhoto.hasCardPhoto(urlString: catalog, localImagePath: ""))
+        XCTAssertTrue(RecipePhoto.hasCardPhoto(urlString: "", localImagePath: "RecipeImages/m.jpg"))
+        XCTAssertFalse(RecipePhoto.hasCardPhoto(urlString: "", localImagePath: "   "))
+        XCTAssertFalse(RecipePhoto.hasCardPhoto(urlString: "https://example.com/a.jpg", localImagePath: ""))
+        XCTAssertTrue(
+            RecipePhoto.hasCardPhoto(urlString: "https://example.com/a.jpg", localImagePath: "RecipeImages/m.jpg")
+        )
+    }
+
     func testCookBarRequiresTheOpenWeek() {
         let now = TestFixtures.now
         let thisWeek = WeekCalendar.weekStart(containing: now)

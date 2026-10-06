@@ -454,6 +454,7 @@ private struct WeekMealCard: View {
                             license: recipe?.photoLicense ?? "",
                             layout: .thumbnail,
                             loadsPhoto: loadsPhoto,
+                            localImagePath: recipe?.sourceImagePath ?? "",
                             isPhotoShown: $isPhotoShown
                         )
                         VStack(alignment: .leading, spacing: 4) {
@@ -613,15 +614,18 @@ private struct TonightDinnerCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isPhotoShown = false
 
-    private var hasRemotePhoto: Bool {
-        RecipePhoto.remoteURL(from: recipe?.photoURL ?? "") != nil
+    private var hasPhoto: Bool {
+        RecipePhoto.hasCardPhoto(
+            urlString: recipe?.photoURL ?? "",
+            localImagePath: recipe?.sourceImagePath ?? ""
+        )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-                if dynamicTypeSize.isAccessibilitySize || !hasRemotePhoto {
+                if dynamicTypeSize.isAccessibilitySize || !hasPhoto {
                     HStack(alignment: .center, spacing: 14) {
-                        if !hasRemotePhoto { symbolStack }
+                        if !hasPhoto { symbolStack }
                         tonightCopy
                     }
                 } else {
@@ -657,17 +661,18 @@ private struct TonightDinnerCard: View {
                 }
             }
             .padding(Theme.screenPadding)
-            .padding(.top, hasRemotePhoto ? 28 : 0)
+            .padding(.top, hasPhoto ? 28 : 0)
         .frame(maxWidth: .infinity, minHeight: 180, alignment: .bottomLeading)
         .background {
             ZStack {
-                if hasRemotePhoto {
+                if hasPhoto {
                     RecipePhotoView(
                         urlString: recipe?.photoURL ?? "",
                         author: recipe?.photoAuthor ?? "",
                         license: recipe?.photoLicense ?? "",
                         layout: .backdrop,
                         loadsPhoto: loadsPhoto,
+                        localImagePath: recipe?.sourceImagePath ?? "",
                         isPhotoShown: $isPhotoShown
                     )
                     Theme.scrimTop
