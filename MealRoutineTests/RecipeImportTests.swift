@@ -691,7 +691,7 @@ final class RecipeImportTests: XCTestCase {
 
         let context = container.mainContext
         let saved = try RecipeCollectionService.quickSave(
-            RecipeCapture(title: "Mantı", urlString: "https://example.com/manti"),
+            RecipeCapture(urlString: "https://example.com/manti", title: "Mantı"),
             in: context
         )
         if AuthSession.shared.account == nil || AuthServices.sharedTokens.load()?.accessToken.isEmpty != false {
