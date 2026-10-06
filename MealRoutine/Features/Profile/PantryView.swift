@@ -157,7 +157,7 @@ struct PantryView: View {
                 item.revision = saved.revision
                 item.updatedAt = saved.updatedAt ?? .now
                 try? modelContext.save()
-            } catch { errorMessage = "Sunucuya kaydedilemedi. Yerel kopya korunuyor." }
+            } catch { enqueue(.create, householdID, remote); errorMessage = "Sunucuya kaydedilemedi. Yerel kopya korunuyor; bağlantı gelince tekrar denenecek." }
         }
     }
 
@@ -169,13 +169,13 @@ struct PantryView: View {
                 item.revision = saved.revision
                 item.updatedAt = saved.updatedAt ?? .now
                 try? modelContext.save()
-            } catch { errorMessage = "Bu malzeme başka bir cihazda güncellendi." }
+            } catch { enqueue(.update, householdID, remote); errorMessage = "Bu malzeme başka bir cihazda güncellendi veya bağlantı kesildi." }
         }
     }
 
     private func syncDelete(_ item: PantryItem) {
         guard let householdID, let api = api(), let remote = remote(item) else { return }
-        Task { try? await api.delete(householdId: householdID, item: remote) }
+        Task { do { try await api.delete(householdId: householdID, item: remote) } catch { await MainActor.run { enqueue(.delete, householdID, remote) } } }
     }
 
     private func refreshFromServer() async {
@@ -183,6 +183,7 @@ struct PantryView: View {
         refreshing = true
         defer { refreshing = false }
         do {
+            await drainPending(householdID: householdID, api: api)
             for item in try await api.list(householdId: householdID) {
                 if let local = items.first(where: { $0.uuid == item.id }) {
                     local.ingredientID = item.ingredientId
@@ -200,6 +201,36 @@ struct PantryView: View {
             try? modelContext.save()
         } catch { errorMessage = "Pantry yenilenemedi. Son kayıtlar gösteriliyor." }
     }
+
+    private enum PantryAction: String { case create, update, delete }
+    private func enqueue(_ action: PantryAction, _ householdID: UUID, _ item: PantryRemoteItem) {
+        guard let payload = try? JSONEncoder().encode(PantryQueuedPayload(action: action.rawValue, householdID: householdID, item: item)) else { return }
+        PendingOperationStore.upsert(SyncWorkItem(id: UUID(), entityType: "pantry", entityId: item.id.uuidString, operationType: action.rawValue, payload: payload, createdAt: .now, retryCount: 0, status: .pending), in: modelContext)
+    }
+
+    private func drainPending(householdID: UUID, api: PantryRepository) async {
+        let queued = PendingOperationStore.items(in: modelContext).filter { $0.entityType == "pantry" }
+        guard !queued.isEmpty else { return }
+        var remaining = PendingOperationStore.items(in: modelContext).filter { $0.entityType != "pantry" }
+        for work in queued {
+            guard let payload = try? JSONDecoder().decode(PantryQueuedPayload.self, from: work.payload), payload.householdID == householdID else { remaining.append(work); continue }
+            do {
+                switch PantryAction(rawValue: payload.action) {
+                case .create: _ = try await api.create(householdId: householdID, item: payload.item)
+                case .update: _ = try await api.update(householdId: householdID, item: payload.item)
+                case .delete: try await api.delete(householdId: householdID, item: payload.item)
+                case nil: break
+                }
+            } catch { remaining.append(work) }
+        }
+        PendingOperationStore.replace(remaining, in: modelContext)
+    }
+}
+
+private struct PantryQueuedPayload: Codable {
+    var action: String
+    var householdID: UUID
+    var item: PantryRemoteItem
 }
 
 private struct PantryAddView: View {

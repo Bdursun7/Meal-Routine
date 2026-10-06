@@ -32,6 +32,22 @@ struct RecentMealSighting: Equatable, Sendable {
     var wasCooked: Bool
 }
 
+struct PantryPlanningStock: Equatable, Sendable {
+    var ingredientId: String
+    var quantity: Double
+    var unit: String
+}
+
+enum PantryPlanningSignal {
+    /// Rewards recipes that can consume stock already at home. The cap keeps pantry
+    /// availability a tie breaker below explicit preferences and safety filters.
+    static func score(candidate: PickerCandidate, stock: [PantryPlanningStock]) -> Int {
+        guard !stock.isEmpty else { return 0 }
+        let matches = candidate.ingredientIds.filter { id in stock.contains { $0.ingredientId == id && $0.quantity > 0 } }.count
+        return min(24, matches * 8)
+    }
+}
+
 /// Pieces of one candidate's rank. Higher `total` is better.
 struct MealRankBreakdown: Equatable, Sendable {
     var curation: Int
@@ -90,6 +106,7 @@ enum MealRecommender {
         excludingSlugs: Set<String> = [],
         recent: [RecentMealSighting] = [],
         anchoredMeals: [PickerCandidate] = [],
+        pantryStock: [PantryPlanningStock] = [],
         now: Date = .now
     ) -> [String] {
         let limit = min(max(evenings, 0), eveningCap)
@@ -113,8 +130,8 @@ enum MealRecommender {
 
         while chosen.count < limit {
             let ranked = remaining.sorted { lhs, rhs in
-                let left = breakdown(for: lhs, recent: recent, anchoredMeals: anchors, now: now).total
-                let right = breakdown(for: rhs, recent: recent, anchoredMeals: anchors, now: now).total
+                let left = breakdown(for: lhs, recent: recent, anchoredMeals: anchors, now: now).total + PantryPlanningSignal.score(candidate: lhs, stock: pantryStock)
+                let right = breakdown(for: rhs, recent: recent, anchoredMeals: anchors, now: now).total + PantryPlanningSignal.score(candidate: rhs, stock: pantryStock)
                 if left != right { return left > right }
                 return lhs.slug < rhs.slug
             }

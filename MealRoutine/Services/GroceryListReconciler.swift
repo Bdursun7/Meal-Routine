@@ -1,5 +1,43 @@
 import Foundation
 
+struct PantryCoverageLine: Equatable, Sendable {
+    var ingredientId: String
+    var quantity: Double
+    var unit: String
+}
+
+/// Applies available pantry stock to the generated shopping list without mutating pantry data.
+/// Quantities are normalized through the existing unit conversion rules; incompatible units stay untouched.
+enum PantryGroceryReconciler {
+    static func remaining(_ groceries: [MergedGroceryLine], pantry: [PantryCoverageLine]) -> [MergedGroceryLine] {
+        var stock = pantry
+        return groceries.compactMap { row in
+            guard let index = stock.firstIndex(where: { $0.ingredientId == row.ingredientId && compatible($0.unit, row.unit) }) else { return row }
+            let available = converted(stock[index].quantity, from: stock[index].unit, to: row.unit)
+            guard let required = row.quantity else { return row }
+            if available >= required {
+                stock[index].quantity = max(0, stock[index].quantity - converted(required, from: row.unit, to: stock[index].unit))
+                return nil
+            }
+            stock[index].quantity = 0
+            var copy = row
+            copy.quantity = required - available
+            return copy
+        }
+    }
+
+    private static func compatible(_ lhs: String, _ rhs: String) -> Bool {
+        UnitNormalization.parse(lhs).family == UnitNormalization.parse(rhs).family
+            || UnitNormalization.parse(lhs).code == UnitNormalization.parse(rhs).code
+    }
+
+    private static func converted(_ value: Double, from: String, to: String) -> Double {
+        let lhs = UnitNormalization.parse(from); let rhs = UnitNormalization.parse(to)
+        guard let family = lhs.family, family == rhs.family else { return value }
+        return value * lhs.basePerUnit / rhs.basePerUnit
+    }
+}
+
 /// An automatic grocery row already stored for the week. Manual rows are not included.
 struct AutoGroceryRow: Equatable, Sendable {
     var id: UUID
