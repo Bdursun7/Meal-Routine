@@ -58,6 +58,40 @@ struct RecipePhotoView: View {
     }
 
     var body: some View {
+        photoPlate
+            .overlay {
+                // The bitmap stays out of the plate's layout. Inside the stack, its
+                // pixel size (960 by 720, or the full upload after a rejected rendition)
+                // is what List measures. The 220 pt frame then clips an unscaled
+                // slice, and the credit's remeasure is what finally scales it.
+                GeometryReader { geo in
+                    if let image, phase == .shown, canDrawBitmap(image), slotIsReady(geo.size) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityAddTraits(phase == .shown ? .isImage : [])
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)" : "") {
+                guard loadsPhoto else { return }
+                await load()
+            }
+    }
+
+    /// Fixed plate. The placeholder stays until the overlay has a settled slot,
+    /// so a cut-off measurement never becomes a visible bitmap.
+    private var photoPlate: some View {
         ZStack {
             if layout == .hero || layout == .backdrop {
                 LinearGradient(
@@ -68,14 +102,7 @@ struct RecipePhotoView: View {
             } else {
                 Theme.accent.opacity(0.16)
             }
-            if let image, phase == .shown, canDrawBitmap(image) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(minWidth: 1, minHeight: 1)
-            } else {
-                placeholderMark
-            }
+            placeholderMark
             if phase == .loading, layout == .hero || layout == .backdrop {
                 ProgressView()
                     .tint(Theme.onAccent)
@@ -86,15 +113,16 @@ struct RecipePhotoView: View {
         .frame(minWidth: fillsWidth ? nil : side, minHeight: fixedHeight)
         .frame(width: fillsWidth ? nil : side, height: layout == .backdrop ? nil : fixedHeight)
         .frame(maxWidth: fillsWidth ? .infinity : side, minHeight: fixedHeight)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityAddTraits(phase == .shown ? .isImage : [])
-        .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)" : "") {
-            guard loadsPhoto else { return }
-            await load()
-        }
+    }
+
+    private func slotIsReady(_ size: CGSize) -> Bool {
+        RecipePhoto.isReadyPhotoSlot(
+            width: Double(size.width),
+            height: Double(size.height),
+            minimumWidth: Double(fixedHeight),
+            minimumHeight: Double(fixedHeight),
+            widerThanTall: layout == .hero
+        )
     }
 
     /// A list cell can be measured at the full row width and height 0.

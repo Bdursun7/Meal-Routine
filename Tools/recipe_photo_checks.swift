@@ -159,6 +159,69 @@ private func checkURLPolicy() {
     )
 }
 
+private func checkPhotoSlot() {
+    check(
+        RecipePhoto.isReadyPhotoSlot(
+            width: 390,
+            height: 220,
+            minimumWidth: 220,
+            minimumHeight: 220,
+            widerThanTall: true
+        ),
+        "settled hero slot can draw"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 220,
+            height: 220,
+            minimumWidth: 220,
+            minimumHeight: 220,
+            widerThanTall: true
+        ),
+        "square hero measurement is the cut-off frame"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 390,
+            height: 80,
+            minimumWidth: 220,
+            minimumHeight: 220,
+            widerThanTall: true
+        ),
+        "short hero measurement is the cut-off frame"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 0,
+            height: 220,
+            minimumWidth: 220,
+            minimumHeight: 220,
+            widerThanTall: true
+        ),
+        "zero-width slot is not drawable"
+    )
+    check(
+        RecipePhoto.isReadyPhotoSlot(
+            width: 64,
+            height: 64,
+            minimumWidth: 64,
+            minimumHeight: 64,
+            widerThanTall: false
+        ),
+        "thumbnail slot can draw"
+    )
+    check(
+        RecipePhoto.isReadyPhotoSlot(
+            width: 390,
+            height: 420,
+            minimumWidth: 180,
+            minimumHeight: 180,
+            widerThanTall: false
+        ),
+        "tall backdrop does not use the hero's wide-frame rule"
+    )
+}
+
 private func checkImageSniff() {
     check(RecipePhoto.isSupportedImageData(Data([0xFF, 0xD8, 0xFF, 0xD9])), "jpeg")
     let png: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]
@@ -388,6 +451,31 @@ private func checkLoader() async {
     check(hamsiCached == jpeg, "remembered hamsi rendition is served from disk")
     check(StubPhotoProtocol.hits == 0, "remembered hamsi rendition does not repeat the 400")
 
+    // Detail asks for 960, which this file serves. That response is the hero.
+    // Falling through to the original would swap a second bitmap in underneath it.
+    let heroJPEG = Data([0xFF, 0xD8, 0xFF, 0xC0])
+    StubPhotoProtocol.replies = [
+        hamsiHero.absoluteString: .init(status: 200, body: heroJPEG),
+        hamsi.absoluteString: .init(status: 200, body: jpeg),
+    ]
+    StubPhotoProtocol.hits = 0
+    StubPhotoProtocol.requested = []
+    let hamsiHeroLoaded = await RecipePhotoLoader.load(
+        remoteURL: hamsi,
+        maxPixel: RecipePhoto.heroMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(hamsiHeroLoaded == heroJPEG, "hamsi hero is the 960 rendition, not the original upload")
+    check(
+        StubPhotoProtocol.requested == [hamsiHero.absoluteString],
+        "hamsi hero does not fetch the original after a 200, got \(StubPhotoProtocol.requested)"
+    )
+    check(
+        RecipePhotoDiskCache.read(remoteURL: hamsiHero, directory: directory) == heroJPEG,
+        "hamsi hero caches the 960 bytes"
+    )
+
     let htmlThumbSource = URL(string: "https://upload.wikimedia.org/wikipedia/commons/1/1a/Bad_thumb.jpg")!
     let htmlThumb = RecipePhoto.deliveryURL(for: htmlThumbSource, maxPixel: RecipePhoto.thumbnailMaxPixel)
     StubPhotoProtocol.replies = [
@@ -443,6 +531,7 @@ struct RecipePhotoCheckMain {
         }
         checkCreditPolicy()
         checkURLPolicy()
+        checkPhotoSlot()
         checkImageSniff()
         checkDiskCache()
         await checkLoader()
