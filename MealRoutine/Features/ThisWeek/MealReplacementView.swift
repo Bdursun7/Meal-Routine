@@ -190,7 +190,8 @@ struct MealReplacementSheet: View {
                 reason: choice.reason,
                 photoURL: recipe?.photoURL ?? "",
                 photoAuthor: recipe?.photoAuthor ?? "",
-                photoLicense: recipe?.photoLicense ?? ""
+                photoLicense: recipe?.photoLicense ?? "",
+                localImagePath: recipe?.sourceImagePath ?? ""
             )
         }
     }
@@ -250,6 +251,7 @@ private struct ReplacementChoiceRow: View {
                 author: choice.photoAuthor,
                 license: choice.photoLicense,
                 layout: .plate,
+                localImagePath: choice.localImagePath,
                 isPhotoShown: $isPhotoShown
             )
             VStack(alignment: .leading, spacing: 4) {

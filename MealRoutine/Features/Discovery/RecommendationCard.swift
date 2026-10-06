@@ -8,6 +8,8 @@ struct RecommendationCard: View {
     var photoURL: String
     var photoAuthor: String
     var photoLicense: String
+    /// Personal recipe file. Empty for catalog rows, which use `photoURL`.
+    var localImagePath: String = ""
     var loadsPhoto: Bool = true
 
     @State private var isPhotoShown = false
@@ -20,6 +22,7 @@ struct RecommendationCard: View {
                 license: photoLicense,
                 layout: .thumbnail,
                 loadsPhoto: loadsPhoto,
+                localImagePath: localImagePath,
                 isPhotoShown: $isPhotoShown
             )
             VStack(alignment: .leading, spacing: 4) {

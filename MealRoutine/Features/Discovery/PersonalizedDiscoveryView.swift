@@ -20,6 +20,7 @@ struct PersonalizedDiscoveryView: View {
                                 photoURL: recipe.photoURL,
                                 photoAuthor: recipe.photoAuthor,
                                 photoLicense: recipe.photoLicense,
+                                localImagePath: recipe.sourceImagePath,
                                 loadsPhoto: loadsPhoto
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
