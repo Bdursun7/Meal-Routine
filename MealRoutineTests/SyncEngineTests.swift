@@ -60,6 +60,32 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(conflicted.first?.payload, original.payload)
     }
 
+    func testOfflineQueueIsSentWhenTheConnectionReturns() async {
+        let original = sampleItem(status: .pending)
+        let calls = CallCount()
+        let held = await SyncDrainer.drain(items: [original], online: false, now: now) { _ in
+            calls.increment()
+            return .applied
+        }
+        let heldCount = calls.value
+        XCTAssertEqual(held, [original])
+        XCTAssertEqual(heldCount, 0)
+
+        let recovered = await SyncDrainer.drain(items: held, online: true, now: now) { item in
+            calls.increment()
+            return item.idempotencyKey == original.idempotencyKey ? .applied : .retry
+        }
+        let recoveredItem = recovered.first
+        let recoveredStatus = recoveredItem?.status
+        let recoveredId = recoveredItem?.id
+        let recoveredPayload = recoveredItem?.payload
+        let sentCount = calls.value
+        XCTAssertEqual(recoveredStatus, .completed)
+        XCTAssertEqual(recoveredId, original.id)
+        XCTAssertEqual(recoveredPayload, original.payload)
+        XCTAssertEqual(sentCount, 1)
+    }
+
     func testFailedAfterTheRetryCapAndServerMealWins() {
         var item = sampleItem(status: .pending)
         for _ in 0..<SyncQueueMachine.maxRetries {

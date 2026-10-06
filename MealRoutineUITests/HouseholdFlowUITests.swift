@@ -56,6 +56,41 @@ final class HouseholdFlowUITests: XCTestCase {
         )
     }
 
+    func testTestModeHappyPathShowsWeekMarketAndStaysHermetic() {
+        let app = XCUIApplication()
+        app.launchArguments = [HouseholdTestLaunchArgument, HouseholdTestResetArgument]
+        app.launch()
+
+        let start = app.buttons["Kuruluma başla"]
+        if start.waitForExistence(timeout: 45) {
+            start.tap()
+            tap("Devam", in: app)
+            tap("Devam", in: app)
+            tap("Devam", in: app)
+            tap("Atla", in: app)
+            tap("Haftamı oluştur", in: app)
+        }
+
+        XCTAssertTrue(app.tabBars.buttons["Bu Hafta"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.navigationBars["Bu Hafta"].waitForExistence(timeout: 10))
+
+        app.tabBars.buttons["Tarifler"].tap()
+        XCTAssertTrue(app.navigationBars["Tarifler"].waitForExistence(timeout: 10))
+
+        app.tabBars.buttons["Market"].tap()
+        let marketBar = app.navigationBars["Market"]
+        let marketEmpty = app.staticTexts["Market henüz dolmadı"]
+        XCTAssertTrue(marketBar.waitForExistence(timeout: 10) || marketEmpty.waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["Profil"].tap()
+        let open = app.buttons["household.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        let toggle = app.switches["household.testMode.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(String(describing: toggle.value ?? ""), "1")
+    }
+
     private func dismissTestBanner(in app: XCUIApplication) {
         let button = app.buttons["household.testBanner.dismiss"]
         guard button.waitForExistence(timeout: 3), button.isHittable else { return }
