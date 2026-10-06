@@ -203,10 +203,18 @@ private func checkDiskCache() {
     check(RecipePhotoDiskCache.read(remoteURL: remote, directory: directory) == nil, "cache remove")
 }
 
-private final class StubPhotoProtocol: URLProtocol, @unchecked Sendable {
+private final class StubPhotoProtocol: URLProtocol {
+    struct Reply {
+        var status: Int
+        var body: Data
+    }
+
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()
+    /// When set, an exact URL uses this reply. Other URLs keep `status` and `body`.
+    nonisolated(unsafe) static var replies: [String: Reply] = [:]
     nonisolated(unsafe) static var hits = 0
+    nonisolated(unsafe) static var requested: [String] = []
     nonisolated(unsafe) static var lastAgent: String?
     nonisolated(unsafe) static var lastURL: URL?
 
@@ -215,18 +223,21 @@ private final class StubPhotoProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        let key = request.url?.absoluteString ?? ""
         Self.hits += 1
+        Self.requested.append(key)
         Self.lastAgent = request.value(forHTTPHeaderField: "User-Agent")
         Self.lastURL = request.url
+        let reply = Self.replies[key]
         let url = request.url ?? URL(string: "https://theunitools.com/")!
         let response = HTTPURLResponse(
             url: url,
-            statusCode: Self.status,
+            statusCode: reply?.status ?? Self.status,
             httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": "image/jpeg"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.body)
+        client?.urlProtocol(self, didLoad: reply?.body ?? Self.body)
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -251,6 +262,8 @@ private func checkLoader() async {
 
     StubPhotoProtocol.status = 200
     StubPhotoProtocol.body = jpeg
+    StubPhotoProtocol.replies = [:]
+    StubPhotoProtocol.requested = []
     StubPhotoProtocol.hits = 0
     let loaded = await RecipePhotoLoader.load(remoteURL: remote, session: session, directory: directory)
     check(loaded == jpeg, "loader returns jpeg")
@@ -274,8 +287,10 @@ private func checkLoader() async {
     let missingURL = URL(string: "https://theunitools.com/recipes/missing.jpg")!
     StubPhotoProtocol.status = 404
     StubPhotoProtocol.body = jpeg
+    StubPhotoProtocol.hits = 0
     let missing = await RecipePhotoLoader.load(remoteURL: missingURL, session: session, directory: directory)
     check(missing == nil, "404 is not a photo")
+    check(StubPhotoProtocol.hits == 1, "an unrewritten url is not fetched twice")
     check(RecipePhotoDiskCache.read(remoteURL: missingURL, directory: directory) == nil, "404 was not cached")
 
     var oversized = Data(count: RecipePhotoLoader.maxBytes + 1)
@@ -317,6 +332,104 @@ private func checkLoader() async {
     )
     check(commonsCached == jpeg, "commons rendition is served from disk")
     check(StubPhotoProtocol.hits == 0, "cached rendition does not use the network")
+
+    // Hamsi tava: 320px is HTTP 400, the original upload is a JPEG. Detail's 960px
+    // rendition is a different URL and is not part of this fallback.
+    let hamsi = URL(string: "https://upload.wikimedia.org/wikipedia/commons/b/b3/Hamsi_tava.jpg")!
+    let hamsiThumb = RecipePhoto.deliveryURL(for: hamsi, maxPixel: RecipePhoto.thumbnailMaxPixel)
+    let hamsiHero = RecipePhoto.deliveryURL(for: hamsi, maxPixel: RecipePhoto.heroMaxPixel)
+    check(
+        hamsiThumb.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/320px-Hamsi_tava.jpg",
+        "hamsi list row asks for 320, got \(hamsiThumb.absoluteString)"
+    )
+    check(
+        hamsiHero.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/960px-Hamsi_tava.jpg",
+        "hamsi hero asks for 960, got \(hamsiHero.absoluteString)"
+    )
+    StubPhotoProtocol.replies = [
+        hamsiThumb.absoluteString: .init(status: 400, body: Data("Thumbnail size rejected".utf8)),
+        hamsi.absoluteString: .init(status: 200, body: jpeg),
+    ]
+    StubPhotoProtocol.status = 500
+    StubPhotoProtocol.body = Data()
+    StubPhotoProtocol.hits = 0
+    StubPhotoProtocol.requested = []
+    let hamsiLoaded = await RecipePhotoLoader.load(
+        remoteURL: hamsi,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(hamsiLoaded == jpeg, "hamsi 320 failure falls back to the original upload")
+    check(
+        StubPhotoProtocol.requested == [hamsiThumb.absoluteString, hamsi.absoluteString],
+        "hamsi requests the thumb, then the original, got \(StubPhotoProtocol.requested)"
+    )
+    check(
+        RecipePhotoDiskCache.read(remoteURL: hamsi, directory: directory) == jpeg,
+        "hamsi original is cached"
+    )
+    check(
+        RecipePhotoDiskCache.read(remoteURL: hamsiThumb, directory: directory) == jpeg,
+        "working hamsi bytes are remembered under the rejected rendition"
+    )
+    check(
+        RecipePhotoDiskCache.read(remoteURL: hamsiHero, directory: directory) == nil,
+        "hamsi fallback does not invent a hero cache entry"
+    )
+    StubPhotoProtocol.hits = 0
+    StubPhotoProtocol.requested = []
+    let hamsiCached = await RecipePhotoLoader.load(
+        remoteURL: hamsi,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(hamsiCached == jpeg, "remembered hamsi rendition is served from disk")
+    check(StubPhotoProtocol.hits == 0, "remembered hamsi rendition does not repeat the 400")
+
+    let htmlThumbSource = URL(string: "https://upload.wikimedia.org/wikipedia/commons/1/1a/Bad_thumb.jpg")!
+    let htmlThumb = RecipePhoto.deliveryURL(for: htmlThumbSource, maxPixel: RecipePhoto.thumbnailMaxPixel)
+    StubPhotoProtocol.replies = [
+        htmlThumb.absoluteString: .init(status: 200, body: Data("<html>not an image</html>".utf8)),
+        htmlThumbSource.absoluteString: .init(status: 200, body: jpeg),
+    ]
+    StubPhotoProtocol.hits = 0
+    StubPhotoProtocol.requested = []
+    let htmlFallback = await RecipePhotoLoader.load(
+        remoteURL: htmlThumbSource,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(htmlFallback == jpeg, "a non-image thumbnail body falls back to the original")
+    check(
+        StubPhotoProtocol.requested == [htmlThumb.absoluteString, htmlThumbSource.absoluteString],
+        "bad thumbnail body is not kept, got \(StubPhotoProtocol.requested)"
+    )
+    check(
+        RecipePhotoDiskCache.read(remoteURL: htmlThumb, directory: directory) == jpeg,
+        "html thumbnail was replaced by the original bytes"
+    )
+
+    let gone = URL(string: "https://upload.wikimedia.org/wikipedia/commons/9/9a/Gone.jpg")!
+    let goneThumb = RecipePhoto.deliveryURL(for: gone, maxPixel: RecipePhoto.thumbnailMaxPixel)
+    StubPhotoProtocol.replies = [
+        goneThumb.absoluteString: .init(status: 400, body: jpeg),
+        gone.absoluteString: .init(status: 404, body: jpeg),
+    ]
+    StubPhotoProtocol.hits = 0
+    let goneLoaded = await RecipePhotoLoader.load(
+        remoteURL: gone,
+        maxPixel: RecipePhoto.thumbnailMaxPixel,
+        session: session,
+        directory: directory
+    )
+    check(goneLoaded == nil, "fallback stays empty when the original is also missing")
+    check(StubPhotoProtocol.hits == 2, "missing original is tried once")
+    check(RecipePhotoDiskCache.read(remoteURL: goneThumb, directory: directory) == nil, "rejected thumb is not cached")
+    check(RecipePhotoDiskCache.read(remoteURL: gone, directory: directory) == nil, "missing original is not cached")
+    StubPhotoProtocol.replies = [:]
 }
 
 @main

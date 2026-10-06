@@ -46,10 +46,16 @@ enum RecipePhotoDiskCache {
 /// (and `AsyncImage`) will not show the file in airplane mode. This loader keeps its
 /// own copy and ignores the shared URL cache. A missing or failed fetch returns nil;
 /// the screen keeps the placeholder and the rest of the app does not wait on it.
+///
+/// Commons originals are requested as a thumbnail first. Some files reject that
+/// size: Hamsi tava's 320 px rendition is HTTP 400, while the upload itself and
+/// the 960 px hero rendition are 200. A rejected rendition is not stored. The
+/// loader then fetches the original URL once, and remembers those bytes under
+/// the rendition key so the next row does not repeat the failed request.
 enum RecipePhotoLoader {
-    /// Larger than every bundled photo (the biggest is about 220 KB).
-    /// Also larger than a 960 px Commons thumbnail, so a full original that slipped
-    /// past the rendition step is still refused.
+    /// Larger than every bundled photo (the biggest is about 220 KB) and larger
+    /// than a 960 px Commons thumbnail. A rejected thumbnail falls back to the
+    /// original upload, which is kept when it is still under this cap.
     static let maxBytes = 8_000_000
     /// Visible rows plus a little prefetch. The catalog has 195 photos; opening
     /// Tarifler used to start one request per row with no cap.
@@ -77,16 +83,39 @@ enum RecipePhotoLoader {
         session: URLSession = RecipePhotoLoader.session,
         directory: URL = RecipePhotoDiskCache.defaultDirectory()
     ) async -> Data? {
-        let fetchURL = RecipePhoto.deliveryURL(for: remoteURL, maxPixel: maxPixel)
-        if let cached = await cachedImageData(for: fetchURL, directory: directory) {
+        let rendition = RecipePhoto.deliveryURL(for: remoteURL, maxPixel: maxPixel)
+        if let data = await loadCachedOrFetch(rendition, session: session, directory: directory) {
+            return data
+        }
+        // Same URL means this was not a Commons rewrite (or the rewrite was a no-op).
+        // A second request would only repeat the failure.
+        guard rendition.absoluteString != remoteURL.absoluteString else { return nil }
+        guard !Task.isCancelled else { return nil }
+        guard let data = await loadCachedOrFetch(remoteURL, session: session, directory: directory) else {
+            return nil
+        }
+        let stored = data
+        await Task.detached(priority: .utility) {
+            RecipePhotoDiskCache.write(stored, remoteURL: rendition, directory: directory)
+        }.value
+        return data
+    }
+
+    /// Cache first, then one network attempt. A miss does not store an error body.
+    private static func loadCachedOrFetch(
+        _ remoteURL: URL,
+        session: URLSession,
+        directory: URL
+    ) async -> Data? {
+        if let cached = await cachedImageData(for: remoteURL, directory: directory) {
             return cached
         }
         return await fetchGate.withSlot {
             if Task.isCancelled { return nil }
-            if let cached = await cachedImageData(for: fetchURL, directory: directory) {
+            if let cached = await cachedImageData(for: remoteURL, directory: directory) {
                 return cached
             }
-            return await fetchAndStore(fetchURL, session: session, directory: directory)
+            return await fetchAndStore(remoteURL, session: session, directory: directory)
         }
     }
 

@@ -14,6 +14,7 @@
 		T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000005 /* PersonalizedScoringTests.swift */; };
 		T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000006 /* SmartReplacementTests.swift */; };
 		T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000007 /* PresentationRuleTests.swift */; };
+		T17B0000000000000000000A /* RecipePhotoLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F0000000000000000000A /* RecipePhotoLoaderTests.swift */; };
 		T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000008 /* MealMemoryStoreTests.swift */; };
 		T17B00000000000000000009 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 		BA0D3D46B2336BA9DD1FB0A6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */; };
@@ -186,6 +187,7 @@
 		T17F00000000000000000005 /* PersonalizedScoringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizedScoringTests.swift; sourceTree = "<group>"; };
 		T17F00000000000000000006 /* SmartReplacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartReplacementTests.swift; sourceTree = "<group>"; };
 		T17F00000000000000000007 /* PresentationRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationRuleTests.swift; sourceTree = "<group>"; };
+		T17F0000000000000000000A /* RecipePhotoLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePhotoLoaderTests.swift; sourceTree = "<group>"; };
 		T17F00000000000000000008 /* MealMemoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealMemoryStoreTests.swift; sourceTree = "<group>"; };
 		T17F00000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A10000000000000000000002 /* MealRoutine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MealRoutine.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -640,6 +642,7 @@
 				T17F00000000000000000008 /* MealMemoryStoreTests.swift */,
 				T17F00000000000000000005 /* PersonalizedScoringTests.swift */,
 				T17F00000000000000000007 /* PresentationRuleTests.swift */,
+				T17F0000000000000000000A /* RecipePhotoLoaderTests.swift */,
 				T17F00000000000000000006 /* SmartReplacementTests.swift */,
 				V3F0000000000000000007 /* RecipeImportTests.swift */,
 				V4F0000000000000000007 /* HouseholdPlanningTests.swift */,
@@ -1013,6 +1016,7 @@
 				T17B00000000000000000005 /* PersonalizedScoringTests.swift in Sources */,
 				T17B00000000000000000006 /* SmartReplacementTests.swift in Sources */,
 				T17B00000000000000000007 /* PresentationRuleTests.swift in Sources */,
+				T17B0000000000000000000A /* RecipePhotoLoaderTests.swift in Sources */,
 				T17B00000000000000000008 /* MealMemoryStoreTests.swift in Sources */,
 				V3B0000000000000000007 /* RecipeImportTests.swift in Sources */,
 				V4B0000000000000000007 /* HouseholdPlanningTests.swift in Sources */,
