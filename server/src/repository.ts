@@ -1,4 +1,6 @@
 import { AppError } from './errors.js'
+import type { HouseholdStore } from './householdTypes.js'
+import { createHouseholdMemory } from './memoryHousehold.js'
 
 export type ProviderName = 'apple' | 'google' | 'dev'
 export type MemberRole = 'owner' | 'member'
@@ -59,7 +61,7 @@ export interface AuthRepository {
   membership(householdId: string, accountId: string): Promise<MemberRole | null>
 }
 
-export interface MemoryRepository extends AuthRepository {
+export interface MemoryRepository extends AuthRepository, HouseholdStore {
   seedMember(householdId: string, accountId: string, role: MemberRole): void
 }
 
@@ -72,6 +74,12 @@ export function createMemoryRepository(): MemoryRepository {
   const identities: IdentityRow[] = []
   const sessions = new Map<string, SessionRow>()
   const members = new Map<string, Map<string, MemberRole>>()
+  const household = createHouseholdMemory(accounts, (householdId, accountId, role) => {
+    const rows = members.get(householdId) ?? new Map<string, MemberRole>()
+    if (role) rows.set(accountId, role)
+    else rows.delete(accountId)
+    members.set(householdId, rows)
+  })
 
   function requireAccount(id: string): AccountRow {
     const account = accounts.get(id)
@@ -162,5 +170,7 @@ export function createMemoryRepository(): MemoryRepository {
       rows.set(accountId, role)
       members.set(householdId, rows)
     },
+    transaction: household.transaction,
+    preferenceRetained: household.preferenceRetained,
   }
 }

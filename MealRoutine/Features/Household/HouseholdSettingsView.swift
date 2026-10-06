@@ -13,6 +13,8 @@ struct HouseholdSettingsView: View {
     @State private var categories = ""
     @State private var proteins = ""
     @State private var avoided = ""
+    @State private var renameName = ""
+    @State private var pendingAction: HouseholdDestructiveAction?
 
     var body: some View {
         Form {
@@ -42,6 +44,46 @@ struct HouseholdSettingsView: View {
             }
         }
         .onAppear(perform: loadPreference)
+        .onChange(of: session.snapshot.household?.name) { _, name in
+            renameName = name ?? ""
+        }
+        .confirmationDialog(
+            pendingAction?.title ?? "",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { if !$0 { pendingAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(pendingAction?.confirmTitle ?? "Onayla", role: .destructive) {
+                let action = pendingAction
+                pendingAction = nil
+                guard let action else { return }
+                perform(action)
+            }
+            Button("Vazgeç", role: .cancel) {
+                pendingAction = nil
+            }
+        } message: {
+            Text(pendingAction?.message ?? "")
+        }
+    }
+
+    private func perform(_ action: HouseholdDestructiveAction) {
+        switch action {
+        case .remove(let userId, _):
+            session.remove(memberId: userId, in: modelContext)
+        case .cancelInvite(let inviteId):
+            session.revoke(inviteId: inviteId, in: modelContext)
+        case .reject(let code):
+            session.rejectInvite(code: code, in: modelContext)
+        case .leave:
+            session.leave(in: modelContext)
+        case .delete:
+            session.deleteHousehold(in: modelContext)
+        case .transfer(let userId, _):
+            session.transferOwnership(to: userId, in: modelContext)
+        }
     }
 
     @ViewBuilder
@@ -119,6 +161,11 @@ struct HouseholdSettingsView: View {
                 Task { await session.acceptInvite(code: inviteCode, in: modelContext) }
             }
             .disabled(HouseholdInviteCode.normalize(inviteCode).count != HouseholdInviteCode.length)
+            Button("Daveti reddet", role: .destructive) {
+                pendingAction = .reject(inviteCode)
+            }
+            .disabled(HouseholdInviteCode.normalize(inviteCode).count != HouseholdInviteCode.length)
+            .accessibilityIdentifier("household.reject")
         } header: {
             Text("Davetlisin")
         }
@@ -133,6 +180,16 @@ struct HouseholdSettingsView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
             }
+            if session.snapshot.role(of: session.account?.id ?? "") == .owner {
+                TextField("Ev halkının yeni adı", text: $renameName)
+                    .textInputAutocapitalization(.words)
+                    .accessibilityLabel("Ev halkının yeni adı")
+                Button("Adı kaydet") {
+                    session.renameHousehold(name: renameName, in: modelContext)
+                }
+                .disabled(renameName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("household.rename")
+            }
             ForEach(session.snapshot.members) { member in
                 HStack {
                     Text(member.displayName)
@@ -144,9 +201,14 @@ struct HouseholdSettingsView: View {
                 .accessibilityElement(children: .combine)
                 if session.snapshot.role(of: session.account?.id ?? "") == .owner, member.role == .member {
                     Button("Çıkar", role: .destructive) {
-                        session.remove(memberId: member.userId, in: modelContext)
+                        pendingAction = .remove(member.userId, member.displayName)
                     }
+                    .accessibilityIdentifier("household.remove")
                     .accessibilityHint("\(member.displayName) ev halkından çıkar")
+                    Button("Ev sahipliğini devret") {
+                        pendingAction = .transfer(member.userId, member.displayName)
+                    }
+                    .accessibilityIdentifier("household.transfer")
                 }
             }
         } header: {
@@ -176,9 +238,14 @@ struct HouseholdSettingsView: View {
                         Text("Davet bağlantısını paylaş")
                     }
                     .accessibilityHint("Partnerin açacağı bağlantıyı paylaşır")
-                    Button("Daveti geri al", role: .destructive) {
-                        session.revoke(inviteId: invite.id, in: modelContext)
+                    Button("Daveti yeniden gönder") {
+                        session.resendInvite(inviteId: invite.id, in: modelContext)
                     }
+                    .accessibilityIdentifier("household.inviteResend")
+                    Button("Daveti geri al", role: .destructive) {
+                        pendingAction = .cancelInvite(invite.id)
+                    }
+                    .accessibilityIdentifier("household.inviteCancel")
                 } else {
                     Button("Partnerini davet et") {
                         session.createInvite(in: modelContext)
@@ -326,14 +393,22 @@ struct HouseholdSettingsView: View {
     private var dangerSection: some View {
         Section {
             if session.snapshot.role(of: session.account?.id ?? "") == .owner {
-                Button("Ev halkını sil", role: .destructive) {
-                    session.deleteHousehold(in: modelContext)
+                if session.snapshot.members.count > 1 {
+                    Button("Ayrıl ve ev sahipliğini devret", role: .destructive) {
+                        pendingAction = .leave
+                    }
+                    .accessibilityIdentifier("household.leave")
                 }
-                .accessibilityHint("Ortak planı siler. Kişisel hafıza ve tarifler kalır.")
+                Button("Ev halkını sil", role: .destructive) {
+                    pendingAction = .delete
+                }
+                .accessibilityIdentifier("household.delete")
+                .accessibilityHint("Evi kapatır. Kişisel hafıza ve tarifler kalır. Ortak plan evle kalır.")
             } else {
                 Button("Ev halkından ayrıl", role: .destructive) {
-                    session.leave(in: modelContext)
+                    pendingAction = .leave
                 }
+                .accessibilityIdentifier("household.leave")
             }
             Button(session.isTestMode ? "Test oturumunu kapat" : "Oturumu kapat") {
                 session.signOut(in: modelContext)
@@ -346,12 +421,67 @@ struct HouseholdSettingsView: View {
     }
 
     private func loadPreference() {
+        renameName = session.snapshot.household?.name ?? ""
         guard let preference = session.snapshot.preference else { return }
         cookingDays = Set(preference.cookingDays)
         maxMinutes = preference.maxWeekdayMinutes
         categories = preference.preferredCategories.joined(separator: ", ")
         proteins = preference.preferredProteins.joined(separator: ", ")
         avoided = preference.avoidedIngredients.joined(separator: ", ")
+    }
+}
+
+private enum HouseholdDestructiveAction {
+    case remove(String, String)
+    case cancelInvite(UUID)
+    case reject(String)
+    case leave
+    case delete
+    case transfer(String, String)
+
+    var title: String {
+        switch self {
+        case .remove(_, let name):
+            "\(name) çıkarılsın mı?"
+        case .cancelInvite:
+            "Davet geri alınsın mı?"
+        case .reject:
+            "Davet reddedilsin mi?"
+        case .leave:
+            "Ev halkından ayrıl?"
+        case .delete:
+            "Ev halkı silinsin mi?"
+        case .transfer(_, let name):
+            "Ev sahipliği \(name) kişisine geçsin mi?"
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .remove: "Çıkar"
+        case .cancelInvite: "Geri al"
+        case .reject: "Reddet"
+        case .leave: "Ayrıl"
+        case .delete: "Sil"
+        case .transfer: "Devret"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .remove:
+            "Kişisel tarifleri ve hafızası silinmez. Ortak plan evde kalır."
+        case .cancelInvite:
+            "Kod artık kullanılamaz. İstersen yeni bir davet açabilirsin."
+        case .reject:
+            "Bu kodla katılmazsın. Kişisel verin durur."
+        case .leave:
+            "Kişisel verin durur. Ortak plan evde kalır. Ev sahibiysen sahiplik diğer üyeye geçer."
+        case .delete:
+            "Ev kapanır. Kişisel tariflerin ve hafızan silinmez. Ortak plan evle kalır."
+        case .transfer:
+            "Sen üye olursun. Ortak plan evde kalır. Kişisel verin durur."
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 import type { Pool } from 'pg'
 import { AppError } from './errors.js'
+import { createPgHouseholdStore } from './pgHousehold.js'
 import type {
   AccountRow,
   AuthRepository,
@@ -10,6 +11,7 @@ import type {
   SessionDraft,
   SessionRow,
 } from './repository.js'
+import type { HouseholdStore } from './householdTypes.js'
 
 function asProvider(value: string): ProviderName {
   if (value === 'apple' || value === 'google' || value === 'dev') return value
@@ -52,7 +54,8 @@ function identityFrom(row: {
   }
 }
 
-export function createPgRepository(pool: Pool): AuthRepository {
+export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore {
+  const household = createPgHouseholdStore(pool)
   return {
     async countAccounts() {
       const result = await pool.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM accounts')
@@ -248,12 +251,19 @@ export function createPgRepository(pool: Pool): AuthRepository {
     },
     async membership(householdId, accountId) {
       const result = await pool.query<{ role: MemberRole }>(
-        `SELECT role FROM household_members
-          WHERE household_id = $1 AND account_id = $2 AND left_at IS NULL`,
+        `SELECT m.role
+           FROM household_members m
+           JOIN households h ON h.id = m.household_id
+          WHERE m.household_id = $1
+            AND m.account_id = $2
+            AND m.left_at IS NULL
+            AND h.deleted_at IS NULL`,
         [householdId, accountId],
       )
       return result.rows[0]?.role ?? null
     },
+    transaction: household.transaction,
+    preferenceRetained: household.preferenceRetained,
   }
 }
 
