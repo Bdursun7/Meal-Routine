@@ -1427,13 +1427,16 @@ enum HouseholdNotifier {
         #else
         #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+                || settings.authorizationStatus == .ephemeral else { return }
             for push in pushes {
                 let content = UNMutableNotificationContent()
                 content.title = push.title
                 content.body = push.body
                 content.sound = .default
+                content.userInfo = ["route": NotificationDeepLink.url(for: push.kind)]
                 let request = UNNotificationRequest(identifier: push.id.uuidString, content: content, trigger: nil)
                 center.add(request)
             }

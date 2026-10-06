@@ -40,6 +40,7 @@ struct HouseholdTestNotice: Identifiable, Equatable, Sendable {
     var audience: HouseholdTestAudience
     var title: String
     var body: String
+    var route: String = ""
     var createdAt: Date
 
     var bannerText: String {
@@ -154,6 +155,7 @@ final class HouseholdTestMode {
                 audience: audience,
                 title: push.title,
                 body: push.body,
+                route: NotificationDeepLink.url(for: push.kind),
                 createdAt: .now
             )
         }

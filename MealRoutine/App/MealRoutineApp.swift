@@ -2,6 +2,7 @@ import GoogleSignIn
 import SwiftData
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct MealRoutineApp: App {
@@ -23,8 +24,9 @@ struct MealRoutineApp: App {
                     if GIDSignIn.sharedInstance.handle(url) {
                         return
                     }
-                    if let code = HouseholdInviteLink.code(from: url) {
-                        HouseholdSession.shared.queueInvite(code)
+                    let route = NotificationDeepLink.parse(url)
+                    if route != .unknown {
+                        NotificationRouter.shared.apply(route)
                         return
                     }
                     CollectionRouter.shared.handleOpenURL(url)
@@ -34,15 +36,40 @@ struct MealRoutineApp: App {
     }
 }
 
-final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate {
+final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         GoogleSignInCoordinator.configureIfNeeded()
-        if HouseholdTestLaunch.allowsAppleServices {
-            application.registerForRemoteNotifications()
-        }
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task { @MainActor in
+            await NotificationSync.shared.registerToken(token)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        _ = error
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let route = NotificationDeepLink.parse(userInfo: response.notification.request.content.userInfo)
+        await MainActor.run {
+            NotificationRouter.shared.apply(route)
+        }
     }
 }

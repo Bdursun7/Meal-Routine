@@ -4,6 +4,7 @@ import { assertRuntimeConfig, loadConfig } from './config.js'
 import { loadEnvFile } from './env.js'
 import { createJwksVerifier } from './jwks.js'
 import { migrate } from './migrate.js'
+import { createPgNotificationStore, createPushSender } from './notifications.js'
 import { createPgMigrationStore } from './pgMigration.js'
 import { createPgRepository } from './pgRepository.js'
 
@@ -16,6 +17,8 @@ async function main(): Promise<void> {
   const app = buildApp({
     repo: createPgRepository(pool),
     migration: createPgMigrationStore(pool),
+    notifications: createPgNotificationStore(pool),
+    sender: createPushSender(),
     config,
     verifier: createJwksVerifier(config),
     logger: true,

@@ -143,6 +143,10 @@
 		V44B44A0000000000000001 /* LocalMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000001 /* LocalMigration.swift */; };
 		V44B44A0000000000000002 /* LocalMigrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000002 /* LocalMigrationView.swift */; };
 		V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V44F44A0000000000000003 /* LocalMigrationTests.swift */; };
+		V45B45A0000000000000001 /* NotificationDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = V45F45A0000000000000001 /* NotificationDeepLink.swift */; };
+		V45B45A0000000000000002 /* NotificationSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = V45F45A0000000000000002 /* NotificationSync.swift */; };
+		V45B45A0000000000000003 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = V45F45A0000000000000003 /* NotificationsView.swift */; };
+		V45B45A0000000000000004 /* NotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V45F45A0000000000000004 /* NotificationTests.swift */; };
 		V41B41A000000000000000B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = V41P41A0000000000000002 /* GoogleSignIn */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
@@ -310,6 +314,10 @@
 		V44F44A0000000000000001 /* LocalMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigration.swift; sourceTree = "<group>"; };
 		V44F44A0000000000000002 /* LocalMigrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigrationView.swift; sourceTree = "<group>"; };
 		V44F44A0000000000000003 /* LocalMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMigrationTests.swift; sourceTree = "<group>"; };
+		V45F45A0000000000000001 /* NotificationDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDeepLink.swift; sourceTree = "<group>"; };
+		V45F45A0000000000000002 /* NotificationSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSync.swift; sourceTree = "<group>"; };
+		V45F45A0000000000000003 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		V45F45A0000000000000004 /* NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationTests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
@@ -441,6 +449,7 @@
 				FA0A11A1A11A11A11A11A007 /* PrivacyView.swift */,
 				V41F41A0000000000000008 /* AccountView.swift */,
 				V44F44A0000000000000002 /* LocalMigrationView.swift */,
+				V45F45A0000000000000003 /* NotificationsView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -639,6 +648,7 @@
 				V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */,
 				V43F43A0000000000000003 /* SyncEngineTests.swift */,
 				V44F44A0000000000000003 /* LocalMigrationTests.swift */,
+				V45F45A0000000000000004 /* NotificationTests.swift */,
 			);
 			path = MealRoutineTests;
 			sourceTree = "<group>";
@@ -665,6 +675,8 @@
 				V42F42A0000000000000001 /* HouseholdLifecycleClient.swift */,
 				V43F43A0000000000000002 /* BoardSyncClient.swift */,
 				V44F44A0000000000000001 /* LocalMigration.swift */,
+				V45F45A0000000000000001 /* NotificationDeepLink.swift */,
+				V45F45A0000000000000002 /* NotificationSync.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -983,7 +995,10 @@
 				V42B42A0000000000000001 /* HouseholdLifecycleClient.swift in Sources */,
 				V43B43A0000000000000002 /* BoardSyncClient.swift in Sources */,
 				V44B44A0000000000000001 /* LocalMigration.swift in Sources */,
+				V45B45A0000000000000001 /* NotificationDeepLink.swift in Sources */,
+				V45B45A0000000000000002 /* NotificationSync.swift in Sources */,
 				V44B44A0000000000000002 /* LocalMigrationView.swift in Sources */,
+				V45B45A0000000000000003 /* NotificationsView.swift in Sources */,
 				V41B41A0000000000000008 /* AccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1006,6 +1021,7 @@
 				V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */,
 				V43B43A0000000000000003 /* SyncEngineTests.swift in Sources */,
 				V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */,
+				V45B45A0000000000000004 /* NotificationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
