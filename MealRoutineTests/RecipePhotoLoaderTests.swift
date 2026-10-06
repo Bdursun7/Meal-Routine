@@ -52,6 +52,81 @@ final class RecipePhotoLoaderTests: XCTestCase {
         )
         XCTAssertEqual(cached, jpeg)
         XCTAssertEqual(CommonsThumbStub.requestedURLs(), [])
+
+        let heroJPEG = Data([0xFF, 0xD8, 0xFF, 0xC0])
+        CommonsThumbStub.reset(replies: [
+            hero.absoluteString: .init(status: 200, body: heroJPEG),
+            hamsi.absoluteString: .init(status: 200, body: jpeg),
+        ])
+        let heroLoaded = await RecipePhotoLoader.load(
+            remoteURL: hamsi,
+            maxPixel: RecipePhoto.heroMaxPixel,
+            session: session,
+            directory: directory
+        )
+        XCTAssertEqual(heroLoaded, heroJPEG)
+        XCTAssertEqual(CommonsThumbStub.requestedURLs(), [hero.absoluteString])
+        XCTAssertEqual(RecipePhotoDiskCache.read(remoteURL: hero, directory: directory), heroJPEG)
+        XCTAssertNotEqual(RecipePhotoDiskCache.read(remoteURL: hamsi, directory: directory), heroJPEG)
+    }
+
+    func testHeroSlotRejectsTheCutOffMeasurement() {
+        XCTAssertTrue(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 390,
+                height: 220,
+                minimumWidth: 220,
+                minimumHeight: 220,
+                widerThanTall: true
+            )
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 220,
+                height: 220,
+                minimumWidth: 220,
+                minimumHeight: 220,
+                widerThanTall: true
+            ),
+            "a square measurement is the clipped hero, not the full-bleed frame"
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 390,
+                height: 80,
+                minimumWidth: 220,
+                minimumHeight: 220,
+                widerThanTall: true
+            )
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 0,
+                height: 220,
+                minimumWidth: 220,
+                minimumHeight: 220,
+                widerThanTall: true
+            )
+        )
+        XCTAssertTrue(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 64,
+                height: 64,
+                minimumWidth: 64,
+                minimumHeight: 64,
+                widerThanTall: false
+            )
+        )
+        XCTAssertTrue(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 390,
+                height: 420,
+                minimumWidth: 180,
+                minimumHeight: 180,
+                widerThanTall: false
+            ),
+            "a tall backdrop is ready; only the detail hero requires a wide frame"
+        )
     }
 
     private func stubSession() -> URLSession {
