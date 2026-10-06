@@ -33,7 +33,7 @@ describe('migrations', () => {
   it('lists versioned SQL files in order and creates the phase-0 tables', async () => {
     const dir = migrationsDirectory()
     const files = await listMigrationFiles(dir)
-    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007'])
+    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008'])
     const sql = (
       await Promise.all(files.map((file) => readFile(path.join(dir, file), 'utf8')))
     ).join('\n')
@@ -43,6 +43,8 @@ describe('migrations', () => {
     expect(sql).toContain('UNIQUE (provider, subject)')
     expect(sql).toContain('household member limit is 2')
     expect(sql).toContain('invites_one_pending')
+    expect(sql).toContain('sync_changes')
+    expect(sql).toContain('quantity')
     expect(sql).toContain("'pending', 'accepted', 'rejected', 'cancelled', 'expired'")
     expect(sql).not.toContain('DROP TABLE')
   })

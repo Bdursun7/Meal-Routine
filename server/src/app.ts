@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { createAuthService, type AuthService, type VerifiedIdentity } from './authService.js'
 import type { AppConfig } from './config.js'
 import { AppError } from './errors.js'
+import { createBoardService } from './boardService.js'
+import type { BoardStore } from './boardTypes.js'
 import { createHouseholdService } from './householdService.js'
 import type { HouseholdStore } from './householdTypes.js'
 import type { IdentityVerifier } from './jwks.js'
@@ -62,8 +64,16 @@ const codeParams = z.object({
   code: z.string().min(1).max(32),
 })
 
+const mutationBody = z.object({
+  entityType: z.enum(['grocery', 'meal', 'reaction', 'plan', 'preference']),
+  entityId: z.string().min(1).max(80),
+  operationType: z.enum(['add', 'check', 'replace', 'set', 'upsert', 'update', 'cook']),
+  baseRevision: z.number().int().nonnegative(),
+  payload: z.record(z.string(), z.unknown()),
+})
+
 export interface BuildAppOptions {
-  repo: AuthRepository & HouseholdStore
+  repo: AuthRepository & HouseholdStore & BoardStore
   config: AppConfig
   verifier: IdentityVerifier
   now?: () => Date
@@ -90,6 +100,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     options.rateLimiter ??
     createRateLimiter({ windowMs: config.rateLimitWindowMs, max: config.rateLimitMax })
   const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
+  const board = createBoardService(options.repo, options.repo, options.householdNow ?? options.now ?? (() => new Date()))
 
   const app = Fastify({
     logger: options.logStream
@@ -110,7 +121,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
       request.log.warn({ code: error.code }, 'request failed')
-      const body: { error: string; existingProviders?: string[] } = { error: error.code }
+      const body: Record<string, unknown> = { ...(error.details ?? {}), error: error.code }
       if (error.existingProviders) body.existingProviders = error.existingProviders
       return reply.code(error.status).send(body)
     }
@@ -280,14 +291,35 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     return households.transfer(accountId, params.householdId, body.accountId)
   })
 
-  app.put('/v1/households/:householdId/board', async (request) => {
-    await assertMember(request, options, config)
-    throw new AppError('not_implemented', 501)
+  app.get('/v1/households/:householdId/board', async (request) => {
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    return board.board(accountId, params.householdId)
   })
 
-  app.get('/v1/households/:householdId/board', async (request) => {
-    await assertMember(request, options, config)
-    throw new AppError('not_implemented', 501)
+  app.get('/v1/households/:householdId/changes', async (request) => {
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    const query = parse(z.object({ cursor: z.coerce.number().int().nonnegative().optional() }), request.query)
+    return board.changes(accountId, params.householdId, query.cursor ?? 0)
+  })
+
+  app.post('/v1/households/:householdId/mutations', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    const idempotencyKey = headerValue(request.headers['idempotency-key'])
+    if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
+      throw new AppError('invalid_request', 400)
+    }
+    const body = parse(mutationBody, request.body)
+    return board.mutate(accountId, params.householdId, idempotencyKey, body)
+  })
+
+  app.put('/v1/households/:householdId/board', async (request) => {
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    return board.board(accountId, params.householdId)
   })
 
   app.delete('/v1/households/:householdId', async (request) => {
@@ -304,6 +336,11 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value)
   if (!result.success) throw new AppError('invalid_request', 400)
   return result.data
+}
+
+function headerValue(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value
+  return raw?.trim() ?? ''
 }
 
 function enforceRateLimit(request: FastifyRequest, limiter: RateLimiter): void {

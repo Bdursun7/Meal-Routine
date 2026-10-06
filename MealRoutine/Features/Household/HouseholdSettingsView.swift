@@ -90,7 +90,7 @@ struct HouseholdSettingsView: View {
     private var statusSection: some View {
         if session.syncState == .offline {
             Section {
-                Label("Çevrimdışı. Değişiklik bu telefonda duruyor ve iCloud gelince gider.", systemImage: "icloud.slash")
+                Label("Çevrimdışı. Değişiklik bu telefonda duruyor ve bağlantı gelince gider.", systemImage: "icloud.slash")
                     .font(.footnote)
                     .accessibilityLabel("Çevrimdışı. Ev halkı bu telefonda duruyor.")
             }
@@ -221,6 +221,13 @@ struct HouseholdSettingsView: View {
         if session.snapshot.role(of: session.account?.id ?? "") == .owner,
            session.snapshot.members.count < HouseholdLimits.maxMembers {
             Section {
+                if testMode.isEnabled, !session.showsPartnerControls {
+                    Button("Test Partner katılsın") {
+                        Task { await session.simulatePartnerJoin(in: modelContext) }
+                    }
+                    .accessibilityIdentifier("household.partnerJoin")
+                    .accessibilityHint("Davet kodunu ikinci üye olarak kabul eder")
+                }
                 if let invite = pendingInvite {
                     Text(invite.inviteCode)
                         .font(.system(.title2, design: .monospaced).weight(.semibold))
@@ -281,6 +288,17 @@ struct HouseholdSettingsView: View {
             }
             .accessibilityIdentifier("household.generateWeek")
             .accessibilityHint("İki kişinin hafızasına ve bu haftanın vetolarına göre plan kurar")
+            if testMode.isEnabled, session.showsPartnerControls {
+                Text("Test Partner evde. Tepkiler ortak haftanın yemeklerinde ve Bu Hafta kartında. Market işareti Market’te.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                if session.snapshot.plan?.meals.isEmpty == false {
+                    Button("Test Partner marketi işaretlesin") {
+                        Task { await session.partnerCheckNextGrocery(in: modelContext) }
+                    }
+                    .accessibilityIdentifier("household.partner.grocery")
+                }
+            }
             if let plan = session.snapshot.plan {
                 ForEach(plan.meals.sorted { $0.dayOffset < $1.dayOffset }) { meal in
                     sharedMealRow(meal)

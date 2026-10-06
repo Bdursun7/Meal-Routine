@@ -39,9 +39,15 @@ struct APIClient: Sendable {
         self.expiry = expiry
     }
 
-    func request(method: String, path: String, body: Data?, authenticated: Bool) async throws -> (Data, HTTPURLResponse) {
+    func request(
+        method: String,
+        path: String,
+        body: Data?,
+        authenticated: Bool,
+        headers: [String: String] = [:]
+    ) async throws -> (Data, HTTPURLResponse) {
         let access = try await accessToken(authenticated: authenticated)
-        let first = try await perform(method: method, path: path, body: body, accessToken: access)
+        let first = try await perform(method: method, path: path, body: body, accessToken: access, headers: headers)
         guard authenticated, first.response.statusCode == 401 else {
             return (first.data, first.response)
         }
@@ -50,7 +56,7 @@ struct APIClient: Sendable {
             throw AuthAPIError.sessionExpired
         }
         let refreshed = try await refresh(current, force: true)
-        let second = try await perform(method: method, path: path, body: body, accessToken: refreshed.accessToken)
+        let second = try await perform(method: method, path: path, body: body, accessToken: refreshed.accessToken, headers: headers)
         if second.response.statusCode == 401 {
             tokens.clear()
             expiry.emit()
@@ -134,14 +140,21 @@ struct APIClient: Sendable {
         }
     }
 
-    private func perform(method: String, path: String, body: Data?, accessToken: String?) async throws -> (data: Data, response: HTTPURLResponse) {
+    private func perform(
+        method: String,
+        path: String,
+        body: Data?,
+        accessToken: String?,
+        headers: [String: String] = [:]
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
         try await APIClient.perform(
             session: session,
             baseURL: baseURL,
             method: method,
             path: path,
             body: body,
-            accessToken: accessToken
+            accessToken: accessToken,
+            headers: headers
         )
     }
 
@@ -151,7 +164,8 @@ struct APIClient: Sendable {
         method: String,
         path: String,
         body: Data?,
-        accessToken: String?
+        accessToken: String?,
+        headers: [String: String] = [:]
     ) async throws -> (data: Data, response: HTTPURLResponse) {
         guard let url = APIClient.url(baseURL: baseURL, path: path) else {
             throw AuthAPIError.transport
@@ -161,6 +175,9 @@ struct APIClient: Sendable {
         request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(MealRoutineConfig.clientAPIVersion, forHTTPHeaderField: "X-Client-API-Version")
+        for (field, value) in headers {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

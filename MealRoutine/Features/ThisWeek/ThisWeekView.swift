@@ -94,7 +94,9 @@ struct ThisWeekView: View {
 
         Group {
             if meals.isEmpty {
-                    WarmEmptyState(
+                    VStack(alignment: .leading, spacing: Theme.cardGap) {
+                        syncBanner
+                        WarmEmptyState(
                         title: household.isHouseholdMode ? "Ortak hafta henüz yok" : "Bu hafta henüz kurulmadı",
                         message: household.isHouseholdMode
                             ? "İkiniz de bakabileceğiniz bir plan kuralım. Kişisel hafızanız yerinde kalır."
@@ -110,13 +112,14 @@ struct ThisWeekView: View {
                             }
                         }
                     )
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: Theme.sectionGap) {
+                            syncBanner
                             VStack(alignment: .leading, spacing: Theme.cardGap) {
                                 if household.isHouseholdMode {
                                     householdHeader
-                                    HouseholdSyncBanner(state: household.syncState)
                                 }
                                 progressCard(summary)
                                 if !planExplanation.isEmpty {
@@ -170,6 +173,23 @@ struct ThisWeekView: View {
                     }
                     .background(Theme.canvas)
                 }
+        }
+        .refreshable {
+            await household.refresh(in: modelContext)
+            await household.drainPending(in: modelContext)
+        }
+    }
+
+    @ViewBuilder
+    private var syncBanner: some View {
+        if household.syncState != .idle {
+            HouseholdSyncBanner(state: household.syncState)
+        }
+        if let message = household.statusMessage, message == SharedConflictNotice.mealUpdated {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityIdentifier("household.syncNotice")
         }
     }
 

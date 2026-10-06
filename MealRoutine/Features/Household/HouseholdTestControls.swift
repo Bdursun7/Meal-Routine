@@ -60,26 +60,21 @@ struct HouseholdTestModeSection: View {
             .accessibilityHint("Apple hesabı, iCloud ve bildirim olmadan ev halkını bu telefonda dener")
             if testMode.isEnabled {
                 HouseholdTestBadge()
-                Text("Tek telefon. Test Partner senin yerine tepki verir. Gerçek CloudKit eşitlemesi ve push burada çalışmaz.")
+                Toggle("Çevrimdışı simüle et", isOn: Binding(
+                    get: { testMode.simulateOffline },
+                    set: { offline in
+                        session.setSimulateOffline(offline, in: modelContext)
+                    }
+                ))
+                .accessibilityIdentifier("household.simulateOffline")
+                Toggle("Partner aynı yemeği değiştirsin", isOn: Binding(
+                    get: { testMode.simulatePartnerEdit },
+                    set: { testMode.simulatePartnerEdit = $0 }
+                ))
+                .accessibilityIdentifier("household.simulatePartnerEdit")
+                Text("Tek telefon. Test Partner senin yerine tepki verir. Ortak veri sunucuda durur; test modu ağa çıkmaz, çevrimdışı ve çakışmayı buradan deneyebilirsin.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
-                if session.showsPartnerControls {
-                    Text("Test Partner evde. Tepkiler ortak haftanın yemeklerinde ve Bu Hafta kartında. Market işareti Market’te.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                    if session.snapshot.plan?.meals.isEmpty == false {
-                        Button("Test Partner marketi işaretlesin") {
-                            Task { await session.partnerCheckNextGrocery(in: modelContext) }
-                        }
-                        .accessibilityIdentifier("household.partner.grocery")
-                    }
-                } else if session.hasHousehold, session.snapshot.members.count < HouseholdLimits.maxMembers {
-                    Button("Test Partner katılsın") {
-                        Task { await session.simulatePartnerJoin(in: modelContext) }
-                    }
-                    .accessibilityIdentifier("household.partnerJoin")
-                    .accessibilityHint("Davet kodunu ikinci üye olarak kabul eder")
-                }
                 if !testMode.notices.isEmpty {
                     ForEach(testMode.notices.prefix(8)) { notice in
                         VStack(alignment: .leading, spacing: 2) {

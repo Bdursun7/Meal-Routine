@@ -3,7 +3,7 @@ import XCTest
 final class HouseholdFlowUITests: XCTestCase {
     func testTestModeWalksCreateJoinVetoAndReplacement() {
         let app = XCUIApplication()
-        app.launchArguments = [HouseholdTestLaunchArgument]
+        app.launchArguments = [HouseholdTestLaunchArgument, HouseholdTestResetArgument]
         app.launch()
 
         let start = app.buttons["Kuruluma başla"]
@@ -40,9 +40,7 @@ final class HouseholdFlowUITests: XCTestCase {
         reveal(app.buttons["household.create"], in: app).tap()
         reveal(app.buttons["household.invite"], in: app).tap()
 
-        let join = app.buttons["household.partnerJoin"]
-        XCTAssertTrue(join.waitForExistence(timeout: 5))
-        join.tap()
+        reveal(app.buttons["household.partnerJoin"], in: app).tap()
         reveal(app.buttons["household.generateWeek"], in: app).tap()
         dismissTestBanner(in: app)
 
@@ -85,14 +83,28 @@ final class HouseholdFlowUITests: XCTestCase {
         if element.waitForExistence(timeout: 2), element.isHittable {
             return element
         }
-        for _ in 0..<4 {
+        for _ in 0..<5 {
             app.swipeUp()
             if element.exists, element.isHittable {
                 return element
             }
         }
+        if let above = revealUp(element, in: app) {
+            return above
+        }
         XCTAssertTrue(element.waitForExistence(timeout: 5))
         return element
+    }
+
+    /// Brings a row back after a lazy list dropped it above the fold.
+    private func revealUp(_ element: XCUIElement, in app: XCUIApplication) -> XCUIElement? {
+        for _ in 0..<8 {
+            app.swipeDown()
+            if element.exists, element.isHittable {
+                return element
+            }
+        }
+        return nil
     }
 
     private func tap(_ label: String, in app: XCUIApplication) {
@@ -102,5 +114,6 @@ final class HouseholdFlowUITests: XCTestCase {
     }
 }
 
-/// Mirrors `HouseholdTestLaunch.argument` without linking the app target.
+/// Mirrors `HouseholdTestLaunch` without linking the app target.
 private let HouseholdTestLaunchArgument = "-HouseholdTestMode"
+private let HouseholdTestResetArgument = "-HouseholdTestReset"

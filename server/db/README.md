@@ -1,6 +1,6 @@
 # MealRoutine veritabanı
 
-Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0006` değişmez; yeni şema `0007_one_pending_invite.sql` ile eklenir ve aynı `npm run migrate` onu da uygular.
+Sunucu Postgres kullanır. Barındırılan bir veritabanı gerekmez. Şema `migrations/` altındaki dosyalardadır. `npm run migrate` her dosyayı bir kez uygular ve adını `schema_migrations` tablosuna yazar. Dosyalar `IF NOT EXISTS` kullandığı için aynı dosyayı elle ikinci kez çalıştırmak da tabloyu bozmaz. `0001`–`0007` değişmez. Bu sürümün yeni şeması `0008_sync_changes.sql` dosyasıdır. `npm run migrate` onu da uygular.
 
 Postgres 14 veya daha yeni olmalı.
 
