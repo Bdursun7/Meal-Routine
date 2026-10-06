@@ -19,9 +19,14 @@ struct RootView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let notice = testMode.banner {
-                HouseholdTestBanner(notice: notice) {
+                HouseholdTestBanner(notice: notice, onOpen: {
+                    if let url = URL(string: notice.route) {
+                        NotificationRouter.shared.apply(NotificationDeepLink.parse(url))
+                    }
                     testMode.dismissBanner()
-                }
+                }, onDismiss: {
+                    testMode.dismissBanner()
+                })
                 .padding(.top, 8)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)

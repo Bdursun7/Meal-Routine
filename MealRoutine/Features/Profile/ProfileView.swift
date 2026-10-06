@@ -59,6 +59,12 @@ struct ProfileView: View {
                     }
                     .accessibilityIdentifier("account.open")
                     .accessibilityHint("Bağlı girişler, çıkış ve oturum")
+                    NavigationLink {
+                        NotificationsView()
+                    } label: {
+                        Text("Bildirimler")
+                    }
+                    .accessibilityIdentifier("notifications.open")
                 }
 
                 Section("Ev halkı") {

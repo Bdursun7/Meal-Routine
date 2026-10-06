@@ -12,6 +12,16 @@ import type { IdentityVerifier } from './jwks.js'
 import { redactSensitive } from './log.js'
 import { createMemoryMigration } from './memoryMigration.js'
 import { createMigrationService, parseUpload, type MigrationStore } from './migrationService.js'
+import {
+  createLogSender,
+  createMemoryNotificationStore,
+  createNotificationService,
+  kindForMutation,
+  notificationKinds,
+  type NotificationKind,
+  type NotificationStore,
+  type PushSender,
+} from './notifications.js'
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
 import type { AuthRepository } from './repository.js'
 import { verifyAccessToken } from './tokens.js'
@@ -66,6 +76,30 @@ const codeParams = z.object({
   code: z.string().min(1).max(32),
 })
 
+const preferenceBody = z.object({
+  masterEnabled: z.boolean(),
+  invitesEnabled: z.boolean(),
+  weeklyPlanEnabled: z.boolean(),
+  mealVetoEnabled: z.boolean(),
+  mealReplacementEnabled: z.boolean(),
+  planFinalizedEnabled: z.boolean(),
+})
+
+const tokenBody = z.object({
+  token: z.string().min(8).max(400),
+  platform: z.enum(['ios', 'android']),
+})
+
+const tokenDeleteBody = z.object({
+  token: z.string().min(8).max(400),
+})
+
+const eventBody = z.object({
+  kind: z.enum(notificationKinds),
+  mealId: z.string().max(80).optional(),
+  inviteCode: z.string().max(12).optional(),
+})
+
 const mutationBody = z.object({
   entityType: z.enum(['grocery', 'meal', 'reaction', 'plan', 'preference']),
   entityId: z.string().min(1).max(80),
@@ -82,6 +116,8 @@ export interface BuildAppOptions {
   householdNow?: () => Date
   rateLimiter?: RateLimiter
   migration?: MigrationStore
+  notifications?: NotificationStore
+  sender?: PushSender
   logger?: boolean
   logStream?: Writable
 }
@@ -105,6 +141,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const households = createHouseholdService(options.repo, options.householdNow ?? options.now ?? (() => new Date()))
   const board = createBoardService(options.repo, options.repo, options.householdNow ?? options.now ?? (() => new Date()))
   const migration = createMigrationService(options.migration ?? createMemoryMigration())
+  const clock = options.now ?? (() => new Date())
+  const pushSender = options.sender ?? createLogSender()
+  const notifications = createNotificationService(options.notifications ?? createMemoryNotificationStore(), pushSender, clock)
 
   const app = Fastify({
     logger: options.logStream
@@ -242,7 +281,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     enforceWriteLimit(request, limiter, 'household')
     const accountId = await requireAccount(request, config)
     const params = parse(householdParams, request.params)
-    return households.createInvite(accountId, params.householdId)
+    const created = await households.createInvite(accountId, params.householdId)
+    const code = created.household?.invites[0]?.code ?? ''
+    await notifyOthers(options.repo, notifications, accountId, params.householdId, 'invite', '', code)
+    return created
   })
 
   app.post('/v1/households/:householdId/invites/:inviteId/resend', async (request) => {
@@ -334,7 +376,64 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       throw new AppError('invalid_request', 400)
     }
     const body = parse(mutationBody, request.body)
-    return board.mutate(accountId, params.householdId, idempotencyKey, body)
+    const result = await board.mutate(accountId, params.householdId, idempotencyKey, body)
+    const event = kindForMutation(body)
+    if (event) await notifyOthers(options.repo, notifications, accountId, params.householdId, event.kind, event.mealId, '')
+    return result
+  })
+
+  app.get('/v1/notifications/preferences', async (request) => {
+    const accountId = await requireAccount(request, config)
+    return notifications.preferences(accountId)
+  })
+
+  app.put('/v1/notifications/preferences', async (request) => {
+    enforceWriteLimit(request, limiter, 'notifications')
+    const accountId = await requireAccount(request, config)
+    const body = parse(preferenceBody, request.body)
+    await notifications.savePreferences(accountId, body)
+    return body
+  })
+
+  app.get('/v1/notifications/tokens', async (request) => {
+    const accountId = await requireAccount(request, config)
+    return { tokens: await notifications.listTokens(accountId) }
+  })
+
+  app.post('/v1/notifications/tokens', async (request) => {
+    enforceWriteLimit(request, limiter, 'notifications')
+    const accountId = await requireAccount(request, config)
+    const body = parse(tokenBody, request.body)
+    await notifications.registerToken(accountId, body.token, body.platform)
+    return { ok: true }
+  })
+
+  app.delete('/v1/notifications/tokens', async (request) => {
+    const accountId = await requireAccount(request, config)
+    const body = parse(tokenDeleteBody, request.body)
+    await notifications.unregisterToken(accountId, body.token)
+    return { ok: true }
+  })
+
+  app.post('/v1/households/:householdId/notifications', async (request) => {
+    enforceWriteLimit(request, limiter, 'notifications')
+    const accountId = await requireAccount(request, config)
+    const params = parse(householdParams, request.params)
+    const role = await options.repo.membership(params.householdId, accountId)
+    if (!role) throw new AppError('not_found', 404)
+    const body = parse(eventBody, request.body)
+    await notifyOthers(options.repo, notifications, accountId, params.householdId, body.kind, body.mealId ?? '', body.inviteCode ?? '')
+    return { batches: await notifications.listBatches(accountId) }
+  })
+
+  app.get('/v1/notifications/outbox', async (request) => {
+    const accountId = await requireAccount(request, config)
+    return { batches: await notifications.listBatches(accountId) }
+  })
+
+  app.post('/v1/notifications/dispatch', async (request) => {
+    await requireAccount(request, config)
+    return { sent: await notifications.dispatch() }
   })
 
   app.put('/v1/households/:householdId/board', async (request) => {
@@ -377,6 +476,26 @@ function enforceClientVersion(request: FastifyRequest): void {
   if (header === undefined) return
   const value = Array.isArray(header) ? header[0] : header
   if (value !== '1' && value !== 'v1') throw new AppError('unsupported_api_version', 406)
+}
+
+async function notifyOthers(
+  repo: BuildAppOptions['repo'],
+  notifications: ReturnType<typeof createNotificationService>,
+  actorId: string,
+  householdId: string,
+  kind: NotificationKind,
+  mealId: string,
+  inviteCode: string,
+) {
+  try {
+    const members = await repo.transaction(async (tx) => tx.members(householdId))
+    for (const member of members) {
+      if (member.accountId === actorId) continue
+      await notifications.enqueue(member.accountId, householdId, kind, mealId, inviteCode)
+    }
+  } catch {
+    // A missed push must not fail the household write.
+  }
 }
 
 async function requireAccount(request: FastifyRequest, config: AppConfig): Promise<string> {

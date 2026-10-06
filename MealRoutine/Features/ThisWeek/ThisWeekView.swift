@@ -12,6 +12,7 @@ struct ThisWeekView: View {
     @Query private var memories: [MealMemory]
     @State private var viewModel = ThisWeekViewModel()
     @State private var household = HouseholdSession.shared
+    @State private var notifications = NotificationRouter.shared
     @State private var testMode = HouseholdTestMode.shared
     @State private var replacingMeal: ReplacingMeal?
     @State private var allowsPhotos = false
@@ -163,6 +164,13 @@ struct ThisWeekView: View {
                                             household.setReaction(kind, mealID: meal.id, in: modelContext)
                                         }
                                     )
+                                    .overlay {
+                                        if notifications.highlightedMealID?.lowercased() == meal.id.uuidString.lowercased() {
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Theme.accent, lineWidth: 2)
+                                                .accessibilityIdentifier("notification.meal")
+                                        }
+                                    }
                                     if household.showsPartnerControls {
                                         HouseholdPartnerMealControls(mealID: meal.id, session: household)
                                     }

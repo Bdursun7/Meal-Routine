@@ -16,6 +16,7 @@ struct HouseholdTestBadge: View {
 
 struct HouseholdTestBanner: View {
     var notice: HouseholdTestNotice
+    var onOpen: () -> Void
     var onDismiss: () -> Void
 
     var body: some View {
@@ -23,14 +24,20 @@ struct HouseholdTestBanner: View {
             Image(systemName: "bell.badge")
                 .foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(notice.audience == .partner ? "Test bildirimi" : notice.title)
-                    .font(.subheadline.weight(.semibold))
-                Text(notice.bannerText)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.secondaryText)
+            Button {
+                onOpen()
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(notice.audience == .partner ? "Test bildirimi" : notice.title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(notice.bannerText)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("notification.banner.open")
             Button("Kapat", action: onDismiss)
                 .font(.caption.weight(.semibold))
                 .accessibilityIdentifier("household.testBanner.dismiss")
@@ -92,6 +99,12 @@ struct HouseholdTestModeSection: View {
                 }
                 .accessibilityIdentifier("household.resetTest")
                 .accessibilityHint("Test evini, partneri ve bildirim günlüğünü siler")
+                Button("Bildirim deep link'ini dene") {
+                    if let url = URL(string: "mealroutine://week/meal?id=test-meal") {
+                        NotificationRouter.shared.apply(NotificationDeepLink.parse(url))
+                    }
+                }
+                .accessibilityIdentifier("notification.testDeepLink")
             } else {
                 Text("Ücretli Apple hesabı yoksa bunu aç. Ev kur, kodu gör, Test Partner katılsın.")
                     .font(.footnote)

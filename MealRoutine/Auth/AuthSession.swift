@@ -147,6 +147,7 @@ final class AuthSession {
     }
 
     func signOutTokensOnly() async {
+        await NotificationSync.shared.unregisterCurrentToken()
         let refresh = AuthServices.sharedTokens.load()?.refreshToken
         AuthServices.sharedTokens.clear()
         account = nil

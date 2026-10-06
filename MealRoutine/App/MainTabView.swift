@@ -21,6 +21,7 @@ struct MainTabView: View {
     /// after one turn, so their `@Query`s are not live during unrelated switches.
     @State private var installedTabs: Set<AppTab> = [.week]
     @State private var router = CollectionRouter.shared
+    @State private var notifications = NotificationRouter.shared
 
     private static let configureTabBar: Void = {
         let appearance = UITabBarAppearance()
@@ -76,6 +77,18 @@ struct MainTabView: View {
             guard slug != nil else { return }
             installedTabs.insert(.recipes)
             selectedTab = .recipes
+        }
+        .onChange(of: notifications.revision) { _, _ in
+            installedTabs.insert(notifications.tab)
+            selectedTab = notifications.tab
+        }
+        .sheet(isPresented: Binding(
+            get: { notifications.showJoin },
+            set: { if !$0 { notifications.clearJoin() } }
+        )) {
+            NavigationStack {
+                HouseholdSettingsView()
+            }
         }
         .onAppear {
             if router.editor != nil || router.openSlug != nil {
