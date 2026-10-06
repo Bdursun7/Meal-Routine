@@ -36,12 +36,29 @@ enum RecipeCaptureStore {
     /// Existing collection row for this URL, if the index or a waiting capture already has it.
     static func existingSlug(for rawURL: String?) -> String? {
         guard let rawURL, let key = RecipeSourceService.normalizedKey(rawURL) else { return nil }
-        if let record = index().first(where: { $0.normalizedURL == key }) {
+        if let record = index().first(where: { !$0.normalizedURL.isEmpty && $0.normalizedURL == key }) {
             return record.slug
         }
         let waiting = pending().contains { capture in
             guard !capture.allowDuplicate, let other = capture.urlString else { return false }
             return RecipeSourceService.normalizedKey(other) == key
+        }
+        return waiting ? "pending" : nil
+    }
+
+    /// URL first, then a near-identical title. `pending` means a capture is already waiting.
+    static func existingSlug(for capture: RecipeCapture) -> String? {
+        if let slug = existingSlug(for: capture.urlString) { return slug }
+        return existingTitleSlug(capture.title ?? "")
+    }
+
+    private static func existingTitleSlug(_ raw: String) -> String? {
+        guard RecipeIdentity.titlesMatch(raw, raw) else { return nil }
+        if let record = index().first(where: { RecipeIdentity.titlesMatch($0.title, raw) }) {
+            return record.slug
+        }
+        let waiting = pending().contains { capture in
+            !capture.allowDuplicate && RecipeIdentity.titlesMatch(capture.title ?? "", raw)
         }
         return waiting ? "pending" : nil
     }

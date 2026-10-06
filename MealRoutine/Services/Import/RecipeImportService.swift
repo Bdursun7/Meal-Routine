@@ -376,33 +376,51 @@ enum RecipeCollectionService {
         try context.save()
         CatalogIndexCache.invalidate()
         try? refreshIndex(in: context)
+        PersonalRecipeSync.enqueue(recipe, in: context)
         Analytics.track(.recipeQuickSaved, properties: sourceProperties(recipe))
         return recipe
     }
 
     static func duplicate(of capture: RecipeCapture, in context: ModelContext) throws -> Recipe? {
-        guard let raw = capture.urlString else { return nil }
-        return try duplicateSlug(for: raw, in: context).flatMap { slug in
+        let name = savedName(title: capture.title ?? "", text: capture.text ?? "")
+        return try duplicateSlug(
+            url: capture.urlString ?? "",
+            title: name,
+            in: context
+        ).flatMap { slug in
             try context.fetch(FetchDescriptor<Recipe>()).first { $0.slug == slug }
         }
     }
 
     static func duplicateSlug(
-        for rawURL: String,
+        url rawURL: String,
+        title: String,
+        sourceKey: String = "",
         in context: ModelContext,
         excluding slug: String? = nil
     ) throws -> String? {
-        guard let key = RecipeSourceService.normalizedKey(rawURL) else { return nil }
         let recipes = try context.fetch(FetchDescriptor<Recipe>())
-        return recipes.first { recipe in
-            recipe.slug != slug
-                && !recipe.isBundledCatalog
-                && RecipeSourceService.normalizedKey(recipe.sourceURL) == key
-        }?.slug
+        let candidates = recipes.map { recipe in
+            RecipeIdentity.Candidate(
+                slug: recipe.slug,
+                title: recipe.displayName,
+                sourceURL: recipe.sourceURL,
+                sourceKey: recipe.sourceKey,
+                isBundled: recipe.isBundledCatalog
+            )
+        }
+        return RecipeIdentity.duplicateSlug(
+            url: rawURL,
+            title: title,
+            sourceKey: sourceKey,
+            among: candidates,
+            excluding: slug
+        )
     }
 
-    /// Saves a completed personal recipe. Refuses a second copy of the same source URL
-    /// unless `allowDuplicate` is set. Never overwrites a different recipe.
+    /// Saves a completed personal recipe. Refuses another personal recipe with the same
+    /// normalized URL, source key, or near-identical title unless `allowDuplicate` is set.
+    /// Never overwrites a different recipe.
     @discardableResult
     static func save(
         _ form: RecipeForm,
@@ -415,7 +433,13 @@ enum RecipeCollectionService {
         guard case .valid = result else {
             throw RecipeCollectionError.incomplete(result.issues)
         }
-        if !allowDuplicate, let existing = try duplicateSlug(for: form.sourceURL, in: context, excluding: slug) {
+        if !allowDuplicate, let existing = try duplicateSlug(
+            url: form.sourceURL,
+            title: form.name,
+            sourceKey: "",
+            in: context,
+            excluding: slug
+        ) {
             Analytics.track(.savedRecipeDuplicateDetected, properties: [
                 "origin": form.origin.rawValue,
                 "platform": form.sourcePlatform.rawValue,
@@ -442,6 +466,7 @@ enum RecipeCollectionService {
         try context.save()
         CatalogIndexCache.invalidate()
         try? refreshIndex(in: context)
+        PersonalRecipeSync.enqueue(recipe, in: context)
         if created && recipe.origin == .manual {
             Analytics.track(.recipeAddedManually, properties: sourceProperties(recipe))
         }
@@ -498,11 +523,13 @@ enum RecipeCollectionService {
     static func refreshIndex(in context: ModelContext) throws {
         let recipes = try context.fetch(FetchDescriptor<Recipe>())
         let records = recipes.compactMap { recipe -> CollectionSourceRecord? in
-            guard !recipe.isBundledCatalog,
-                  let key = RecipeSourceService.normalizedKey(recipe.sourceURL) else { return nil }
+            guard !recipe.isBundledCatalog else { return nil }
+            let key = RecipeSourceService.normalizedKey(recipe.sourceURL) ?? ""
+            let title = recipe.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if key.isEmpty && !RecipeIdentity.titlesMatch(title, title) { return nil }
             return CollectionSourceRecord(
                 slug: recipe.slug,
-                title: recipe.displayName,
+                title: title,
                 normalizedURL: key,
                 savedAt: recipe.savedAt ?? .now
             )
@@ -511,14 +538,23 @@ enum RecipeCollectionService {
     }
 
     private static func fillQuickSave(_ recipe: Recipe, capture: RecipeCapture, now: Date) {
-        let title = capture.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let text = capture.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let name = title.isEmpty ? fallbackTitle(from: text) : title
+        let title = RecipeTextLimit.clamp(
+            capture.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            maxCharacters: RecipeFieldLimits.name
+        )
+        let text = RecipeTextLimit.clamp(
+            capture.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            maxCharacters: RecipeFieldLimits.notes
+        )
+        let name = savedName(title: title, text: text)
         recipe.nameTR = name
         recipe.origin = .savedExternal
         recipe.collectionState = .savedToTry
-        recipe.sourceURL = capture.urlString?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        recipe.sourceTitle = title
+        recipe.sourceURL = RecipeTextLimit.clamp(
+            capture.urlString?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            maxCharacters: RecipeFieldLimits.sourceURL
+        )
+        recipe.sourceTitle = RecipeTextLimit.clamp(title, maxCharacters: RecipeFieldLimits.sourceTitle)
         recipe.sourcePlatform = capture.sourcePlatform
         recipe.sourceImagePath = capture.imagePath ?? ""
         recipe.savedAt = capture.capturedAt
@@ -665,6 +701,19 @@ enum RecipeCollectionService {
         return "Kaynak: \(name)"
     }
 
+    private static func savedName(title: String, text: String) -> String {
+        let clampedTitle = RecipeTextLimit.clamp(
+            title.trimmingCharacters(in: .whitespacesAndNewlines),
+            maxCharacters: RecipeFieldLimits.name
+        )
+        if !clampedTitle.isEmpty { return clampedTitle }
+        let clampedText = RecipeTextLimit.clamp(
+            text.trimmingCharacters(in: .whitespacesAndNewlines),
+            maxCharacters: RecipeFieldLimits.notes
+        )
+        return fallbackTitle(from: clampedText)
+    }
+
     private static func fallbackTitle(from text: String) -> String {
         let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -721,6 +770,104 @@ enum ImportedGrocery {
             quantity: ingredient.quantity,
             unit: ingredient.unit
         )
+    }
+}
+
+/// Personal recipes still waiting for ingredients and steps.
+struct IncompleteRecipeSnapshot: Equatable, Sendable {
+    var originRaw: String
+    var collectionStateRaw: String
+}
+
+enum IncompleteRecipeQueue {
+    static func isWaiting(_ row: IncompleteRecipeSnapshot) -> Bool {
+        let origin = row.originRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if origin.isEmpty || origin == RecipeOrigin.builtIn.rawValue { return false }
+        return row.collectionStateRaw == RecipeCollectionState.savedToTry.rawValue
+    }
+
+    static func count(_ rows: [IncompleteRecipeSnapshot]) -> Int {
+        rows.reduce(0) { $0 + (isWaiting($1) ? 1 : 0) }
+    }
+}
+
+/// Upserts one personal recipe through the shared pending-operation queue.
+/// The board mutator never sees these items. Test mode and a signed-out device do not enqueue.
+@MainActor
+enum PersonalRecipeSync {
+    static let entityType = "personalRecipe"
+    static let operationType = "upsert"
+
+    static func allows(testMode: Bool, signedIn: Bool, apiConfigured: Bool) -> Bool {
+        !testMode && signedIn && apiConfigured
+    }
+
+    static func isPersonal(_ item: SyncWorkItem) -> Bool {
+        item.entityType == entityType
+    }
+
+    static func enqueue(_ recipe: Recipe, in context: ModelContext) {
+        guard allows(
+            testMode: HouseholdTestMode.shared.isEnabled,
+            signedIn: AuthSession.shared.account != nil,
+            apiConfigured: MealRoutineConfig.apiBaseURL != nil
+        ) else { return }
+        guard AuthServices.sharedTokens.load()?.accessToken.isEmpty == false else { return }
+        guard let item = workItem(for: recipe) else { return }
+        let current = PendingOperationStore.items(in: context)
+        PendingOperationStore.replace(merging(item, into: current), in: context)
+        Task { await HouseholdSession.shared.drainPending(in: context) }
+    }
+
+    static func workItem(for recipe: Recipe, id: UUID = UUID(), now: Date = .now) -> SyncWorkItem? {
+        guard MigrationSelection.includesRecipe(origin: recipe.originRaw) else { return nil }
+        let payload = MigrationCollector.uploadPayload(for: recipe)
+        guard let data = try? JSONEncoder().encode(payload) else { return nil }
+        return SyncWorkItem(
+            id: id,
+            entityType: entityType,
+            entityId: recipe.slug,
+            operationType: operationType,
+            payload: data,
+            createdAt: now,
+            retryCount: 0,
+            status: .pending
+        )
+    }
+
+    /// One pending upsert per slug. A newer save keeps the original idempotency id.
+    static func merging(_ item: SyncWorkItem, into items: [SyncWorkItem]) -> [SyncWorkItem] {
+        let prior = items.first { isPersonal($0) && $0.entityId == item.entityId }
+        var stored = item
+        if let prior {
+            stored.id = prior.id
+        }
+        var next = items.filter { !(isPersonal($0) && $0.entityId == item.entityId) }
+        next.append(stored)
+        return next
+    }
+
+    static func send(_ items: [SyncWorkItem]) async -> [SyncWorkItem] {
+        let personal = items.filter { isPersonal($0) }
+        let others = items.filter { !isPersonal($0) }
+        guard !personal.isEmpty else { return items }
+        guard let baseURL = MealRoutineConfig.apiBaseURL,
+              let token = AuthServices.sharedTokens.load()?.accessToken,
+              !token.isEmpty,
+              SyncEngine.shared.online else { return items }
+        let client = MigrationHTTPClient(session: .shared, baseURL: baseURL, accessToken: token)
+        let drained = await SyncDrainer.drain(items: personal, online: true, now: .now) { item in
+            guard let payload = try? JSONDecoder().decode(MigrationPayload.self, from: item.payload) else {
+                return .retry
+            }
+            do {
+                _ = try await client.upload(payload)
+                return .applied
+            } catch {
+                return .retry
+            }
+        }
+        return others + drained
     }
 }
 

@@ -155,9 +155,86 @@ enum RecipeSourceService {
         return platform.title
     }
 
+    /// Caps shared with the editor (`RecipeFieldLimits`). This file is also compiled into the
+    /// share extension, which does not include the editor model.
+    static let captureURLLimit = 500
+    static let captureTitleLimit = 80
+    static let captureTextLimit = 1000
+
     private static let trackingNames: Set<String> = [
         "fbclid", "gclid", "igshid", "igsh", "si", "mc_cid", "mc_eid",
     ]
+}
+
+/// URL, source key, and title identity. Built-in catalog rows are never duplicates.
+enum RecipeIdentity {
+    struct Candidate: Equatable, Sendable {
+        var slug: String
+        var title: String
+        var sourceURL: String
+        var sourceKey: String
+        var isBundled: Bool
+    }
+
+    static func normalizedTitle(_ raw: String) -> String {
+        let lowered = raw.lowercased(with: Locale(identifier: "tr_TR"))
+        let folded = lowered
+            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "tr_TR"))
+            .replacingOccurrences(of: "ı", with: "i")
+        var scalars: [Unicode.Scalar] = []
+        var pendingSpace = false
+        for scalar in folded.unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar) {
+                if pendingSpace, !scalars.isEmpty {
+                    scalars.append(" ")
+                }
+                scalars.append(scalar)
+                pendingSpace = false
+            } else if !scalars.isEmpty {
+                pendingSpace = true
+            }
+        }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
+    static func titlesMatch(_ left: String, _ right: String) -> Bool {
+        let a = normalizedTitle(left)
+        let b = normalizedTitle(right)
+        guard a.count >= 2, a == b else { return false }
+        return a != normalizedTitle("Kaydedilen tarif")
+    }
+
+    /// Same normalized URL, same non-empty source key, or a near-identical personal title.
+    static func duplicateSlug(
+        url: String?,
+        title: String?,
+        sourceKey: String? = nil,
+        among candidates: [Candidate],
+        excluding slug: String? = nil
+    ) -> String? {
+        let key = url.flatMap { RecipeSourceService.normalizedKey($0) }
+        let identifier = sourceKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let wantedTitle = title ?? ""
+        for candidate in candidates {
+            if candidate.isBundled { continue }
+            if let slug, candidate.slug == slug { continue }
+            if let key, RecipeSourceService.normalizedKey(candidate.sourceURL) == key {
+                return candidate.slug
+            }
+            if !identifier.isEmpty, candidate.sourceKey == identifier {
+                return candidate.slug
+            }
+        }
+        guard !wantedTitle.isEmpty else { return nil }
+        for candidate in candidates {
+            if candidate.isBundled { continue }
+            if let slug, candidate.slug == slug { continue }
+            if titlesMatch(candidate.title, wantedTitle) {
+                return candidate.slug
+            }
+        }
+        return nil
+    }
 }
 
 /// One saved source, used by the share extension to spot a duplicate URL.
@@ -179,9 +256,13 @@ enum SharePayloadAssembly {
         imagePath: String?,
         sourceHint: String?
     ) -> RecipeCapture? {
-        let url = urls.lazy.compactMap { RecipeSourceService.publicURL($0)?.absoluteString }.first
-        let title = firstDistinct(titles, ignoring: url)
-        let text = firstDistinct(texts, ignoring: url, also: title)
+        let url = urls.lazy.compactMap { raw -> String? in
+            guard let absolute = RecipeSourceService.publicURL(raw)?.absoluteString else { return nil }
+            let clamped = clamp(absolute, RecipeSourceService.captureURLLimit)
+            return clamped.isEmpty ? nil : clamped
+        }.first
+        let title = firstDistinct(titles, ignoring: url).map { clamp($0, RecipeSourceService.captureTitleLimit) }
+        let text = firstDistinct(texts, ignoring: url, also: title).map { clamp($0, RecipeSourceService.captureTextLimit) }
         let image = imagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
         let storedImage = (image?.isEmpty == false) ? image : nil
         let capture = RecipeCapture(
@@ -207,6 +288,11 @@ enum SharePayloadAssembly {
             return trimmed
         }
         return nil
+    }
+
+    private static func clamp(_ raw: String, _ maxCharacters: Int) -> String {
+        guard maxCharacters > 0, raw.count > maxCharacters else { return raw }
+        return String(raw.prefix(maxCharacters))
     }
 
     /// A non-http URL is not a recipe title. http(s) links stay on the URL field.

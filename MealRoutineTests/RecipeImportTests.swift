@@ -472,6 +472,273 @@ final class RecipeImportTests: XCTestCase {
         XCTAssertEqual(recipe.baseServings, 3)
     }
 
+    func testShareAssemblyClampsLongInputAndKeepsAMissingTitle() {
+        XCTAssertEqual(RecipeSourceService.captureURLLimit, RecipeFieldLimits.sourceURL)
+        XCTAssertEqual(RecipeSourceService.captureTitleLimit, RecipeFieldLimits.name)
+        XCTAssertEqual(RecipeSourceService.captureTextLimit, RecipeFieldLimits.notes)
+
+        let missingTitle = SharePayloadAssembly.makeCapture(
+            urls: ["https://www.youtube.com/watch?v=abc"],
+            titles: ["   "],
+            texts: ["Akşam dene"],
+            imagePath: nil,
+            sourceHint: "YouTube"
+        )
+        XCTAssertNil(missingTitle?.title)
+        XCTAssertEqual(missingTitle?.text, "Akşam dene")
+        XCTAssertEqual(missingTitle?.urlString, "https://www.youtube.com/watch?v=abc")
+        XCTAssertEqual(missingTitle?.sourcePlatform, .youtube)
+
+        let textOnly = SharePayloadAssembly.makeCapture(
+            urls: [],
+            titles: [],
+            texts: ["Sadece metin"],
+            imagePath: nil,
+            sourceHint: "WhatsApp"
+        )
+        XCTAssertNil(textOnly?.title)
+        XCTAssertNil(textOnly?.urlString)
+        XCTAssertEqual(textOnly?.text, "Sadece metin")
+        XCTAssertEqual(textOnly?.sourcePlatform, .whatsapp)
+
+        let longTitle = String(repeating: "ç", count: 400)
+        let longText = String(repeating: "n", count: 2_500)
+        let longURL = "https://example.com/" + String(repeating: "a", count: 700)
+        let clamped = SharePayloadAssembly.makeCapture(
+            urls: [longURL],
+            titles: [longTitle],
+            texts: [longText],
+            imagePath: "RecipeImages/long.jpg",
+            sourceHint: nil
+        )
+        XCTAssertEqual(clamped?.title?.count, RecipeFieldLimits.name)
+        XCTAssertEqual(clamped?.text?.count, RecipeFieldLimits.notes)
+        XCTAssertEqual(clamped?.urlString?.count, RecipeFieldLimits.sourceURL)
+        XCTAssertEqual(clamped?.imagePath, "RecipeImages/long.jpg")
+        XCTAssertTrue(clamped?.urlString?.hasPrefix("https://example.com/") == true)
+    }
+
+    func testDuplicateMatchesNormalizedURLOrNearTitleAndSkipsBuiltIns() throws {
+        XCTAssertEqual(
+            RecipeIdentity.normalizedTitle("  Mercimek Çorbası!! "),
+            RecipeIdentity.normalizedTitle("mercimek corbasi")
+        )
+        XCTAssertTrue(RecipeIdentity.titlesMatch("Izgara Köfte", "ızgara kofte"))
+        XCTAssertFalse(RecipeIdentity.titlesMatch("Köfte", "Köfte tabağı"))
+        XCTAssertFalse(RecipeIdentity.titlesMatch("Kaydedilen tarif", "kaydedilen tarif"))
+        XCTAssertNil(RecipeIdentity.duplicateSlug(
+            url: "",
+            title: "farklı",
+            sourceKey: "",
+            among: [RecipeIdentity.Candidate(slug: "a", title: "x", sourceURL: "", sourceKey: "", isBundled: false)]
+        ))
+        XCTAssertEqual(
+            RecipeIdentity.duplicateSlug(
+                url: nil,
+                title: "farklı",
+                sourceKey: "ig-abc",
+                among: [RecipeIdentity.Candidate(slug: "a", title: "x", sourceURL: "", sourceKey: "ig-abc", isBundled: false)]
+            ),
+            "a"
+        )
+        XCTAssertNil(RecipeIdentity.duplicateSlug(
+            url: "https://example.com/a",
+            title: "Köfte",
+            among: [RecipeIdentity.Candidate(
+                slug: "cat",
+                title: "Köfte",
+                sourceURL: "https://example.com/a",
+                sourceKey: "",
+                isBundled: true
+            )]
+        ))
+
+        let context = container.mainContext
+        let first = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://www.Example.com/tarif/a?utm_source=ig", title: "Mercimek Çorbası"),
+            in: context
+        )
+        let byTitle = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://baska.example/b", title: "mercimek corbasi!"),
+            in: context
+        )
+        XCTAssertEqual(byTitle.slug, first.slug)
+
+        var allowed = RecipeCapture(urlString: "https://baska.example/c", title: "Mercimek Çorbası")
+        allowed.allowDuplicate = true
+        let copy = try RecipeCollectionService.quickSave(allowed, in: context)
+        XCTAssertNotEqual(copy.slug, first.slug)
+
+        let byURL = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "http://example.com/tarif/a?fbclid=9", title: "Tamamen başka"),
+            in: context
+        )
+        XCTAssertEqual(byURL.slug, first.slug)
+
+        let catalog = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://katalog.example/kofte", title: "Katalog Köfte"),
+            in: context
+        )
+        catalog.origin = .builtIn
+        try context.save()
+        let notCatalog = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://benim.example/kofte", title: "Katalog Köfte"),
+            in: context
+        )
+        XCTAssertNotEqual(notCatalog.slug, catalog.slug)
+
+        var form = readyForm()
+        form.name = "mercimek   corbasi"
+        form.sourceURL = "https://editor.example/1"
+        do {
+            _ = try RecipeCollectionService.save(form, slug: nil, in: context)
+            XCTFail("near title should be a duplicate")
+        } catch let error as RecipeCollectionError {
+            guard case .duplicateSource(let slug) = error else {
+                return XCTFail("Expected duplicate, got \(error)")
+            }
+            XCTAssertTrue(slug == first.slug || slug == copy.slug)
+        }
+
+        form.name = "Editör tarifi"
+        form.sourceURL = "https://www.example.com/tarif/a?utm_source=ig"
+        do {
+            _ = try RecipeCollectionService.save(form, slug: nil, in: context)
+            XCTFail("normalized URL should be a duplicate")
+        } catch let error as RecipeCollectionError {
+            guard case .duplicateSource(let slug) = error else {
+                return XCTFail("Expected duplicate, got \(error)")
+            }
+            XCTAssertEqual(slug, first.slug)
+        }
+
+        var unique = readyForm()
+        unique.name = "Benzersiz tarif"
+        unique.sourceURL = "https://benzersiz.example/1"
+        let created = try RecipeCollectionService.save(unique, slug: nil, in: context)
+        unique.notes = "tuz serbest"
+        let updated = try RecipeCollectionService.save(unique, slug: created.slug, in: context)
+        XCTAssertEqual(updated.slug, created.slug)
+        XCTAssertEqual(updated.userNotes, "tuz serbest")
+    }
+
+    func testCaptureIndexFindsURLAndNearTitle() throws {
+        let key = try XCTUnwrap(RecipeSourceService.normalizedKey("https://www.example.com/tarif/corba?utm_source=ig"))
+        let previousIndex = RecipeCaptureStore.index()
+        try RecipeCaptureStore.writeIndex([
+            CollectionSourceRecord(slug: "kayit-1", title: "Mercimek Çorbası", normalizedURL: key, savedAt: .now),
+        ])
+        let waiting = RecipeCapture(title: "Tas Kebabı")
+        try RecipeCaptureStore.enqueue(waiting)
+        defer {
+            RecipeCaptureStore.remove(ids: [waiting.id])
+            try? RecipeCaptureStore.writeIndex(previousIndex)
+        }
+
+        let byURL = RecipeCapture(urlString: "http://example.com/tarif/corba?fbclid=1", title: "Başka")
+        XCTAssertEqual(RecipeCaptureStore.existingSlug(for: byURL), "kayit-1")
+        let byTitle = RecipeCapture(urlString: "https://other.example/x", title: "mercimek corbasi!")
+        XCTAssertEqual(RecipeCaptureStore.existingSlug(for: byTitle), "kayit-1")
+        let pendingTitle = RecipeCapture(title: "tas kebabi")
+        XCTAssertEqual(RecipeCaptureStore.existingSlug(for: pendingTitle), "pending")
+        XCTAssertNil(RecipeCaptureStore.existingSlug(for: RecipeCapture(urlString: "https://other.example/y", title: "Mantı")))
+    }
+
+    func testIncompleteQueueCountsOnlyPersonalDrafts() throws {
+        let waiting = IncompleteRecipeSnapshot(originRaw: RecipeOrigin.savedExternal.rawValue, collectionStateRaw: "savedToTry")
+        let ready = IncompleteRecipeSnapshot(originRaw: RecipeOrigin.manual.rawValue, collectionStateRaw: "readyToCook")
+        let bundled = IncompleteRecipeSnapshot(originRaw: RecipeOrigin.builtIn.rawValue, collectionStateRaw: "savedToTry")
+        let legacy = IncompleteRecipeSnapshot(originRaw: "imported", collectionStateRaw: "savedToTry")
+        XCTAssertEqual(IncompleteRecipeQueue.count([waiting, ready, bundled, legacy, waiting]), 3)
+        XCTAssertFalse(IncompleteRecipeQueue.isWaiting(ready))
+        XCTAssertFalse(IncompleteRecipeQueue.isWaiting(bundled))
+
+        let context = container.mainContext
+        let titled = try RecipeCollectionService.quickSave(
+            RecipeCapture(title: "Tas kebabı", text: "akşam"),
+            in: context
+        )
+        let addressOnly = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://example.com/sadece-adres"),
+            in: context
+        )
+        XCTAssertEqual(addressOnly.nameTR, "Kaydedilen tarif")
+        XCTAssertEqual(titled.collectionState, .savedToTry)
+        let long = try RecipeCollectionService.quickSave(
+            RecipeCapture(
+                urlString: "https://example.com/" + String(repeating: "c", count: 600),
+                title: String(repeating: "a", count: 500),
+                text: String(repeating: "b", count: 2_000)
+            ),
+            in: context
+        )
+        XCTAssertEqual(long.nameTR.count, RecipeFieldLimits.name)
+        XCTAssertLessThanOrEqual(long.userNotes.count, RecipeFieldLimits.notes)
+        XCTAssertLessThanOrEqual(long.sourceURL.count, RecipeFieldLimits.sourceURL)
+
+        let recipes = try context.fetch(FetchDescriptor<Recipe>())
+        let count = IncompleteRecipeQueue.count(recipes.map {
+            IncompleteRecipeSnapshot(originRaw: $0.originRaw, collectionStateRaw: $0.collectionStateRaw)
+        })
+        XCTAssertEqual(count, 3)
+    }
+
+    func testPersonalRecipeSyncPayloadCoalescesAndStaysOffWithoutASession() throws {
+        XCTAssertFalse(PersonalRecipeSync.allows(testMode: true, signedIn: true, apiConfigured: true))
+        XCTAssertFalse(PersonalRecipeSync.allows(testMode: false, signedIn: false, apiConfigured: true))
+        XCTAssertFalse(PersonalRecipeSync.allows(testMode: false, signedIn: true, apiConfigured: false))
+        XCTAssertTrue(PersonalRecipeSync.allows(testMode: false, signedIn: true, apiConfigured: true))
+
+        let context = container.mainContext
+        let saved = try RecipeCollectionService.quickSave(
+            RecipeCapture(urlString: "https://example.com/manti", title: "Mantı"),
+            in: context
+        )
+        if AuthSession.shared.account == nil || AuthServices.sharedTokens.load()?.accessToken.isEmpty != false {
+            let queued = PendingOperationStore.items(in: context).filter { PersonalRecipeSync.isPersonal($0) }
+            XCTAssertTrue(queued.isEmpty)
+        }
+        let itemID = try XCTUnwrap(UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"))
+        let item = try XCTUnwrap(PersonalRecipeSync.workItem(for: saved, id: itemID))
+        XCTAssertEqual(item.entityType, PersonalRecipeSync.entityType)
+        XCTAssertEqual(item.operationType, PersonalRecipeSync.operationType)
+        XCTAssertEqual(item.entityId, saved.slug)
+        let payload = try JSONDecoder().decode(MigrationPayload.self, from: item.payload)
+        XCTAssertEqual(payload.recipes.map(\.slug), [saved.slug])
+        XCTAssertEqual(payload.recipes.first?.nameTr, "Mantı")
+        XCTAssertEqual(payload.recipes.first?.collectionState, RecipeCollectionState.savedToTry.rawValue)
+        XCTAssertEqual(payload.recipes.first?.origin, RecipeOrigin.savedExternal.rawValue)
+        XCTAssertTrue(payload.memories.isEmpty)
+        XCTAssertTrue(payload.history.isEmpty)
+        XCTAssertNil(payload.preferences)
+
+        saved.nameTR = "Mantı evi"
+        let again = try XCTUnwrap(PersonalRecipeSync.workItem(for: saved, id: UUID()))
+        let merged = PersonalRecipeSync.merging(again, into: [item])
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].id, item.id)
+        XCTAssertEqual(merged[0].entityId, saved.slug)
+        let updated = try JSONDecoder().decode(MigrationPayload.self, from: merged[0].payload)
+        XCTAssertEqual(updated.recipes.first?.nameTr, "Mantı evi")
+
+        let board = SyncWorkItem(
+            id: UUID(),
+            entityType: "meal",
+            entityId: "meal-1",
+            operationType: "replace",
+            payload: Data("{}".utf8),
+            createdAt: .now,
+            retryCount: 0,
+            status: .pending
+        )
+        let combined = PersonalRecipeSync.merging(again, into: [board, item])
+        XCTAssertEqual(combined.filter { !PersonalRecipeSync.isPersonal($0) }.map(\.entityType), ["meal"])
+        XCTAssertEqual(combined.filter { PersonalRecipeSync.isPersonal($0) }.count, 1)
+
+        saved.origin = .builtIn
+        XCTAssertNil(PersonalRecipeSync.workItem(for: saved))
+    }
+
     private func readyForm() -> RecipeForm {
         var form = RecipeForm.emptyManual()
         form.name = "Köfte"
