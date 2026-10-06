@@ -94,7 +94,6 @@ struct HouseholdSettingsView: View {
         }
     }
 
-    @ViewBuilder
     private var migrationHoldsHousehold: Bool {
         LocalMigrationGate.blocksHousehold(
             testMode: testMode.isEnabled,
@@ -120,6 +119,7 @@ struct HouseholdSettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var statusSection: some View {
         if session.syncState == .offline {
             Section {

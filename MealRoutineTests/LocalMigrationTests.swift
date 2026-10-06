@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class LocalMigrationTests: XCTestCase {
-    func testStateMachineReachesDoneAndRetryDoesNotDuplicate() async {
+    func testStateMachineReachesDoneAndRetryDoesNotDuplicate() async throws {
         let backend = FakeMigrationBackend()
         let center = LocalMigrationCenter(defaults: suite())
         let payload = samplePayload()
