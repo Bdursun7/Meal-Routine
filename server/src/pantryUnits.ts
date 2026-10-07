@@ -82,9 +82,9 @@ export function roundPantryQuantity(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
-export function canonicalUnit(raw: string, allowUnknown: boolean): string | null {
+/** Known unit code, or null. Pantry never stores a unit outside the shared unit table. */
+export function canonicalUnit(raw: string): string | null {
   const parsed = parsePantryUnit(raw)
-  if (!parsed.code) return null
-  if (!parsed.known && !allowUnknown) return null
+  if (!parsed.code || !parsed.known) return null
   return parsed.code
 }

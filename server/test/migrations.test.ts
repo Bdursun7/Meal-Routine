@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { buildIngredientIndex, resolveIngredientId, seedIngredients } from '../src/ingredients.js'
 import { listMigrationFiles, migrationsDirectory } from '../src/migrate.js'
 
 const requiredTables = [
@@ -57,5 +58,38 @@ describe('migrations', () => {
     }
     expect(sql).toContain("'pending', 'accepted', 'rejected', 'cancelled', 'expired'")
     expect(sql).not.toContain('DROP TABLE')
+  })
+
+  it('keeps 0001-0011 untouched by V5 and seeds the same dictionary the app bundles', async () => {
+    const dir = migrationsDirectory()
+    const files = await listMigrationFiles(dir)
+    for (const file of files.filter((name) => !name.startsWith('0012'))) {
+      const earlier = await readFile(path.join(dir, file), 'utf8')
+      for (const marker of ['TABLE IF NOT EXISTS ingredients', 'date_type', 'pantry_']) expect(earlier, file).not.toContain(marker)
+    }
+    const pantry = await readFile(path.join(dir, files.find((name) => name.startsWith('0012'))!), 'utf8')
+    for (const marker of ['CREATE TABLE IF NOT EXISTS ingredients', 'REFERENCES ingredients (id)', "date_type IN ('bestBefore', 'useBy')", 'pantry_items_date_pair', 'unit_bucket', 'pantry_items_one_row_per_bucket', 'version INT']) {
+      expect(pantry).toContain(marker)
+    }
+    expect(pantry).not.toContain('best_before')
+    expect(pantry).not.toMatch(/^\s*(DROP|DELETE FROM|TRUNCATE|ALTER TABLE)\b/im)
+
+    const serverCopy = await readFile(path.resolve(dir, '../ingredients.v1.json'), 'utf8')
+    const appCopy = await readFile(path.resolve(dir, '../../../MealRoutine/Recipes/ingredients.v1.json'), 'utf8')
+    expect(appCopy).toBe(serverCopy)
+    const seeded = [...pantry.matchAll(/^ {2}\('([^']+)', /gm)].map((match) => match[1])
+    expect(seeded).toEqual(seedIngredients().map((row) => row.id))
+  })
+
+  it('covers every catalog ingredient id so recipe lines can reach the dictionary', async () => {
+    const catalog = JSON.parse(await readFile(path.resolve(migrationsDirectory(), '../../../MealRoutine/Recipes/recipes.v1.json'), 'utf8')) as {
+      recipes: { ingredients: { id: string }[] }[]
+    }
+    const index = buildIngredientIndex(seedIngredients())
+    const missing = new Set<string>()
+    for (const recipe of catalog.recipes) {
+      for (const line of recipe.ingredients) if (!resolveIngredientId(index, line.id)) missing.add(line.id)
+    }
+    expect([...missing]).toEqual([])
   })
 })
