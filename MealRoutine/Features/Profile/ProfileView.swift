@@ -145,11 +145,11 @@ struct ProfileView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Kiler") {
+                Section(PantryCopy.screenTitle) {
                     NavigationLink {
                         PantryView()
                     } label: {
-                        Label("Pantry", systemImage: "shippingbox")
+                        Label(PantryCopy.screenTitle, systemImage: "shippingbox")
                     }
                     .accessibilityIdentifier("pantry.open")
                     Text("Evde bulunan malzemeleri, miktarlarını ve son kullanma tarihlerini takip et.")

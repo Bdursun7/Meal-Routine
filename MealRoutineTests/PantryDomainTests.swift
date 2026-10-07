@@ -182,7 +182,7 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertNil(PantryFinishedMath.shortage(quantity: 0, minimum: nil))
     }
 
-    func testEditDraftLoadsTheStoredRowAndNeverSavesAnUnknownUnitOrIngredient() {
+    func testEditDraftLoadsTheStoredRowAndNeverSavesAnUnknownUnit() {
         let draft = PantryFormDraft.loaded(
             ingredientId: "tomatoes", name: "Domates", quantity: 500, unit: "g", location: .refrigerator,
             minimumQuantity: 100, dateType: .useBy, dateValue: day("2026-10-09"), dictionary: dictionary
@@ -203,7 +203,14 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertNil(legacy.ingredientId)
         XCTAssertEqual(legacy.legacyUnit, "kova")
         XCTAssertEqual(legacy.unit, "")
-        XCTAssertFalse(legacy.canSave)
+        XCTAssertFalse(legacy.canSave, "an unknown unit still blocks save")
+        var typed = legacy
+        typed.unit = "piece"
+        XCTAssertTrue(typed.canSave, "a typed name does not have to be picked from the list first")
+        guard case .linked(let linkedTomato) = typed.resolvedIngredient(dictionary: dictionary) else {
+            return XCTFail("Domates links the dictionary row on save")
+        }
+        XCTAssertEqual(linkedTomato.id, "tomato")
         var fixed = legacy
         fixed.choose(dictionary.entry("tomato")!, isNewCustom: false)
         fixed.unit = "piece"
@@ -211,6 +218,94 @@ final class PantryDomainTests: XCTestCase {
         fixed.hasMinimum = true
         fixed.minimumText = "abc"
         XCTAssertFalse(fixed.canSave)
+    }
+
+    func testFreeTextLinksOneExactNameAndOtherwiseCreatesACustomIngredient() {
+        guard case .linked(let tomato) = PantryIngredientMatching.resolve(typed: "domates", dictionary: dictionary) else {
+            return XCTFail("domates")
+        }
+        XCTAssertEqual(tomato.id, "tomato")
+        XCTAssertEqual(tomato.name, "Domates")
+
+        guard case .linked(let iri) = PantryIngredientMatching.resolve(typed: "İRI DOMATES", dictionary: dictionary) else {
+            return XCTFail("synonym")
+        }
+        XCTAssertEqual(iri.id, "tomato")
+
+        guard case .linked(let cherry) = PantryIngredientMatching.resolve(typed: "Cherry domates", dictionary: dictionary) else {
+            return XCTFail("cherry")
+        }
+        XCTAssertEqual(cherry.id, "cherry-tomato")
+        XCTAssertNotEqual(cherry.id, tomato.id)
+
+        guard case .linked(let paste) = PantryIngredientMatching.resolve(typed: "Domates salçası", dictionary: dictionary) else {
+            return XCTFail("paste")
+        }
+        XCTAssertEqual(paste.id, "tomatopaste")
+
+        guard case .createCustom(let prefix) = PantryIngredientMatching.resolve(typed: "dom", dictionary: dictionary) else {
+            return XCTFail("a prefix must not auto-link")
+        }
+        XCTAssertEqual(prefix, "dom")
+
+        guard case .createCustom(let fresh) = PantryIngredientMatching.resolve(typed: "Kestane şekeri", dictionary: dictionary) else {
+            return XCTFail("unknown name")
+        }
+        XCTAssertEqual(fresh, "Kestane şekeri")
+        XCTAssertNil(PantryIngredientMatching.resolve(typed: "   ", dictionary: dictionary))
+
+        XCTAssertTrue(PantryIngredientMatching.suggestions(matching: "  ", dictionary: dictionary).isEmpty)
+        let suggested = PantryIngredientMatching.suggestions(matching: "domates", dictionary: dictionary)
+        XCTAssertEqual(suggested.first?.id, "tomato")
+        XCTAssertTrue(suggested.contains { $0.id == "cherry-tomato" })
+        XCTAssertFalse(suggested.contains { $0.id == "chicken" })
+
+        let custom = IngredientEntry(id: "custom:11111111-1111-4111-8111-111111111111", name: "Anne tarhanası")
+        guard case .linked(let kept) = PantryIngredientMatching.resolve(typed: "anne tarhanası", dictionary: dictionary, customs: [custom]) else {
+            return XCTFail("household custom")
+        }
+        XCTAssertEqual(kept.id, custom.id)
+
+        let shadow = IngredientEntry(id: "custom:22222222-2222-4222-8222-222222222222", name: "Domates")
+        guard case .createCustom(let apart) = PantryIngredientMatching.resolve(typed: "Domates", dictionary: dictionary, customs: [shadow]) else {
+            return XCTFail("two exact Domates rows must not auto-merge")
+        }
+        XCTAssertEqual(apart, "Domates")
+        let both = PantryIngredientMatching.suggestions(matching: "Domates", dictionary: dictionary, customs: [shadow])
+        XCTAssertTrue(both.contains { $0.id == "tomato" })
+        XCTAssertTrue(both.contains { $0.id == shadow.id })
+
+        let ambiguous = IngredientDictionary(entries: [
+            IngredientEntry(id: "mint-a", name: "Nane"),
+            IngredientEntry(id: "mint-b", name: "Nane"),
+        ])
+        guard case .createCustom(let nane) = PantryIngredientMatching.resolve(typed: "Nane", dictionary: ambiguous) else {
+            return XCTFail("ambiguous")
+        }
+        XCTAssertEqual(nane, "Nane")
+
+        var pinned = PantryFormDraft.loaded(
+            ingredientId: "tomato", name: "Salkım", quantity: 1, unit: "piece", location: .refrigerator,
+            minimumQuantity: nil, dictionary: dictionary
+        )
+        guard case .linked(let keptDisplay) = pinned.resolvedIngredient(dictionary: dictionary) else {
+            return XCTFail("pinned display name")
+        }
+        XCTAssertEqual(keptDisplay.id, "tomato")
+        XCTAssertEqual(keptDisplay.name, "Salkım")
+
+        pinned.name = "Cherry domates"
+        guard case .linked(let moved) = pinned.resolvedIngredient(dictionary: dictionary) else {
+            return XCTFail("renamed to another exact ingredient")
+        }
+        XCTAssertEqual(moved.id, "cherry-tomato")
+
+        pinned.choose(dictionary.entry("tomato")!, isNewCustom: false)
+        pinned.name = "İri domates"
+        guard case .linked(let synonym) = pinned.resolvedIngredient(dictionary: dictionary) else {
+            return XCTFail("synonym of the tapped row")
+        }
+        XCTAssertEqual(synonym.id, "tomato")
     }
 
     // MARK: Market
@@ -401,5 +496,13 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(PantryCopy.empty, "Evdeki malzemelerini ekle. Planını ve marketini daha doğru hazırlayalım.")
         XCTAssertEqual(PantryCopy.conflict, "Bu malzeme başka bir cihazda güncellendi.")
         XCTAssertEqual(PantryCopy.usesStock, "Evdeki malzemeleri kullanıyor")
+        XCTAssertEqual(PantryCopy.screenTitle, "Evdekiler")
+        XCTAssertEqual(PantryCopy.consume, "Evdekilerden düş")
+        XCTAssertEqual(PantryCopy.restock, "Evdekilere ekle")
+        XCTAssertEqual(PantryCopy.missingPantry, "Evdekilerde bu malzeme yok.")
+        XCTAssertEqual(PantryCopy.separateUnitMessage(existing: "400 g"), "Evdekilerde 400 g var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
+        for text in PantryCopy.userFacing {
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("pantry"), text)
+        }
     }
 }

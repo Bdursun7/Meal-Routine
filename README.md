@@ -25,7 +25,7 @@ The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It w
 
 ## V5 Smart Pantry
 
-Profil → Pantry. Ortak pantry sunucudadır (`0012_pantry`). Kişisel pantry, kullanıcı aktar veya kopyala demeden eve karışmaz. Market eksik miktarı pantry’den hesaplayabilir, stoktan düşebilir veya alınanı pantry’ye ekleyebilir. “Bitti” miktarı sıfırlar ve silmeden önce üç seçenek sorar. Ayrıntı: `docs/v5-smart-pantry.md`. Sürüm `5.0.0`.
+Profil → Evdekiler. Ortak pantry sunucudadır (`0012_pantry`). Kişisel pantry, kullanıcı aktar veya kopyala demeden eve karışmaz. Market eksik miktarı pantry’den hesaplayabilir, stoktan düşebilir veya alınanı pantry’ye ekleyebilir. “Bitti” miktarı sıfırlar ve silmeden önce üç seçenek sorar. Ayrıntı: `docs/v5-smart-pantry.md`. Sürüm `5.0.0`.
 
 ## V4.1 API
 
