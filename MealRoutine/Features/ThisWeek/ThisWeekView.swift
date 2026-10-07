@@ -24,7 +24,7 @@ struct ThisWeekView: View {
 
     private var pantryStock: [PantryPlanningStock] {
         let householdID = household.snapshot.household?.id
-        return pantryItems.filter { $0.householdID == householdID && $0.quantity > 0 }.map(\.planningStock)
+        return pantryItems.filter { $0.householdID == householdID && $0.quantity > 0 }.map { $0.planningStock }
     }
 
     private var householdSize: Int {

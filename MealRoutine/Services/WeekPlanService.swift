@@ -215,7 +215,7 @@ enum WeekPlanService {
     private static func pantryStock(in context: ModelContext) -> [PantryPlanningStock] {
         let householdID = HouseholdSession.shared.snapshot.household?.id
         let items = (try? context.fetch(FetchDescriptor<PantryItem>())) ?? []
-        return items.filter { $0.householdID == householdID && $0.quantity > 0 }.map(\.planningStock)
+        return items.filter { $0.householdID == householdID && $0.quantity > 0 }.map { $0.planningStock }
     }
 
     /// Keeps cooked evenings and their checks. Skipped evenings are open and can change.
