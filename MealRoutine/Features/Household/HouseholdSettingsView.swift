@@ -42,38 +42,8 @@ struct HouseholdSettingsView: View {
         .sheet(isPresented: Binding(get: { session.offersPantryTransfer }, set: { if !$0 { session.offersPantryTransfer = false } })) {
             PantryTransferSheet { choice in
                 if let householdID = session.snapshot.household?.id, choice != .keepSeparate {
-                    let touched = PantryTransferApply.apply(choice, householdID: householdID, in: modelContext)
-                    for item in touched {
-                        guard var remote = pantryRemote(item, householdID: householdID) else { continue }
-                        let key = UUID()
-                        let updating = item.revision > 1
-                        if updating { remote.revision = max(1, item.revision - 1) }
-                        let payload = remote
-                        let action = updating ? "update" : "create"
-                        guard let api = PantrySync.repository() else {
-                            if !session.isTestMode, MealRoutineConfig.apiBaseURL != nil {
-                                PantrySync.enqueue(action: action, householdID: householdID, item: payload, in: modelContext, id: key, confirmSeparate: !updating)
-                            }
-                            continue
-                        }
-                        Task { @MainActor in
-                            do {
-                                if updating {
-                                    let saved = try await api.update(householdId: householdID, item: payload, idempotencyKey: key.uuidString)
-                                    item.revision = saved.revision
-                                } else {
-                                    let saved = try await api.create(householdId: householdID, item: payload, idempotencyKey: key.uuidString, confirmSeparate: true)
-                                    item.uuid = saved.id
-                                    item.revision = saved.revision
-                                }
-                                try? modelContext.save()
-                            } catch PantrySyncError.conflict {
-                                PantrySync.enqueue(action: action, householdID: householdID, item: payload, in: modelContext, status: .requiresResolution, id: key, confirmSeparate: !updating)
-                            } catch {
-                                PantrySync.enqueue(action: action, householdID: householdID, item: payload, in: modelContext, status: .pending, id: key, confirmSeparate: !updating)
-                            }
-                        }
-                    }
+                    PantryTransferApply.apply(choice, householdID: householdID, in: modelContext)
+                    Task { await PantryOutbox.flush(in: modelContext) }
                 }
                 session.resolvePantryTransfer()
             }
@@ -518,23 +488,6 @@ struct HouseholdSettingsView: View {
         categories = preference.preferredCategories.joined(separator: ", ")
         proteins = preference.preferredProteins.joined(separator: ", ")
         avoided = preference.avoidedIngredients.joined(separator: ", ")
-    }
-
-    private func pantryRemote(_ item: PantryItem, householdID: UUID) -> PantryRemoteItem? {
-        PantryRemoteItem(
-            id: item.uuid,
-            householdId: householdID,
-            ingredientId: item.ingredientID,
-            displayName: item.displayName,
-            quantity: item.quantity,
-            unit: item.unit,
-            location: item.location,
-            minimumQuantity: item.minimumQuantity,
-            bestBefore: item.bestBefore.map { $0.formatted(.iso8601.year().month().day()) },
-            revision: item.revision,
-            createdAt: nil,
-            updatedAt: item.updatedAt
-        )
     }
 }
 

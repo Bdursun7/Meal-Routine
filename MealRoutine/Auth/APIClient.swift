@@ -299,59 +299,108 @@ struct AccountRepository {
     }
 }
 
-struct PantryRemoteItem: Codable, Equatable, Sendable {
-    var id: UUID; var householdId: UUID; var ingredientId: String; var displayName: String
-    var quantity: Double; var unit: String; var location: PantryLocation; var minimumQuantity: Double?
-    var bestBefore: String?; var revision: Int; var createdAt: Date?; var updatedAt: Date?
-}
-struct PantryListDTO: Codable, Sendable { var items: [PantryRemoteItem]; var serverTime: Date? }
+struct PantryListDTO: Decodable, Sendable { var items: [PantryRemoteItem]; var serverTime: String? }
 
-struct PantryReconcileResponse: Codable, Sendable {
-    var lines: [PantryReconcileLine]
+struct PantryReconcileResponse: Decodable, Sendable {
+    var lines: [PantryReconcileResultLine]
     var items: [PantryRemoteItem]
 }
 
+struct PantryReconcileResultLine: Decodable, Sendable {
+    var ingredientId: String
+    var resolvedIngredientId: String?
+    var quantity: Double
+    var unit: String
+    var incompatible: Bool
+    var unknownIngredient: Bool?
+    var applied: Bool
+}
+
+/// `GET /v1/ingredients` row. `scope` is `dictionary` for the seed and `household` for user-created rows.
+struct IngredientDTO: Decodable, Sendable {
+    var id: String
+    var displayName: String
+    var synonyms: [String]
+    var sourceIds: [String]
+    var scope: String
+
+    var entry: IngredientEntry { IngredientEntry(id: id, name: displayName, synonyms: synonyms, sourceIds: sourceIds) }
+}
+
+private struct IngredientListDTO: Decodable { var version: Int; var ingredients: [IngredientDTO] }
+private struct IngredientRegisterBody: Encodable { var id: String; var displayName: String }
+
 struct PantryRepository {
     var client: APIClient
+
     func list(householdId: UUID) async throws -> [PantryRemoteItem] {
-        let (data, response) = try await client.request(method: "GET", path: "/v1/households/\(householdId.uuidString)/pantry", body: nil, authenticated: true)
-        try client.validateAuth(response, data: data, authenticated: true)
+        let (data, response) = try await client.request(method: "GET", path: "\(base(householdId))/pantry", body: nil, authenticated: true)
+        try throwPantry(response, data: data)
         return try JSONDecoder.mealRoutine.decode(PantryListDTO.self, from: data).items
     }
-    func create(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
-        try await mutate("POST", "/v1/households/\(householdId.uuidString)/pantry/items", item, baseRevision: nil, idempotencyKey: idempotencyKey, confirmSeparate: confirmSeparate)
+
+    /// Dictionary plus this household's own ingredients. The server copy is authoritative.
+    func ingredients(householdId: UUID?, query: String = "", limit: Int = 1000) async throws -> [IngredientDTO] {
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let householdId { items.append(URLQueryItem(name: "householdId", value: householdId.uuidString.lowercased())) }
+        if !query.isEmpty { items.append(URLQueryItem(name: "q", value: query)) }
+        var components = URLComponents()
+        components.path = "/v1/ingredients"
+        components.queryItems = items
+        let (data, response) = try await client.request(method: "GET", path: components.string ?? "/v1/ingredients", body: nil, authenticated: true)
+        try throwPantry(response, data: data)
+        return try JSONDecoder.mealRoutine.decode(IngredientListDTO.self, from: data).ingredients
     }
-    func update(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString) async throws -> PantryRemoteItem {
-        try await mutate("PATCH", "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)", item, baseRevision: max(1, item.revision), idempotencyKey: idempotencyKey)
+
+    /// Registers a `custom:<uuid>` ingredient. Repeating the call with the same id is a no-op on the server.
+    func registerIngredient(householdId: UUID, id: String, displayName: String, idempotencyKey: String) async throws -> IngredientDTO {
+        let body = try JSONEncoder.mealRoutine.encode(IngredientRegisterBody(id: id, displayName: displayName))
+        let (data, response) = try await client.request(method: "POST", path: "\(base(householdId))/ingredients", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+        try throwPantry(response, data: data)
+        return try JSONDecoder.mealRoutine.decode(IngredientDTO.self, from: data)
     }
-    func delete(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String = UUID().uuidString) async throws {
-        let (data, response) = try await client.request(method: "DELETE", path: "/v1/households/\(householdId.uuidString)/pantry/items/\(item.id.uuidString)?baseRevision=\(item.revision)", body: nil, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+
+    func create(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
+        let body = try JSONEncoder.mealRoutine.encode(PantryItemBody.create(item, confirmSeparate: confirmSeparate))
+        return try await send("POST", "\(base(householdId))/pantry/items", body: body, idempotencyKey: idempotencyKey)
+    }
+
+    func update(householdId: UUID, item: PantryRemoteItem, baseVersion: Int, idempotencyKey: String) async throws -> PantryRemoteItem {
+        let body = try JSONEncoder.mealRoutine.encode(PantryItemBody.patch(item))
+        return try await send("PATCH", "\(itemPath(householdId, item.id))?baseVersion=\(max(1, baseVersion))", body: body, idempotencyKey: idempotencyKey)
+    }
+
+    func delete(householdId: UUID, itemId: UUID, baseVersion: Int?, idempotencyKey: String) async throws {
+        var path = itemPath(householdId, itemId)
+        if let baseVersion { path += "?baseVersion=\(max(1, baseVersion))" }
+        let (data, response) = try await client.request(method: "DELETE", path: path, body: nil, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
         try throwPantry(response, data: data)
     }
+
     func reconcile(householdId: UUID, operation: String, lines: [PantryReconcileLine], idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryReconcileResponse {
         let body = try JSONEncoder.mealRoutine.encode(PantryReconcileBody(operation: operation, confirmSeparate: confirmSeparate, lines: lines))
-        let (data, response) = try await client.request(method: "POST", path: "/v1/households/\(householdId.uuidString)/pantry/reconcile-grocery", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+        let (data, response) = try await client.request(method: "POST", path: "\(base(householdId))/pantry/reconcile-grocery", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
         try throwPantry(response, data: data)
         return try JSONDecoder.mealRoutine.decode(PantryReconcileResponse.self, from: data)
     }
-    private func mutate(_ method: String, _ path: String, _ item: PantryRemoteItem, baseRevision: Int?, idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
-        var body = try JSONEncoder.mealRoutine.encode(item)
-        if confirmSeparate, var object = try JSONSerialization.jsonObject(with: body) as? [String: Any] {
-            object["confirmSeparate"] = true
-            body = try JSONSerialization.data(withJSONObject: object)
-        }
-        var fullPath = path; if let baseRevision { fullPath += "?baseRevision=\(baseRevision)" }
-        let (data, response) = try await client.request(method: method, path: fullPath, body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
+
+    private func base(_ householdId: UUID) -> String { "/v1/households/\(householdId.uuidString.lowercased())" }
+
+    private func itemPath(_ householdId: UUID, _ itemId: UUID) -> String { "\(base(householdId))/pantry/items/\(itemId.uuidString.lowercased())" }
+
+    private func send(_ method: String, _ path: String, body: Data, idempotencyKey: String) async throws -> PantryRemoteItem {
+        let (data, response) = try await client.request(method: method, path: path, body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
         try throwPantry(response, data: data)
         return try JSONDecoder.mealRoutine.decode(PantryRemoteItem.self, from: data)
     }
+
+    /// Classified pantry errors first; anything transient falls through to the shared auth handling.
     private func throwPantry(_ response: HTTPURLResponse, data: Data) throws {
-        if response.statusCode == 409 {
-            let body = try? JSONDecoder().decode(APIErrorDTO.self, from: data)
-            if body?.error == "conflict" { throw PantrySyncError.conflict }
-            if body?.error == "pantry_unit_choice" { throw PantrySyncError.unitChoice }
-        }
+        if (200..<300).contains(response.statusCode) { return }
+        let body = try? JSONDecoder.mealRoutine.decode(PantryErrorBody.self, from: data)
+        if let classified = PantrySyncError.classify(status: response.statusCode, body: body) { throw classified }
         try client.validateAuth(response, data: data, authenticated: true)
+        throw PantrySyncError.failed
     }
 }
 

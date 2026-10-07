@@ -76,6 +76,13 @@ enum SyncQueueMachine {
         return copy
     }
 
+    /// The server refused the request itself. Resending the same body cannot succeed.
+    static func markFailed(_ item: SyncWorkItem) -> SyncWorkItem {
+        var copy = item
+        copy.status = .failed
+        return copy
+    }
+
     static func isReady(_ item: SyncWorkItem, now: Date, jitterUnit: Double = 0) -> Bool {
         guard item.status == .pending else { return false }
         if item.retryCount == 0 { return true }
@@ -88,6 +95,7 @@ enum SyncSendResult: Equatable, Sendable {
     case applied
     case conflict
     case retry
+    case rejected
 }
 
 enum SyncDrainer {
@@ -114,6 +122,8 @@ enum SyncDrainer {
                     output.append(SyncQueueMachine.markConflict(syncing))
                 case .retry:
                     output.append(SyncQueueMachine.markRetry(syncing))
+                case .rejected:
+                    output.append(SyncQueueMachine.markFailed(syncing))
                 }
             } catch {
                 output.append(SyncQueueMachine.markRetry(syncing))
@@ -231,6 +241,14 @@ enum PendingOperationStore {
             ))
         }
         try? context.save()
+    }
+
+    /// Replaces every queued operation except those of `entityType`, which keep what is stored now.
+    /// Board and personal-recipe drains use this so they never overwrite pantry work queued meanwhile.
+    @MainActor
+    static func replace(_ items: [SyncWorkItem], keeping entityType: String, in context: ModelContext) {
+        let kept = Self.items(in: context).filter { $0.entityType == entityType }
+        replace(items.filter { $0.entityType != entityType } + kept, in: context)
     }
 
     @MainActor

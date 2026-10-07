@@ -1092,7 +1092,6 @@ final class HouseholdSession {
         let now = Date()
         let queued = PendingOperationStore.items(in: context)
         if isTestMode {
-            let pantryQueued = queued.filter { PantrySync.isPantry($0) }
             let rest = queued.filter { !PantrySync.isPantry($0) }
             let ready = rest.contains { SyncQueueMachine.isReady($0, now: now) }
             guard ready else { return }
@@ -1102,7 +1101,7 @@ final class HouseholdSession {
                 let updated = await SyncDrainer.drain(items: rest, online: true, now: now.addingTimeInterval(120)) { _ in
                     .applied
                 }
-                PendingOperationStore.replace(updated + pantryQueued, in: context)
+                PendingOperationStore.replace(updated, keeping: PantrySync.entityType, in: context)
                 syncState = .idle
             } catch HouseholdError.offline {
                 syncState = .offline
@@ -1113,7 +1112,7 @@ final class HouseholdSession {
                     }
                     return item
                 }
-                PendingOperationStore.replace(updated + pantryQueued, in: context)
+                PendingOperationStore.replace(updated, keeping: PantrySync.entityType, in: context)
                 statusMessage = SharedConflictNotice.mealUpdated
                 syncState = .failed
             } catch {
@@ -1123,23 +1122,13 @@ final class HouseholdSession {
             return
         }
         let personal = queued.filter { PersonalRecipeSync.isPersonal($0) }
-        let pantryQueued = queued.filter { PantrySync.isPantry($0) }
         let board = queued.filter { !PersonalRecipeSync.isPersonal($0) && !PantrySync.isPantry($0) }
         let drainedPersonal = await PersonalRecipeSync.send(personal)
-        let drainedPantry = await SyncDrainer.drain(
-            items: pantryQueued,
-            online: usesHouseholdAPI && SyncEngine.shared.online,
-            now: now
-        ) { item in
-            await PantrySync.send(item)
-        }
-        let keptPantry = drainedPantry.filter { $0.status != .completed }
-        let preserved = drainedPersonal + keptPantry
-        let pantryConflicted = keptPantry.contains { item in
-            item.status == .requiresResolution && pantryQueued.first { $0.id == item.id }?.status != .requiresResolution
-        }
+        var pantryConflicted = false
+        if usesHouseholdAPI { pantryConflicted = await PantryOutbox.flush(in: context) }
+        let preserved = drainedPersonal
         func storeBoard(_ items: [SyncWorkItem]) {
-            PendingOperationStore.replace(items + preserved, in: context)
+            PendingOperationStore.replace(items + preserved, keeping: PantrySync.entityType, in: context)
         }
         func notePantryConflict() {
             guard pantryConflicted else { return }
@@ -1151,7 +1140,7 @@ final class HouseholdSession {
             syncState = .failed
         }
         guard usesHouseholdAPI, let householdId = snapshot.household?.id else {
-            if drainedPersonal != personal || keptPantry != pantryQueued {
+            if drainedPersonal != personal {
                 storeBoard(board)
             }
             return
@@ -1164,7 +1153,7 @@ final class HouseholdSession {
                 preserving: preserved,
                 in: context
             )
-            if !pulled && (drainedPersonal != personal || keptPantry != pantryQueued) {
+            if !pulled && (drainedPersonal != personal) {
                 storeBoard(board)
             }
             notePantryConflict()
@@ -1255,7 +1244,7 @@ final class HouseholdSession {
             }
             return item
         }
-        PendingOperationStore.replace(resolved + personal, in: context)
+        PendingOperationStore.replace(resolved + personal, keeping: PantrySync.entityType, in: context)
         statusMessage = SharedConflictNotice.mealUpdated
         syncState = .failed
         return true
@@ -1449,6 +1438,7 @@ final class HouseholdSession {
         await performRemote(in: context, success: message) {
             try await self.lifecycleAPI().leave(householdId: householdId)
         }
+        if snapshot.household?.id != householdId { PantryAccountPrivacy.dropHouseholdCache(householdID: householdId, in: context) }
     }
 
     private func transferRemote(memberId: String, in context: ModelContext) async {
@@ -1463,6 +1453,7 @@ final class HouseholdSession {
         await performRemote(in: context, success: "Ev halkı silindi. Kişisel planın duruyor.") {
             try await self.lifecycleAPI().deleteHousehold(householdId: householdId)
         }
+        if snapshot.household?.id != householdId { PantryAccountPrivacy.dropHouseholdCache(householdID: householdId, in: context) }
     }
 
     private func rejectRemote(code: String, in context: ModelContext) async {
@@ -1515,8 +1506,10 @@ final class HouseholdSession {
             persist(in: context)
             syncState = .idle
         } catch let error as HouseholdError where error == .notMember {
+            let previous = snapshot.household?.id
             snapshot = .empty(now: .now)
             persist(in: context)
+            if let previous { PantryAccountPrivacy.dropHouseholdCache(householdID: previous, in: context) }
             syncState = .idle
         } catch HouseholdError.offline {
             syncState = .offline
