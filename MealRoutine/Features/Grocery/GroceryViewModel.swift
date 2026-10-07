@@ -35,6 +35,21 @@ struct GroceryListPresentation: Equatable {
     var isEmpty: Bool { totalCount == 0 }
 }
 
+/// A question the user answers before a grocery row is added to the pantry.
+struct PantryRestockPrompt: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case pickIngredient
+        case confirmSeparate(existing: String)
+    }
+
+    var groceryID: UUID
+    var name: String
+    var kind: Kind
+    var ingredient: IngredientEntry?
+
+    var id: UUID { groceryID }
+}
+
 @MainActor
 @Observable
 final class GroceryViewModel {
@@ -48,6 +63,7 @@ final class GroceryViewModel {
     var editingQuantity = ""
     var usesPantryCoverage = UserDefaults.standard.bool(forKey: coverageKey)
     var pantryNote: String?
+    var pantryPrompt: PantryRestockPrompt?
     private static let coverageKey = "mealroutine.pantry.marketCoverage"
 
     static let manualUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "toTaste"]
@@ -150,17 +166,28 @@ final class GroceryViewModel {
         mutatePantry(id, in: context, adding: false)
     }
 
-    func addToPantry(_ id: UUID, confirmSeparate: Bool = false, in context: ModelContext) {
-        mutatePantry(id, in: context, adding: true, confirmSeparate: confirmSeparate)
+    func addToPantry(_ id: UUID, confirmSeparate: Bool = false, ingredient: IngredientEntry? = nil, in context: ModelContext) {
+        mutatePantry(id, in: context, adding: true, confirmSeparate: confirmSeparate, chosen: ingredient)
     }
 
-    private func mutatePantry(_ id: UUID, in context: ModelContext, adding: Bool, confirmSeparate: Bool = false) {
+    /// Grocery → pantry runs only from these explicit actions. Rows meet on the dictionary id;
+    /// a row without one asks the user which ingredient it is instead of guessing from its name.
+    private func mutatePantry(_ id: UUID, in context: ModelContext, adding: Bool, confirmSeparate: Bool = false, chosen: IngredientEntry? = nil) {
         let groceries = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
         guard let row = groceries.first(where: { $0.uuid == id }), let amount = row.quantity, amount > 0 else { return }
+        let dictionary = IngredientDictionary.shared
         let householdID = HouseholdSession.shared.snapshot.household?.id
+        guard let key = chosen.flatMap({ dictionary.canonicalId($0.id) }) ?? dictionary.canonicalId(row.ingredientId) else {
+            if adding {
+                pantryPrompt = PantryRestockPrompt(groceryID: row.uuid, name: row.displayName, kind: .pickIngredient, ingredient: nil)
+            } else {
+                errorMessage = PantryCopy.missingPantry
+            }
+            return
+        }
         let pantry = ((try? context.fetch(FetchDescriptor<PantryItem>())) ?? []).filter { $0.householdID == householdID }
-        let match = pantry.first { $0.ingredientID == row.ingredientId && PantryUnitPolicy.compatible($0.unit, row.unit) }
-        if let match {
+        let peers = pantry.filter { dictionary.canonicalId($0.ingredientID) == key }
+        if let match = peers.first(where: { PantryUnitPolicy.compatible($0.unit, row.unit) }) {
             let next = adding
                 ? PantryUnitPolicy.restock(stockQuantity: match.quantity, stockUnit: match.unit, amount: amount, amountUnit: row.unit)
                 : PantryUnitPolicy.consume(stockQuantity: match.quantity, stockUnit: match.unit, amount: amount, amountUnit: row.unit)
@@ -168,79 +195,55 @@ final class GroceryViewModel {
                 errorMessage = PantryCopy.unitMismatch
                 return
             }
+            let base = match.revision
             match.quantity = next
             match.updatedAt = .now
             match.revision += 1
             try? context.save()
-            sync(match, action: "update", householdID: householdID, in: context)
+            if PantryOutbox.record(.update, match, baseVersion: base, in: context) {
+                Task { await PantryOutbox.flush(in: context) }
+            }
             return
         }
         if !adding {
-            errorMessage = pantry.contains(where: { $0.ingredientID == row.ingredientId }) ? PantryCopy.unitMismatch : PantryCopy.missingPantry
+            errorMessage = peers.isEmpty ? PantryCopy.missingPantry : PantryCopy.unitMismatch
             return
         }
-        if pantry.contains(where: { $0.ingredientID == row.ingredientId }) && !confirmSeparate {
-            errorMessage = PantryCopy.unitChoice
+        guard PantryUnitPolicy.isKnown(row.unit) else {
+            errorMessage = PantryCopy.unknownUnit
             return
         }
-        guard PantryUnitPolicy.isKnown(row.unit) || confirmSeparate else {
-            errorMessage = PantryCopy.unitMismatch
+        if let peer = peers.first, !confirmSeparate {
+            pantryPrompt = PantryRestockPrompt(
+                groceryID: row.uuid,
+                name: row.displayName,
+                kind: .confirmSeparate(existing: QuantityFormat.quantityAndUnit(quantity: peer.quantity, unit: peer.unit)),
+                ingredient: chosen
+            )
             return
         }
         let created = PantryItem(
             householdID: householdID,
-            ingredientID: row.ingredientId,
-            displayName: row.displayName,
+            ingredientID: key,
+            displayName: chosen?.name ?? dictionary.entry(key)?.name ?? row.displayName,
             quantity: amount,
             unit: UnitNormalization.parse(row.unit).code,
             location: .pantry
         )
         context.insert(created)
         try? context.save()
-        sync(created, action: "create", householdID: householdID, confirmSeparate: confirmSeparate, in: context)
-    }
-
-    private func sync(_ item: PantryItem, action: String, householdID: UUID?, confirmSeparate: Bool = false, in context: ModelContext) {
-        guard let householdID, PantrySync.repository() != nil else { return }
-        let remote = PantryRemoteItem(
-            id: item.uuid,
-            householdId: householdID,
-            ingredientId: item.ingredientID,
-            displayName: item.displayName,
-            quantity: item.quantity,
-            unit: item.unit,
-            location: item.location,
-            minimumQuantity: item.minimumQuantity,
-            bestBefore: item.bestBefore.map { $0.formatted(.iso8601.year().month().day()) },
-            revision: max(1, item.revision - 1),
-            createdAt: nil,
-            updatedAt: item.updatedAt
-        )
-        let key = UUID()
-        Task { @MainActor in
-            guard let api = PantrySync.repository() else { return }
-            do {
-                if action == "create" {
-                    let saved = try await api.create(householdId: householdID, item: remote, idempotencyKey: key.uuidString, confirmSeparate: confirmSeparate)
-                    item.uuid = saved.id
-                    item.revision = saved.revision
-                } else {
-                    let saved = try await api.update(householdId: householdID, item: remote, idempotencyKey: key.uuidString)
-                    item.revision = saved.revision
-                }
-                try? context.save()
-            } catch PantrySyncError.conflict {
-                PantrySync.enqueue(action: action, householdID: householdID, item: remote, in: context, status: .requiresResolution, id: key, confirmSeparate: confirmSeparate)
-                errorMessage = PantryCopy.conflict
-            } catch {
-                PantrySync.enqueue(action: action, householdID: householdID, item: remote, in: context, status: .pending, id: key, confirmSeparate: confirmSeparate)
-                errorMessage = PantryCopy.saveFailed
-            }
+        if let chosen, IngredientDictionary.isCustom(chosen.id) {
+            PantryIngredientStore.remember(chosen, householdID: householdID)
+        }
+        if PantryOutbox.record(.create, created, baseVersion: nil, confirmSeparate: confirmSeparate, in: context) {
+            Task { await PantryOutbox.flush(in: context) }
         }
     }
 
     private func pushCoverage(_ needs: [PantryReconcileLine]) async {
-        guard let householdID = HouseholdSession.shared.snapshot.household?.id, let api = PantrySync.repository() else { return }
+        guard PantryOutbox.syncsHousehold,
+              let householdID = HouseholdSession.shared.snapshot.household?.id,
+              let api = PantrySync.repository() else { return }
         let key = PantryMarketCoverage.idempotencyKey(for: needs)
         _ = try? await api.reconcile(
             householdId: householdID,

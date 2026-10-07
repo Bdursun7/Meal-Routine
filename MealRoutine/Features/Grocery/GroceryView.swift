@@ -40,6 +40,38 @@ struct GroceryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+            .sheet(item: pickingIngredient) { prompt in
+                NavigationStack {
+                    PantryIngredientPicker(query: prompt.name, householdID: household.snapshot.household?.id) { entry, _ in
+                        viewModel.pantryPrompt = nil
+                        Task { @MainActor in
+                            // A follow-up "separate row" alert cannot present while the sheet is still closing.
+                            try? await Task.sleep(for: .milliseconds(400))
+                            viewModel.addToPantry(prompt.groceryID, ingredient: entry, in: modelContext)
+                        }
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("İptal") { viewModel.pantryPrompt = nil }
+                        }
+                    }
+                }
+            }
+            .alert(
+                PantryCopy.unitChoice,
+                isPresented: separatePromptIsPresented,
+                presenting: viewModel.pantryPrompt
+            ) { prompt in
+                Button(PantryCopy.separateUnit) {
+                    viewModel.pantryPrompt = nil
+                    viewModel.addToPantry(prompt.groceryID, confirmSeparate: true, ingredient: prompt.ingredient, in: modelContext)
+                }
+                Button("Vazgeç", role: .cancel) { viewModel.pantryPrompt = nil }
+            } message: { prompt in
+                if case .confirmSeparate(let existing) = prompt.kind {
+                    Text("Pantry'de \(existing) var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
+                }
+            }
         }
         .task(id: isTabSelected) {
             if !isTabSelected {
@@ -248,6 +280,20 @@ struct GroceryView: View {
             set: { isPresented in
                 if !isPresented { viewModel.errorMessage = nil }
             }
+        )
+    }
+
+    private var pickingIngredient: Binding<PantryRestockPrompt?> {
+        Binding(
+            get: { viewModel.pantryPrompt?.kind == .pickIngredient ? viewModel.pantryPrompt : nil },
+            set: { if $0 == nil, viewModel.pantryPrompt?.kind == .pickIngredient { viewModel.pantryPrompt = nil } }
+        )
+    }
+
+    private var separatePromptIsPresented: Binding<Bool> {
+        Binding(
+            get: { if case .confirmSeparate = viewModel.pantryPrompt?.kind { return true }; return false },
+            set: { if !$0, case .confirmSeparate = viewModel.pantryPrompt?.kind { viewModel.pantryPrompt = nil } }
         )
     }
 
