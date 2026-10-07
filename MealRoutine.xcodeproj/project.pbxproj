@@ -54,6 +54,10 @@
 		BA0E7E258B03828C5F96A42F /* GroceryListReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */; };
 		V50B50A0000000000000001 /* PantryRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000001 /* PantryRules.swift */; };
 		V50B50A0000000000000002 /* PantryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000002 /* PantryTests.swift */; };
+		V50B50A0000000000000003 /* IngredientDictionary.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000003 /* IngredientDictionary.swift */; };
+		V50B50A0000000000000004 /* PantryDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000004 /* PantryDomain.swift */; };
+		V50B50A0000000000000005 /* ingredients.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000005 /* ingredients.v1.json */; };
+		V50B50A0000000000000006 /* PantryDomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = V50F50A0000000000000006 /* PantryDomainTests.swift */; };
 		BAA499CFD09FEC17DA10E029 /* GroceryListService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */; };
 		BA53DA2735F01A502CCB6A94 /* GroceryMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */; };
 		BA8F52A872ACCF3DF45FA4C0 /* MealExposureLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */; };
@@ -231,6 +235,10 @@
 		FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListReconciler.swift; sourceTree = "<group>"; };
 		V50F50A0000000000000001 /* PantryRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryRules.swift; sourceTree = "<group>"; };
 		V50F50A0000000000000002 /* PantryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryTests.swift; sourceTree = "<group>"; };
+		V50F50A0000000000000003 /* IngredientDictionary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngredientDictionary.swift; sourceTree = "<group>"; };
+		V50F50A0000000000000004 /* PantryDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryDomain.swift; sourceTree = "<group>"; };
+		V50F50A0000000000000005 /* ingredients.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ingredients.v1.json; sourceTree = "<group>"; };
+		V50F50A0000000000000006 /* PantryDomainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantryDomainTests.swift; sourceTree = "<group>"; };
 		FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListService.swift; sourceTree = "<group>"; };
 		FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryMerger.swift; sourceTree = "<group>"; };
 		FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealExposureLog.swift; sourceTree = "<group>"; };
@@ -518,6 +526,7 @@
 			children = (
 				FA969AA2AD13C618BEC4C2A1 /* ingredient-aliases.tr.json */,
 				FAAEADD99759A35A9C873AC6 /* recipes.v1.json */,
+				V50F50A0000000000000005 /* ingredients.v1.json */,
 			);
 			path = Recipes;
 			sourceTree = "<group>";
@@ -539,6 +548,8 @@
 				FA0A11A1A11A11A11A11A005 /* GroceryQuantityEdit.swift */,
 				FA10CE4E5AB5311C3B15E0B4 /* GroceryListReconciler.swift */,
 				V50F50A0000000000000001 /* PantryRules.swift */,
+				V50F50A0000000000000003 /* IngredientDictionary.swift */,
+				V50F50A0000000000000004 /* PantryDomain.swift */,
 				FAB857DED9B36BEA85DF30C7 /* GroceryListService.swift */,
 				FADEAA694C9CF05774D164E2 /* GroceryMerger.swift */,
 				FA9A6CAE6502F3D50EEF0A77 /* MealExposureLog.swift */,
@@ -659,6 +670,7 @@
 				V42F42A0000000000000002 /* HouseholdLifecycleTests.swift */,
 				V43F43A0000000000000003 /* SyncEngineTests.swift */,
 				V50F50A0000000000000002 /* PantryTests.swift */,
+				V50F50A0000000000000006 /* PantryDomainTests.swift */,
 				V44F44A0000000000000003 /* LocalMigrationTests.swift */,
 				V45F45A0000000000000004 /* NotificationTests.swift */,
 			);
@@ -872,6 +884,7 @@
 				BAE79929CB2D00C1135A093F /* PrivacyInfo.xcprivacy in Resources */,
 				BA460A646DD6DDF48F7CA56B /* ingredient-aliases.tr.json in Resources */,
 				BA341F75B64DDC998C31DB99 /* recipes.v1.json in Resources */,
+				V50B50A0000000000000005 /* ingredients.v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -933,6 +946,8 @@
 				BA9ED1B35B8D4E4C8CFF152B /* FeedbackIndex.swift in Sources */,
 				BA0E7E258B03828C5F96A42F /* GroceryListReconciler.swift in Sources */,
 				V50B50A0000000000000001 /* PantryRules.swift in Sources */,
+				V50B50A0000000000000003 /* IngredientDictionary.swift in Sources */,
+				V50B50A0000000000000004 /* PantryDomain.swift in Sources */,
 				BAA499CFD09FEC17DA10E029 /* GroceryListService.swift in Sources */,
 				BA53DA2735F01A502CCB6A94 /* GroceryMerger.swift in Sources */,
 				BA8F52A872ACCF3DF45FA4C0 /* MealExposureLog.swift in Sources */,
@@ -1036,6 +1051,7 @@
 				V42B42A0000000000000002 /* HouseholdLifecycleTests.swift in Sources */,
 				V43B43A0000000000000003 /* SyncEngineTests.swift in Sources */,
 				V50B50A0000000000000002 /* PantryTests.swift in Sources */,
+				V50B50A0000000000000006 /* PantryDomainTests.swift in Sources */,
 				V44B44A0000000000000003 /* LocalMigrationTests.swift in Sources */,
 				V45B45A0000000000000004 /* NotificationTests.swift in Sources */,
 			);
