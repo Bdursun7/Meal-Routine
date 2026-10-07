@@ -10,7 +10,6 @@ struct PantryView: View {
     @State private var refreshing = false
     @State private var loadFailed = false
     @State private var finished: PantryItem?
-    @State private var finishedQuantity: Double = 0
     @State private var editing: PantryItem?
     @State private var session = HouseholdSession.shared
 
@@ -99,6 +98,7 @@ struct PantryView: View {
             PantryForm(item: item) { name, quantity, unit, location, minimum, date, confirmSeparate in
                 edit(item, name: name, quantity: quantity, unit: unit, location: location, minimum: minimum, date: date, confirmSeparate: confirmSeparate)
             }
+            .id(item.persistentModelID)
         }
         .sheet(isPresented: Binding(get: { session.offersPantryTransfer }, set: { if !$0 { session.offersPantryTransfer = false } })) {
             PantryTransferSheet { choice in
@@ -111,11 +111,16 @@ struct PantryView: View {
                 session.resolvePantryTransfer()
             }
         }
-        .confirmationDialog(PantryCopy.finishedTitle, isPresented: Binding(get: { finished != nil }, set: { if !$0 { finished = nil } }), titleVisibility: .visible) {
-            Button(PantryCopy.addToMarket) { finish(.addToMarket) }
-            Button(PantryCopy.missingMinimum) { finish(.missingAgainstMinimum) }
-            Button(PantryCopy.deleteItem, role: .destructive) { finish(.deleteItem) }
-        } message: {
+        .confirmationDialog(
+            PantryCopy.finishedTitle,
+            isPresented: Binding(get: { finished != nil }, set: { if !$0 { finished = nil } }),
+            titleVisibility: .visible,
+            presenting: finished
+        ) { item in
+            Button(PantryCopy.addToMarket) { finish(item, choice: .addToMarket) }
+            Button(PantryCopy.missingMinimum) { finish(item, choice: .missingAgainstMinimum) }
+            Button(PantryCopy.deleteItem, role: .destructive) { finish(item, choice: .deleteItem) }
+        } message: { _ in
             Text(PantryCopy.finishedMessage)
         }
         .alert("Pantry güncellenemedi", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -131,58 +136,71 @@ struct PantryView: View {
     @ViewBuilder
     private func row(_ item: PantryItem) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text(item.displayName).font(.headline)
-                Spacer()
-                if item.isLowStock { Text("Azaldı").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
-                if item.isExpiredOrNear { Text("Tarih yaklaşıyor").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
-            }
-            HStack {
-                Text(QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit))
-                Text("· \(item.location.title)")
-                Spacer()
-                if let minimum = item.minimumQuantity {
-                    Text("Min \(QuantityFormat.quantityAndUnit(quantity: minimum, unit: item.unit))")
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    Text(item.displayName).font(.headline)
+                    Spacer()
+                    if item.isLowStock { Text("Azaldı").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
+                    if item.isExpiredOrNear { Text("Tarih yaklaşıyor").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
                 }
-                if let date = item.bestBefore {
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
-                        .foregroundStyle(item.isExpiredOrNear ? .orange : .secondary)
+                HStack {
+                    Text(QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit))
+                    Text("· \(item.location.title)")
+                    Spacer()
+                    if let minimum = item.minimumQuantity {
+                        Text("Min \(QuantityFormat.quantityAndUnit(quantity: minimum, unit: item.unit))")
+                    }
+                    if let date = item.bestBefore {
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                            .foregroundStyle(item.isExpiredOrNear ? .orange : .secondary)
+                    }
                 }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
             HStack(spacing: 10) {
-                Button("−") { change(item, by: -1) }.buttonStyle(.bordered)
-                Button("+") { change(item, by: 1) }.buttonStyle(.bordered)
+                Button("−") { change(item, by: -1) }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Miktarı bir azalt")
+                Button("+") { change(item, by: 1) }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Miktarı bir artır")
                 Spacer()
-                Button("Düzenle") { editing = item }.font(.footnote.weight(.semibold))
-                Button("Bitti") { markFinished(item) }.font(.footnote.weight(.semibold))
+                Button("Düzenle") { editing = item }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(.borderless)
+                    .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
+                Button("Bitti") { markFinished(item) }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(.borderless)
+                    .accessibilityHint("Seçenekleri gösterir. İptal miktarı değiştirmez.")
             }
         }
         .padding(.vertical, 5)
-        .accessibilityElement(children: .combine)
         .swipeActions {
             Button(role: .destructive) { delete(item) } label: { Label("Sil", systemImage: "trash") }
         }
     }
 
+    /// Opens the finished choices. Stock is unchanged until the user picks one.
     private func markFinished(_ item: PantryItem) {
-        finishedQuantity = item.quantity
-        item.quantity = 0
-        item.revision += 1
-        item.updatedAt = .now
-        try? modelContext.save()
-        syncUpdate(item)
         finished = item
     }
 
-    private func finish(_ choice: PantryFinishedChoice) {
-        guard let item = finished else { return }
+    private func finish(_ item: PantryItem, choice: PantryFinishedChoice) {
+        let recorded = item.quantity
         finished = nil
+        item.quantity = PantryFinishedFlow.quantity(current: recorded, choice: choice)
         switch choice {
+        case .deleteItem:
+            // The delete request is the sync. A separate zero-update would race it on revision.
+            delete(item)
         case .addToMarket:
-            addMarket(name: item.displayName, ingredientId: item.ingredientID, quantity: finishedQuantity > 0 ? finishedQuantity : 1, unit: item.unit)
+            commitFinishedStock(item)
+            addMarket(name: item.displayName, ingredientId: item.ingredientID, quantity: recorded > 0 ? recorded : 1, unit: item.unit)
         case .missingAgainstMinimum:
+            commitFinishedStock(item)
             guard let missing = PantryFinishedMath.shortage(quantity: 0, minimum: item.minimumQuantity) else {
                 errorMessage = PantryCopy.noMinimum
                 return
@@ -190,9 +208,14 @@ struct PantryView: View {
             if missing > 0 {
                 addMarket(name: item.displayName, ingredientId: item.ingredientID, quantity: missing, unit: item.unit)
             }
-        case .deleteItem:
-            delete(item)
         }
+    }
+
+    private func commitFinishedStock(_ item: PantryItem) {
+        item.revision += 1
+        item.updatedAt = .now
+        try? modelContext.save()
+        syncUpdate(item)
     }
 
     private func addMarket(name: String, ingredientId: String, quantity: Double, unit: String) {
@@ -249,6 +272,7 @@ struct PantryView: View {
     }
 
     private func edit(_ item: PantryItem, name: String, quantity: Double, unit: String, location: PantryLocation, minimum: Double?, date: Date?, confirmSeparate: Bool) {
+        guard quantity.isFinite, quantity >= 0 else { return }
         if !PantryUnitPolicy.isKnown(unit) && !confirmSeparate {
             errorMessage = PantryCopy.unitMismatch
             return
@@ -461,90 +485,152 @@ struct PantryTransferSheet: View {
     }
 }
 
+/// Values shown in the pantry sheet. Built from the item up front so a reused sheet
+/// cannot open on an empty amount, and so opening the sheet never writes stock.
+struct PantryFormDraft: Equatable {
+    var name: String
+    var quantityText: String
+    var unit: String
+    var customUnit: String
+    var markIncompatible: Bool
+    var location: PantryLocation
+    var hasMinimum: Bool
+    var minimumText: String
+    var hasDate: Bool
+    var date: Date
+
+    static let empty = PantryFormDraft(
+        name: "",
+        quantityText: "",
+        unit: "piece",
+        customUnit: "",
+        markIncompatible: false,
+        location: .pantry,
+        hasMinimum: false,
+        minimumText: "",
+        hasDate: false,
+        date: Date(timeIntervalSince1970: 0)
+    )
+
+    static func loaded(from item: PantryItem?) -> PantryFormDraft {
+        guard let item else {
+            var draft = empty
+            draft.date = Date()
+            return draft
+        }
+        return loaded(
+            name: item.displayName,
+            quantity: item.quantity,
+            unit: item.unit,
+            location: item.location,
+            minimumQuantity: item.minimumQuantity,
+            bestBefore: item.bestBefore
+        )
+    }
+
+    static func loaded(
+        name: String,
+        quantity: Double,
+        unit: String,
+        location: PantryLocation,
+        minimumQuantity: Double?,
+        bestBefore: Date?,
+        pickerUnits: [String] = GroceryViewModel.manualUnits
+    ) -> PantryFormDraft {
+        var draft = empty
+        draft.date = Date()
+        draft.name = name
+        draft.quantityText = QuantityFormat.string(quantity)
+        draft.location = location
+        let canonical = UnitNormalization.parse(unit).code
+        if PantryUnitPolicy.isKnown(unit), pickerUnits.contains(canonical) {
+            draft.unit = canonical
+            draft.markIncompatible = false
+        } else {
+            draft.markIncompatible = true
+            draft.customUnit = unit
+        }
+        if let minimumQuantity {
+            draft.hasMinimum = true
+            draft.minimumText = QuantityFormat.string(minimumQuantity)
+        }
+        if let bestBefore {
+            draft.hasDate = true
+            draft.date = bestBefore
+        }
+        return draft
+    }
+
+    var resolvedUnit: String { markIncompatible ? customUnit : unit }
+
+    /// Nil when the field is empty or not a finite, non-negative number. Never substitutes 0.
+    var quantityToSave: Double? { Self.parseQuantity(quantityText) }
+
+    var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && quantityToSave != nil
+            && !resolvedUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    static func parseQuantity(_ text: String) -> Double? {
+        GroceryQuantityEdit.parse(text)
+    }
+}
+
 private struct PantryForm: View {
     @Environment(\.dismiss) private var dismiss
     var item: PantryItem?
-    @State private var name = ""
-    @State private var quantity = ""
-    @State private var unit = "piece"
-    @State private var customUnit = ""
-    @State private var markIncompatible = false
-    @State private var location: PantryLocation = .pantry
-    @State private var hasMinimum = false
-    @State private var minimum = ""
-    @State private var hasDate = false
-    @State private var date = Date()
+    @State private var draft: PantryFormDraft
     var onSave: (String, Double, String, PantryLocation, Double?, Date?, Bool) -> Void
 
-    private var resolvedUnit: String { markIncompatible ? customUnit : unit }
+    init(item: PantryItem?, onSave: @escaping (String, Double, String, PantryLocation, Double?, Date?, Bool) -> Void) {
+        self.item = item
+        self.onSave = onSave
+        _draft = State(initialValue: PantryFormDraft.loaded(from: item))
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Malzeme", text: $name)
-                TextField("Miktar", text: $quantity).keyboardType(.decimalPad)
-                if markIncompatible {
-                    TextField("Uyumsuz birim", text: $customUnit)
+                TextField("Malzeme", text: $draft.name)
+                TextField("Miktar", text: $draft.quantityText).keyboardType(.decimalPad)
+                if draft.markIncompatible {
+                    TextField("Uyumsuz birim", text: $draft.customUnit)
                 } else {
-                    Picker("Birim", selection: $unit) {
+                    Picker("Birim", selection: $draft.unit) {
                         ForEach(GroceryViewModel.manualUnits, id: \.self) { code in
                             Text(UnitLabels.turkish(code)).tag(code)
                         }
                     }
                 }
-                Toggle("Uyumsuz birim", isOn: $markIncompatible)
-                Picker("Konum", selection: $location) { ForEach(PantryLocation.allCases) { Text($0.title).tag($0) } }
-                Toggle("Minimum miktar", isOn: $hasMinimum)
-                if hasMinimum { TextField("Minimum", text: $minimum).keyboardType(.decimalPad) }
-                Toggle("Son kullanma tarihi", isOn: $hasDate)
-                if hasDate { DatePicker("Tarih", selection: $date, displayedComponents: .date) }
+                Toggle("Uyumsuz birim", isOn: $draft.markIncompatible)
+                Picker("Konum", selection: $draft.location) { ForEach(PantryLocation.allCases) { Text($0.title).tag($0) } }
+                Toggle("Minimum miktar", isOn: $draft.hasMinimum)
+                if draft.hasMinimum { TextField("Minimum", text: $draft.minimumText).keyboardType(.decimalPad) }
+                Toggle("Son kullanma tarihi", isOn: $draft.hasDate)
+                if draft.hasDate { DatePicker("Tarih", selection: $draft.date, displayedComponents: .date) }
             }
             .navigationTitle(item == nil ? "Pantry malzemesi" : "Malzemeyi düzenle")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("İptal") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(item == nil ? "Ekle" : "Kaydet") { save() }
-                        .disabled(!canSave)
+                        .disabled(!draft.canSave)
                 }
             }
-            .onAppear(perform: load)
+            .task(id: item?.persistentModelID) { reload() }
+            .onChange(of: item?.persistentModelID) { _, _ in reload() }
         }
     }
 
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && parsed(quantity) != nil && !resolvedUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func load() {
-        guard let item else { return }
-        name = item.displayName
-        quantity = QuantityFormat.string(item.quantity)
-        if PantryUnitPolicy.isKnown(item.unit), GroceryViewModel.manualUnits.contains(UnitNormalization.parse(item.unit).code) {
-            unit = UnitNormalization.parse(item.unit).code
-            markIncompatible = false
-        } else {
-            markIncompatible = true
-            customUnit = item.unit
-        }
-        location = item.location
-        if let minimumQuantity = item.minimumQuantity {
-            hasMinimum = true
-            minimum = QuantityFormat.string(minimumQuantity)
-        }
-        if let bestBefore = item.bestBefore {
-            hasDate = true
-            date = bestBefore
-        }
+    private func reload() {
+        draft = PantryFormDraft.loaded(from: item)
     }
 
     private func save() {
-        guard let value = parsed(quantity) else { return }
-        let minValue = hasMinimum ? parsed(minimum) : nil
-        onSave(name, value, resolvedUnit, location, minValue, hasDate ? date : nil, markIncompatible)
+        guard let value = draft.quantityToSave else { return }
+        let minValue = draft.hasMinimum ? PantryFormDraft.parseQuantity(draft.minimumText) : nil
+        onSave(draft.name, value, draft.resolvedUnit, draft.location, minValue, draft.hasDate ? draft.date : nil, draft.markIncompatible)
         dismiss()
-    }
-
-    private func parsed(_ text: String) -> Double? {
-        Double(text.replacingOccurrences(of: ",", with: "."))
     }
 }
