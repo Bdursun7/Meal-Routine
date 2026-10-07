@@ -22,5 +22,11 @@ OUT="${TMPDIR:-/tmp}/meal-product-gap-checks"
   "$ROOT/MealRoutine/Services/PreferenceInsight.swift" \
   "$ROOT/MealRoutine/Services/Analytics.swift" \
   "$ROOT/MealRoutine/Support/Formatters.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
+  "$ROOT/MealRoutine/Services/PantryDomain.swift" \
+  "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
+  "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
+  "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
+  "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \
   "$ROOT/Tools/product_gap_checks.swift"
 (cd "$ROOT" && "$OUT")
