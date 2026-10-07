@@ -733,7 +733,7 @@ function isPantryRoute(url: string): boolean {
 }
 
 function registerPantryRoutes(app: FastifyInstance, options: BuildAppOptions, pantry: PantryService, limiter: RateLimiter, clock: () => Date): void {
-  const itemParams = householdParams.extend({ itemId: z.string().uuid() })
+  const itemParams = householdParams.extend({ itemId: z.string().uuid().transform((value) => value.toLowerCase()) })
   const idempotencyKey = (request: FastifyRequest) => headerValue(request.headers['idempotency-key'])
   const baseVersion = (request: FastifyRequest) => {
     const query = parse(pantryVersionQuery, request.query)
