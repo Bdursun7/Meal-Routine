@@ -317,7 +317,8 @@ struct PantryReconcileResultLine: Decodable, Sendable {
 }
 
 /// `GET /v1/ingredients` row. `scope` is `dictionary` for the seed and `household` for user-created rows.
-struct IngredientDTO: Decodable, Sendable {
+/// Named apart from the catalog `IngredientDTO` in `RecipeCatalogDTO.swift`.
+struct DictionaryIngredientDTO: Decodable, Sendable {
     var id: String
     var displayName: String
     var synonyms: [String]
@@ -327,7 +328,7 @@ struct IngredientDTO: Decodable, Sendable {
     var entry: IngredientEntry { IngredientEntry(id: id, name: displayName, synonyms: synonyms, sourceIds: sourceIds) }
 }
 
-private struct IngredientListDTO: Decodable { var version: Int; var ingredients: [IngredientDTO] }
+private struct IngredientListDTO: Decodable { var version: Int; var ingredients: [DictionaryIngredientDTO] }
 private struct IngredientRegisterBody: Encodable { var id: String; var displayName: String }
 
 struct PantryRepository {
@@ -340,7 +341,7 @@ struct PantryRepository {
     }
 
     /// Dictionary plus this household's own ingredients. The server copy is authoritative.
-    func ingredients(householdId: UUID?, query: String = "", limit: Int = 1000) async throws -> [IngredientDTO] {
+    func ingredients(householdId: UUID?, query: String = "", limit: Int = 1000) async throws -> [DictionaryIngredientDTO] {
         var items = [URLQueryItem(name: "limit", value: String(limit))]
         if let householdId { items.append(URLQueryItem(name: "householdId", value: householdId.uuidString.lowercased())) }
         if !query.isEmpty { items.append(URLQueryItem(name: "q", value: query)) }
@@ -353,11 +354,11 @@ struct PantryRepository {
     }
 
     /// Registers a `custom:<uuid>` ingredient. Repeating the call with the same id is a no-op on the server.
-    func registerIngredient(householdId: UUID, id: String, displayName: String, idempotencyKey: String) async throws -> IngredientDTO {
+    func registerIngredient(householdId: UUID, id: String, displayName: String, idempotencyKey: String) async throws -> DictionaryIngredientDTO {
         let body = try JSONEncoder.mealRoutine.encode(IngredientRegisterBody(id: id, displayName: displayName))
         let (data, response) = try await client.request(method: "POST", path: "\(base(householdId))/ingredients", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
         try throwPantry(response, data: data)
-        return try JSONDecoder.mealRoutine.decode(IngredientDTO.self, from: data)
+        return try JSONDecoder.mealRoutine.decode(DictionaryIngredientDTO.self, from: data)
     }
 
     func create(householdId: UUID, item: PantryRemoteItem, idempotencyKey: String, confirmSeparate: Bool = false) async throws -> PantryRemoteItem {
