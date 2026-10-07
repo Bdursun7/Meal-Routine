@@ -11,7 +11,7 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | `cd server && npm run typecheck` | geçti |
 | `cd server && npm test` | 61 geçti, 4 atlandı (Postgres yok) |
 | `cd server && DATABASE_URL=postgres://… npm test` | 65 / 65 geçti, Postgres 16 |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 28 / 28, XCTest, Swift 6.0.3 Linux |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 29 / 29, XCTest, Swift 6.0.3 Linux |
 | `Tools/run_recommender_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_product_gap_checks.sh`, `run_grocery_checks.sh`, `run_recipe_photo_checks.sh` | geçti |
 | `Tools/run_portion_checks.sh` | geçti. 125 g + 1 kg `1,125 kg` kalır; market yuvarlaması pantry ile aynı binde birlik snap |
 
