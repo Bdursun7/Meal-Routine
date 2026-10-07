@@ -11,9 +11,9 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | `cd server && npm run typecheck` | geçti |
 | `cd server && npm test` | 61 geçti, 4 atlandı (Postgres yok) |
 | `cd server && DATABASE_URL=postgres://… npm test` | 65 / 65 geçti, Postgres 16 |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 27 / 27, XCTest, Swift 6.0.3 Linux |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 28 / 28, XCTest, Swift 6.0.3 Linux |
 | `Tools/run_recommender_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_product_gap_checks.sh`, `run_grocery_checks.sh`, `run_recipe_photo_checks.sh` | geçti |
-| `Tools/run_portion_checks.sh` | bir V4 kontrolü kalıyor: `GroceryMerger` 1,125 kg’yi 1,13 gösteriyor. Pantry ile ilgisi yok; V5 öncesinde betik derlenmediği için görünmüyordu |
+| `Tools/run_portion_checks.sh` | geçti. 125 g + 1 kg `1,125 kg` kalır; market yuvarlaması pantry ile aynı binde birlik snap |
 
 Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRules`, `GroceryView`, `GroceryViewModel`, `HouseholdSession`, `APIClient`) ve `MealRoutineTests/PantryTests.swift` Linux’ta derlenemez. Bunlar Mac’te Xcode ile derlenip koşulur.
 
@@ -37,7 +37,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Reddedilen istek | pass | 400/422 sonsuz retry olmaz, `failed` olur; kullanıcı yeniden dener veya atar |
 | Migration | pass | `0012` V4.1 verisi olan Postgres’te household, board ve hesap satırlarını silmeden uygulanır (`pantry.integration.test.ts`). `DROP TABLE` yok |
 | Account deletion | pass | Tek üyeli ev silinince pantry gider; partner kalırsa kalır. Silinen hesabın idempotency satırı silinir; telefon kişisel pantry’yi ve ev kopyasını temizler. Evden çıkınca o evin cache’i telefonda kalmaz |
-| V1–V4.1 regresyon | pass (Linux) / Mac | Sunucu paketi yeşil. Linux check betikleri yeşil (yukarıdaki portion notu hariç). Boş pantry V4.1 planını ve açıklamasını değiştirmez. Tam XCTest paketi Mac’te |
+| V1–V4.1 regresyon | pass (Linux) / Mac | Sunucu paketi yeşil. Linux check betikleri yeşil. Boş pantry V4.1 planını ve açıklamasını değiştirmez. Tam XCTest paketi Mac’te |
 | Türkçe metinler | pass | Yükleniyor, boş, hata + yeniden dene, çevrimdışı, conflict, failed metinleri `PantryCopy` içinde; boş metin yönergedeki cümle |
 | VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Erişilebilirlik boyutlarında kontroller alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
 | iOS XCTest | Mac | `PantryDomainTests` Linux’ta geçti. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook) Xcode’da koşulur |

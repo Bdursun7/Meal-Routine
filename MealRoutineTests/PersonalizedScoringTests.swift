@@ -317,6 +317,18 @@ final class PersonalizedScoringTests: XCTestCase {
         XCTAssertEqual(pieces.first?.quantity, 0.3)
         XCTAssertEqual(pieces.first?.hasUnitConflict, false)
 
+        let chicken = GroceryMerger.merge([
+            GrocerySourceLine(ingredientId: "chicken", nameTR: "Tavuk", nameEN: "Chicken", quantity: 125, unit: "g"),
+            GrocerySourceLine(ingredientId: "chicken", nameTR: "Tavuk", nameEN: "Chicken", quantity: 1, unit: "kg"),
+        ])
+        XCTAssertEqual(chicken.count, 1)
+        XCTAssertEqual(chicken.first?.unit, "kg")
+        XCTAssertEqual(chicken.first?.quantity, 1.125)
+        let shown = QuantityFormat.quantityAndUnit(quantity: chicken.first?.quantity, unit: "kg")
+        XCTAssertTrue(shown == "1,125 kg" || shown == "1.125 kg", shown)
+        XCTAssertEqual(GroceryQuantityEdit.parse(QuantityFormat.string(1.125)), 1.125)
+        XCTAssertEqual(GroceryMerger.roundedQuantity(1.125), PantryUnitPolicy.snap(1.125))
+
         XCTAssertEqual(GrocerySyncQuantity.whole(nil), 1)
         XCTAssertEqual(GrocerySyncQuantity.whole(0), 1)
         XCTAssertEqual(GrocerySyncQuantity.whole(-2), 1)
