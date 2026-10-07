@@ -65,8 +65,9 @@ enum PantryTransferChoice: String, Equatable, Sendable {
 enum PantryTransferPolicy {
     static let resolvedKey = "mealroutine.pantryTransfer.resolved"
 
-    static func shouldOffer(personalCount: Int, householdId: UUID?, resolvedHouseholdId: String?) -> Bool {
-        guard personalCount > 0, let householdId else { return false }
+    /// Test mode never offers: its household is fake and a reset wipes it, so moved rows would vanish.
+    static func shouldOffer(personalCount: Int, householdId: UUID?, resolvedHouseholdId: String?, testMode: Bool = false) -> Bool {
+        guard !testMode, personalCount > 0, let householdId else { return false }
         return resolvedHouseholdId != householdId.uuidString
     }
 }
