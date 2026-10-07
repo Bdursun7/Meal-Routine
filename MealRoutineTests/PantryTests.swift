@@ -43,6 +43,59 @@ final class PantryTests: XCTestCase {
         XCTAssertNil(PantryFinishedMath.shortage(quantity: 0, minimum: nil))
     }
 
+    func testQuantityFormatKeepsARealAmount() {
+        XCTAssertEqual(QuantityFormat.string(500), "500")
+        XCTAssertEqual(QuantityFormat.string(0), "0")
+        XCTAssertEqual(QuantityFormat.string(nil), "")
+        XCTAssertEqual(QuantityFormat.string(1_500), "1500")
+        let fraction = QuantityFormat.string(1.25)
+        XCTAssertTrue(fraction == "1,25" || fraction == "1.25", fraction)
+        XCTAssertEqual(GroceryQuantityEdit.parse(fraction), 1.25)
+        let small = QuantityFormat.string(0.004)
+        XCTAssertFalse(small.isEmpty)
+        XCTAssertNotEqual(small, "0")
+        XCTAssertNotEqual(GroceryQuantityEdit.parse(small), 0)
+    }
+
+    func testPantryFormLoadsStoredQuantityAndDoesNotTreatBlankAsZero() {
+        let draft = PantryFormDraft.loaded(
+            name: "Un",
+            quantity: 500,
+            unit: "g",
+            location: .pantry,
+            minimumQuantity: 100,
+            bestBefore: nil
+        )
+        XCTAssertEqual(draft.quantityText, "500")
+        XCTAssertEqual(draft.quantityToSave, 500)
+        XCTAssertEqual(draft.minimumText, "100")
+        XCTAssertTrue(draft.canSave)
+        XCTAssertFalse(draft.markIncompatible)
+        XCTAssertEqual(draft.unit, "g")
+
+        var cleared = draft
+        cleared.quantityText = ""
+        XCTAssertNil(cleared.quantityToSave)
+        XCTAssertFalse(cleared.canSave)
+        cleared.quantityText = "   "
+        XCTAssertNil(cleared.quantityToSave)
+        cleared.quantityText = "abc"
+        XCTAssertNil(cleared.quantityToSave)
+        cleared.quantityText = "0"
+        XCTAssertEqual(cleared.quantityToSave, 0)
+        XCTAssertTrue(cleared.canSave)
+    }
+
+    func testFinishedChoiceKeepsStockUntilTheUserPicks() {
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: nil), 500)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .addToMarket), 0)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .missingAgainstMinimum), 0)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .deleteItem), 0)
+        XCTAssertFalse(PantryCopy.finishedMessage.contains("sıfırlandı"))
+        XCTAssertTrue(PantryCopy.finishedMessage.contains("İptal"))
+        XCTAssertTrue(PantryCopy.finishedMessage.contains("Düzenle"))
+    }
+
     func testUnknownUnitsNeedAnExplicitSeparateChoice() {
         XCTAssertEqual(
             PantryUnitPolicy.decision(existingUnit: nil, existingQuantity: 0, incomingUnit: "kova", incomingQuantity: 1, confirmSeparate: false),

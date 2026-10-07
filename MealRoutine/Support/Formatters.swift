@@ -22,14 +22,42 @@ enum UnitLabels {
 
 enum QuantityFormat {
     static func string(_ value: Double?) -> String {
-        guard let value else { return "" }
+        guard let value, value.isFinite else { return "" }
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "tr_TR")
         formatter.numberStyle = .decimal
+        // Grouping (1.500) does not round-trip through Double and would save as 1.5.
+        formatter.usesGroupingSeparator = false
         // Two places so a summed 1.25 kg is not rounded to the nearest tenth.
         formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: value)) ?? String(value)
+        if let rendered = formatter.string(from: NSNumber(value: value)),
+           !rendered.isEmpty,
+           let roundTrip = parsed(rendered),
+           abs(roundTrip - value) < 0.006,
+           value == 0 || roundTrip != 0 {
+            return rendered
+        }
+        return plain(value)
+    }
+
+    private static func parsed(_ rendered: String) -> Double? {
+        let normalized = rendered
+            .replacingOccurrences(of: ",", with: ".")
+            .replacingOccurrences(of: "\u{00A0}", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        return Double(normalized)
+    }
+
+    private static func plain(_ value: Double) -> String {
+        let raw = String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), value)
+        var text = raw
+        while text.contains(".") && text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        if parsed(text) == 0, value != 0 {
+            return String(value).replacingOccurrences(of: ".", with: ",")
+        }
+        return text.replacingOccurrences(of: ".", with: ",")
     }
 
     static func quantityAndUnit(quantity: Double?, unit: String) -> String {

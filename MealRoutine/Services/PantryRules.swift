@@ -14,7 +14,7 @@ enum PantryCopy {
     static let unitMismatch = "Bu birimler birbirine çevrilemiyor. Otomatik düşülmedi."
     static let unitChoice = "Bu malzeme başka bir birimle kayıtlı. Satırlar birleştirilmedi."
     static let finishedTitle = "Bitti"
-    static let finishedMessage = "Miktar sıfırlandı. Ne yapmak istersin?"
+    static let finishedMessage = "Bitti, Düzenle ya da − değildir. Seçersen stok sıfırlanır. İptal edersen miktar aynı kalır."
     static let addToMarket = "Markete ekle"
     static let missingMinimum = "Eksik miktarı hesapla"
     static let deleteItem = "Öğeyi sil"
@@ -39,6 +39,13 @@ enum PantryFinishedChoice: String, Equatable, Sendable {
     case addToMarket
     case missingAgainstMinimum
     case deleteItem
+}
+
+enum PantryFinishedFlow {
+    /// Cancel (`nil`) keeps the current stock. Choosing an option is what zeroes it.
+    static func quantity(current: Double, choice: PantryFinishedChoice?) -> Double {
+        choice == nil ? current : 0
+    }
 }
 
 enum PantryFinishedMath {

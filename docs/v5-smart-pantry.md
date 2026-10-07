@@ -90,13 +90,13 @@ PantryItem
 
 ### “Bitti” davranışı
 
-“Bitti” bir pantry öğesini sessizce silmez. Miktar sıfıra çekilir ve kullanıcıya:
+“Bitti” bir pantry öğesini sessizce silmez ve diyalog açılır açılmaz miktarı sıfırlamaz. Önce kullanıcıya:
 
 1. markete ekle,
 2. minimum miktara göre eksik hesapla,
 3. öğeyi sil
 
-seçenekleri gösterilir.
+seçenekleri gösterilir. Bir seçenek seçilirse miktar sıfıra çekilir, değişiklik eşitlenir, sonra seçilen işlem yapılır. Diyalog iptal edilirse miktar aynı kalır. “Bitti”, “Düzenle” ve eksi düğmesi değildir.
 
 ## 5. Birim ve miktar kuralları
 
@@ -160,7 +160,7 @@ Desteklenen işlemler:
 - **Eksik miktarı hesapla:** Tarif ihtiyacından pantry miktarını düşer.
 - **Pantry'den düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır.
 - **Pantry'ye ekle:** Satın alınan miktarı pantry'ye ekler.
-- **Bitti olarak işaretle:** Pantry miktarını sıfırlar ve markete ekleme önerir.
+- **Bitti olarak işaretle:** Kullanıcı bir seçenek seçince pantry miktarını sıfırlar ve markete ekleme önerir. İptal stoku değiştirmez.
 
 Kurallar:
 
