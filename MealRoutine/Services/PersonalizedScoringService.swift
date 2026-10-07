@@ -140,7 +140,7 @@ enum PersonalizedScoringService {
                 wasLoved: (memory?.lovedCount ?? 0) > 0
             )
         }
-        let explanation: String
+        var explanation: String
         if chosen.chosen.isEmpty {
             explanation = PlanExplanationBuilder.emptyPool
         } else if chosen.chosen.count < limit {
