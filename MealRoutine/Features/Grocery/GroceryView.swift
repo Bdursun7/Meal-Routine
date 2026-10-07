@@ -69,7 +69,7 @@ struct GroceryView: View {
                 Button("Vazgeç", role: .cancel) { viewModel.pantryPrompt = nil }
             } message: { prompt in
                 if case .confirmSeparate(let existing) = prompt.kind {
-                    Text("Pantry'de \(existing) var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
+                    Text(PantryCopy.separateUnitMessage(existing: existing))
                 }
             }
         }

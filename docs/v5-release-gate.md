@@ -26,11 +26,11 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Başka household erişimi | pass | Başka evin `itemId`’si 404; liste ve export yalnız kendi evini döner |
 | Uyumlu birimler | pass | 400 g + 1 kg → 1400 g tek satır; g ↔ kg düzenlemesi stoku korur (`testSwitchingGramsToKilogramsKeepsTheSameStock`) |
 | Uyumsuz birimler | pass | Adet gram satırına karışmaz; `confirmSeparate` ile ayrı satır. Bilinmeyen birim `confirmSeparate` ile de reddedilir |
-| Yalnız ingredient kimliği | pass | Sunucu ve istemci `ingredientId` ile eşler. “Domates” / “Cherry domates” ayrı kalır. Sözlük `0012` ile seed edilir; yeni malzeme yalnız “Yeni malzeme olarak ekle” onayıyla `custom:<uuid>` olur |
+| Yalnız ingredient kimliği | pass | Sunucu ve istemci `ingredientId` ile eşler. “Domates” / “Cherry domates” ayrı kalır. Sözlük `0012` ile seed edilir. Serbest ad, tekil birebir ad/eş anlamlıysa ona bağlanır; değilse `custom:<uuid>` olur (`testFreeTextLinksOneExactNameAndOtherwiseCreatesACustomIngredient`) |
 | `bestBefore` / `useBy` | pass | Tarih yalnız kullanıcı girerse vardır. Geçmiş `useBy` “Güvenlik uyarısı”, geçmiş `bestBefore` “Tazelik uyarısı” rozetini gösterir; planner geçmiş `useBy` stoğa bonus vermez |
 | Eksik miktar | pass | 1000 g ihtiyaç, 400 g stok → 600 g. Replay aynı gövdeyi döner, stok değişmez. İstemcide iki kez hesaplamak tekrar düşmez (`PantryTests`) |
 | İşaretli market satırı | pass | `checked` satır hesapta aynen kalır (sunucu ve `testIncompatibleUnitsAndCheckedRowsStayAsWritten`) |
-| Sessiz düşüm yok | pass | Plan kurmak ve “Pişirdim” pantry’yi değiştirmez (`testPlanningAndCookingNeverChangePantry…`). Market → pantry yalnız “Pantry’den düş” / “Pantry’ye ekle” ile |
+| Sessiz düşüm yok | pass | Plan kurmak ve “Pişirdim” pantry’yi değiştirmez (`testPlanningAndCookingNeverChangePantry…`). Market → evdekiler yalnız “Evdekilerden düş” / “Evdekilere ekle” ile |
 | “Bitti” | pass | Seçim yapılmadan stok değişmez; İptal miktarı korur |
 | Offline queue | pass | Her household yazımı önce cache’e, sonra sabit `Idempotency-Key` ve `baseVersion` ile kuyruğa girer. Çevrimdışıyken gönderilmez, dönüşte bir kez gönderilir; sunucu replay’i ikinci kez uygulamaz |
 | Conflict | pass | Eski `baseVersion` 409 ve `current` döner. Kuyruk `requiresResolution`, satır sunucu halini gösterir, “Bu malzeme başka bir cihazda güncellendi.” görünür. “Sunucudaki hali kullan” veya “Değişikliğimi yeniden uygula”; ikisinde de sessiz kayıp yok |
@@ -39,7 +39,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Account deletion | pass | Tek üyeli ev silinince pantry gider; partner kalırsa kalır. Silinen hesabın idempotency satırı silinir; telefon kişisel pantry’yi ve ev kopyasını temizler. Evden çıkınca o evin cache’i telefonda kalmaz |
 | V1–V4.1 regresyon | pass (Linux) / Mac | Sunucu paketi yeşil. Linux check betikleri yeşil. Boş pantry V4.1 planını ve açıklamasını değiştirmez. Tam XCTest paketi Mac’te |
 | Türkçe metinler | pass | Yükleniyor, boş, hata + yeniden dene, çevrimdışı, conflict, failed metinleri `PantryCopy` içinde; boş metin yönergedeki cümle |
-| VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Erişilebilirlik boyutlarında kontroller alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
+| VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Varsayılan yazı boyutunda satır içeriğe göre sıkıdır; kontroller yalnız erişilebilirlik boyutlarında alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
 | iOS XCTest | Mac | `PantryDomainTests` Linux’ta geçti. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook) Xcode’da koşulur |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |
 

@@ -69,7 +69,7 @@ POST   /v1/households/:id/pantry/reconcile-grocery
 Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövdeyle ilk cevabı döner, farklı gövdeyle 409 verir.
 
 - `GET /v1/ingredients`: seed sözlük ve `householdId` verilirse o evin malzemeleri. `scope` `dictionary` veya `household`.
-- `POST …/ingredients`: `{ id: "custom:<uuid>", displayName }`. Yalnız “Yeni malzeme olarak ekle” onayından sonra çağrılır; aynı id ikinci kez gelirse mevcut satır döner.
+- `POST …/ingredients`: `{ id: "custom:<uuid>", displayName }`. İstemci, yazılan ad tek bir sözlük veya ev malzemesiyle birebir örtüşmezse bu kimliği üretir ve ortak evde kaydeder. Aynı id ikinci kez gelirse mevcut satır döner. Kişisel evdekilerde özel malzeme yalnız telefonda durur.
 - Pantry gövdesi: `ingredientId`, `displayName`, `quantity`, `unit`, `location`, `minimumQuantity`, `dateType`, `dateValue` (`YYYY-MM-DD`). Şema strict; eski `bestBefore` alanı reddedilir.
 - Uyumlu birim aynı `ingredientId` satırına eklenir (g/kg, ml/L). Uyumsuz birim 409 `pantry_unit_choice`; `confirmSeparate: true` ayrı satır açar. Bilinmeyen birim 400.
 - Eski `baseVersion` 409 `conflict` ve gövdede `current` (sunucudaki satır) döner.
@@ -78,11 +78,11 @@ Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövde
 
 ## Uygulama
 
-`MARKETING_VERSION` `5.0.0`. Pantry, Profil’den açılır.
+`MARKETING_VERSION` `5.0.0`. Evdekiler, Profil’den açılır.
 
-- Malzeme sözlükten seçilir; yoksa “Yeni malzeme olarak ekle” onayı istenir.
+- Malzeme adı serbest yazılır. Öneriler sözlük adı, eş anlamlı ve evin özel malzemeleridir. Öneriye basılmazsa tekil birebir eşleşme bağlanır; yoksa `custom:<uuid>` oluşur. İkinci onay yoktur. “Domates” ile “Cherry domates” birleşmez.
 - Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince güvenlik uyarısı, “Tavsiye edilen tüketim tarihi (TETT)” geçince tazelik uyarısı görünür.
-- Market’te “Eksik miktarı hesapla”, satırda “Pantry’den düş” ve “Pantry’ye ekle” vardır. Plan kurmak ve “Pişirdim” stoğu değiştirmez.
+- Market’te “Eksik miktarı hesapla”, satırda “Evdekilerden düş” ve “Evdekilere ekle” vardır. Plan kurmak ve “Pişirdim” stoğu değiştirmez.
 - “Bitti” seçenek ister; seçilmeden ya da İptal ile stok değişmez.
 - Household yazımları önce telefona yazılır, sonra kuyruktan gönderilir. Çevrimdışıyken satırda “Eşitlenmeyi bekliyor” görünür. Çakışmada “Bu malzeme başka bir cihazda güncellendi.” ve iki seçenek çıkar.
 - Kişisel pantry, ev kurulunca kendiliğinden karışmaz. Aktar, kopyala veya ayrı tut onayı istenir; satırlar yalnız aynı sözlük kimliğinde birleşir.

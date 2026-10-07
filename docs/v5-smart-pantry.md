@@ -167,6 +167,18 @@ Household verisi yüklenemediğinde boş liste gösterilmez; hata ve yeniden den
 
 Miktar, birim, konum, minimum miktar ve tarih türü/tarihi tek düzenleme akışında değiştirilebilir. Kaydetme başarısız olursa yerel değer sessizce kesinleşmiş gibi gösterilmez.
 
+### Malzeme adı
+
+Kullanıcı adı serbest yazar. Yazarken sözlükteki adlar, eş anlamlılar ve bu evin (ya da kişisel listenin) özel malzemeleri öneri olarak görünür. Öneriye basmak o `ingredientId` ile bağlar.
+
+Öneri seçilmezse kayıt şöyle çözülür:
+
+- Yazılan ad, büyük/küçük harf ve diakritik farkı yok sayılarak **tek** bir maddenin adı veya eş anlamlısıyla birebir örtüşüyorsa o `ingredientId` bağlanır.
+- Örtüşme yoksa ya da birden fazla madde aynı ada sahipse yeni `custom:<uuid>` oluşturulur. Ortak evde bu kimlik mevcut `POST /v1/households/:id/ingredients` ile kaydedilir; kişisel evdekilerde yalnız cihazda durur.
+- “Domates” ile “Cherry domates” gibi benzer adlar asla kendiliğinden birleşmez. Eşleşme LLM ile yapılmaz. Yazılan metin `ingredientId` olmaz.
+
+Market satırında kimlik yoksa aynı kural geçerlidir: alan yazılır, öneriye basılabilir, Kaydet ikinci bir onay istemez.
+
 ## 7. Market listesi entegrasyonu
 
 Pantry miktarı ortak market satırını otomatik olarak silmez. Market kullanıcının açıkça onayladığı bir satın alma listesidir.
@@ -174,8 +186,8 @@ Pantry miktarı ortak market satırını otomatik olarak silmez. Market kullanı
 Desteklenen işlemler:
 
 - **Eksik miktarı hesapla:** Tarif ihtiyacından pantry miktarını düşer.
-- **Pantry'den düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır.
-- **Pantry'ye ekle:** Satın alınan miktarı pantry'ye ekler.
+- **Evdekilerden düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır.
+- **Evdekilere ekle:** Satın alınan miktarı pantry’ye ekler.
 - **Bitti olarak işaretle:** Pantry miktarını sıfırlar ve markete ekleme önerir.
 
 Kurallar:
@@ -226,7 +238,7 @@ Postgres server database
 - Server conflict response ve version bilgisini döner.
 - Idempotency anahtarı aynı mutation'ın iki kez uygulanmasını engeller.
 - `Ingredient` sözlüğü server tarafında authoritative kaynaktır.
-- Client, yalnızca serbest metin göndererek yeni ingredient kimliği üretemez; bilinmeyen malzeme için kontrollü oluşturma/öneri akışı gerekir.
+- Client, yazılan metni `ingredientId` yapmaz. Öneri seçilmezse birebir ve tekil bir ad veya eş anlamlı o kimliğe bağlanır; aksi halde istemci `custom:<uuid>` üretir ve ortak evde bunu `POST /v1/households/:id/ingredients` ile kaydeder. Benzer adlar birleşmez ve LLM eşlemesi yoktur.
 - V5'te ingredient sözlüğünün yönetimi admin paneli gerektirmez; başlangıç sözlüğü migration/seed ile gelir ve uygulama içinden kullanıcıya görünmez.
 
 ### SwiftData
@@ -391,8 +403,8 @@ V5'in uygulanması sırasında aşağıdaki kararlar yeniden açılmaz:
 ### Faz 5 — Market entegrasyonu
 
 - Eksik miktar hesabı
-- Pantry'den düşme
-- Pantry'ye ekleme
+- Evdekilerden düşme
+- Evdekilere ekleme
 - İşaretli satır koruması
 - Idempotent replay
 

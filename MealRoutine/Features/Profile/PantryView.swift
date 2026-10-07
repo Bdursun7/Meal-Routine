@@ -19,7 +19,6 @@ struct PantryFormResult: Equatable, Identifiable {
 
 struct PantryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var items: [PantryItem]
     @Query private var operations: [PendingOperation]
     @State private var showingAdd = false
@@ -79,7 +78,7 @@ struct PantryView: View {
             statusSections
             content
         }
-        .navigationTitle("Pantry")
+        .navigationTitle(PantryCopy.screenTitle)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Malzeme ara")
         .toolbar {
@@ -88,7 +87,7 @@ struct PantryView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAdd = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel("Pantry malzemesi ekle")
+                    .accessibilityLabel(PantryCopy.addAccessibility)
                     .accessibilityIdentifier("pantry.add")
             }
         }
@@ -133,7 +132,7 @@ struct PantryView: View {
         } message: { result in
             Text("\(result.name) başka bir birimle kayıtlı. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
         }
-        .alert("Pantry güncellenemedi", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert(PantryCopy.saveFailedTitle, isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("Tamam", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
         .task(id: householdID) {
@@ -147,7 +146,7 @@ struct PantryView: View {
     private var statusSections: some View {
         if householdID == nil {
             Section {
-                Label("Kişisel pantry yalnız bu telefonda durur. Ev halkı kurarsan aktarıp aktarmayacağını sen seçersin.", systemImage: "iphone")
+                Label(PantryCopy.personalBanner, systemImage: "iphone")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -251,81 +250,18 @@ struct PantryView: View {
         )
     }
 
-    @ViewBuilder
     private func row(_ item: PantryItem) -> some View {
-        let shown = presentation(item)
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(shown.title).font(.headline)
-                Text("\(shown.amount) · \(shown.location)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let minimum = shown.minimum {
-                    Text(minimum).font(.footnote).foregroundStyle(.secondary)
-                }
-                if let date = shown.date {
-                    Text(date).font(.footnote).foregroundStyle(.secondary)
-                }
-                if !shown.badges.isEmpty {
-                    FlowLayout(spacing: 6) {
-                        ForEach(shown.badges, id: \.self) { badge in
-                            Label(badge.text, systemImage: badge.symbol)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(color(badge.tone))
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(shown.accessibilityLabel)
-            controls(item)
+        PantryRow(shown: presentation(item)) {
+            change(item, by: -1)
+        } onIncrement: {
+            change(item, by: 1)
+        } onEdit: {
+            editing = item
+        } onFinish: {
+            finished = item
         }
-        .padding(.vertical, 5)
         .swipeActions {
             Button(role: .destructive) { delete(item) } label: { Label("Sil", systemImage: "trash") }
-        }
-    }
-
-    @ViewBuilder
-    private func controls(_ item: PantryItem) -> some View {
-        let stepper = HStack(spacing: 10) {
-            Button("−") { change(item, by: -1) }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("Miktarı bir azalt")
-            Button("+") { change(item, by: 1) }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("Miktarı bir artır")
-        }
-        let actions = Group {
-            Button("Düzenle") { editing = item }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.borderless)
-                .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
-            Button("Bitti") { finished = item }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.borderless)
-                .accessibilityHint("Seçenekleri gösterir. İptal miktarı değiştirmez.")
-        }
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 10) {
-                stepper
-                HStack(spacing: 16) { actions }
-            }
-        } else {
-            HStack(spacing: 10) {
-                stepper
-                Spacer()
-                actions
-            }
-        }
-    }
-
-    private func color(_ tone: PantryBadgeTone) -> Color {
-        switch tone {
-        case .critical: .red
-        case .warning: .orange
-        case .info: .secondary
         }
     }
 
@@ -513,6 +449,142 @@ struct PantryView: View {
     }
 }
 
+/// Compact at the default text size. Controls stack only for the five accessibility
+/// sizes, so an unknown future size stays on one line. List proposes a tall height;
+/// bordered buttons and a flexible frame were accepting it and stretching every row.
+private struct PantryRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    var shown: PantryRowPresentation
+    var onDecrement: () -> Void
+    var onIncrement: () -> Void
+    var onEdit: () -> Void
+    var onFinish: () -> Void
+
+    private var stacksControls: Bool {
+        switch dynamicTypeSize {
+        case .accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: stacksControls ? 10 : 4) {
+            details
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(shown.accessibilityLabel)
+            controls
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(shown.title)
+                .font(.headline)
+                .lineLimit(stacksControls ? nil : 1)
+            Text("\(shown.amount) · \(shown.location)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(stacksControls ? nil : 1)
+            if let minimum = shown.minimum {
+                Text(minimum)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let date = shown.date {
+                Text(date)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !shown.badges.isEmpty {
+                badges
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var badges: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(shown.badges, id: \.self) { badge in
+                badgeLabel(badge)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func badgeLabel(_ badge: PantryBadge) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: badge.symbol)
+            Text(badge.text)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(color(badge.tone))
+    }
+
+    @ViewBuilder
+    private var controls: some View {
+        if stacksControls {
+            VStack(alignment: .leading, spacing: 8) {
+                stepper
+                actions
+            }
+        } else {
+            HStack(alignment: .center, spacing: 8) {
+                stepper
+                actions
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    private var stepper: some View {
+        HStack(spacing: 8) {
+            stepButton("−", label: "Miktarı bir azalt", action: onDecrement)
+            stepButton("+", label: "Miktarı bir artır", action: onIncrement)
+        }
+    }
+
+    private func stepButton(_ title: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.body.weight(.semibold))
+                .frame(minWidth: 28, minHeight: 28)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.15), in: Capsule())
+        }
+        .buttonStyle(.borderless)
+        .fixedSize(horizontal: true, vertical: true)
+        .accessibilityLabel(label)
+    }
+
+    private var actions: some View {
+        HStack(spacing: 16) {
+            Button("Düzenle", action: onEdit)
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+                .fixedSize(horizontal: true, vertical: true)
+                .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
+            Button("Bitti", action: onFinish)
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+                .fixedSize(horizontal: true, vertical: true)
+                .accessibilityHint("Seçenekleri gösterir. İptal miktarı değiştirmez.")
+        }
+    }
+
+    private func color(_ tone: PantryBadgeTone) -> Color {
+        switch tone {
+        case .critical: .red
+        case .warning: .orange
+        case .info: .secondary
+        }
+    }
+}
+
 private struct PantryConflictSummary: Identifiable {
     var entityId: String
     var name: String
@@ -540,13 +612,13 @@ private struct PantryConflictSummary: Identifiable {
     }
 }
 
-/// Controlled ingredient choice: dictionary rows and this household's own ingredients.
-/// A new ingredient gets a random `custom:<uuid>` id only after the user confirms.
+/// Free-text ingredient entry for grocery rows that have no dictionary id.
+/// A tapped suggestion links that id. Kaydet without a tap uses the same
+/// exact-match-or-custom rule as the pantry form. No second confirmation.
 struct PantryIngredientPicker: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var items: [PantryItem]
     @State private var query: String
-    @State private var confirmingCustom = false
     var householdID: UUID?
     var onPick: (IngredientEntry, Bool) -> Void
 
@@ -560,59 +632,71 @@ struct PantryIngredientPicker: View {
 
     private var customs: [IngredientEntry] { PantryIngredientStore.customs(householdID: householdID, items: items) }
 
-    private var results: [IngredientEntry] { IngredientDictionary.shared.search(trimmed, including: customs, limit: 40) }
-
-    private var hasExactName: Bool {
-        let folded = IngredientDictionary.fold(trimmed)
-        return results.contains { entry in ([entry.name] + entry.synonyms).contains { IngredientDictionary.fold($0) == folded } }
+    private var suggestions: [IngredientEntry] {
+        PantryIngredientMatching.suggestions(matching: query, customs: customs)
     }
 
     var body: some View {
         List {
-            if !trimmed.isEmpty && !hasExactName {
-                Section {
-                    Button { confirmingCustom = true } label: {
-                        Label("“\(trimmed)” — \(PantryCopy.createCustom)", systemImage: "plus.circle")
-                    }
-                    .accessibilityIdentifier("pantry.ingredient.create")
-                } footer: {
-                    Text(PantryCopy.unmatchedHint)
-                }
-            }
             Section {
-                if results.isEmpty {
-                    Text("Sözlükte eşleşen malzeme yok.").foregroundStyle(.secondary)
-                }
-                ForEach(results) { entry in
-                    Button { pick(entry, isNew: false) } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.name).foregroundStyle(.primary)
-                            if IngredientDictionary.isCustom(entry.id) {
-                                Text("Ev halkının malzemesi").font(.caption).foregroundStyle(.secondary)
-                            } else if !entry.synonyms.isEmpty {
-                                Text(entry.synonyms.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
-                            }
+                TextField("Malzeme adı", text: $query)
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("pantry.ingredient.name")
+            } footer: {
+                Text(PantryCopy.ingredientFooter)
+            }
+            if !suggestions.isEmpty {
+                Section("Öneriler") {
+                    ForEach(suggestions) { entry in
+                        Button { pick(entry, isNew: false) } label: {
+                            PantryIngredientSuggestionLabel(entry: entry)
                         }
                     }
                 }
             }
         }
-        .navigationTitle(PantryCopy.pickIngredient)
+        .navigationTitle(PantryCopy.whichIngredient)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Malzeme ara")
-        .alert(PantryCopy.createCustom, isPresented: $confirmingCustom) {
-            Button(PantryCopy.createCustom) {
-                pick(IngredientEntry(id: IngredientDictionary.newCustomId(), name: trimmed), isNew: true)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Kaydet") { commitTyped() }
+                    .disabled(trimmed.isEmpty)
+                    .accessibilityIdentifier("pantry.ingredient.save")
             }
-            Button("Vazgeç", role: .cancel) {}
-        } message: {
-            Text("“\(trimmed)”. \(PantryCopy.createCustomMessage)")
+        }
+    }
+
+    private func commitTyped() {
+        guard let resolution = PantryIngredientMatching.resolve(typed: query, dictionary: .shared, customs: customs) else { return }
+        switch resolution {
+        case .linked(let entry):
+            pick(entry, isNew: false)
+        case .createCustom(let name):
+            pick(IngredientEntry(id: IngredientDictionary.newCustomId(), name: name), isNew: true)
         }
     }
 
     private func pick(_ entry: IngredientEntry, isNew: Bool) {
         onPick(entry, isNew)
         dismiss()
+    }
+}
+
+private struct PantryIngredientSuggestionLabel: View {
+    var entry: IngredientEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(entry.name).foregroundStyle(.primary)
+            if IngredientDictionary.isCustom(entry.id) {
+                Text("Eklenen malzeme").font(.caption).foregroundStyle(.secondary)
+            } else if !entry.synonyms.isEmpty {
+                Text(entry.synonyms.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
     }
 }
 
@@ -650,6 +734,7 @@ struct PantryTransferSheet: View {
 
 private struct PantryForm: View {
     @Environment(\.dismiss) private var dismiss
+    @Query private var items: [PantryItem]
     var item: PantryItem?
     var householdID: UUID?
     @State private var draft: PantryFormDraft
@@ -680,21 +765,32 @@ private struct PantryForm: View {
         )
     }
 
+    private var customs: [IngredientEntry] {
+        PantryIngredientStore.customs(householdID: householdID, items: items)
+    }
+
+    private var suggestions: [IngredientEntry] {
+        PantryIngredientMatching.suggestions(matching: draft.name, customs: customs)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Malzeme") {
-                    NavigationLink {
-                        PantryIngredientPicker(query: draft.name, householdID: householdID) { entry, isNew in
-                            draft.choose(entry, isNewCustom: isNew)
+                Section {
+                    TextField("Malzeme adı", text: $draft.name)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("pantry.form.ingredient")
+                    ForEach(suggestions) { entry in
+                        Button {
+                            draft.choose(entry, isNewCustom: false)
+                        } label: {
+                            PantryIngredientSuggestionLabel(entry: entry)
                         }
-                    } label: {
-                        LabeledContent("Malzeme", value: draft.ingredientId == nil ? PantryCopy.pickIngredient : draft.name)
                     }
-                    .accessibilityIdentifier("pantry.form.ingredient")
-                    if draft.ingredientId == nil && item != nil {
-                        Text(PantryCopy.unmatchedHint).font(.footnote).foregroundStyle(.secondary)
-                    }
+                } header: {
+                    Text("Malzeme")
+                } footer: {
+                    Text(PantryCopy.ingredientFooter)
                 }
                 Section("Miktar") {
                     TextField("Miktar", text: $draft.quantityText)
@@ -739,7 +835,7 @@ private struct PantryForm: View {
                     Text(PantryCopy.dateFooter)
                 }
             }
-            .navigationTitle(item == nil ? "Pantry malzemesi" : "Malzemeyi düzenle")
+            .navigationTitle(item == nil ? "Malzeme ekle" : "Malzemeyi düzenle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("İptal") { dismiss() } }
@@ -752,11 +848,25 @@ private struct PantryForm: View {
     }
 
     private func save() {
-        guard let quantity = draft.quantityToSave, let ingredientId = draft.ingredientId else { return }
+        guard let quantity = draft.quantityToSave else { return }
+        guard let resolution = draft.resolvedIngredient(dictionary: .shared, customs: customs) else { return }
+        let ingredientId: String
+        let name: String
+        let isNewCustom: Bool
+        switch resolution {
+        case .linked(let entry):
+            ingredientId = entry.id
+            name = entry.name
+            isNewCustom = false
+        case .createCustom(let typed):
+            ingredientId = IngredientDictionary.newCustomId()
+            name = typed
+            isNewCustom = true
+        }
         onSave(PantryFormResult(
             ingredientId: ingredientId,
-            name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
-            isNewCustom: draft.isNewCustom,
+            name: name,
+            isNewCustom: isNewCustom,
             quantity: quantity,
             unit: draft.unit,
             location: draft.location,

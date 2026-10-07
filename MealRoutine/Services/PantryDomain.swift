@@ -4,18 +4,21 @@ import CryptoKit
 #endif
 
 enum PantryCopy {
+    static let screenTitle = "Evdekiler"
     static let usesStock = "Evdeki malzemeleri kullanıyor"
     static let approachingExpiry = "Tarihi yaklaşan malzemeyi kullanıyor"
     static let conflict = "Bu malzeme başka bir cihazda güncellendi."
     static let offline = "Çevrimdışısın. Son kayıtlar gösteriliyor; değişiklikler bağlantı gelince gönderilecek."
-    static let loadFailedTitle = "Pantry yüklenemedi"
-    static let loadFailed = "Pantry yüklenemedi. Yeniden dene."
-    static let refreshFailed = "Pantry yenilenemedi. Son kayıtlar gösteriliyor."
+    static let loadFailedTitle = "Evdekiler yüklenemedi"
+    static let loadFailed = "Evdekiler yüklenemedi. Yeniden dene."
+    static let refreshFailed = "Evdekiler yenilenemedi. Son kayıtlar gösteriliyor."
     static let retry = "Yeniden dene"
-    static let loading = "Pantry yükleniyor"
-    static let emptyTitle = "Pantry boş"
+    static let loading = "Evdekiler yükleniyor"
+    static let emptyTitle = "Evdekiler boş"
     static let empty = "Evdeki malzemelerini ekle. Planını ve marketini daha doğru hazırlayalım."
     static let addIngredient = "Malzeme ekle"
+    static let addAccessibility = "Evdekilere malzeme ekle"
+    static let saveFailedTitle = "Evdekiler güncellenemedi"
     static let saveFailed = "Sunucuya kaydedilemedi. Yerel kopya korunuyor; bağlantı gelince tekrar denenecek."
     static let rejected = "Sunucu bu değişikliği kabul etmedi. Değişiklik gönderilmedi."
     static let unitMismatch = "Bu birimler birbirine çevrilemiyor. Otomatik düşülmedi."
@@ -28,35 +31,49 @@ enum PantryCopy {
     static let missingMinimum = "Eksik miktarı hesapla"
     static let deleteItem = "Öğeyi sil"
     static let noMinimum = "Minimum miktar yok. Eksik hesaplanamadı."
-    static let transferTitle = "Kişisel pantry ayrı duruyor"
-    static let transferMessage = "Kişisel pantry otomatik olarak ortak veriye karışmaz. Aktar, kopyala veya ayrı tut."
+    static let personalBanner = "Kişisel evdekiler yalnız bu telefonda durur. Ev halkı kurarsan aktarıp aktarmayacağını sen seçersin."
+    static let transferTitle = "Kişisel evdekiler ayrı duruyor"
+    static let transferMessage = "Kişisel evdekiler otomatik olarak ortak veriye karışmaz. Aktar, kopyala veya ayrı tut."
     static let transferMove = "Aktar"
     static let transferCopy = "Kopyala"
     static let transferKeep = "Ayrı tut"
     static let covered = "Evde var"
     static let computeMissing = "Eksik miktarı hesapla"
     static let showFullNeed = "Tam ihtiyacı göster"
-    static let consume = "Pantry'den düş"
-    static let restock = "Pantry'ye ekle"
+    static let consume = "Evdekilerden düş"
+    static let restock = "Evdekilere ekle"
     static let useServer = "Sunucudaki hali kullan"
     static let reapplyMine = "Değişikliğimi yeniden uygula"
     static let separateUnit = "Ayrı satır olarak ekle"
-    static let missingPantry = "Pantry'de bu malzeme yok."
+    static let missingPantry = "Evdekilerde bu malzeme yok."
     static let incompatibleCount = "Bazı birimler uyuşmuyor. Onlar otomatik düşülmedi."
     static let pending = "Eşitlenmeyi bekliyor"
     static let failed = "Gönderilemedi"
-    static let failedMessage = "Bazı pantry değişiklikleri gönderilemedi. Yeniden dene ya da vazgeç."
+    static let failedMessage = "Evdekilerdeki bazı değişiklikler gönderilemedi. Yeniden dene ya da vazgeç."
     static let discardFailed = "Değişikliklerden vazgeç"
     static let conflictBadge = "Başka cihazda güncellendi"
     static let unmatched = "Sözlükte eşleşmedi"
-    static let unmatchedHint = "Malzemeyi listeden seç; eşleşme yalnız malzeme kimliğiyle yapılır."
     static let lowStock = "Azaldı"
     static let outOfStock = "Tükendi"
-    static let pickIngredient = "Malzeme seç"
-    static let createCustom = "Yeni malzeme olarak ekle"
-    static let createCustomMessage = "Bu ad sözlükte yok. Yeni bir malzeme olarak eklenir ve yalnız kendisiyle eşleşir; benzer adlı malzemelerle birleşmez."
+    static let whichIngredient = "Hangi malzeme?"
+    static let ingredientFooter = "Yazdıkça sözlük ve evin malzemeleri önerilir. Öneriye basmazsan ad tek bir malzemeyle birebir örtüşürse ona bağlanır; yoksa yeni malzeme olarak kaydedilir. Benzer adlar birleşmez."
     static let dateSection = "Tarih"
     static let dateFooter = "Son tüketim tarihi (STT) güvenlik içindir. Tavsiye edilen tüketim tarihi (TETT) tat ve tazelik içindir. Tarih girmezsen uygulama tarih uydurmaz."
+
+    static func separateUnitMessage(existing: String) -> String {
+        "Evdekilerde \(existing) var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin."
+    }
+
+    /// Strings a person can read. Technical identifiers stay out of this list.
+    static let userFacing: [String] = [
+        screenTitle, usesStock, approachingExpiry, conflict, offline, loadFailedTitle, loadFailed, refreshFailed,
+        retry, loading, emptyTitle, empty, addIngredient, addAccessibility, saveFailedTitle, saveFailed, rejected,
+        unitMismatch, unitChoice, unknownUnit, duplicateRow, finishedTitle, finishedMessage, addToMarket,
+        missingMinimum, deleteItem, noMinimum, personalBanner, transferTitle, transferMessage, transferMove,
+        transferCopy, transferKeep, covered, computeMissing, showFullNeed, consume, restock, useServer, reapplyMine,
+        separateUnit, missingPantry, incompatibleCount, pending, failed, failedMessage, discardFailed, conflictBadge,
+        unmatched, lowStock, outOfStock, whichIngredient, ingredientFooter, dateSection, dateFooter,
+    ]
 }
 
 enum PantryLocation: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -715,6 +732,91 @@ struct PantryQueuedPayload: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Typed ingredient
+
+/// What saving a typed name means. Identity is still `ingredientId`.
+/// A partial or similar name never links: "Domates" and "Cherry domates" stay apart.
+enum PantryIngredientResolution: Equatable, Sendable {
+    case linked(IngredientEntry)
+    case createCustom(name: String)
+}
+
+enum PantryIngredientMatching {
+    /// Suggestions while the field is non-empty. Blank text does not dump the dictionary.
+    static func suggestions(
+        matching query: String,
+        dictionary: IngredientDictionary = .shared,
+        customs: [IngredientEntry] = [],
+        limit: Int = 8
+    ) -> [IngredientEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return dictionary.search(trimmed, including: customs, limit: limit)
+    }
+
+    /// A pinned row wins while the text still belongs to it. Otherwise one exact
+    /// name or synonym (case and diacritics ignored) links that entry. Zero or
+    /// several exact hits become a new `custom:<uuid>` — the caller mints the id.
+    static func resolve(
+        typed raw: String,
+        pinnedId: String? = nil,
+        pinnedName: String = "",
+        dictionary: IngredientDictionary = .shared,
+        customs: [IngredientEntry] = []
+    ) -> PantryIngredientResolution? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let folded = IngredientDictionary.fold(trimmed)
+        if let pinnedId {
+            let unchanged = !pinnedName.isEmpty && IngredientDictionary.fold(pinnedName) == folded
+            if let entry = storedEntry(id: pinnedId, dictionary: dictionary, customs: customs) {
+                if unchanged {
+                    if matches(entry, folded: folded) { return .linked(entry) }
+                    return .linked(IngredientEntry(id: entry.id, name: trimmed, synonyms: entry.synonyms, sourceIds: entry.sourceIds))
+                }
+                if matches(entry, folded: folded) { return .linked(entry) }
+            } else if unchanged {
+                return .linked(IngredientEntry(id: pinnedId, name: trimmed))
+            }
+        }
+        let exact = exactEntries(named: trimmed, dictionary: dictionary, customs: customs)
+        if exact.count == 1, let only = exact.first { return .linked(only) }
+        return .createCustom(name: trimmed)
+    }
+
+    static func exactEntries(
+        named raw: String,
+        dictionary: IngredientDictionary,
+        customs: [IngredientEntry]
+    ) -> [IngredientEntry] {
+        let folded = IngredientDictionary.fold(raw)
+        guard !folded.isEmpty else { return [] }
+        var found: [IngredientEntry] = []
+        var seen = Set<String>()
+        for entry in customs + dictionary.entries {
+            guard seen.insert(entry.id.lowercased()).inserted else { continue }
+            if matches(entry, folded: folded) { found.append(entry) }
+        }
+        return found
+    }
+
+    private static func storedEntry(
+        id: String,
+        dictionary: IngredientDictionary,
+        customs: [IngredientEntry]
+    ) -> IngredientEntry? {
+        if let entry = dictionary.entry(id) { return entry }
+        let lowered = id.lowercased()
+        return customs.first { $0.id.lowercased() == lowered }
+    }
+
+    private static func matches(_ entry: IngredientEntry, folded: String) -> Bool {
+        guard !folded.isEmpty else { return false }
+        let names = [entry.name] + entry.synonyms
+        return names.contains { IngredientDictionary.fold($0) == folded }
+    }
+}
+
 // MARK: - Edit form
 
 /// Values shown in the pantry sheet. Built from the item up front so a reused sheet
@@ -722,6 +824,8 @@ struct PantryQueuedPayload: Codable, Equatable, Sendable {
 struct PantryFormDraft: Equatable {
     var ingredientId: String?
     var name: String
+    /// Display name last tied to `ingredientId`: the loaded row, or a tapped suggestion.
+    var anchorName: String
     var isNewCustom: Bool
     var quantityText: String
     var unit: String
@@ -737,6 +841,7 @@ struct PantryFormDraft: Equatable {
     static let empty = PantryFormDraft(
         ingredientId: nil,
         name: "",
+        anchorName: "",
         isNewCustom: false,
         quantityText: "",
         unit: "piece",
@@ -765,6 +870,7 @@ struct PantryFormDraft: Equatable {
         draft.date = now
         draft.ingredientId = ingredientId.flatMap { dictionary.canonicalId($0) }
         draft.name = name
+        draft.anchorName = name
         draft.quantityText = QuantityFormat.string(quantity)
         draft.location = location
         let canonical = UnitNormalization.parse(unit).code
@@ -789,7 +895,23 @@ struct PantryFormDraft: Equatable {
     mutating func choose(_ entry: IngredientEntry, isNewCustom: Bool) {
         ingredientId = entry.id
         name = entry.name
+        anchorName = entry.name
         self.isNewCustom = isNewCustom
+    }
+
+    /// Nil when the name is blank. A tapped or loaded id is kept while the text still
+    /// belongs to it; otherwise one exact match links and anything else is custom.
+    func resolvedIngredient(
+        dictionary: IngredientDictionary,
+        customs: [IngredientEntry] = []
+    ) -> PantryIngredientResolution? {
+        PantryIngredientMatching.resolve(
+            typed: name,
+            pinnedId: ingredientId,
+            pinnedName: anchorName,
+            dictionary: dictionary,
+            customs: customs
+        )
     }
 
     /// Nil when the field is empty or not a finite, non-negative number. Never substitutes 0.
@@ -798,8 +920,7 @@ struct PantryFormDraft: Equatable {
     var minimumToSave: Double? { hasMinimum ? Self.parseQuantity(minimumText) : nil }
 
     var canSave: Bool {
-        ingredientId != nil
-            && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && quantityToSave != nil
             && PantryUnitPolicy.isKnown(unit)
             && (!hasMinimum || minimumToSave != nil)

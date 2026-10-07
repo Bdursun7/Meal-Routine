@@ -402,7 +402,7 @@ enum PantryCache {
     }
 }
 
-/// Household ingredients created with "Yeni malzeme olarak ekle", as the server last listed them.
+/// Household and personal ingredients created from a typed name, as last remembered on this phone.
 @MainActor
 enum PantryIngredientStore {
     private static func key(_ householdID: UUID?) -> String {
