@@ -1391,7 +1391,8 @@ final class HouseholdSession {
         offersPantryTransfer = PantryTransferPolicy.shouldOffer(
             personalCount: personal,
             householdId: householdId,
-            resolvedHouseholdId: resolved
+            resolvedHouseholdId: resolved,
+            testMode: isTestMode
         )
     }
 

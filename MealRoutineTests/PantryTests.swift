@@ -121,6 +121,7 @@ final class PantryTests: XCTestCase {
         XCTAssertTrue(PantryTransferPolicy.shouldOffer(personalCount: 2, householdId: household, resolvedHouseholdId: nil))
         XCTAssertFalse(PantryTransferPolicy.shouldOffer(personalCount: 2, householdId: household, resolvedHouseholdId: household.uuidString))
         XCTAssertFalse(PantryTransferPolicy.shouldOffer(personalCount: 0, householdId: household, resolvedHouseholdId: nil))
+        XCTAssertFalse(PantryTransferPolicy.shouldOffer(personalCount: 2, householdId: household, resolvedHouseholdId: nil, testMode: true))
     }
 
     func testEmptyPantryDoesNotChangeThePlanSentence() {

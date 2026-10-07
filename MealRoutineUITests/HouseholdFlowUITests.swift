@@ -40,19 +40,30 @@ final class HouseholdFlowUITests: XCTestCase {
         reveal(app.buttons["household.create"], in: app).tap()
         reveal(app.buttons["household.invite"], in: app).tap()
 
-        reveal(app.buttons["household.partnerJoin"], in: app).tap()
+        let partnerJoin = reveal(app.buttons["household.partnerJoin"], in: app)
+        partnerJoin.tap()
+        // Join is async. Generating first races the partner's push and can leave the house without a partner.
+        XCTAssertTrue(waitForDisappearance(partnerJoin, timeout: 15), "Test Partner did not join")
         reveal(app.buttons["household.generateWeek"], in: app).tap()
         dismissTestBanner(in: app)
 
+        // Bu Hafta builds every card eagerly. The Household form is lazy, so its rows can be missing until scrolled.
+        app.tabBars.buttons["Bu Hafta"].tap()
+        XCTAssertTrue(app.navigationBars["Bu Hafta"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.buttons.matching(identifier: "household.partner.veto").firstMatch.waitForExistence(timeout: 20),
+            "Shared week has no Test Partner controls on Bu Hafta"
+        )
+
         tapControl("household.partner.veto", in: app)
-        XCTAssertTrue(app.staticTexts["Karar gerekiyor"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(labelContaining: "Karar gerekiyor", in: app).waitForExistence(timeout: 8))
 
         dismissTestBanner(in: app)
         tapControl("household.partner.replace", in: app)
-        let notice = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "yerine")).firstMatch
-        let otherNotice = app.otherElements.containing(NSPredicate(format: "label CONTAINS[c] %@", "yerine")).firstMatch
+        let notice = NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "yerine", "önerdi")
         XCTAssertTrue(
-            notice.waitForExistence(timeout: 8) || otherNotice.waitForExistence(timeout: 2)
+            app.descendants(matching: .any).matching(notice).firstMatch.waitForExistence(timeout: 8),
+            "Replacement notice did not appear"
         )
     }
 
@@ -97,11 +108,17 @@ final class HouseholdFlowUITests: XCTestCase {
         button.tap()
     }
 
-    /// Picks a visible control. The same identifier also exists on Bu Hafta cards, which may be off this screen.
-    private func tapControl(_ identifier: String, in app: XCUIApplication) {
+    /// Taps the first hittable match, scrolling down and then back up. Existence alone is not asserted
+    /// up front: a lazy list only exposes rows near the viewport.
+    private func tapControl(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
         let query = app.buttons.matching(identifier: identifier)
-        XCTAssertTrue(query.firstMatch.waitForExistence(timeout: 20))
-        for _ in 0..<5 {
+        _ = query.firstMatch.waitForExistence(timeout: 10)
+        for attempt in 0..<14 {
             for index in 0..<query.count {
                 let element = query.element(boundBy: index)
                 if element.exists, element.isHittable {
@@ -109,9 +126,24 @@ final class HouseholdFlowUITests: XCTestCase {
                     return
                 }
             }
-            app.swipeUp()
+            if attempt < 7 {
+                app.swipeUp()
+            } else {
+                app.swipeDown()
+            }
         }
-        XCTFail("\(identifier) never became tappable")
+        XCTFail("\(identifier) never became tappable", file: file, line: line)
+    }
+
+    private func element(labelContaining text: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
+            .firstMatch
+    }
+
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+        return XCTWaiter().wait(for: [gone], timeout: timeout) == .completed
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
