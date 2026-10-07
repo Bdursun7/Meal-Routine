@@ -1,81 +1,83 @@
 import SwiftData
 import SwiftUI
 
+/// What the pantry sheet hands back. `ingredientId` is a dictionary id or a `custom:<uuid>`,
+/// never text folded from the name.
+struct PantryFormResult: Equatable, Identifiable {
+    var ingredientId: String
+    var name: String
+    var isNewCustom: Bool
+    var quantity: Double
+    var unit: String
+    var location: PantryLocation
+    var minimum: Double?
+    var dateType: PantryDateType?
+    var dateValue: Date?
+
+    var id: String { "\(ingredientId)|\(unit)" }
+}
+
 struct PantryView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var items: [PantryItem]
+    @Query private var operations: [PendingOperation]
     @State private var showingAdd = false
     @State private var search = ""
     @State private var errorMessage: String?
     @State private var refreshing = false
+    @State private var loadedOnce = false
     @State private var loadFailed = false
     @State private var finished: PantryItem?
     @State private var editing: PantryItem?
+    @State private var separatePrompt: PantryFormResult?
     @State private var session = HouseholdSession.shared
 
-    private var householdID: UUID? { HouseholdSession.shared.snapshot.household?.id }
+    private var householdID: UUID? { session.snapshot.household?.id }
+    private var syncsHousehold: Bool { householdID != nil && PantryOutbox.syncsHousehold }
+
+    private var scoped: [PantryItem] { items.filter { $0.householdID == householdID } }
 
     private var visible: [PantryItem] {
-        items.filter { item in
-            item.householdID == householdID &&
-            (search.isEmpty || item.displayName.localizedCaseInsensitiveContains(search))
-        }.sorted {
-            if $0.isLowStock != $1.isLowStock { return $0.isLowStock }
-            return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        scoped.filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
+            .sorted {
+                if $0.isLowStock != $1.isLowStock { return $0.isLowStock }
+                return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+            }
+    }
+
+    private var pantryOperations: [SyncWorkItem] {
+        operations.map(\.workItem).filter { item in
+            PantrySync.isPantry(item) && PantrySync.payload(of: item)?.householdID == householdID
         }
     }
 
-    private var awaitingResolution: Bool {
-        PendingOperationStore.items(in: modelContext).contains { PantrySync.isPantry($0) && $0.status == .requiresResolution }
+    private var marks: [String: PantrySyncMark] { PantryOutbox.marks(pantryOperations) }
+
+    private var conflicts: [PantryConflictSummary] {
+        var seen = Set<String>()
+        return pantryOperations.compactMap { operation in
+            guard operation.status == .requiresResolution, !seen.contains(operation.entityId) else { return nil }
+            seen.insert(operation.entityId)
+            let payloads = pantryOperations.filter { $0.entityId == operation.entityId }.compactMap(PantrySync.payload(of:))
+            let server = payloads.first { $0.serverItem != nil || $0.serverDeleted || $0.rejection == "pantry_unit_choice" }
+            return PantryConflictSummary(
+                entityId: operation.entityId,
+                name: payloads.last?.item?.displayName ?? server?.serverItem?.displayName ?? "Malzeme",
+                mine: payloads.last,
+                server: server
+            )
+        }
     }
+
+    private var hasFailed: Bool { pantryOperations.contains { $0.status == .failed } }
+
+    private var isOffline: Bool { !SyncEngine.shared.online || session.syncState == .offline }
 
     var body: some View {
         List {
-            if !SyncEngine.shared.online || session.syncState == .offline {
-                Section {
-                    Text(PantryCopy.offline)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if awaitingResolution {
-                Section {
-                    Text(PantryCopy.conflict)
-                        .font(.subheadline.weight(.semibold))
-                    Button(PantryCopy.useServer) {
-                        dropConflicts()
-                        Task { await refreshFromServer() }
-                    }
-                }
-            }
-            if refreshing && visible.isEmpty && !loadFailed {
-                Section {
-                    HStack {
-                        ProgressView()
-                        Text(PantryCopy.loading)
-                    }
-                    .accessibilityLabel(PantryCopy.loading)
-                }
-            } else if loadFailed && visible.isEmpty {
-                ContentUnavailableView {
-                    Label("Pantry yüklenemedi", systemImage: "wifi.exclamationmark")
-                } description: {
-                    Text(PantryCopy.loadFailed)
-                } actions: {
-                    Button("Yeniden dene") { Task { await refreshFromServer() } }
-                }
-            } else if visible.isEmpty {
-                ContentUnavailableView {
-                    Label("Pantry boş", systemImage: "shippingbox")
-                } description: {
-                    Text(PantryCopy.empty)
-                } actions: {
-                    Button("Malzeme ekle") { showingAdd = true }
-                }
-            } else {
-                ForEach(visible) { item in row(item) }
-                    .onDelete(perform: delete)
-            }
+            statusSections
+            content
         }
         .navigationTitle("Pantry")
         .navigationBarTitleDisplayMode(.inline)
@@ -87,26 +89,21 @@ struct PantryView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingAdd = true } label: { Image(systemName: "plus") }
                     .accessibilityLabel("Pantry malzemesi ekle")
+                    .accessibilityIdentifier("pantry.add")
             }
         }
         .sheet(isPresented: $showingAdd) {
-            PantryForm(item: nil) { name, quantity, unit, location, minimum, date, confirmSeparate in
-                add(name: name, quantity: quantity, unit: unit, location: location, minimum: minimum, date: date, confirmSeparate: confirmSeparate)
-            }
+            PantryForm(item: nil, householdID: householdID) { add($0, confirmSeparate: false) }
         }
         .sheet(item: $editing) { item in
-            PantryForm(item: item) { name, quantity, unit, location, minimum, date, confirmSeparate in
-                edit(item, name: name, quantity: quantity, unit: unit, location: location, minimum: minimum, date: date, confirmSeparate: confirmSeparate)
-            }
-            .id(item.persistentModelID)
+            PantryForm(item: item, householdID: householdID) { edit(item, with: $0) }
+                .id(item.persistentModelID)
         }
         .sheet(isPresented: Binding(get: { session.offersPantryTransfer }, set: { if !$0 { session.offersPantryTransfer = false } })) {
             PantryTransferSheet { choice in
-                let touched = PantryTransferApply.apply(choice, householdID: householdID ?? UUID(), in: modelContext)
                 if let householdID, choice != .keepSeparate {
-                    for item in touched {
-                        sync(item, action: item.revision > 1 ? "update" : "create", householdID: householdID)
-                    }
+                    PantryTransferApply.apply(choice, householdID: householdID, in: modelContext)
+                    flush()
                 }
                 session.resolvePantryTransfer()
             }
@@ -123,10 +120,23 @@ struct PantryView: View {
         } message: { _ in
             Text(PantryCopy.finishedMessage)
         }
+        .alert(
+            PantryCopy.unitChoice,
+            isPresented: Binding(get: { separatePrompt != nil }, set: { if !$0 { separatePrompt = nil } }),
+            presenting: separatePrompt
+        ) { result in
+            Button(PantryCopy.separateUnit) {
+                separatePrompt = nil
+                add(result, confirmSeparate: true)
+            }
+            Button("Vazgeç", role: .cancel) { separatePrompt = nil }
+        } message: { result in
+            Text("\(result.name) başka bir birimle kayıtlı. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
+        }
         .alert("Pantry güncellenemedi", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("Tamam", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
-        .task {
+        .task(id: householdID) {
             session.offerPantryTransferIfNeeded(in: modelContext)
             await refreshFromServer()
         }
@@ -134,48 +144,142 @@ struct PantryView: View {
     }
 
     @ViewBuilder
+    private var statusSections: some View {
+        if householdID == nil {
+            Section {
+                Label("Kişisel pantry yalnız bu telefonda durur. Ev halkı kurarsan aktarıp aktarmayacağını sen seçersin.", systemImage: "iphone")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } else if syncsHousehold && isOffline {
+            Section {
+                Label(PantryCopy.offline, systemImage: "wifi.slash")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        ForEach(conflicts) { conflict in
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(PantryCopy.conflict, systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                        .font(.subheadline.weight(.semibold))
+                    Text(conflict.name).font(.headline)
+                    Text(conflict.serverLine).font(.footnote).foregroundStyle(.secondary)
+                    Text(conflict.mineLine).font(.footnote).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                Button(PantryCopy.useServer) {
+                    PantryOutbox.useServer(entityId: conflict.entityId, in: modelContext)
+                    Task { await refreshFromServer() }
+                }
+                Button(PantryCopy.reapplyMine) {
+                    PantryOutbox.reapply(entityId: conflict.entityId, in: modelContext)
+                    flush()
+                }
+            }
+        }
+        if hasFailed {
+            Section {
+                Label(PantryCopy.failedMessage, systemImage: "xmark.icloud")
+                    .font(.subheadline)
+                Button(PantryCopy.retry) {
+                    PantryOutbox.retryFailed(in: modelContext)
+                    flush()
+                }
+                Button(PantryCopy.discardFailed, role: .destructive) {
+                    PantryOutbox.discardFailed(in: modelContext)
+                    Task { await refreshFromServer() }
+                }
+            }
+        }
+        if loadFailed && !scoped.isEmpty {
+            Section {
+                Label(PantryCopy.refreshFailed, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                Button(PantryCopy.retry) { Task { await refreshFromServer() } }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if syncsHousehold && !loadedOnce && scoped.isEmpty {
+            Section {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text(PantryCopy.loading)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(PantryCopy.loading)
+            }
+        } else if loadFailed && scoped.isEmpty {
+            ContentUnavailableView {
+                Label(PantryCopy.loadFailedTitle, systemImage: "wifi.exclamationmark")
+            } description: {
+                Text(PantryCopy.loadFailed)
+            } actions: {
+                Button(PantryCopy.retry) { Task { await refreshFromServer() } }
+                    .accessibilityIdentifier("pantry.retry")
+            }
+        } else if scoped.isEmpty {
+            ContentUnavailableView {
+                Label(PantryCopy.emptyTitle, systemImage: "shippingbox")
+            } description: {
+                Text(PantryCopy.empty)
+            } actions: {
+                Button(PantryCopy.addIngredient) { showingAdd = true }
+            }
+        } else if visible.isEmpty {
+            ContentUnavailableView.search(text: search)
+        } else {
+            ForEach(visible) { item in row(item) }
+                .onDelete(perform: delete)
+        }
+    }
+
+    private func presentation(_ item: PantryItem) -> PantryRowPresentation {
+        PantryRowPresentation.make(
+            name: item.displayName,
+            ingredientResolved: item.ingredientResolved,
+            quantity: item.quantity,
+            unit: item.unit,
+            location: item.location,
+            minimumQuantity: item.minimumQuantity,
+            dateType: item.dateType,
+            dateValue: item.dateValue,
+            sync: marks[item.uuid.uuidString.lowercased()] ?? .synced
+        )
+    }
+
+    @ViewBuilder
     private func row(_ item: PantryItem) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text(item.displayName).font(.headline)
-                    Spacer()
-                    if item.isLowStock { Text("Azaldı").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
-                    if item.isExpiredOrNear { Text("Tarih yaklaşıyor").font(.caption.weight(.semibold)).foregroundStyle(.orange) }
+        let shown = presentation(item)
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(shown.title).font(.headline)
+                Text("\(shown.amount) · \(shown.location)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let minimum = shown.minimum {
+                    Text(minimum).font(.footnote).foregroundStyle(.secondary)
                 }
-                HStack {
-                    Text(QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit))
-                    Text("· \(item.location.title)")
-                    Spacer()
-                    if let minimum = item.minimumQuantity {
-                        Text("Min \(QuantityFormat.quantityAndUnit(quantity: minimum, unit: item.unit))")
-                    }
-                    if let date = item.bestBefore {
-                        Text(date.formatted(date: .abbreviated, time: .omitted))
-                            .foregroundStyle(item.isExpiredOrNear ? .orange : .secondary)
+                if let date = shown.date {
+                    Text(date).font(.footnote).foregroundStyle(.secondary)
+                }
+                if !shown.badges.isEmpty {
+                    FlowLayout(spacing: 6) {
+                        ForEach(shown.badges, id: \.self) { badge in
+                            Label(badge.text, systemImage: badge.symbol)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(color(badge.tone))
+                        }
                     }
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
             }
-            .accessibilityElement(children: .combine)
-            HStack(spacing: 10) {
-                Button("−") { change(item, by: -1) }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("Miktarı bir azalt")
-                Button("+") { change(item, by: 1) }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel("Miktarı bir artır")
-                Spacer()
-                Button("Düzenle") { editing = item }
-                    .font(.footnote.weight(.semibold))
-                    .buttonStyle(.borderless)
-                    .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
-                Button("Bitti") { markFinished(item) }
-                    .font(.footnote.weight(.semibold))
-                    .buttonStyle(.borderless)
-                    .accessibilityHint("Seçenekleri gösterir. İptal miktarı değiştirmez.")
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(shown.accessibilityLabel)
+            controls(item)
         }
         .padding(.vertical, 5)
         .swipeActions {
@@ -183,24 +287,74 @@ struct PantryView: View {
         }
     }
 
-    /// Opens the finished choices. Stock is unchanged until the user picks one.
-    private func markFinished(_ item: PantryItem) {
-        finished = item
+    @ViewBuilder
+    private func controls(_ item: PantryItem) -> some View {
+        let stepper = HStack(spacing: 10) {
+            Button("−") { change(item, by: -1) }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Miktarı bir azalt")
+            Button("+") { change(item, by: 1) }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Miktarı bir artır")
+        }
+        let actions = Group {
+            Button("Düzenle") { editing = item }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+                .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
+            Button("Bitti") { finished = item }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+                .accessibilityHint("Seçenekleri gösterir. İptal miktarı değiştirmez.")
+        }
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 10) {
+                stepper
+                HStack(spacing: 16) { actions }
+            }
+        } else {
+            HStack(spacing: 10) {
+                stepper
+                Spacer()
+                actions
+            }
+        }
+    }
+
+    private func color(_ tone: PantryBadgeTone) -> Color {
+        switch tone {
+        case .critical: .red
+        case .warning: .orange
+        case .info: .secondary
+        }
+    }
+
+    // MARK: Writes
+
+    private func write(_ action: PantryOutbox.Action, _ item: PantryItem, baseVersion: Int?, confirmSeparate: Bool = false) {
+        if PantryOutbox.record(action, item, baseVersion: baseVersion, confirmSeparate: confirmSeparate, in: modelContext) {
+            flush()
+        }
+    }
+
+    private func flush() {
+        Task { @MainActor in
+            if await PantryOutbox.flush(in: modelContext) { errorMessage = PantryCopy.conflict }
+        }
     }
 
     private func finish(_ item: PantryItem, choice: PantryFinishedChoice) {
         let recorded = item.quantity
         finished = nil
-        item.quantity = PantryFinishedFlow.quantity(current: recorded, choice: choice)
         switch choice {
         case .deleteItem:
-            // The delete request is the sync. A separate zero-update would race it on revision.
+            // The delete is the only write; a zero-update first would race it on version.
             delete(item)
         case .addToMarket:
-            commitFinishedStock(item)
+            commitQuantity(item, PantryFinishedFlow.quantity(current: recorded, choice: choice))
             addMarket(name: item.displayName, ingredientId: item.ingredientID, quantity: recorded > 0 ? recorded : 1, unit: item.unit)
         case .missingAgainstMinimum:
-            commitFinishedStock(item)
+            commitQuantity(item, PantryFinishedFlow.quantity(current: recorded, choice: choice))
             guard let missing = PantryFinishedMath.shortage(quantity: 0, minimum: item.minimumQuantity) else {
                 errorMessage = PantryCopy.noMinimum
                 return
@@ -211,11 +365,13 @@ struct PantryView: View {
         }
     }
 
-    private func commitFinishedStock(_ item: PantryItem) {
+    private func commitQuantity(_ item: PantryItem, _ quantity: Double) {
+        let base = item.revision
+        item.quantity = quantity
         item.revision += 1
         item.updatedAt = .now
         try? modelContext.save()
-        syncUpdate(item)
+        write(.update, item, baseVersion: base)
     }
 
     private func addMarket(name: String, ingredientId: String, quantity: Double, unit: String) {
@@ -226,231 +382,237 @@ struct PantryView: View {
         }
     }
 
-    private func add(name: String, quantity: Double, unit: String, location: PantryLocation, minimum: Double?, date: Date?, confirmSeparate: Bool) {
-        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty, quantity >= 0 else { return }
-        let ingredientID = clean.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        let peers = visible.filter { $0.ingredientID == ingredientID }
-        let match = peers.first { PantryUnitPolicy.compatible($0.unit, unit) }
+    private func add(_ result: PantryFormResult, confirmSeparate: Bool) {
+        guard result.quantity.isFinite, result.quantity >= 0 else { return }
+        let dictionary = IngredientDictionary.shared
+        let peers = scoped.filter { dictionary.canonicalId($0.ingredientID) == result.ingredientId }
+        let match = peers.first { PantryUnitPolicy.compatible($0.unit, result.unit) }
         switch PantryUnitPolicy.decision(
             existingUnit: match?.unit ?? peers.first?.unit,
             existingQuantity: match?.quantity ?? 0,
-            incomingUnit: unit,
-            incomingQuantity: quantity,
-            confirmSeparate: confirmSeparate || match != nil
+            incomingUnit: result.unit,
+            incomingQuantity: result.quantity,
+            confirmSeparate: confirmSeparate
         ) {
         case .invalid:
-            errorMessage = PantryCopy.unitMismatch
+            errorMessage = PantryCopy.unknownUnit
         case .choiceRequired:
-            errorMessage = PantryCopy.unitChoice
+            separatePrompt = result
         case .merge(let total, let storedUnit):
             guard let match else { return }
+            let base = match.revision
             match.quantity = total
             match.unit = storedUnit
-            match.location = location
-            match.minimumQuantity = minimum
-            match.bestBefore = date
+            match.location = result.location
+            if let minimum = result.minimum {
+                match.minimumQuantity = PantryUnitPolicy.converted(minimum, from: result.unit, to: storedUnit) ?? minimum
+            }
+            // Merged stock keeps the earlier date so a warning is never hidden by the newer pack.
+            if let type = result.dateType, let value = result.dateValue, match.dateValue.map({ value < $0 }) ?? true {
+                match.setDate(type, value)
+            }
             match.revision += 1
             match.updatedAt = .now
             try? modelContext.save()
-            syncUpdate(match)
+            write(.update, match, baseVersion: base)
         case .separate:
             let item = PantryItem(
                 householdID: householdID,
-                ingredientID: ingredientID,
-                displayName: clean,
-                quantity: quantity,
-                unit: UnitNormalization.parse(unit).code,
-                location: location,
-                minimumQuantity: minimum,
-                bestBefore: date
+                ingredientID: result.ingredientId,
+                displayName: result.name,
+                quantity: result.quantity,
+                unit: UnitNormalization.parse(result.unit).code,
+                location: result.location,
+                minimumQuantity: result.minimum,
+                dateType: result.dateType,
+                dateValue: result.dateValue
             )
             modelContext.insert(item)
             try? modelContext.save()
-            syncCreate(item, confirmSeparate: confirmSeparate)
+            if result.isNewCustom {
+                PantryIngredientStore.remember(IngredientEntry(id: result.ingredientId, name: result.name), householdID: householdID)
+            }
+            write(.create, item, baseVersion: nil, confirmSeparate: confirmSeparate || !peers.isEmpty)
         }
     }
 
-    private func edit(_ item: PantryItem, name: String, quantity: Double, unit: String, location: PantryLocation, minimum: Double?, date: Date?, confirmSeparate: Bool) {
-        guard quantity.isFinite, quantity >= 0 else { return }
-        if !PantryUnitPolicy.isKnown(unit) && !confirmSeparate {
-            errorMessage = PantryCopy.unitMismatch
+    private func edit(_ item: PantryItem, with result: PantryFormResult) {
+        guard result.quantity.isFinite, result.quantity >= 0 else { return }
+        guard PantryUnitPolicy.isKnown(result.unit) else {
+            errorMessage = PantryCopy.unknownUnit
             return
         }
-        if !PantryUnitPolicy.compatible(item.unit, unit) && !confirmSeparate {
-            errorMessage = PantryCopy.unitChoice
+        let dictionary = IngredientDictionary.shared
+        let duplicate = scoped.contains { other in
+            other.uuid != item.uuid
+                && dictionary.canonicalId(other.ingredientID) == result.ingredientId
+                && PantryUnitPolicy.compatible(other.unit, result.unit)
+        }
+        if duplicate {
+            errorMessage = PantryCopy.duplicateRow
             return
         }
-        let canonical = UnitNormalization.parse(unit).code
-        var storedQuantity = quantity
-        if PantryUnitPolicy.compatible(item.unit, unit), item.unit != canonical, abs(quantity - item.quantity) < 0.001,
-           let converted = PantryUnitPolicy.converted(item.quantity, from: item.unit, to: canonical) {
-            storedQuantity = converted
-        }
-        item.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        item.quantity = storedQuantity
-        item.unit = canonical
-        item.location = location
-        item.minimumQuantity = minimum
-        item.bestBefore = date
+        let wasOnServer = item.ingredientResolved
+        let base = item.revision
+        item.quantity = PantryUnitPolicy.editedQuantity(previousQuantity: item.quantity, previousUnit: item.unit, typedQuantity: result.quantity, newUnit: result.unit)
+        item.ingredientID = result.ingredientId
+        item.displayName = result.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        item.unit = UnitNormalization.parse(result.unit).code
+        item.location = result.location
+        item.minimumQuantity = result.minimum
+        item.setDate(result.dateType, result.dateValue)
         item.revision += 1
         item.updatedAt = .now
         try? modelContext.save()
-        syncUpdate(item)
+        if result.isNewCustom {
+            PantryIngredientStore.remember(IngredientEntry(id: result.ingredientId, name: result.name), householdID: householdID)
+        }
+        if wasOnServer {
+            write(.update, item, baseVersion: base)
+        } else {
+            // A row the server never accepted (it had no dictionary id) is created now that it has one.
+            item.revision = 1
+            try? modelContext.save()
+            write(.create, item, baseVersion: nil, confirmSeparate: true)
+        }
     }
 
     private func change(_ item: PantryItem, by amount: Double) {
-        item.quantity = max(0, item.quantity + amount)
-        item.revision += 1
-        item.updatedAt = .now
-        try? modelContext.save()
-        syncUpdate(item)
+        commitQuantity(item, max(0, item.quantity + amount))
     }
 
     private func delete(_ item: PantryItem) {
-        syncDelete(item)
+        if item.ingredientResolved { write(.delete, item, baseVersion: item.revision) }
         modelContext.delete(item)
         try? modelContext.save()
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets where visible.indices.contains(index) { delete(visible[index]) }
-    }
-
-    private func remote(_ item: PantryItem, revision: Int? = nil) -> PantryRemoteItem? {
-        guard let householdID else { return nil }
-        return PantryRemoteItem(
-            id: item.uuid,
-            householdId: householdID,
-            ingredientId: item.ingredientID,
-            displayName: item.displayName,
-            quantity: item.quantity,
-            unit: item.unit,
-            location: item.location,
-            minimumQuantity: item.minimumQuantity,
-            bestBefore: item.bestBefore.map { $0.formatted(.iso8601.year().month().day()) },
-            revision: revision ?? item.revision,
-            createdAt: nil,
-            updatedAt: item.updatedAt
-        )
-    }
-
-    private func sync(_ item: PantryItem, action: String, householdID: UUID) {
-        if action == "create" { syncCreate(item, confirmSeparate: true) }
-        else { syncUpdate(item) }
-    }
-
-    private func syncCreate(_ item: PantryItem, confirmSeparate: Bool) {
-        guard let householdID, let api = PantrySync.repository(), let remote = remote(item) else { return }
-        let key = UUID()
-        Task { @MainActor in
-            do {
-                let saved = try await api.create(householdId: householdID, item: remote, idempotencyKey: key.uuidString, confirmSeparate: confirmSeparate)
-                item.uuid = saved.id
-                item.revision = saved.revision
-                item.updatedAt = saved.updatedAt ?? .now
-                try? modelContext.save()
-                loadFailed = false
-            } catch PantrySyncError.unitChoice where !confirmSeparate {
-                errorMessage = PantryCopy.unitChoice
-            } catch PantrySyncError.conflict {
-                PantrySync.enqueue(action: "create", householdID: householdID, item: remote, in: modelContext, status: .requiresResolution, id: key, confirmSeparate: confirmSeparate)
-                errorMessage = PantryCopy.conflict
-            } catch {
-                PantrySync.enqueue(action: "create", householdID: householdID, item: remote, in: modelContext, status: .pending, id: key, confirmSeparate: confirmSeparate)
-                errorMessage = PantryCopy.saveFailed
-            }
-        }
-    }
-
-    private func syncUpdate(_ item: PantryItem) {
-        guard let householdID, let api = PantrySync.repository(), let remote = remote(item, revision: max(1, item.revision - 1)) else { return }
-        let key = UUID()
-        Task { @MainActor in
-            do {
-                let saved = try await api.update(householdId: householdID, item: remote, idempotencyKey: key.uuidString)
-                item.revision = saved.revision
-                item.updatedAt = saved.updatedAt ?? .now
-                try? modelContext.save()
-            } catch PantrySyncError.conflict {
-                PantrySync.enqueue(action: "update", householdID: householdID, item: remote, in: modelContext, status: .requiresResolution, id: key)
-                errorMessage = PantryCopy.conflict
-            } catch {
-                PantrySync.enqueue(action: "update", householdID: householdID, item: remote, in: modelContext, status: .pending, id: key)
-                errorMessage = PantryCopy.saveFailed
-            }
-        }
-    }
-
-    private func syncDelete(_ item: PantryItem) {
-        guard let householdID, let api = PantrySync.repository(), let remote = remote(item) else { return }
-        let key = UUID()
-        Task {
-            do { try await api.delete(householdId: householdID, item: remote, idempotencyKey: key.uuidString) }
-            catch PantrySyncError.conflict {
-                await MainActor.run {
-                    PantrySync.enqueue(action: "delete", householdID: householdID, item: remote, in: modelContext, status: .requiresResolution, id: key)
-                    errorMessage = PantryCopy.conflict
-                }
-            } catch {
-                await MainActor.run {
-                    PantrySync.enqueue(action: "delete", householdID: householdID, item: remote, in: modelContext, status: .pending, id: key)
-                }
-            }
-        }
+        let rows = visible
+        for index in offsets where rows.indices.contains(index) { delete(rows[index]) }
     }
 
     private func refreshFromServer() async {
-        guard let householdID, let api = PantrySync.repository() else { return }
+        guard let householdID, syncsHousehold else {
+            loadedOnce = true
+            loadFailed = false
+            return
+        }
         refreshing = true
-        defer { refreshing = false }
-        await HouseholdSession.shared.drainPending(in: modelContext)
+        defer {
+            refreshing = false
+            loadedOnce = true
+        }
+        if await PantryOutbox.flush(in: modelContext) { errorMessage = PantryCopy.conflict }
         do {
-            let remoteItems = try await api.list(householdId: householdID)
-            for item in remoteItems {
-                if let local = items.first(where: { $0.uuid == item.id }) {
-                    local.ingredientID = item.ingredientId
-                    local.displayName = item.displayName
-                    local.quantity = item.quantity
-                    local.unit = item.unit
-                    local.location = item.location
-                    local.minimumQuantity = item.minimumQuantity
-                    local.bestBefore = item.bestBefore.flatMap { Self.parseDay($0) }
-                    local.revision = item.revision
-                    local.updatedAt = item.updatedAt ?? Date()
-                } else {
-                    modelContext.insert(PantryItem(
-                        uuid: item.id,
-                        householdID: householdID,
-                        ingredientID: item.ingredientId,
-                        displayName: item.displayName,
-                        quantity: item.quantity,
-                        unit: item.unit,
-                        location: item.location,
-                        minimumQuantity: item.minimumQuantity,
-                        bestBefore: item.bestBefore.flatMap { Self.parseDay($0) },
-                        revision: item.revision,
-                        updatedAt: item.updatedAt ?? Date()
-                    ))
-                }
-            }
-            try? modelContext.save()
+            try await PantryCache.refresh(householdID: householdID, in: modelContext)
             loadFailed = false
         } catch {
             loadFailed = true
-            errorMessage = SyncEngine.shared.online ? "Pantry yenilenemedi. Son kayıtlar gösteriliyor." : PantryCopy.offline
+        }
+    }
+}
+
+private struct PantryConflictSummary: Identifiable {
+    var entityId: String
+    var name: String
+    var mine: PantryQueuedPayload?
+    var server: PantryQueuedPayload?
+
+    var id: String { entityId }
+
+    var serverLine: String {
+        if server?.serverDeleted == true { return "Sunucuda: silinmiş" }
+        if server?.rejection == "pantry_unit_choice" { return "Sunucuda: bu malzeme başka bir birimle kayıtlı" }
+        guard let item = server?.serverItem else { return "Sunucuda: güncel hali yükleniyor" }
+        return "Sunucuda: \(Self.describe(item))"
+    }
+
+    var mineLine: String {
+        guard let mine else { return "Senin değişikliğin: —" }
+        if mine.action == "delete" { return "Senin değişikliğin: sil" }
+        guard let item = mine.item else { return "Senin değişikliğin: —" }
+        return "Senin değişikliğin: \(Self.describe(item))"
+    }
+
+    private static func describe(_ item: PantryRemoteItem) -> String {
+        "\(QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit)) · \(item.location.title)"
+    }
+}
+
+/// Controlled ingredient choice: dictionary rows and this household's own ingredients.
+/// A new ingredient gets a random `custom:<uuid>` id only after the user confirms.
+struct PantryIngredientPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Query private var items: [PantryItem]
+    @State private var query: String
+    @State private var confirmingCustom = false
+    var householdID: UUID?
+    var onPick: (IngredientEntry, Bool) -> Void
+
+    init(query: String = "", householdID: UUID?, onPick: @escaping (IngredientEntry, Bool) -> Void) {
+        _query = State(initialValue: query)
+        self.householdID = householdID
+        self.onPick = onPick
+    }
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var customs: [IngredientEntry] { PantryIngredientStore.customs(householdID: householdID, items: items) }
+
+    private var results: [IngredientEntry] { IngredientDictionary.shared.search(trimmed, including: customs, limit: 40) }
+
+    private var hasExactName: Bool {
+        let folded = IngredientDictionary.fold(trimmed)
+        return results.contains { entry in ([entry.name] + entry.synonyms).contains { IngredientDictionary.fold($0) == folded } }
+    }
+
+    var body: some View {
+        List {
+            if !trimmed.isEmpty && !hasExactName {
+                Section {
+                    Button { confirmingCustom = true } label: {
+                        Label("“\(trimmed)” — \(PantryCopy.createCustom)", systemImage: "plus.circle")
+                    }
+                    .accessibilityIdentifier("pantry.ingredient.create")
+                } footer: {
+                    Text(PantryCopy.unmatchedHint)
+                }
+            }
+            Section {
+                if results.isEmpty {
+                    Text("Sözlükte eşleşen malzeme yok.").foregroundStyle(.secondary)
+                }
+                ForEach(results) { entry in
+                    Button { pick(entry, isNew: false) } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.name).foregroundStyle(.primary)
+                            if IngredientDictionary.isCustom(entry.id) {
+                                Text("Ev halkının malzemesi").font(.caption).foregroundStyle(.secondary)
+                            } else if !entry.synonyms.isEmpty {
+                                Text(entry.synonyms.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(PantryCopy.pickIngredient)
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Malzeme ara")
+        .alert(PantryCopy.createCustom, isPresented: $confirmingCustom) {
+            Button(PantryCopy.createCustom) {
+                pick(IngredientEntry(id: IngredientDictionary.newCustomId(), name: trimmed), isNew: true)
+            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text("“\(trimmed)”. \(PantryCopy.createCustomMessage)")
         }
     }
 
-    private func dropConflicts() {
-        let kept = PendingOperationStore.items(in: modelContext).filter { !PantrySync.isPantry($0) || $0.status != .requiresResolution }
-        PendingOperationStore.replace(kept, in: modelContext)
-    }
-
-    private static func parseDay(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    private func pick(_ entry: IngredientEntry, isNew: Bool) {
+        onPick(entry, isNew)
+        dismiss()
     }
 }
 
@@ -460,23 +622,24 @@ struct PantryTransferSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(PantryCopy.transferMessage)
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(PantryCopy.transferMove) { choose(.move) }
-                    .buttonStyle(.borderedProminent)
-                Button(PantryCopy.transferCopy) { choose(.copy) }
-                    .buttonStyle(.bordered)
-                Button(PantryCopy.transferKeep) { choose(.keepSeparate) }
-                    .buttonStyle(.bordered)
-                Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(PantryCopy.transferMessage)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(PantryCopy.transferMove) { choose(.move) }
+                        .buttonStyle(.borderedProminent)
+                    Button(PantryCopy.transferCopy) { choose(.copy) }
+                        .buttonStyle(.bordered)
+                    Button(PantryCopy.transferKeep) { choose(.keepSeparate) }
+                        .buttonStyle(.bordered)
+                }
+                .padding()
             }
-            .padding()
             .navigationTitle(PantryCopy.transferTitle)
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     private func choose(_ choice: PantryTransferChoice) {
@@ -485,132 +648,99 @@ struct PantryTransferSheet: View {
     }
 }
 
-/// Values shown in the pantry sheet. Built from the item up front so a reused sheet
-/// cannot open on an empty amount, and so opening the sheet never writes stock.
-struct PantryFormDraft: Equatable {
-    var name: String
-    var quantityText: String
-    var unit: String
-    var customUnit: String
-    var markIncompatible: Bool
-    var location: PantryLocation
-    var hasMinimum: Bool
-    var minimumText: String
-    var hasDate: Bool
-    var date: Date
+private struct PantryForm: View {
+    @Environment(\.dismiss) private var dismiss
+    var item: PantryItem?
+    var householdID: UUID?
+    @State private var draft: PantryFormDraft
+    var onSave: (PantryFormResult) -> Void
 
-    static let empty = PantryFormDraft(
-        name: "",
-        quantityText: "",
-        unit: "piece",
-        customUnit: "",
-        markIncompatible: false,
-        location: .pantry,
-        hasMinimum: false,
-        minimumText: "",
-        hasDate: false,
-        date: Date(timeIntervalSince1970: 0)
-    )
+    init(item: PantryItem?, householdID: UUID?, onSave: @escaping (PantryFormResult) -> Void) {
+        self.item = item
+        self.householdID = householdID
+        self.onSave = onSave
+        _draft = State(initialValue: Self.draft(for: item))
+    }
 
-    static func loaded(from item: PantryItem?) -> PantryFormDraft {
+    private static func draft(for item: PantryItem?) -> PantryFormDraft {
         guard let item else {
-            var draft = empty
+            var draft = PantryFormDraft.empty
             draft.date = Date()
             return draft
         }
-        return loaded(
+        return PantryFormDraft.loaded(
+            ingredientId: item.ingredientID,
             name: item.displayName,
             quantity: item.quantity,
             unit: item.unit,
             location: item.location,
             minimumQuantity: item.minimumQuantity,
-            bestBefore: item.bestBefore
+            dateType: item.dateType,
+            dateValue: item.dateValue
         )
-    }
-
-    static func loaded(
-        name: String,
-        quantity: Double,
-        unit: String,
-        location: PantryLocation,
-        minimumQuantity: Double?,
-        bestBefore: Date?,
-        pickerUnits: [String] = GroceryViewModel.manualUnits
-    ) -> PantryFormDraft {
-        var draft = empty
-        draft.date = Date()
-        draft.name = name
-        draft.quantityText = QuantityFormat.string(quantity)
-        draft.location = location
-        let canonical = UnitNormalization.parse(unit).code
-        if PantryUnitPolicy.isKnown(unit), pickerUnits.contains(canonical) {
-            draft.unit = canonical
-            draft.markIncompatible = false
-        } else {
-            draft.markIncompatible = true
-            draft.customUnit = unit
-        }
-        if let minimumQuantity {
-            draft.hasMinimum = true
-            draft.minimumText = QuantityFormat.string(minimumQuantity)
-        }
-        if let bestBefore {
-            draft.hasDate = true
-            draft.date = bestBefore
-        }
-        return draft
-    }
-
-    var resolvedUnit: String { markIncompatible ? customUnit : unit }
-
-    /// Nil when the field is empty or not a finite, non-negative number. Never substitutes 0.
-    var quantityToSave: Double? { Self.parseQuantity(quantityText) }
-
-    var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && quantityToSave != nil
-            && !resolvedUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    static func parseQuantity(_ text: String) -> Double? {
-        GroceryQuantityEdit.parse(text)
-    }
-}
-
-private struct PantryForm: View {
-    @Environment(\.dismiss) private var dismiss
-    var item: PantryItem?
-    @State private var draft: PantryFormDraft
-    var onSave: (String, Double, String, PantryLocation, Double?, Date?, Bool) -> Void
-
-    init(item: PantryItem?, onSave: @escaping (String, Double, String, PantryLocation, Double?, Date?, Bool) -> Void) {
-        self.item = item
-        self.onSave = onSave
-        _draft = State(initialValue: PantryFormDraft.loaded(from: item))
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Malzeme", text: $draft.name)
-                TextField("Miktar", text: $draft.quantityText).keyboardType(.decimalPad)
-                if draft.markIncompatible {
-                    TextField("Uyumsuz birim", text: $draft.customUnit)
-                } else {
+                Section("Malzeme") {
+                    NavigationLink {
+                        PantryIngredientPicker(query: draft.name, householdID: householdID) { entry, isNew in
+                            draft.choose(entry, isNewCustom: isNew)
+                        }
+                    } label: {
+                        LabeledContent("Malzeme", value: draft.ingredientId == nil ? PantryCopy.pickIngredient : draft.name)
+                    }
+                    .accessibilityIdentifier("pantry.form.ingredient")
+                    if draft.ingredientId == nil && item != nil {
+                        Text(PantryCopy.unmatchedHint).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                Section("Miktar") {
+                    TextField("Miktar", text: $draft.quantityText)
+                        .keyboardType(.decimalPad)
                     Picker("Birim", selection: $draft.unit) {
-                        ForEach(GroceryViewModel.manualUnits, id: \.self) { code in
+                        if draft.unit.isEmpty { Text("Birim seç").tag("") }
+                        ForEach(PantryUnitPolicy.pickerUnits, id: \.self) { code in
                             Text(UnitLabels.turkish(code)).tag(code)
                         }
                     }
+                    if let legacy = draft.legacyUnit, draft.unit.isEmpty {
+                        Text("Kayıtlı birim “\(legacy)” tanınmıyor. Listeden bilinen bir birim seç.")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                    Picker("Konum", selection: $draft.location) {
+                        ForEach(PantryLocation.allCases) { Text($0.title).tag($0) }
+                    }
                 }
-                Toggle("Uyumsuz birim", isOn: $draft.markIncompatible)
-                Picker("Konum", selection: $draft.location) { ForEach(PantryLocation.allCases) { Text($0.title).tag($0) } }
-                Toggle("Minimum miktar", isOn: $draft.hasMinimum)
-                if draft.hasMinimum { TextField("Minimum", text: $draft.minimumText).keyboardType(.decimalPad) }
-                Toggle("Son kullanma tarihi", isOn: $draft.hasDate)
-                if draft.hasDate { DatePicker("Tarih", selection: $draft.date, displayedComponents: .date) }
+                Section {
+                    Toggle("Minimum miktar", isOn: $draft.hasMinimum)
+                    if draft.hasMinimum {
+                        TextField("Minimum (\(UnitLabels.turkish(draft.unit)))", text: $draft.minimumText)
+                            .keyboardType(.decimalPad)
+                    }
+                } footer: {
+                    Text("Minimum, miktarla aynı birimdedir. Altına inince satırda “Azaldı” görünür.")
+                }
+                Section {
+                    Toggle("Tarih ekle", isOn: $draft.hasDate)
+                    if draft.hasDate {
+                        Picker("Tarih türü", selection: $draft.dateType) {
+                            ForEach(PantryDateType.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.inline)
+                        DatePicker("Tarih", selection: $draft.date, displayedComponents: .date)
+                            .environment(\.locale, Locale(identifier: "tr_TR"))
+                    }
+                } header: {
+                    Text(PantryCopy.dateSection)
+                } footer: {
+                    Text(PantryCopy.dateFooter)
+                }
             }
             .navigationTitle(item == nil ? "Pantry malzemesi" : "Malzemeyi düzenle")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("İptal") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -618,19 +748,22 @@ private struct PantryForm: View {
                         .disabled(!draft.canSave)
                 }
             }
-            .task(id: item?.persistentModelID) { reload() }
-            .onChange(of: item?.persistentModelID) { _, _ in reload() }
         }
     }
 
-    private func reload() {
-        draft = PantryFormDraft.loaded(from: item)
-    }
-
     private func save() {
-        guard let value = draft.quantityToSave else { return }
-        let minValue = draft.hasMinimum ? PantryFormDraft.parseQuantity(draft.minimumText) : nil
-        onSave(draft.name, value, draft.resolvedUnit, draft.location, minValue, draft.hasDate ? draft.date : nil, draft.markIncompatible)
+        guard let quantity = draft.quantityToSave, let ingredientId = draft.ingredientId else { return }
+        onSave(PantryFormResult(
+            ingredientId: ingredientId,
+            name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
+            isNewCustom: draft.isNewCustom,
+            quantity: quantity,
+            unit: draft.unit,
+            location: draft.location,
+            minimum: draft.minimumToSave,
+            dateType: draft.hasDate ? draft.dateType : nil,
+            dateValue: draft.hasDate ? Calendar.current.startOfDay(for: draft.date) : nil
+        ))
         dismiss()
     }
 }

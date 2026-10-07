@@ -23,5 +23,12 @@ OUT="${TMPDIR:-/tmp}/meal-memory-checks"
   "$ROOT/MealRoutine/Services/MealReplacement.swift" \
   "$ROOT/MealRoutine/Support/WeekCalendar.swift" \
   "$ROOT/MealRoutine/Support/WeekPresentationRules.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
+  "$ROOT/MealRoutine/Services/PantryDomain.swift" \
+  "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
+  "$ROOT/MealRoutine/Support/Formatters.swift" \
+  "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
+  "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
+  "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \
   "$ROOT/Tools/meal_memory_checks.swift"
 (cd "$ROOT" && "$OUT")

@@ -9,5 +9,12 @@ OUT="${TMPDIR:-/tmp}/meal-recommender-checks"
   "$ROOT/MealRoutine/Services/Catalog/RecipeCatalogDTO.swift" \
   "$ROOT/MealRoutine/Services/MealRecommender.swift" \
   "$ROOT/MealRoutine/Services/MealExposureLog.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
+  "$ROOT/MealRoutine/Services/PantryDomain.swift" \
+  "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
+  "$ROOT/MealRoutine/Support/Formatters.swift" \
+  "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
+  "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
+  "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \
   "$ROOT/Tools/meal_recommender_checks.swift"
 (cd "$ROOT" && "$OUT")

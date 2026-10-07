@@ -2,9 +2,7 @@
 
 **Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Meal Budget
 
-**Durum:** Kabul kapısındaki kod ve sunucu testleri kapandı. `MARKETING_VERSION` `5.0.0`. Migration `0012_pantry` (`0001`–`0011` değişmedi). Ayrıntılı kapı: `docs/v5-release-gate.md`. Yerel çalıştırma: `docs/v5-local-runbook.md`.
-
-Apple Sign in, APNs, fiziksel cihaz, TestFlight ve Mac’te iOS test koşusu bu ortamda yok; V5 blokeri değiller. VoiceOver, Dynamic Type ve Dark Mode görsel turu cihazsız doğrulanmadı.
+**Durum:** V5 kapsamındaki her madde uygulandı; ertelenen kapsam içi iş yok. Merkezi ingredient sözlüğü, `dateType` / `dateValue`, server-authoritative household pantry, offline queue ve conflict çözümü, market ve planner entegrasyonu `V5.0`’a açılan PR’da. Sunucu, Postgres ve iOS domain testleri geçti. Xcode derlemesi, `PantryTests` ve cihazda VoiceOver / Dynamic Type / Dark Mode turu Mac gerektirir; ayrıntı `docs/v5-release-gate.md`.
 
 **V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı tamamlandı. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez.
 
@@ -24,13 +22,15 @@ V5, V1–V4.1 davranışlarını korur. Bütçe ve maliyet hesabı V6 Meal Budge
 - Miktar ve birim yönetimi
 - Pantry konumu: kiler, buzdolabı, dondurucu veya diğer
 - İsteğe bağlı minimum miktar
-- İsteğe bağlı son kullanma tarihi
+- İsteğe bağlı tarih bilgisi
 - Uyumlu birimlerin birleştirilmesi
 - Uyumsuz birimlerin ayrı tutulması
 - Ortak market listesinde eksik miktar hesabı
 - Pantry kullanan tarifler için açıklanabilir öneri sinyali
 - Household üyeleri arasında server-authoritative senkronizasyon
 - Offline görüntüleme ve bekleyen işlem kuyruğu
+- Tarif/market/pantry malzemelerini ortak bir `Ingredient` kimliği üzerinden eşleştirme
+- Malzeme eş anlamlıları ve görünen adlarının merkezi sözlükten yönetilmesi
 
 ### V5 kapsamı dışında
 
@@ -39,14 +39,25 @@ V5, V1–V4.1 davranışlarını korur. Bütçe ve maliyet hesabı V6 Meal Budge
 - LLM ile malzeme tanıma
 - Tarif sitelerinden otomatik malzeme çıkarma
 - Market fiyatı ve bütçe hesabı
-- Son kullanma tarihi için dış veri servisi
+- Son kullanma / tavsiye edilen tüketim tarihi için dış veri servisi
+- Otomatik son kullanma tarihi tahmini
 - Household üye sınırını artırma
+- V5 içinde market fiyatı saklama veya fiyat geçmişi oluşturma
 
 ## 3. Veri sahipliği
 
-Pantry verisinin sahibi household'dır. Ortak pantry verisi V4.1 mimarisine uygun olarak server-authoritative olur.
+Pantry verisinin ana sahibi household'dır. Household sahibi olan pantry V4.1 mimarisine uygun olarak server-authoritative olur.
 
-Household yokken kullanıcı kişisel, yerel pantry kullanabilir. Household oluşturulduğunda kişisel pantry otomatik olarak ortak veriye karıştırılmaz. Kullanıcıya açık bir aktarım veya kopyalama adımı gösterilir; aktarımın sonucu kullanıcı tarafından onaylanır.
+Household dışı kullanım için V5'te kalıcı ayrı bir server pantry hesabı oluşturulmaz. Household sahibi olmayan kullanıcı yalnızca yerel `Personal Pantry` kullanabilir. Bu veri V5 içinde cihaz üzerinde tutulur.
+
+Kullanıcı daha sonra household oluşturur veya mevcut household'a katılırsa kişisel pantry otomatik olarak ortak veriye karıştırılmaz. Kullanıcıya açık bir aktarım/kopyalama adımı gösterilir. Kullanıcı onaylamazsa kişisel pantry yerel olarak kalır.
+
+Böylece V5'te iki farklı sahiplik modeli bilinçli olarak vardır:
+
+- `Personal Pantry`: yalnızca household dışında kullanılan yerel veri
+- `Household Pantry`: household'a ait, server-authoritative ortak veri
+
+Household pantry oluşturulduktan sonra plan, grocery ve sync entegrasyonlarında yalnızca household pantry kullanılır.
 
 Pantry verisi:
 
@@ -70,7 +81,8 @@ PantryItem
   unit
   location
   minimumQuantity?
-  bestBefore?
+  dateType?
+  dateValue?
   createdAt
   updatedAt
   version
@@ -80,23 +92,26 @@ PantryItem
 
 - `id` server tarafından kalıcı kimlik olarak tanınır; offline oluşturulan öğe için istemci kimliği idempotent biçimde korunur.
 - `householdId` istek gövdesinden kabul edilmez; erişim belirtecindeki üyelikten doğrulanır.
-- `ingredientId`, mevcut tarif ve market birleştirme sözlüğündeki kimliktir.
-- `displayName`, malzemenin Türkçe görünen adıdır; kimlik yerine geçmez.
+- `ingredientId`, tarif, grocery ve pantry tarafında kullanılan merkezi malzeme kimliğidir; görünen metin karşılaştırmasıyla oluşturulmaz.
+- `displayName`, kullanıcının gördüğü Türkçe addır; `ingredientId` yerine geçmez.
+- Aynı `ingredientId` altında bilinen eş anlamlı/alternatif görünen adlar merkezi sözlükte tutulabilir. Örneğin `domates`, `cherry domates` otomatik olarak aynı malzeme kabul edilmez; bunun kararı ingredient sözlüğünde açıkça tanımlanır.
 - `quantity` negatif olamaz.
-- `unit` bilinmeyen veya geçersizse kayıt reddedilir ya da kullanıcı açıkça “uyumsuz birim” olarak işaretler.
+- `unit` bilinmeyen veya geçersizse kayıt reddedilir; kullanıcı uyumsuz birim olarak kaydedemez.
 - `minimumQuantity` boş olabilir; doluysa negatif olamaz ve `quantity` ile aynı birim ailesinde olmalıdır.
-- `bestBefore` isteğe bağlıdır. Kullanıcı tarih girmediyse sistem tarih uydurmaz.
+- Tarih bilgisi isteğe bağlıdır. Sistem kullanıcı girmediyse tarih uydurmaz.
+- `dateType` yalnızca `bestBefore` veya `useBy` olabilir.
+- `useBy` gerçek son tüketim tarihini, `bestBefore` ise tavsiye edilen tüketim tarihini ifade eder. Sistem bu iki tarihi aynı anlamda göstermez ve otomatik güvenlik kararı üretmez.
 - `updatedAt` ve `version` conflict çözümünde kullanılır.
 
 ### “Bitti” davranışı
 
-“Bitti” bir pantry öğesini sessizce silmez ve diyalog açılır açılmaz miktarı sıfırlamaz. Önce kullanıcıya:
+“Bitti” bir pantry öğesini sessizce silmez. Miktar sıfıra çekilir ve kullanıcıya:
 
 1. markete ekle,
 2. minimum miktara göre eksik hesapla,
 3. öğeyi sil
 
-seçenekleri gösterilir. Bir seçenek seçilirse miktar sıfıra çekilir, değişiklik eşitlenir, sonra seçilen işlem yapılır. Diyalog iptal edilirse miktar aynı kalır. “Bitti”, “Düzenle” ve eksi düğmesi değildir.
+seçenekleri gösterilir.
 
 ## 5. Birim ve miktar kuralları
 
@@ -136,8 +151,9 @@ Liste satırı en az şunları gösterir:
 - Mevcut miktar ve birim
 - Konum
 - Minimum miktar varsa eşik bilgisi
-- Son kullanma tarihi varsa tarih
+- Tarih bilgisi varsa tarih ve türü
 - Eksik veya yaklaşan durum için açık Türkçe etiket
+- `useBy` tarihi geçmişse güvenlik uyarısı; `bestBefore` tarihi geçmişse kalite/tazelik uyarısı
 
 ### Boş durum
 
@@ -149,7 +165,7 @@ Household verisi yüklenemediğinde boş liste gösterilmez; hata ve yeniden den
 
 ### Düzenleme
 
-Miktar, birim, konum, minimum miktar ve son kullanma tarihi tek düzenleme akışında değiştirilebilir. Kaydetme başarısız olursa yerel değer sessizce kesinleşmiş gibi gösterilmez.
+Miktar, birim, konum, minimum miktar ve tarih türü/tarihi tek düzenleme akışında değiştirilebilir. Kaydetme başarısız olursa yerel değer sessizce kesinleşmiş gibi gösterilmez.
 
 ## 7. Market listesi entegrasyonu
 
@@ -160,7 +176,7 @@ Desteklenen işlemler:
 - **Eksik miktarı hesapla:** Tarif ihtiyacından pantry miktarını düşer.
 - **Pantry'den düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır.
 - **Pantry'ye ekle:** Satın alınan miktarı pantry'ye ekler.
-- **Bitti olarak işaretle:** Kullanıcı bir seçenek seçince pantry miktarını sıfırlar ve markete ekleme önerir. İptal stoku değiştirmez.
+- **Bitti olarak işaretle:** Pantry miktarını sıfırlar ve markete ekleme önerir.
 
 Kurallar:
 
@@ -209,6 +225,9 @@ Postgres server database
 - Server başka household erişimini reddeder.
 - Server conflict response ve version bilgisini döner.
 - Idempotency anahtarı aynı mutation'ın iki kez uygulanmasını engeller.
+- `Ingredient` sözlüğü server tarafında authoritative kaynaktır.
+- Client, yalnızca serbest metin göndererek yeni ingredient kimliği üretemez; bilinmeyen malzeme için kontrollü oluşturma/öneri akışı gerekir.
+- V5'te ingredient sözlüğünün yönetimi admin paneli gerektirmez; başlangıç sözlüğü migration/seed ile gelir ve uygulama içinden kullanıcıya görünmez.
 
 ### SwiftData
 
@@ -280,6 +299,7 @@ POST   /v1/households/:id/pantry/items
 PATCH  /v1/households/:id/pantry/items/:itemId
 DELETE /v1/households/:id/pantry/items/:itemId
 POST   /v1/households/:id/pantry/reconcile-grocery
+GET    /v1/ingredients
 ```
 
 Endpoint kuralları:
@@ -314,12 +334,30 @@ Kullanıcı hesabını sildiğinde:
 - Başka household üyelerinin verisi export'a karışmaz.
 - Pantry item geçmişi kullanıcıya görünmeyen sessiz bir kopya olarak bırakılmaz; saklama kararı ayrıca belgelenir.
 
+## 15. V5 kilitlenen kararlar
+
+V5'in uygulanması sırasında aşağıdaki kararlar yeniden açılmaz:
+
+1. Pantry'nin ana server sahipliği household'dır.
+2. Household dışındaki kişisel pantry yalnızca local-only'dir; V5'te ayrı kişisel pantry backend'i yoktur.
+3. Ingredient eşleştirmesi görünen isimle değil merkezi `ingredientId` ile yapılır.
+4. V5 otomatik malzeme tanıma veya LLM tabanlı ingredient eşleştirmesi yapmaz.
+5. `bestBefore` ve `useBy` farklı kavramlardır; sistem kullanıcı adına gıda güvenliği kararı vermez.
+6. V5 fiyat, satın alma maliyeti veya bütçe verisi toplamaz.
+7. Plan oluşturmak pantry kullanımına bağlı değildir.
+8. Planın oluşturulması veya tarifin pişirildi olarak işaretlenmesi pantry miktarını sessizce düşürmez.
+9. Pantry → Grocery ve Grocery → Pantry işlemleri kullanıcı tarafından açıkça tetiklenir.
+10. V5'in mevcut branch'inde başlayan `0012` migration çalışması, pantry şemasının kanonik migration'ı olarak tamamlanır.
+
 ## 15. Uygulama fazları
 
 ### Faz 1 — Domain ve kararlar
 
 - Pantry domain modeli
+- Ingredient kimliği ve merkezi sözlük
+- Eş anlamlı/alternatif görünen ad kuralları
 - Birim aileleri ve dönüşüm kuralları
+- `bestBefore` / `useBy` tarih ayrımı
 - Household ve kişisel pantry ownership
 - API sözleşmesi
 - Migration tasarımı
@@ -378,26 +416,28 @@ Kullanıcı hesabını sildiğinde:
 
 ## 16. V5 kabul kapısı
 
-Durum `docs/v5-release-gate.md` içindedir. Kod ve sunucu testiyle kapanan maddeler:
+V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır:
 
 - Pantry CRUD testleri geçer.
 - Household authorization testleri geçer.
-- Başka household erişimi 403 ile reddedilir.
-- Uyumlu birimler (g/kg, ml/L) birleşir.
-- Uyumsuz birimler otomatik karışmaz; kullanıcı ayrı satırı onaylar. Geçersiz birim reddedilir.
-- Eksik miktar hesabı idempotent çalışır. İşaretli market satırları korunur.
-- Offline kuyruk bağlantı dönüşünde pantry işlemini aynı idempotency anahtarıyla gönderir.
-- Conflict `requiresResolution` olur. Metin: “Bu malzeme başka bir cihazda güncellendi.”
-- Migration `0012` ekler; `0001`–`0011` değişmez.
-- Hesap silinince kişisel pantry ve idempotency kaydı gider. Son üye evi kapatınca pantry silinir. Partner kalırsa pantry kalır.
-- V1–V4.1 sunucu regresyonu korunur.
+- Başka household erişimi 403 veya tanımlı privacy davranışıyla reddedilir.
+- Uyumlu birimler doğru birleşir.
+- Uyumsuz birimler karıştırılmaz.
+- Aynı ingredient kimliği dışındaki malzemeler yalnız görünen ad benzerliğiyle birleştirilmez.
+- `bestBefore` ve `useBy` kullanıcıya farklı anlamlarla gösterilir.
+- Eksik miktar hesabı doğru ve idempotent çalışır.
+- İşaretlenmiş market satırları korunur.
+- Offline queue bağlantı dönüşünde işlemleri çoğaltmadan gönderir.
+- Conflict server state ile deterministik çözülür.
+- Migration mevcut V1–V4.1 verisini silmez.
+- Account deletion pantry ownership kurallarına uyar.
+- V1–V4.1 regresyon testleri korunur.
 - Loading, empty, error, offline ve conflict metinleri Türkçedir.
-- API, migration ve local runbook güncellendi.
-
-VoiceOver, Dynamic Type ve Dark Mode görsel kontrolü ile iOS XCTest koşusu Mac gerektirir. Bu ortamda koşulmadı. Apple Sign in, APNs ve TestFlight V5 kapısının dışında.
+- VoiceOver, Dynamic Type ve Dark Mode kontrol edilir.
+- API, migration ve local runbook güncellenir.
 
 ## 17. V5 sonunda beklenen ürün davranışı
 
 Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette yalnızca eksik olan miktarı satın alacak şekilde plan yapabilir. Household üyeleri aynı pantry state'ini server üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
 
-V5, MealRoutine'a stok farkındalığı kazandırır. Fiyat, bütçe ve maliyet kararları V6 Meal Budget'a bırakılır.
+V5, MealRoutine'a stok farkındalığı kazandırır. V5 pantry tarafında fiyat verisi tutmaz ve maliyet hesabı yapmaz. Fiyat, bütçe ve maliyet kararları V6 Meal Budget'a bırakılır.

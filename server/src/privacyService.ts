@@ -55,6 +55,7 @@ export function createPrivacyService(input: {
         household,
         notificationPreferences: preferences,
         pantry: membership && household ? await input.pantry.listPantry(membership.householdId) : [],
+        pantryIngredients: membership && household ? await input.pantry.listIngredients(membership.householdId) : [],
       }
     },
 

@@ -1,0 +1,391 @@
+import Foundation
+import XCTest
+@testable import MealRoutine
+
+/// Pure V5 pantry rules. Foundation only, so this file also runs outside Xcode.
+final class PantryDomainTests: XCTestCase {
+    private static let dictionary: IngredientDictionary = {
+        if !IngredientDictionary.shared.entries.isEmpty { return IngredientDictionary.shared }
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<4 {
+            let url = directory.appendingPathComponent("MealRoutine/Recipes/ingredients.v1.json")
+            if let data = try? Data(contentsOf: url), let loaded = try? IngredientDictionary(data: data) { return loaded }
+            directory.deleteLastPathComponent()
+        }
+        return IngredientDictionary(entries: [])
+    }()
+
+    private var dictionary: IngredientDictionary { Self.dictionary }
+
+    private let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Istanbul")!
+        return calendar
+    }()
+
+    private func day(_ text: String) -> Date { PantryDay.date(from: text, calendar: utc)! }
+
+    // MARK: Dictionary
+
+    func testDictionaryLoadsTheSeedTheServerUses() {
+        XCTAssertGreaterThan(dictionary.entries.count, 300)
+        XCTAssertEqual(dictionary.entry("tomato")?.name, "Domates")
+        XCTAssertEqual(Set(dictionary.entries.map(\.id)).count, dictionary.entries.count)
+    }
+
+    func testCatalogIdsMeetOnOneIngredientIdOnlyWhenTheDictionarySaysSo() {
+        XCTAssertEqual(dictionary.canonicalId("tomatoes"), "tomato")
+        XCTAssertTrue(dictionary.sameIngredient("tomatoes", "tomato"))
+        XCTAssertEqual(dictionary.canonicalId("pepper"), "blackpepper")
+        XCTAssertFalse(dictionary.sameIngredient("pepper", "peppers"))
+        XCTAssertFalse(dictionary.sameIngredient("cherry-tomato", "tomato"))
+        XCTAssertFalse(dictionary.sameIngredient("tomatopaste", "tomato"))
+    }
+
+    func testImportedNamesResolveOnlyThroughADeclaredNameOrSynonym() {
+        XCTAssertEqual(dictionary.canonicalId("import:domates"), "tomato")
+        XCTAssertEqual(dictionary.canonicalId("import:iridomates"), "tomato")
+        XCTAssertNil(dictionary.canonicalId("import:domatesler"))
+        XCTAssertNil(dictionary.canonicalId("manual:\(UUID().uuidString)"))
+        XCTAssertNil(dictionary.canonicalId("domates"))
+        XCTAssertEqual(dictionary.matchKey("domates"), "unresolved:domates")
+        XCTAssertFalse(dictionary.sameIngredient("domates", "domates"))
+    }
+
+    func testCustomIngredientsAreRandomAndMatchOnlyThemselves() {
+        let first = IngredientDictionary.newCustomId()
+        let second = IngredientDictionary.newCustomId()
+        XCTAssertTrue(IngredientDictionary.isCustom(first))
+        XCTAssertNotEqual(first, second)
+        XCTAssertFalse(first.contains("kestane"))
+        XCTAssertEqual(dictionary.canonicalId(first.uppercased()), first)
+        XCTAssertFalse(dictionary.sameIngredient(first, second))
+        XCTAssertFalse(IngredientDictionary.isCustom("custom:kestane"))
+        XCTAssertNil(dictionary.canonicalId("custom:kestane"))
+    }
+
+    func testSearchSuggestsButNeverDecidesIdentity() {
+        let results = dictionary.search("domates")
+        XCTAssertEqual(results.first?.id, "tomato")
+        XCTAssertTrue(results.contains { $0.id == "cherry-tomato" })
+        XCTAssertNil(dictionary.exactMatch(for: "cherry"))
+        XCTAssertEqual(dictionary.exactMatch(for: "Cherry domates")?.id, "cherry-tomato")
+        let custom = IngredientEntry(id: IngredientDictionary.newCustomId(), name: "Kestane")
+        XCTAssertEqual(dictionary.search("kest", including: [custom]).first, custom)
+    }
+
+    func testFoldMatchesTheServerFold() {
+        XCTAssertEqual(IngredientDictionary.fold("İri Domates"), "iridomates")
+        XCTAssertEqual(IngredientDictionary.fold("Çarliston biber"), "carlistonbiber")
+        XCTAssertEqual(IngredientDictionary.fold("  Şeker (toz) "), "sekertoz")
+        XCTAssertEqual(IngredientDictionary.fold("ılık süt"), "iliksut")
+    }
+
+    // MARK: Dates
+
+    func testUseByAndBestBeforeWarnDifferently() {
+        let now = day("2026-10-07")
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, date: day("2026-10-05"), now: now, calendar: utc), .pastUseBy(daysAgo: 2))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-05"), now: now, calendar: utc), .pastBestBefore(daysAgo: 2))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, date: day("2026-10-07"), now: now, calendar: utc), .approaching(daysLeft: 0))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-10"), now: now, calendar: utc), .approaching(daysLeft: 3))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-11"), now: now, calendar: utc), .upcoming(daysLeft: 4))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: nil, date: nil, now: now, calendar: utc), .none)
+        XCTAssertNotEqual(PantryDateType.useBy.title, PantryDateType.bestBefore.title)
+    }
+
+    func testCalendarDaysRoundTripAndInvalidDaysAreRejected() {
+        XCTAssertEqual(PantryDay.string(from: day("2026-02-28"), calendar: utc), "2026-02-28")
+        XCTAssertNil(PantryDay.date(from: "2026-02-30", calendar: utc))
+        XCTAssertNil(PantryDay.date(from: "yarın", calendar: utc))
+    }
+
+    func testRowShowsSafetyForUseByAndQualityForBestBefore() {
+        let now = day("2026-10-07")
+        let safety = PantryRowPresentation.make(
+            name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
+            minimumQuantity: nil, dateType: .useBy, dateValue: day("2026-10-06"), now: now, calendar: utc
+        )
+        XCTAssertEqual(safety.badges.first?.tone, .critical)
+        XCTAssertTrue(safety.badges.first?.text.hasPrefix("Güvenlik uyarısı") == true)
+        XCTAssertTrue(safety.date?.hasPrefix("Son tüketim tarihi (STT)") == true)
+
+        let quality = PantryRowPresentation.make(
+            name: "Makarna", ingredientResolved: true, quantity: 500, unit: "g", location: .pantry,
+            minimumQuantity: nil, dateType: .bestBefore, dateValue: day("2026-10-06"), now: now, calendar: utc
+        )
+        XCTAssertEqual(quality.badges.first?.tone, .warning)
+        XCTAssertTrue(quality.badges.first?.text.hasPrefix("Tazelik uyarısı") == true)
+        XCTAssertFalse(quality.badges.contains { $0.text.contains("Güvenlik") })
+        XCTAssertTrue(quality.date?.hasPrefix("Tavsiye edilen tüketim tarihi (TETT)") == true)
+    }
+
+    func testRowListsEveryGuideFieldAndSpeaksThem() {
+        let now = day("2026-10-07")
+        let row = PantryRowPresentation.make(
+            name: "Un", ingredientResolved: true, quantity: 200, unit: "g", location: .pantry,
+            minimumQuantity: 500, dateType: .bestBefore, dateValue: day("2026-10-09"), sync: .pending, now: now, calendar: utc
+        )
+        XCTAssertEqual(row.amount, "200 g")
+        XCTAssertEqual(row.location, "Kiler")
+        XCTAssertEqual(row.minimum, "Minimum 500 g")
+        XCTAssertEqual(row.date, "Tavsiye edilen tüketim tarihi (TETT): 9 Ekim 2026 (2 gün kaldı)")
+        XCTAssertEqual(row.badges.map(\.text), ["Tavsiye edilen tarih yaklaşıyor", PantryCopy.lowStock, PantryCopy.pending])
+        for piece in ["Un", "200 g", "Kiler", "Minimum 500 g", "TETT", PantryCopy.lowStock, PantryCopy.pending] {
+            XCTAssertTrue(row.accessibilityLabel.contains(piece), piece)
+        }
+        let plain = PantryRowPresentation.make(
+            name: "Tuz", ingredientResolved: false, quantity: 0, unit: "g", location: .other,
+            minimumQuantity: nil, dateType: nil, dateValue: nil, now: now, calendar: utc
+        )
+        XCTAssertNil(plain.date)
+        XCTAssertEqual(plain.badges.map(\.text), [PantryCopy.outOfStock, PantryCopy.unmatched])
+    }
+
+    // MARK: Units and Bitti
+
+    func testUnknownUnitsAreRejectedEvenWhenTheUserAsksForASeparateRow() {
+        XCTAssertEqual(PantryUnitPolicy.decision(existingUnit: nil, existingQuantity: 0, incomingUnit: "kova", incomingQuantity: 1, confirmSeparate: true), .invalid)
+        XCTAssertEqual(PantryUnitPolicy.decision(existingUnit: "g", existingQuantity: 400, incomingUnit: "piece", incomingQuantity: 2, confirmSeparate: false), .choiceRequired(existingUnit: "g"))
+        XCTAssertEqual(PantryUnitPolicy.decision(existingUnit: "g", existingQuantity: 400, incomingUnit: "piece", incomingQuantity: 2, confirmSeparate: true), .separate)
+        XCTAssertEqual(PantryUnitPolicy.decision(existingUnit: "g", existingQuantity: 400, incomingUnit: "kg", incomingQuantity: 1, confirmSeparate: false), .merge(quantity: 1400, unit: "g"))
+        XCTAssertTrue(PantryUnitPolicy.pickerUnits.allSatisfy(PantryUnitPolicy.isKnown))
+        XCTAssertEqual(Set(PantryUnitPolicy.pickerUnits), PantryUnitPolicy.knownCodes)
+    }
+
+    func testSwitchingGramsToKilogramsKeepsTheSameStock() {
+        XCTAssertEqual(PantryUnitPolicy.editedQuantity(previousQuantity: 500, previousUnit: "g", typedQuantity: 500, newUnit: "kg"), 0.5)
+        XCTAssertEqual(PantryUnitPolicy.editedQuantity(previousQuantity: 500, previousUnit: "g", typedQuantity: 2, newUnit: "kg"), 2)
+        XCTAssertEqual(PantryUnitPolicy.editedQuantity(previousQuantity: 500, previousUnit: "g", typedQuantity: 500, newUnit: "piece"), 500)
+    }
+
+    func testBittiOnlyZeroesAfterAChoiceAndCancelKeepsStock() {
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: nil), 500)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .addToMarket), 0)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .missingAgainstMinimum), 0)
+        XCTAssertEqual(PantryFinishedFlow.quantity(current: 500, choice: .deleteItem), 0)
+        XCTAssertEqual(PantryFinishedMath.shortage(quantity: 0, minimum: 2), 2)
+        XCTAssertNil(PantryFinishedMath.shortage(quantity: 0, minimum: nil))
+    }
+
+    func testEditDraftLoadsTheStoredRowAndNeverSavesAnUnknownUnitOrIngredient() {
+        let draft = PantryFormDraft.loaded(
+            ingredientId: "tomatoes", name: "Domates", quantity: 500, unit: "g", location: .refrigerator,
+            minimumQuantity: 100, dateType: .useBy, dateValue: day("2026-10-09"), dictionary: dictionary
+        )
+        XCTAssertEqual(draft.ingredientId, "tomato")
+        XCTAssertEqual(draft.quantityToSave, 500)
+        XCTAssertEqual(draft.minimumText, "100")
+        XCTAssertEqual(draft.dateType, .useBy)
+        XCTAssertTrue(draft.hasDate)
+        XCTAssertTrue(draft.canSave)
+
+        var blank = draft
+        blank.quantityText = " "
+        XCTAssertNil(blank.quantityToSave)
+        XCTAssertFalse(blank.canSave)
+
+        let legacy = PantryFormDraft.loaded(ingredientId: "domates", name: "Domates", quantity: 2, unit: "kova", location: .pantry, minimumQuantity: nil, dictionary: dictionary)
+        XCTAssertNil(legacy.ingredientId)
+        XCTAssertEqual(legacy.legacyUnit, "kova")
+        XCTAssertEqual(legacy.unit, "")
+        XCTAssertFalse(legacy.canSave)
+        var fixed = legacy
+        fixed.choose(dictionary.entry("tomato")!, isNewCustom: false)
+        fixed.unit = "piece"
+        XCTAssertTrue(fixed.canSave)
+        fixed.hasMinimum = true
+        fixed.minimumText = "abc"
+        XCTAssertFalse(fixed.canSave)
+    }
+
+    // MARK: Market
+
+    func testMissingAmountUsesTheDictionaryIdAcrossCatalogSpellings() {
+        let lines = [PantryMarketLine(ingredientId: "tomatoes", quantity: 1, unit: "kg", isChecked: false, preserve: false)]
+        let stock = [PantryCoverageLine(ingredientId: "tomato", quantity: 400, unit: "g")]
+        let adjusted = PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary)
+        XCTAssertEqual(adjusted.first?.quantity, 0.6)
+        XCTAssertEqual(adjusted.first?.applied, true)
+        XCTAssertEqual(PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary), adjusted)
+    }
+
+    func testSimilarNamesWithoutASharedIdAreNeverSubtracted() {
+        let lines = [
+            PantryMarketLine(ingredientId: "tomato", quantity: 500, unit: "g", isChecked: false, preserve: false),
+            PantryMarketLine(ingredientId: "manual:\(UUID().uuidString)", quantity: 2, unit: "piece", isChecked: false, preserve: false),
+        ]
+        let stock = [
+            PantryCoverageLine(ingredientId: "cherry-tomato", quantity: 500, unit: "g"),
+            PantryCoverageLine(ingredientId: "tomatopaste", quantity: 500, unit: "g"),
+            PantryCoverageLine(ingredientId: IngredientDictionary.newCustomId(), quantity: 5, unit: "piece"),
+        ]
+        let adjusted = PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary)
+        XCTAssertEqual(adjusted.map(\.quantity), [500, 2])
+        XCTAssertEqual(adjusted.map(\.applied), [false, false])
+        XCTAssertEqual(adjusted.map(\.incompatible), [false, false])
+    }
+
+    func testIncompatibleUnitsAndCheckedRowsStayAsWritten() {
+        let lines = [
+            PantryMarketLine(ingredientId: "eggs", quantity: 6, unit: "piece", isChecked: false, preserve: false),
+            PantryMarketLine(ingredientId: "flour", quantity: 1, unit: "kg", isChecked: true, preserve: true),
+        ]
+        let stock = [
+            PantryCoverageLine(ingredientId: "egg", quantity: 500, unit: "g"),
+            PantryCoverageLine(ingredientId: "flour", quantity: 2, unit: "kg"),
+        ]
+        let adjusted = PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary)
+        XCTAssertEqual(adjusted[0].quantity, 6)
+        XCTAssertTrue(adjusted[0].incompatible)
+        XCTAssertFalse(adjusted[0].applied)
+        XCTAssertEqual(adjusted[1].quantity, 1)
+        XCTAssertFalse(adjusted[1].applied)
+    }
+
+    func testStockIsSharedAcrossLinesInsteadOfCountedTwice() {
+        let lines = [
+            PantryMarketLine(ingredientId: "tomato", quantity: 300, unit: "g", isChecked: false, preserve: false),
+            PantryMarketLine(ingredientId: "tomatoes", quantity: 300, unit: "g", isChecked: false, preserve: false),
+        ]
+        let stock = [PantryCoverageLine(ingredientId: "tomato", quantity: 400, unit: "g")]
+        let adjusted = PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary)
+        XCTAssertEqual(adjusted.map(\.quantity), [0, 200])
+        XCTAssertEqual(adjusted.first?.coveredByPantry, true)
+    }
+
+    func testCoverageKeyIsStableSoARetryReusesTheMutation() {
+        let lines = [PantryReconcileLine(ingredientId: "tomato", displayName: "Domates", quantity: 1000, unit: "g", checked: false)]
+        XCTAssertEqual(PantryMarketCoverage.idempotencyKey(for: lines), PantryMarketCoverage.idempotencyKey(for: lines))
+        var changed = lines
+        changed[0].quantity = 900
+        XCTAssertNotEqual(PantryMarketCoverage.idempotencyKey(for: lines), PantryMarketCoverage.idempotencyKey(for: changed))
+    }
+
+    // MARK: Planner
+
+    private func candidate(_ slug: String, score: Int = 60, ingredients: Set<String>, rating: MealRating? = nil) -> PickerCandidate {
+        PickerCandidate(
+            slug: slug, totalMinutes: 30, trDogfoodScore: score, ingredientIds: ingredients, rating: rating,
+            cuisine: "TR", category: "main", tags: [], protein: ""
+        )
+    }
+
+    func testPlannerSignalUsesIdsAndExplainsItself() {
+        let now = day("2026-10-07")
+        let menemen = candidate("menemen", ingredients: ["tomatoes", "eggs"])
+        let stock = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece")]
+        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: stock, now: now, dictionary: dictionary), 8)
+        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: stock, now: now, dictionary: dictionary), PantryCopy.usesStock)
+        let cherry = [PantryPlanningStock(ingredientId: "cherry-tomato", quantity: 2, unit: "piece")]
+        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: cherry, now: now, dictionary: dictionary), 0)
+        XCTAssertNil(PantryPlanningSignal.explanation(candidate: menemen, stock: cherry, now: now, dictionary: dictionary))
+    }
+
+    func testApproachingDatesSignalButAPassedUseByNeverEarnsABonus() {
+        let now = day("2026-10-07")
+        let menemen = candidate("menemen", ingredients: ["tomatoes"])
+        let soon = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: day("2026-10-08"))]
+        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: soon, now: now, dictionary: dictionary), PantryCopy.approachingExpiry)
+        let expired = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: day("2026-10-06"))]
+        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: expired, now: now, dictionary: dictionary), 0)
+        XCTAssertNil(PantryPlanningSignal.explanation(candidate: menemen, stock: expired, now: now, dictionary: dictionary))
+        let stale = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .bestBefore, dateValue: day("2026-10-06"))]
+        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: stale, now: now, dictionary: dictionary), PantryCopy.usesStock)
+        let empty = [PantryPlanningStock(ingredientId: "tomato", quantity: 0, unit: "piece")]
+        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: empty, now: now, dictionary: dictionary), 0)
+    }
+
+    func testEmptyPantryKeepsTheV41PlanAndPantryNeverBeatsHardFilters() {
+        let now = day("2026-10-07")
+        let pool = [
+            candidate("a", score: 80, ingredients: ["flour"]),
+            candidate("b", score: 70, ingredients: ["tomatoes"]),
+            candidate("c", score: 60, ingredients: ["eggs"]),
+            candidate("never", score: 99, ingredients: ["tomatoes"], rating: .never),
+        ]
+        let baseline = MealRecommender.pick(candidates: pool, evenings: 3, maxCookMinutes: 90, dislikedIngredientIds: [], now: now)
+        XCTAssertEqual(MealRecommender.pick(candidates: pool, evenings: 3, maxCookMinutes: 90, dislikedIngredientIds: [], pantryStock: [], now: now), baseline)
+        XCTAssertFalse(baseline.contains("never"))
+
+        let stock = [PantryPlanningStock(ingredientId: "tomato", quantity: 4, unit: "piece")]
+        let withPantry = MealRecommender.pick(candidates: pool, evenings: 3, maxCookMinutes: 90, dislikedIngredientIds: [], pantryStock: stock, now: now)
+        XCTAssertFalse(withPantry.contains("never"))
+        let vetoed = MealRecommender.pick(candidates: pool, evenings: 3, maxCookMinutes: 90, dislikedIngredientIds: [], excludingSlugs: ["b"], pantryStock: stock, now: now)
+        XCTAssertFalse(vetoed.contains("b"))
+        let disliked = MealRecommender.pick(candidates: pool, evenings: 3, maxCookMinutes: 90, dislikedIngredientIds: ["tomatoes"], pantryStock: stock, now: now)
+        XCTAssertFalse(disliked.contains("b"))
+    }
+
+    // MARK: Wire format
+
+    func testServerRowsDecodeWithMillisecondTimestamps() throws {
+        let json = """
+        {"id":"0b9c7c5e-7f43-4c1e-9d55-0d2b8f2f6a11","householdId":"6f1d2c3b-1a2b-4c5d-8e9f-001122334455","ingredientId":"tomato",
+         "displayName":"Domates","quantity":400,"unit":"g","location":"refrigerator","minimumQuantity":null,
+         "dateType":"useBy","dateValue":"2026-10-09","version":3,"createdAt":"2026-10-07T10:00:00.123Z","updatedAt":"2026-10-07T10:00:00.123Z"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let item = try decoder.decode(PantryRemoteItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.version, 3)
+        XCTAssertEqual(item.dateType, .useBy)
+        XCTAssertEqual(item.dateValue, "2026-10-09")
+        XCTAssertEqual(item.location, .refrigerator)
+    }
+
+    func testPreGatePayloadsStillDecodeSoQueuedEditsAreNotLost() throws {
+        let item = """
+        {"id":"0b9c7c5e-7f43-4c1e-9d55-0d2b8f2f6a11","householdId":"6f1d2c3b-1a2b-4c5d-8e9f-001122334455","ingredientId":"tomato",
+         "displayName":"Domates","quantity":1,"unit":"kg","location":"pantry","bestBefore":"2026-10-09","revision":4}
+        """
+        let payload = "{\"action\":\"update\",\"householdID\":\"6F1D2C3B-1A2B-4C5D-8E9F-001122334455\",\"item\":\(item),\"confirmSeparate\":false}"
+        let decoded = try JSONDecoder().decode(PantryQueuedPayload.self, from: Data(payload.utf8))
+        XCTAssertEqual(decoded.item?.dateType, .bestBefore)
+        XCTAssertEqual(decoded.item?.dateValue, "2026-10-09")
+        XCTAssertEqual(decoded.baseVersion, 4)
+        let roundTrip = try JSONDecoder().decode(PantryQueuedPayload.self, from: JSONEncoder().encode(decoded))
+        XCTAssertEqual(roundTrip, decoded)
+    }
+
+    func testBodiesMatchTheStrictServerSchema() throws {
+        let item = PantryRemoteItem(
+            id: UUID(uuidString: "0B9C7C5E-7F43-4C1E-9D55-0D2B8F2F6A11")!, householdId: UUID(), ingredientId: "tomato",
+            displayName: "Domates", quantity: 400, unit: "g", location: .pantry, minimumQuantity: nil,
+            dateType: nil, dateValue: nil, version: 2
+        )
+        let allowed: Set<String> = ["id", "ingredientId", "displayName", "quantity", "unit", "location", "minimumQuantity", "dateType", "dateValue", "confirmSeparate"]
+        let create = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(PantryItemBody.create(item, confirmSeparate: true))) as? [String: Any])
+        XCTAssertTrue(Set(create.keys).isSubset(of: allowed))
+        XCTAssertEqual(create["id"] as? String, "0b9c7c5e-7f43-4c1e-9d55-0d2b8f2f6a11")
+        XCTAssertEqual(create["confirmSeparate"] as? Bool, true)
+        let patch = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(PantryItemBody.patch(item))) as? [String: Any])
+        XCTAssertNil(patch["id"])
+        XCTAssertNil(patch["confirmSeparate"])
+        XCTAssertTrue(patch["dateValue"] is NSNull, "clearing a date must send null, not omit it")
+        XCTAssertTrue(patch["minimumQuantity"] is NSNull)
+        XCTAssertNil(patch["householdId"])
+        XCTAssertNil(patch["version"])
+    }
+
+    func testErrorBodiesDriveRecovery() {
+        let current = PantryRemoteItem(
+            id: UUID(), householdId: UUID(), ingredientId: "tomato", displayName: "Domates", quantity: 1, unit: "kg",
+            location: .pantry, minimumQuantity: nil, dateType: nil, dateValue: nil, version: 5
+        )
+        XCTAssertEqual(PantrySyncError.classify(status: 409, body: PantryErrorBody(error: "conflict", recovery: "resolve", current: current)), .conflict(current: current))
+        XCTAssertEqual(PantrySyncError.classify(status: 409, body: PantryErrorBody(error: "pantry_unit_choice", recovery: "choose-unit")), .unitChoice)
+        XCTAssertEqual(PantrySyncError.classify(status: 400, body: PantryErrorBody(error: "unknown_ingredient", recovery: "fix-input")), .rejected(code: "unknown_ingredient"))
+        XCTAssertEqual(PantrySyncError.classify(status: 403, body: PantryErrorBody(error: "forbidden", recovery: "refresh-household")), .rejected(code: "forbidden"))
+        XCTAssertEqual(PantrySyncError.classify(status: 404, body: PantryErrorBody(error: "not_found", recovery: "refresh-household")), .notFound)
+        XCTAssertNil(PantrySyncError.classify(status: 429, body: PantryErrorBody(error: "rate_limited", recovery: "retry-later")))
+        XCTAssertNil(PantrySyncError.classify(status: 503, body: nil))
+        XCTAssertNil(PantrySyncError.classify(status: 401, body: PantryErrorBody(error: "session_expired", recovery: "reauthenticate")))
+    }
+
+    func testTurkishCopyTheGuideFixes() {
+        XCTAssertEqual(PantryCopy.empty, "Evdeki malzemelerini ekle. Planını ve marketini daha doğru hazırlayalım.")
+        XCTAssertEqual(PantryCopy.conflict, "Bu malzeme başka bir cihazda güncellendi.")
+        XCTAssertEqual(PantryCopy.usesStock, "Evdeki malzemeleri kullanıyor")
+    }
+}

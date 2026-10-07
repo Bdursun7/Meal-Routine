@@ -11,5 +11,9 @@ OUT="${TMPDIR:-/tmp}/meal-portion-checks"
   "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
   "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
   "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \
+  "$ROOT/MealRoutine/Models/MealRating.swift" \
+  "$ROOT/MealRoutine/Services/MealRecommender.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
+  "$ROOT/MealRoutine/Services/PantryDomain.swift" \
   "$ROOT/Tools/portion_scale_checks.swift"
 (cd "$ROOT" && "$OUT")

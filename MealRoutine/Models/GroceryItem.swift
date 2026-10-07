@@ -83,14 +83,8 @@ final class IngredientCheck {
     }
 }
 
-enum PantryLocation: String, CaseIterable, Codable, Identifiable {
-    case pantry, refrigerator, freezer, other
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .pantry: "Kiler"; case .refrigerator: "Buzdolabı"; case .freezer: "Dondurucu"; case .other: "Diğer" }
-    }
-}
-
+/// Household rows (`householdID` set) are a cache of the server. Personal rows (`householdID == nil`)
+/// live only on this phone.
 @Model
 final class PantryItem {
     @Attribute(.unique) var uuid: UUID
@@ -101,16 +95,57 @@ final class PantryItem {
     var unit: String
     var locationRaw: String
     var minimumQuantity: Double?
+    /// The user's date (`dateValue`). The stored name predates the `dateType` split.
     var bestBefore: Date?
+    /// `PantryDateType` raw value. Nil on rows saved before V5 had a type; those read as `bestBefore`.
+    var dateTypeRaw: String?
+    /// Server `version` this cache row was last confirmed at, plus local edits not yet confirmed.
     var revision: Int
     var updatedAt: Date
 
-    init(uuid: UUID = UUID(), householdID: UUID?, ingredientID: String, displayName: String, quantity: Double, unit: String, location: PantryLocation = .pantry, minimumQuantity: Double? = nil, bestBefore: Date? = nil, revision: Int = 1, updatedAt: Date = .now) {
+    init(
+        uuid: UUID = UUID(),
+        householdID: UUID?,
+        ingredientID: String,
+        displayName: String,
+        quantity: Double,
+        unit: String,
+        location: PantryLocation = .pantry,
+        minimumQuantity: Double? = nil,
+        dateType: PantryDateType? = nil,
+        dateValue: Date? = nil,
+        revision: Int = 1,
+        updatedAt: Date = .now
+    ) {
         self.uuid = uuid; self.householdID = householdID; self.ingredientID = ingredientID; self.displayName = displayName
         self.quantity = quantity; self.unit = unit; self.locationRaw = location.rawValue; self.minimumQuantity = minimumQuantity
-        self.bestBefore = bestBefore; self.revision = revision; self.updatedAt = updatedAt
+        self.bestBefore = dateValue; self.dateTypeRaw = dateValue == nil ? nil : (dateType ?? .bestBefore).rawValue
+        self.revision = revision; self.updatedAt = updatedAt
     }
+
     var location: PantryLocation { get { PantryLocation(rawValue: locationRaw) ?? .other } set { locationRaw = newValue.rawValue } }
+
+    var dateValue: Date? { bestBefore }
+
+    var dateType: PantryDateType? {
+        guard bestBefore != nil else { return nil }
+        return dateTypeRaw.flatMap(PantryDateType.init(rawValue:)) ?? .bestBefore
+    }
+
+    /// Both or neither: a date never exists without its type.
+    func setDate(_ type: PantryDateType?, _ value: Date?) {
+        if let type, let value {
+            bestBefore = value
+            dateTypeRaw = type.rawValue
+        } else {
+            bestBefore = nil
+            dateTypeRaw = nil
+        }
+    }
+
     var isLowStock: Bool { minimumQuantity.map { quantity <= $0 } ?? false }
-    var isExpiredOrNear: Bool { guard let bestBefore else { return false }; return bestBefore < Calendar.current.date(byAdding: .day, value: 2, to: .now)! }
+
+    var planningStock: PantryPlanningStock {
+        PantryPlanningStock(ingredientId: ingredientID, quantity: quantity, unit: unit, dateType: dateType, dateValue: dateValue)
+    }
 }

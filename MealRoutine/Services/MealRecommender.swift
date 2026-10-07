@@ -36,16 +36,43 @@ struct PantryPlanningStock: Equatable, Sendable {
     var ingredientId: String
     var quantity: Double
     var unit: String
-    var bestBefore: Date? = nil
+    var dateType: PantryDateType? = nil
+    var dateValue: Date? = nil
 }
 
 enum PantryPlanningSignal {
+    struct UsableStock: Equatable, Sendable {
+        var key: String
+        var status: PantryDateStatus
+    }
+
     /// Rewards recipes that can consume stock already at home. The cap keeps pantry
-    /// availability a tie breaker below explicit preferences and safety filters.
-    static func score(candidate: PickerCandidate, stock: [PantryPlanningStock]) -> Int {
+    /// availability a tie breaker below explicit preferences and safety filters, which run first.
+    static func score(
+        candidate: PickerCandidate,
+        stock: [PantryPlanningStock],
+        now: Date = .now,
+        dictionary: IngredientDictionary = .shared
+    ) -> Int {
         guard !stock.isEmpty else { return 0 }
-        let matches = candidate.ingredientIds.filter { id in stock.contains { $0.ingredientId == id && $0.quantity > 0 } }.count
+        let keys = Set(usable(stock, now: now, dictionary: dictionary).map(\.key))
+        let matches = candidateKeys(candidate, dictionary).intersection(keys).count
         return min(24, matches * 8)
+    }
+
+    /// Stock that may earn a bonus. Unresolved ids never match, and a passed use-by date
+    /// is never something the planner nudges the household toward.
+    static func usable(_ stock: [PantryPlanningStock], now: Date, dictionary: IngredientDictionary) -> [UsableStock] {
+        stock.compactMap { line in
+            guard line.quantity > 0, let key = dictionary.canonicalId(line.ingredientId) else { return nil }
+            let status = PantryDateStatus.evaluate(type: line.dateType, date: line.dateValue, now: now)
+            if status.isPastUseBy { return nil }
+            return UsableStock(key: key, status: status)
+        }
+    }
+
+    static func candidateKeys(_ candidate: PickerCandidate, _ dictionary: IngredientDictionary) -> Set<String> {
+        Set(candidate.ingredientIds.compactMap { dictionary.canonicalId($0) })
     }
 }
 
@@ -128,11 +155,17 @@ enum MealRecommender {
         }
         var anchors = anchoredMeals
         var chosen: [String] = []
+        var pantryBonus: [String: Int] = [:]
+        if !pantryStock.isEmpty {
+            for candidate in remaining {
+                pantryBonus[candidate.slug] = PantryPlanningSignal.score(candidate: candidate, stock: pantryStock, now: now)
+            }
+        }
 
         while chosen.count < limit {
             let ranked = remaining.sorted { lhs, rhs in
-                let left = breakdown(for: lhs, recent: recent, anchoredMeals: anchors, now: now).total + PantryPlanningSignal.score(candidate: lhs, stock: pantryStock)
-                let right = breakdown(for: rhs, recent: recent, anchoredMeals: anchors, now: now).total + PantryPlanningSignal.score(candidate: rhs, stock: pantryStock)
+                let left = breakdown(for: lhs, recent: recent, anchoredMeals: anchors, now: now).total + (pantryBonus[lhs.slug] ?? 0)
+                let right = breakdown(for: rhs, recent: recent, anchoredMeals: anchors, now: now).total + (pantryBonus[rhs.slug] ?? 0)
                 if left != right { return left > right }
                 return lhs.slug < rhs.slug
             }
