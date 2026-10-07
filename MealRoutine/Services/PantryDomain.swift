@@ -367,6 +367,7 @@ enum PantryUnitPolicy {
         return typedQuantity
     }
 
+    /// Thousandths, matching `GroceryMerger.roundedQuantity`.
     static func snap(_ value: Double) -> Double {
         (value * 1_000).rounded() / 1_000
     }

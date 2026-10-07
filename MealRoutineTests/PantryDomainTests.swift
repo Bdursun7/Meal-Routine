@@ -153,6 +153,20 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(Set(PantryUnitPolicy.pickerUnits), PantryUnitPolicy.knownCodes)
     }
 
+    func testGroceryAndPantryShareTheThousandthSnap() {
+        XCTAssertEqual(GroceryMerger.roundedQuantity(1.125), 1.125)
+        XCTAssertEqual(GroceryMerger.roundedQuantity(0.1 + 0.2), 0.3)
+        XCTAssertEqual(PantryUnitPolicy.snap(1.125), GroceryMerger.roundedQuantity(1.125))
+        XCTAssertEqual(PantryUnitPolicy.snap(0.1 + 0.2), GroceryMerger.roundedQuantity(0.1 + 0.2))
+        let shown = QuantityFormat.quantityAndUnit(quantity: 1.125, unit: "kg")
+        XCTAssertTrue(shown == "1,125 kg" || shown == "1.125 kg", shown)
+        XCTAssertEqual(GroceryQuantityEdit.parse(QuantityFormat.string(1.125)), 1.125)
+        let quarter = QuantityFormat.string(1.25)
+        XCTAssertTrue(quarter == "1,25" || quarter == "1.25", quarter)
+        let spice = QuantityFormat.string(2 * 2.squareRoot())
+        XCTAssertTrue(spice == "2,83" || spice == "2.83", spice)
+    }
+
     func testSwitchingGramsToKilogramsKeepsTheSameStock() {
         XCTAssertEqual(PantryUnitPolicy.editedQuantity(previousQuantity: 500, previousUnit: "g", typedQuantity: 500, newUnit: "kg"), 0.5)
         XCTAssertEqual(PantryUnitPolicy.editedQuantity(previousQuantity: 500, previousUnit: "g", typedQuantity: 2, newUnit: "kg"), 2)

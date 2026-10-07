@@ -28,8 +28,10 @@ enum QuantityFormat {
         formatter.numberStyle = .decimal
         // Grouping (1.500) does not round-trip through Double and would save as 1.5.
         formatter.usesGroupingSeparator = false
-        // Two places so a summed 1.25 kg is not rounded to the nearest tenth.
-        formatter.maximumFractionDigits = 2
+        // A stored thousandth (125 g written as 1.125 kg) keeps three places.
+        // Anything finer, such as a raw scaled spice, stays at two so 2.828… is still 2,83.
+        let thousandth = (value * 1_000).rounded() / 1_000
+        formatter.maximumFractionDigits = abs(value - thousandth) < 0.000_000_1 ? 3 : 2
         formatter.minimumFractionDigits = 0
         if let rendered = formatter.string(from: NSNumber(value: value)),
            !rendered.isEmpty,

@@ -69,10 +69,11 @@ enum GroceryMerger {
         }
     }
 
-    /// Two decimal places. `0.1 + 0.2` becomes `0.3` instead of a binary tail.
+    /// Thousandths, the same snap as pantry and unit conversion.
+    /// `0.1 + 0.2` becomes `0.3`. 125 g + 1 kg stays `1.125` kg.
     static func roundedQuantity(_ quantity: Double?) -> Double? {
         guard let quantity else { return nil }
-        return (quantity * 100).rounded() / 100
+        return (quantity * 1_000).rounded() / 1_000
     }
 
     /// Canonical unit code. Safe to store and to compare across rebuilds.

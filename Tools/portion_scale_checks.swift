@@ -70,6 +70,11 @@ private func checkPerMealGrocerySum() {
     ])
     check(merged.count == 1 && merged[0].unit == "kg", "per-meal chicken merges \(merged)")
     close(merged.first?.quantity, 1.125, "125 g at 2 servings + 1 kg at 4 servings")
+    let shown = QuantityFormat.quantityAndUnit(quantity: merged.first?.quantity, unit: merged.first?.unit ?? "")
+    check(
+        shown.contains("1,125") || shown.contains("1.125"),
+        "125 g + 1 kg should show 1.125 kg, got \(shown)"
+    )
 
     let oldHousehold = GroceryMerger.merge([
         GrocerySourceLine(
