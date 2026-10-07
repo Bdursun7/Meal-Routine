@@ -377,7 +377,7 @@ enum PantryCache {
         guard let api = PantrySync.repository() else { return }
         let remote = try await api.list(householdId: householdID)
         if let dictionary = try? await api.ingredients(householdId: householdID) {
-            PantryIngredientStore.replaceCustoms(dictionary.filter { $0.scope == "household" }.map(\.entry), householdID: householdID)
+            PantryIngredientStore.replaceCustoms(dictionary.filter { $0.scope == "household" }.map(\<#Root#>.entry), householdID: householdID)
         }
         apply(remote, householdID: householdID, operations: PantryOutbox.operations(in: context), in: context)
     }
