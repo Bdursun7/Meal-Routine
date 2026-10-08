@@ -567,7 +567,8 @@ struct RecipeDetailView: View {
 
     private func memoryDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = RegionalContext.displayLocale
+        formatter.timeZone = RegionalContext.timeZone
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
@@ -828,9 +829,9 @@ struct RecipeDetailView: View {
                 minutes: recipe.timeIsUnknown ? -1 : recipe.totalMinutes,
                 servings: activeServings,
                 servingsUnspecified: recipe.servingsUnspecified,
-                difficulty: DifficultyLabel.turkish(recipe.difficulty)
+                difficulty: DifficultyLabel.label(recipe.difficulty)
             )
-            Text("\(CategoryLabel.turkish(recipe.unitoolsCategory)) · \(RegionLabel.turkish(recipe.country))")
+            Text("\(CategoryLabel.label(recipe.unitoolsCategory)) · \(RegionLabel.label(recipe.country))")
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)

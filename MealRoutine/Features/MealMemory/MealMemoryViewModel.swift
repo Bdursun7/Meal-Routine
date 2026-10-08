@@ -88,7 +88,7 @@ final class MealMemoryViewModel {
             guard let category = bySlug[snapshot.recipeID]?.category, !category.isEmpty else { continue }
             let key = category.lowercased()
             if seenCategories.insert(key).inserted, snapshot.timesCooked <= 2 {
-                firstCategories.append(CategoryLabel.turkish(category))
+                firstCategories.append(CategoryLabel.label(category))
             }
         }
 

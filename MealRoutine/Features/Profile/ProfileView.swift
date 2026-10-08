@@ -469,7 +469,8 @@ private struct CookingHistoryView: View {
 
     private func cookedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = RegionalContext.displayLocale
+        formatter.timeZone = RegionalContext.timeZone
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)

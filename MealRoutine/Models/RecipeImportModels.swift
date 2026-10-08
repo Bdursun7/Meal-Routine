@@ -104,14 +104,7 @@ enum RecipeNumericInput {
             || fractionDigits > RecipeFieldLimits.quantityFractionDigits {
             return .tooLong
         }
-        var normalized = trimmed.replacingOccurrences(of: ",", with: ".")
-        if normalized.hasSuffix(".") {
-            normalized.removeLast()
-        }
-        if normalized.hasPrefix(".") {
-            normalized = "0" + normalized
-        }
-        guard let number = Double(normalized), number.isFinite else { return .notANumber }
+        guard let number = QuantityFormat.parse(trimmed) else { return .notANumber }
         return .value(number)
     }
 
@@ -195,11 +188,15 @@ enum RecipeEditorField: Hashable, Sendable {
     case sourceTitle
 }
 
-/// Catalog unit codes. The editor stores these, not the Turkish label.
+/// Structured unit codes (`UnitCode`). The editor stores these, never a display label.
 enum RecipeUnitChoices {
-    static let codes = [
-        "g", "kg", "ml", "l", "piece", "tbsp", "tsp", "clove", "toTaste", "sprig", "pinch", "slice",
-    ]
+    static let codes: [String] = {
+        let units: [UnitCode] = [
+            .g, .kg, .ml, .l, .piece, .tbsp, .tsp, .clove, .toTaste, .sprig, .pinch, .slice,
+            .cup, .package, .can, .bottle, .oz, .lb,
+        ]
+        return units.map { $0.rawValue }
+    }()
 
     /// Known spellings fold to a catalog code. An empty unit stays empty. Anything else is kept.
     static func canonical(_ raw: String) -> String {

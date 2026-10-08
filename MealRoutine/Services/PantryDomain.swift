@@ -121,14 +121,15 @@ enum PantryDateType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Calendar days as the server stores them (`YYYY-MM-DD`), read in the phone's own time zone.
+/// Calendar days as the server stores them (`YYYY-MM-DD`), read in the household timezone
+/// (`RegionalContext.calendar`), so every member sees the same day for a best-before date.
 enum PantryDay {
-    static func string(from date: Date, calendar: Calendar = .current) -> String {
+    static func string(from date: Date, calendar: Calendar = RegionalContext.calendar) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
-    static func date(from text: String, calendar: Calendar = .current) -> Date? {
+    static func date(from text: String, calendar: Calendar = RegionalContext.calendar) -> Date? {
         let pieces = text.prefix(10).split(separator: "-").compactMap { Int($0) }
         guard pieces.count == 3 else { return nil }
         var parts = DateComponents()
@@ -149,7 +150,7 @@ enum PantryDateStatus: Equatable, Sendable {
 
     static let approachingWindowDays = 3
 
-    static func evaluate(type: PantryDateType?, date: Date?, now: Date, calendar: Calendar = .current) -> PantryDateStatus {
+    static func evaluate(type: PantryDateType?, date: Date?, now: Date, calendar: Calendar = RegionalContext.calendar) -> PantryDateStatus {
         guard let date else { return .none }
         let start = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
@@ -206,7 +207,7 @@ struct PantryRowPresentation: Equatable, Sendable {
         dateValue: Date?,
         sync: PantrySyncMark = .synced,
         now: Date = .now,
-        calendar: Calendar = .current
+        calendar: Calendar = RegionalContext.calendar
     ) -> PantryRowPresentation {
         let amount = QuantityFormat.quantityAndUnit(quantity: quantity, unit: unit)
         let minimum = minimumQuantity.map { "Minimum \(QuantityFormat.quantityAndUnit(quantity: $0, unit: unit))" }
@@ -256,10 +257,10 @@ struct PantryRowPresentation: Equatable, Sendable {
 
     private static func dayText(_ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = RegionalContext.displayLocale
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "d MMMM yyyy"
+        formatter.setLocalizedDateFormatFromTemplate("dMMMMyyyy")
         return formatter.string(from: date)
     }
 
@@ -330,9 +331,19 @@ enum PantryUnitDecision: Equatable, Sendable {
 }
 
 enum PantryUnitPolicy {
-    static let knownCodes: Set<String> = ["g", "kg", "ml", "l", "piece", "tbsp", "tsp", "clove", "pinch", "slice", "sprig", "toTaste"]
+    static let knownCodes: Set<String> = Set(UnitCode.allCases.map { $0.rawValue })
     /// Order of the unit picker. Every entry is a known code; there is no free-text unit.
-    static let pickerUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "slice", "sprig", "pinch", "toTaste"]
+    static var pickerUnits: [String] { pickerUnits(for: RegionalContext.shared.measurementSystem) }
+
+    /// The household's measurement system only changes the order; every unit stays available.
+    static func pickerUnits(for system: MeasurementSystem) -> [String] {
+        let mass: [UnitCode] = system == .imperial ? [.oz, .lb, .g, .kg] : [.g, .kg, .oz, .lb]
+        let rest: [UnitCode] = [.ml, .l, .tbsp, .tsp, .cup, .package, .can, .bottle, .clove, .slice, .sprig, .pinch, .toTaste]
+        var ordered: [UnitCode] = [.piece]
+        ordered.append(contentsOf: mass)
+        ordered.append(contentsOf: rest)
+        return ordered.map { $0.rawValue }
+    }
 
     static func isKnown(_ unit: String) -> Bool {
         knownCodes.contains(UnitNormalization.parse(unit).code)

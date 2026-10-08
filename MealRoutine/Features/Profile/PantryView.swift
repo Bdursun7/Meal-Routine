@@ -798,7 +798,7 @@ private struct PantryForm: View {
                     Picker("Birim", selection: $draft.unit) {
                         if draft.unit.isEmpty { Text("Birim seç").tag("") }
                         ForEach(PantryUnitPolicy.pickerUnits, id: \.self) { code in
-                            Text(UnitLabels.turkish(code)).tag(code)
+                            Text(UnitLabels.label(code)).tag(code)
                         }
                     }
                     if let legacy = draft.legacyUnit, draft.unit.isEmpty {
@@ -813,7 +813,7 @@ private struct PantryForm: View {
                 Section {
                     Toggle("Minimum miktar", isOn: $draft.hasMinimum)
                     if draft.hasMinimum {
-                        TextField("Minimum (\(UnitLabels.turkish(draft.unit)))", text: $draft.minimumText)
+                        TextField("Minimum (\(UnitLabels.label(draft.unit)))", text: $draft.minimumText)
                             .keyboardType(.decimalPad)
                     }
                 } footer: {
@@ -827,7 +827,9 @@ private struct PantryForm: View {
                         }
                         .pickerStyle(.inline)
                         DatePicker("Tarih", selection: $draft.date, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "tr_TR"))
+                            .environment(\.locale, RegionalContext.displayLocale)
+                            .environment(\.timeZone, RegionalContext.timeZone)
+                            .environment(\.calendar, RegionalContext.calendar)
                     }
                 } header: {
                     Text(PantryCopy.dateSection)
@@ -872,7 +874,7 @@ private struct PantryForm: View {
             location: draft.location,
             minimum: draft.minimumToSave,
             dateType: draft.hasDate ? draft.dateType : nil,
-            dateValue: draft.hasDate ? Calendar.current.startOfDay(for: draft.date) : nil
+            dateValue: draft.hasDate ? RegionalContext.calendar.startOfDay(for: draft.date) : nil
         ))
         dismiss()
     }

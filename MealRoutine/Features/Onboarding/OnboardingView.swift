@@ -416,7 +416,7 @@ struct OnboardingView: View {
             Text(recipe.displayName)
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.turkish(recipe.difficulty))")
+            Text("\(recipe.totalMinutes) dk · \(DifficultyLabel.label(recipe.difficulty))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             ratingButtons(for: recipe.slug)

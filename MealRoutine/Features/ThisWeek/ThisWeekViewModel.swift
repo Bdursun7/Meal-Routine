@@ -145,7 +145,7 @@ final class ThisWeekViewModel {
                     recipeName: recipe?.displayName
                         ?? (meal.titleSnapshot.isEmpty ? meal.recipeSlug : meal.titleSnapshot),
                     minutes: recipe?.totalMinutes ?? 0,
-                    difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
+                    difficultyTitle: DifficultyLabel.label(recipe?.difficulty ?? ""),
                     servings: ActiveServings.resolve(
                         mealServings: meal.servings,
                         householdSize: householdSize
@@ -335,8 +335,8 @@ enum ReplacementPresenter {
                 slug: choice.slug,
                 name: recipe?.displayName ?? choice.slug,
                 minutes: choice.minutes,
-                difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
-                categoryTitle: CategoryLabel.turkish(recipe?.unitoolsCategory ?? ""),
+                difficultyTitle: DifficultyLabel.label(recipe?.difficulty ?? ""),
+                categoryTitle: CategoryLabel.label(recipe?.unitoolsCategory ?? ""),
                 reason: choice.reason,
                 photoURL: recipe?.photoURL ?? "",
                 photoAuthor: recipe?.photoAuthor ?? "",

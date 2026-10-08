@@ -536,7 +536,7 @@ struct RecipeEditorView: View {
         Picker("Birim", selection: unitSelection(index)) {
             Text("Birim yok").tag("")
             ForEach(unitOptions(index), id: \.self) { code in
-                Text(UnitLabels.turkish(code)).tag(code)
+                Text(UnitLabels.label(code)).tag(code)
             }
         }
         .pickerStyle(.menu)

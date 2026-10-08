@@ -375,7 +375,7 @@ struct GroceryView: View {
                     .keyboardType(.decimalPad)
                 Picker("Birim", selection: $viewModel.draftUnit) {
                     ForEach(GroceryViewModel.manualUnits, id: \.self) { unit in
-                        Text(UnitLabels.turkish(unit)).tag(unit)
+                        Text(UnitLabels.label(unit)).tag(unit)
                     }
                 }
             }

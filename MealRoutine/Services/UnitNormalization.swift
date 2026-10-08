@@ -18,23 +18,108 @@ struct ParsedUnit: Equatable, Sendable {
     var basePerUnit: Double
 }
 
-/// Folds Turkish and English spellings of the units that actually appear in
-/// `recipes.v1.json` onto one code.
+/// Structured unit codes. Stored on recipe, grocery and pantry rows; shared with the server's
+/// `pantryUnits.ts`. Display goes through `UnitLabels` (`unit.<code>` keys), never the raw code.
+///
+/// Conversion is exact only: mass through grams (1 oz = 28.349523125 g, 1 lb = 453.59237 g) and
+/// volume through millilitres. Spoons and cups are not converted because their size differs by
+/// measurement system (US cup 236.6 ml, metric cup 250 ml, Turkish su bardağı 200 ml). piece,
+/// package, can and bottle never convert to mass or volume without ingredient data.
+enum UnitCode: String, CaseIterable, Codable, Sendable {
+    case g, kg, oz, lb
+    case ml, l
+    case piece, tsp, tbsp, cup, package, can, bottle, clove, pinch, slice, sprig
+    case toTaste
+
+    var family: UnitFamily? {
+        switch self {
+        case .g, .kg, .oz, .lb: .mass
+        case .ml, .l: .volume
+        default: nil
+        }
+    }
+
+    var basePerUnit: Double {
+        switch self {
+        case .kg, .l: 1_000
+        case .oz: 28.349523125
+        case .lb: 453.59237
+        default: 1
+        }
+    }
+
+    var isImperial: Bool { self == .oz || self == .lb }
+
+    /// The code and language-neutral abbreviations.
+    var aliases: [String] {
+        switch self {
+        case .g: ["g", "gr", "gm"]
+        case .kg: ["kg", "kgs"]
+        case .oz: ["oz"]
+        case .lb: ["lb", "lbs"]
+        case .ml: ["ml", "mls"]
+        case .l: ["l", "lt", "ltr"]
+        case .piece: ["piece", "pc", "pcs"]
+        case .tsp: ["tsp"]
+        case .tbsp: ["tbsp"]
+        case .cup: ["cup"]
+        case .package: ["package", "pkg"]
+        case .can: ["can"]
+        case .bottle: ["bottle"]
+        case .clove: ["clove"]
+        case .pinch: ["pinch"]
+        case .slice: ["slice"]
+        case .sprig: ["sprig"]
+        case .toTaste: ["toTaste", "to-taste"]
+        }
+    }
+
+    /// Typed spellings keyed by language. Parsing accepts every language, so a recipe typed in
+    /// Turkish still parses on an English device; no alias names two codes.
+    var localeAliases: [String: [String]] {
+        switch self {
+        case .g: ["en": ["gram", "grams", "gramme", "grammes"], "tr": ["gram"]]
+        case .kg: ["en": ["kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes"], "tr": ["kilo", "kilogram"]]
+        case .oz: ["en": ["ounce", "ounces"], "tr": ["ons"]]
+        case .lb: ["en": ["pound", "pounds"], "tr": ["libre"]]
+        case .ml: ["en": ["milliliter", "milliliters", "millilitre", "millilitres"], "tr": ["mililitre", "mililitres"]]
+        case .l: ["en": ["liter", "liters", "litre", "litres"], "tr": ["litre"]]
+        case .piece: ["en": ["pieces"], "tr": ["adet"]]
+        case .tsp: ["en": ["teaspoon", "teaspoons"], "tr": ["tatlı kaşığı", "tatli kasigi", "tk"]]
+        case .tbsp: ["en": ["tablespoon", "tablespoons"], "tr": ["yemek kaşığı", "yemek kasigi", "yk"]]
+        case .cup: ["en": ["cups"], "tr": ["su bardağı", "su bardagi", "bardak"]]
+        case .package: ["en": ["packages", "pack", "packs"], "tr": ["paket"]]
+        case .can: ["en": ["cans", "tin", "tins"], "tr": ["kutu", "konserve"]]
+        case .bottle: ["en": ["bottles"], "tr": ["şişe", "sise"]]
+        case .clove: ["en": ["cloves"], "tr": ["diş", "dis"]]
+        case .pinch: ["en": ["pinches"], "tr": ["tutam"]]
+        case .slice: ["en": ["slices"], "tr": ["dilim"]]
+        case .sprig: ["en": ["sprigs"], "tr": ["dal"]]
+        case .toTaste: ["en": ["to taste"], "tr": ["damak tadına", "damak tadina"]]
+        }
+    }
+}
+
+/// Folds typed and catalog unit spellings onto one `UnitCode`.
 ///
 /// The catalog itself only stores twelve codes (`g`, `kg`, `ml`, `l`, `piece`,
-/// `tbsp`, `tsp`, `clove`, `toTaste`, `sprig`, `pinch`, `slice`). Aliases cover
-/// those codes, the Turkish labels `UnitLabels` already shows, and the short
-/// English variants of the same words (`gr`, `gram`, `mL`, `adet`, …).
+/// `tbsp`, `tsp`, `clove`, `toTaste`, `sprig`, `pinch`, `slice`). Unknown spellings keep a loose
+/// code of their own and never merge with a known unit.
 ///
-/// V1 converts only exact metric pairs: gram ↔ kilogram and millilitre ↔ litre.
-/// Spoons, pinches, sprigs, pieces, and “to taste” stay on their own code.
+/// Only exact pairs convert: g ↔ kg ↔ oz ↔ lb and ml ↔ l. Spoons, cups, pinches, sprigs,
+/// pieces, packages and “to taste” stay on their own code.
 enum UnitNormalization {
     static func parse(_ raw: String) -> ParsedUnit {
         let key = fold(raw)
-        if let spec = specsByFoldedAlias[key] {
-            return ParsedUnit(code: spec.code, family: spec.family, basePerUnit: spec.basePerUnit)
+        if let unit = unitsByFoldedAlias[key] {
+            return ParsedUnit(code: unit.rawValue, family: unit.family, basePerUnit: unit.basePerUnit)
         }
         return ParsedUnit(code: looseCode(raw), family: nil, basePerUnit: 1)
+    }
+
+    /// The structured code for a typed or stored unit, or nil when it is not a known unit.
+    static func unitCode(_ raw: String) -> UnitCode? {
+        unitsByFoldedAlias[fold(raw)]
     }
 
     /// Sum quantities that already belong in one merge bucket.
@@ -42,7 +127,8 @@ enum UnitNormalization {
     /// A single canonical code keeps its own unit, so a week of only grams stays
     /// in grams even when the scaled total crosses a kilogram. Mixed codes in one
     /// family convert through the base unit, then pick grams or kilograms
-    /// (millilitres or litres) from the total.
+    /// (millilitres or litres) from the total. A mass bucket written only in ounces and pounds
+    /// stays imperial (ounces, or pounds from 16 oz).
     static func combine(quantities: [Double?], units: [ParsedUnit]) -> (quantity: Double?, code: String) {
         guard let first = units.first, quantities.count == units.count else {
             return (nil, "")
@@ -70,7 +156,8 @@ enum UnitNormalization {
         if measuredCount == 0 {
             return (nil, preferredCode(units))
         }
-        return display(base: snapBase(base), family: family)
+        let imperial = units.allSatisfy { UnitCode(rawValue: $0.code)?.isImperial == true }
+        return display(base: snapBase(base), family: family, imperial: imperial)
     }
 
     /// Match key for aliases. Letters and digits only, Turkish diacritics folded.
@@ -102,9 +189,16 @@ enum UnitNormalization {
         return folded
     }
 
-    private static func display(base: Double, family: UnitFamily) -> (quantity: Double?, code: String) {
+    private static func display(base: Double, family: UnitFamily, imperial: Bool) -> (quantity: Double?, code: String) {
         switch family {
         case .mass:
+            if imperial {
+                let ounces = base / UnitCode.oz.basePerUnit
+                if ounces >= 16 {
+                    return (snapBase(base / UnitCode.lb.basePerUnit), UnitCode.lb.rawValue)
+                }
+                return (snapBase(ounces), UnitCode.oz.rawValue)
+            }
             if base >= 1_000 {
                 return (base / 1_000, "kg")
             }
@@ -140,58 +234,11 @@ enum UnitNormalization {
         return text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    private struct Spec {
-        var code: String
-        var family: UnitFamily?
-        var basePerUnit: Double
-        var aliases: [String]
-    }
-
-    /// Aliases are the spellings we fold. Each code is included as its own alias.
-    private static let specs: [Spec] = [
-        Spec(code: "g", family: .mass, basePerUnit: 1, aliases: [
-            "g", "gr", "gm", "gram", "grams", "gramme", "grammes",
-        ]),
-        Spec(code: "kg", family: .mass, basePerUnit: 1_000, aliases: [
-            "kg", "kgs", "kilo", "kilos", "kilogram", "kilograms", "kilogramme", "kilogrammes",
-        ]),
-        Spec(code: "ml", family: .volume, basePerUnit: 1, aliases: [
-            "ml", "mls", "milliliter", "milliliters", "millilitre", "millilitres", "mililitre", "mililitres",
-        ]),
-        Spec(code: "l", family: .volume, basePerUnit: 1_000, aliases: [
-            "l", "lt", "ltr", "liter", "liters", "litre", "litres",
-        ]),
-        Spec(code: "piece", family: nil, basePerUnit: 1, aliases: [
-            "piece", "pieces", "pc", "pcs", "adet",
-        ]),
-        Spec(code: "tbsp", family: nil, basePerUnit: 1, aliases: [
-            "tbsp", "tablespoon", "tablespoons", "yemek kaşığı", "yemek kasigi", "yk",
-        ]),
-        Spec(code: "tsp", family: nil, basePerUnit: 1, aliases: [
-            "tsp", "teaspoon", "teaspoons", "tatlı kaşığı", "tatli kasigi", "tk",
-        ]),
-        Spec(code: "clove", family: nil, basePerUnit: 1, aliases: [
-            "clove", "cloves", "diş", "dis",
-        ]),
-        Spec(code: "pinch", family: nil, basePerUnit: 1, aliases: [
-            "pinch", "pinches", "tutam",
-        ]),
-        Spec(code: "slice", family: nil, basePerUnit: 1, aliases: [
-            "slice", "slices", "dilim",
-        ]),
-        Spec(code: "sprig", family: nil, basePerUnit: 1, aliases: [
-            "sprig", "sprigs", "dal",
-        ]),
-        Spec(code: "toTaste", family: nil, basePerUnit: 1, aliases: [
-            "toTaste", "to taste", "to-taste", "damak tadına", "damak tadina",
-        ]),
-    ]
-
-    private static let specsByFoldedAlias: [String: Spec] = {
-        var map: [String: Spec] = [:]
-        for spec in specs {
-            for alias in spec.aliases {
-                map[fold(alias)] = spec
+    private static let unitsByFoldedAlias: [String: UnitCode] = {
+        var map: [String: UnitCode] = [:]
+        for unit in UnitCode.allCases {
+            for alias in unit.aliases + unit.localeAliases.keys.sorted().flatMap({ unit.localeAliases[$0] ?? [] }) {
+                map[fold(alias)] = unit
             }
         }
         return map

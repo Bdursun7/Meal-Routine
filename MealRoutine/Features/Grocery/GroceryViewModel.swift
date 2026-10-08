@@ -66,7 +66,10 @@ final class GroceryViewModel {
     var pantryPrompt: PantryRestockPrompt?
     private static let coverageKey = "mealroutine.pantry.marketCoverage"
 
-    static let manualUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "toTaste"]
+    static let manualUnits: [String] = {
+        let units: [UnitCode] = [.piece, .g, .kg, .ml, .l, .tbsp, .tsp, .clove, .toTaste, .cup, .package, .can, .bottle, .oz, .lb]
+        return units.map { $0.rawValue }
+    }()
 
     func presentation(weeks: [PlanWeek], now: Date = .now) -> GroceryListPresentation {
         let rows = sortedRows(weeks: weeks, now: now)
@@ -123,7 +126,7 @@ final class GroceryViewModel {
                     name: item.displayName,
                     detail: QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit),
                     quantity: item.quantity,
-                    unitLabel: UnitLabels.turkish(item.unit),
+                    unitLabel: UnitLabels.label(item.unit),
                     category: GroceryCategory.classify(ingredientId: item.ingredientId, name: item.displayName),
                     hasUnitConflict: item.hasUnitConflict,
                     isChecked: item.isChecked,
@@ -314,8 +317,6 @@ final class GroceryViewModel {
     }
 
     private func parseQuantity(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return Double(trimmed.replacingOccurrences(of: ",", with: "."))
+        QuantityFormat.parse(text)
     }
 }

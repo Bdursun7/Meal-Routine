@@ -185,7 +185,7 @@ struct MealReplacementSheet: View {
                 slug: choice.slug,
                 name: title,
                 minutes: choice.minutes,
-                difficultyTitle: DifficultyLabel.turkish(recipe?.difficulty ?? ""),
+                difficultyTitle: DifficultyLabel.label(recipe?.difficulty ?? ""),
                 categoryTitle: "",
                 reason: choice.reason,
                 photoURL: recipe?.photoURL ?? "",

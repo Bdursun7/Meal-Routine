@@ -288,6 +288,50 @@
         }
       }
     },
+    "category.breakfast": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kahvaltı"
+          }
+        }
+      }
+    },
+    "category.main": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ana yemek"
+          }
+        }
+      }
+    },
+    "category.salad": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salata"
+          }
+        }
+      }
+    },
+    "category.soup": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çorba"
+          }
+        }
+      }
+    },
     "date.today": {
       "extractionState": "manual",
       "localizations": {
@@ -295,6 +339,105 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bugün"
+          }
+        }
+      }
+    },
+    "diet.glutenFree": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glutensiz"
+          }
+        }
+      }
+    },
+    "diet.pescatarian": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pesketaryen"
+          }
+        }
+      }
+    },
+    "diet.vegan": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vegan"
+          }
+        }
+      }
+    },
+    "diet.vegetarian": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vejetaryen"
+          }
+        }
+      }
+    },
+    "difficulty.easy": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kolay"
+          }
+        }
+      }
+    },
+    "difficulty.hard": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zor"
+          }
+        }
+      }
+    },
+    "difficulty.medium": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orta"
+          }
+        }
+      }
+    },
+    "difficulty.unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilinmiyor"
+          }
+        }
+      }
+    },
+    "evenings.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld akşam"
           }
         }
       }
@@ -856,6 +999,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tercihlerin netleşiyor"
+          }
+        }
+      }
+    },
+    "minutes.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld dk"
           }
         }
       }
@@ -1660,6 +1814,204 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu akşam"
+          }
+        }
+      }
+    },
+    "unit.bottle": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "şişe"
+          }
+        }
+      }
+    },
+    "unit.can": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kutu"
+          }
+        }
+      }
+    },
+    "unit.clove": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diş"
+          }
+        }
+      }
+    },
+    "unit.cup": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "su bardağı"
+          }
+        }
+      }
+    },
+    "unit.g": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "g"
+          }
+        }
+      }
+    },
+    "unit.kg": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kg"
+          }
+        }
+      }
+    },
+    "unit.l": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "l"
+          }
+        }
+      }
+    },
+    "unit.lb": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lb"
+          }
+        }
+      }
+    },
+    "unit.ml": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ml"
+          }
+        }
+      }
+    },
+    "unit.oz": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "oz"
+          }
+        }
+      }
+    },
+    "unit.package": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "paket"
+          }
+        }
+      }
+    },
+    "unit.piece": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "adet"
+          }
+        }
+      }
+    },
+    "unit.pinch": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tutam"
+          }
+        }
+      }
+    },
+    "unit.slice": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dilim"
+          }
+        }
+      }
+    },
+    "unit.sprig": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dal"
+          }
+        }
+      }
+    },
+    "unit.tbsp": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yemek kaşığı"
+          }
+        }
+      }
+    },
+    "unit.toTaste": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "damak tadına"
+          }
+        }
+      }
+    },
+    "unit.tsp": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tatlı kaşığı"
           }
         }
       }

@@ -56,9 +56,9 @@ private func checkSynonyms() {
     check(GroceryMerger.normalize("to taste") == "toTaste", "to taste should be toTaste")
     check(GroceryMerger.normalize("dal") == "sprig", "dal should be sprig")
     check(GroceryMerger.normalize("dilim") == "slice", "dilim should be slice")
-    check(UnitLabels.turkish("kg") == "kg", "kg label")
-    check(UnitLabels.turkish("piece") == "adet", "piece label")
-    check(UnitLabels.turkish("tbsp") == "yemek kaşığı", "tbsp label")
+    check(UnitLabels.label("kg") == "kg", "kg label")
+    check(UnitLabels.label("piece") == "adet", "piece label")
+    check(UnitLabels.label("tbsp") == "yemek kaşığı", "tbsp label")
 
     let merged = GroceryMerger.merge([
         line("salt", 200, "GR", nameTR: "Tuz"),

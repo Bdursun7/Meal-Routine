@@ -417,6 +417,6 @@ private struct RecipeListRow: View {
             return source
         }
         let time = recipe.timeIsUnknown ? "Süre yok" : "\(recipe.totalMinutes) dk"
-        return "\(time) · \(DifficultyLabel.turkish(recipe.difficulty)) · \(RegionLabel.turkish(recipe.country))"
+        return "\(time) · \(DifficultyLabel.label(recipe.difficulty)) · \(RegionLabel.label(recipe.country))"
     }
 }

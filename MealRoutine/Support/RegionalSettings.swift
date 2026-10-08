@@ -196,9 +196,18 @@ final class RegionalContext: @unchecked Sendable {
     /// Locale whose ingredient names and aliases the user types and reads.
     var contentLocale: String { displayLocaleIdentifier }
 
+    /// Gregorian calendar in `timeZone`. Calendar days (pantry dates, "today") are read with it.
+    var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.locale = displayLocale
+        return calendar
+    }
+
     static var timeZone: TimeZone { shared.timeZone }
     static var displayLocale: Locale { shared.displayLocale }
     static var contentLocale: String { shared.contentLocale }
+    static var calendar: Calendar { shared.calendar }
 }
 
 /// Device values offered when a user or household is created. Only locale and timezone come from

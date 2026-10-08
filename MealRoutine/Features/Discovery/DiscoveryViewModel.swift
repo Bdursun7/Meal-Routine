@@ -69,7 +69,7 @@ final class DiscoveryViewModel {
             hasher.combine(planning.difficulty.rawValue)
             hasher.combine(planning.weekdayStyle.rawValue)
         }
-        let day = Calendar.current.startOfDay(for: Date())
+        let day = RegionalContext.calendar.startOfDay(for: Date())
         hasher.combine(day.timeIntervalSinceReferenceDate)
         return hasher.finalize()
     }
