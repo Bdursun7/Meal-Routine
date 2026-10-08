@@ -10,6 +10,7 @@ struct HouseholdRemoteBody: Decodable, Equatable, Sendable {
     var role: String
     var members: [HouseholdRemoteMember]
     var invites: [HouseholdRemoteInvite]
+    var settings: HouseholdRegionalSettings? = nil
 }
 
 struct HouseholdRemoteMember: Decodable, Equatable, Sendable {
@@ -29,8 +30,22 @@ struct HouseholdRemoteInvite: Decodable, Equatable, Sendable {
 struct HouseholdLifecycleAPI: Sendable {
     var client: APIClient
 
-    func create(name: String) async throws -> HouseholdRemoteState {
-        try await send(method: "POST", path: "/v1/households", body: try JSONEncoder().encode(NameBody(name: name)))
+    /// Country, currency and measurement system are left to the server, which copies the creator's
+    /// account settings; only the device timezone is offered.
+    func create(name: String, timezone: String = DeviceRegion.timezone()) async throws -> HouseholdRemoteState {
+        try await send(
+            method: "POST",
+            path: "/v1/households",
+            body: try JSONEncoder().encode(CreateBody(name: name, timezone: timezone))
+        )
+    }
+
+    func updateSettings(householdId: UUID, settings: HouseholdRegionalSettings) async throws -> HouseholdRemoteState {
+        try await send(
+            method: "PATCH",
+            path: "/v1/households/\(householdId.uuidString)/settings",
+            body: try JSONEncoder().encode(settings)
+        )
     }
 
     func current() async throws -> HouseholdRemoteState {
@@ -183,7 +198,8 @@ enum HouseholdRemoteMerge {
             ownerId: ownerId,
             createdAt: next.household?.createdAt ?? now,
             revision: (next.household?.revision ?? 0) + 1,
-            baseRevision: next.household?.baseRevision ?? 0
+            baseRevision: next.household?.baseRevision ?? 0,
+            regional: body.settings ?? next.household?.regional
         )
         next.members = body.members.map { member in
             let existing = snapshot.members.first { $0.userId == member.accountId }
@@ -234,6 +250,11 @@ enum HouseholdRemoteMerge {
 
 private struct NameBody: Encodable {
     var name: String
+}
+
+private struct CreateBody: Encodable {
+    var name: String
+    var timezone: String
 }
 
 private struct TransferBody: Encodable {

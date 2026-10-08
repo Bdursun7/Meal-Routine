@@ -113,6 +113,48 @@ final class HouseholdLifecycleTests: XCTestCase {
         XCTAssertEqual(HouseholdRemoteMerge.status("revoked"), .revoked)
     }
 
+    func testRemoteMergeKeepsHouseholdRegionalSettings() throws {
+        let owner = HouseholdUser(id: "owner", displayName: "Berkay", createdAt: now)
+        let snapshot = try HouseholdReducer.createHousehold(user: owner, name: "Ev", now: now, householdId: householdId)
+        let auckland = HouseholdRegionalSettings(
+            countryCode: "NZ",
+            currencyCode: "NZD",
+            measurementSystem: .metric,
+            timezone: "Pacific/Auckland"
+        )
+        let members = [HouseholdRemoteMember(accountId: owner.id, displayName: "Berkay", role: "owner")]
+        let withSettings = HouseholdRemoteMerge.apply(
+            HouseholdRemoteState(household: HouseholdRemoteBody(
+                id: householdId,
+                name: "Ev",
+                role: "owner",
+                members: members,
+                invites: [],
+                settings: auckland
+            )),
+            to: snapshot,
+            now: now
+        )
+        XCTAssertEqual(withSettings.household?.regional, auckland)
+
+        let legacyServer = HouseholdRemoteMerge.apply(
+            HouseholdRemoteState(household: HouseholdRemoteBody(
+                id: householdId,
+                name: "Ev",
+                role: "owner",
+                members: members,
+                invites: []
+            )),
+            to: withSettings,
+            now: now
+        )
+        XCTAssertEqual(legacyServer.household?.regional, auckland)
+
+        let data = try JSONEncoder().encode(legacyServer)
+        let decoded = try JSONDecoder().decode(HouseholdSnapshot.self, from: data)
+        XCTAssertEqual(decoded.household?.regional, auckland)
+    }
+
     func testFakeBackendRoundTripsRenameAndTransfer() async throws {
         let backend = FakeHouseholdBackend()
         let owner = HouseholdUser(id: "owner", displayName: "Berkay", createdAt: now)

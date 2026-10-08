@@ -63,6 +63,7 @@ final class HouseholdSession {
             } else {
                 account = HouseholdAccountStore.load(testMode: isTestMode)
                 snapshot = HouseholdCacheStore.load(in: context, key: clientCacheKey)
+                syncRegionalContext()
                 if isTestMode {
                     restoreTestServer(in: context)
                 }
@@ -127,6 +128,7 @@ final class HouseholdSession {
         HouseholdTestMode.shared.setEnabled(enabled)
         deliveredPushIDs = []
         snapshot = HouseholdCacheStore.load(in: context, key: clientCacheKey)
+        syncRegionalContext()
         account = HouseholdAccountStore.load(testMode: enabled)
         PendingOperationStore.replace([], in: context)
         if enabled {
@@ -155,10 +157,11 @@ final class HouseholdSession {
         HouseholdCacheStore.clear(in: context, key: HouseholdCacheBox.testServerKey)
         account = nil
         snapshot = .empty()
+        syncRegionalContext()
         deliveredPushIDs = []
         PendingOperationStore.replace([], in: context)
         syncState = .idle
-        statusMessage = "Test verisi silindi."
+        statusMessage = L10n.text("household.status.testDataCleared", "Test verisi silindi.")
     }
 
     func queueInvite(_ code: String) {
@@ -336,6 +339,24 @@ final class HouseholdSession {
             statusMessage = L10n.text("household.status.renamed", "Ev halkının adı güncellendi.")
         } catch {
             statusMessage = error.localizedDescription
+        }
+    }
+
+    /// Owner-only on the server. Invalid values are rejected locally with the server's codes.
+    func updateRegionalSettings(_ settings: HouseholdRegionalSettings, in context: ModelContext) {
+        if let code = RegionalValidator.validate(settings) {
+            statusMessage = code.message
+            return
+        }
+        guard usesHouseholdAPI, let householdId = snapshot.household?.id else {
+            snapshot.household?.regional = settings
+            persist(in: context)
+            return
+        }
+        Task {
+            await self.performRemote(in: context, success: L10n.text("household.status.regionalUpdated", "Bölge ayarları güncellendi.")) {
+                try await self.lifecycleAPI().updateSettings(householdId: householdId, settings: settings)
+            }
         }
     }
 
@@ -1417,7 +1438,7 @@ final class HouseholdSession {
         }
         guard syncState == .idle,
               let code = snapshot.invites.last(where: { $0.status == .pending })?.inviteCode else { return }
-        statusMessage = "Davet kodu \(code)"
+        statusMessage = L10n.format("household.status.inviteCode", "Davet kodu %@", code)
     }
 
     private func resendRemote(inviteId: UUID, in context: ModelContext) async {
@@ -1560,7 +1581,13 @@ final class HouseholdSession {
         try? FakeHouseholdBackend.shared.importData(data)
     }
 
+    /// Week identity and pantry days follow the household timezone while a household is active.
+    private func syncRegionalContext() {
+        RegionalContext.shared.apply(household: snapshot.household?.regional)
+    }
+
     private func persist(in context: ModelContext) {
+        syncRegionalContext()
         HouseholdCacheStore.save(snapshot, in: context, key: clientCacheKey)
         guard isTestMode, let data = try? FakeHouseholdBackend.shared.exportData() else { return }
         HouseholdCacheStore.saveData(data, in: context, key: HouseholdCacheBox.testServerKey)

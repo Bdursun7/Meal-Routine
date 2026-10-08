@@ -202,16 +202,19 @@ struct APIClient: Sendable {
         return URL(string: suffix, relativeTo: baseURL)?.absoluteURL
     }
 
-    private static func message(for code: String?) -> String {
+    static func message(for code: String?) -> String {
+        if let regional = code.flatMap({ RegionalErrorCode(rawValue: $0) }) {
+            return regional.message
+        }
         switch code {
         case "rate_limited":
-            AuthAPIError.rateLimited.message
+            return AuthAPIError.rateLimited.message
         case "not_implemented":
-            "Sunucu bu işlemi henüz uygulamıyor."
+            return L10n.text("api.error.notImplemented", "Sunucu bu işlemi henüz uygulamıyor.")
         case "invalid_request":
-            "İstek tamamlanamadı."
+            return L10n.text("api.error.invalidRequest", "İstek tamamlanamadı.")
         default:
-            "Sunucu isteği tamamlayamadı."
+            return L10n.text("api.error.generic", "Sunucu isteği tamamlayamadı.")
         }
     }
 }
@@ -262,6 +265,20 @@ struct AccountRepository {
         let (data, response) = try await client.request(method: "GET", path: "/v1/auth/me", body: nil, authenticated: true)
         try client.validateAuth(response, data: data, authenticated: true)
         return try JSONDecoder().decode(AuthMeDTO.self, from: data)
+    }
+
+    func accountSettings() async throws -> RegionalSettings {
+        let (data, response) = try await client.request(method: "GET", path: "/v1/account/settings", body: nil, authenticated: true)
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder().decode(AccountSettingsDTO.self, from: data).settings
+    }
+
+    /// Sends only the fields in `patch`; the server keeps the rest.
+    func updateAccountSettings(_ patch: RegionalSettingsPatch) async throws -> RegionalSettings {
+        let body = try JSONEncoder().encode(patch)
+        let (data, response) = try await client.request(method: "PATCH", path: "/v1/account/settings", body: body, authenticated: true)
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder().decode(AccountSettingsDTO.self, from: data).settings
     }
 
     func logout(refreshToken: String) async {

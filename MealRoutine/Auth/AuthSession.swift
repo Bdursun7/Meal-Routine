@@ -32,6 +32,7 @@ final class AuthSession {
             identities = me.identities
             adoptHousehold(id: me.account.id, displayName: me.account.displayName)
             statusMessage = nil
+            await adoptRegional(me.settings)
         } catch AuthAPIError.sessionExpired {
             noteSessionExpired()
         } catch {
@@ -236,6 +237,21 @@ final class AuthSession {
         if wasSignedOut {
             Analytics.track(.signIn)
         }
+        if let settings = session.settings {
+            Task { await self.adoptRegional(settings) }
+        }
+    }
+
+    /// Account settings replace the device copy; onboarding values still pending are uploaded once.
+    private func adoptRegional(_ server: RegionalSettings?) async {
+        guard let server else { return }
+        let resolved = RegionalSettingsStore.reconcile(server: server, stored: RegionalSettingsStore.load())
+        RegionalSettingsStore.save(StoredRegionalSettings(settings: resolved.settings, pendingUpload: resolved.upload != nil))
+        RegionalContext.shared.apply(user: resolved.settings)
+        guard let patch = resolved.upload,
+              let saved = try? await repository().updateAccountSettings(patch) else { return }
+        RegionalSettingsStore.save(StoredRegionalSettings(settings: saved, pendingUpload: false))
+        RegionalContext.shared.apply(user: saved)
     }
 
     private func adoptHousehold(id: String, displayName: String) {

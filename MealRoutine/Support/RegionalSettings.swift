@@ -24,6 +24,35 @@ struct HouseholdRegionalSettings: Codable, Equatable, Hashable, Sendable {
     var timezone: String
 }
 
+/// Lenient decoding: a missing or unknown field (for example a measurement system added by a newer
+/// server) falls back to the default instead of failing the sign-in or household payload around it.
+extension RegionalSettings {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = RegionalDefaults.user
+        self.init(
+            locale: (try? container.decodeIfPresent(String.self, forKey: .locale)) ?? defaults.locale,
+            countryCode: (try? container.decodeIfPresent(String.self, forKey: .countryCode)) ?? defaults.countryCode,
+            currencyCode: (try? container.decodeIfPresent(String.self, forKey: .currencyCode)) ?? defaults.currencyCode,
+            measurementSystem: (try? container.decodeIfPresent(MeasurementSystem.self, forKey: .measurementSystem)) ?? defaults.measurementSystem,
+            timezone: (try? container.decodeIfPresent(String.self, forKey: .timezone)) ?? defaults.timezone
+        )
+    }
+}
+
+extension HouseholdRegionalSettings {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = RegionalDefaults.household
+        self.init(
+            countryCode: (try? container.decodeIfPresent(String.self, forKey: .countryCode)) ?? defaults.countryCode,
+            currencyCode: (try? container.decodeIfPresent(String.self, forKey: .currencyCode)) ?? defaults.currencyCode,
+            measurementSystem: (try? container.decodeIfPresent(MeasurementSystem.self, forKey: .measurementSystem)) ?? defaults.measurementSystem,
+            timezone: (try? container.decodeIfPresent(String.self, forKey: .timezone)) ?? defaults.timezone
+        )
+    }
+}
+
 /// The single place for first-deployment (Turkey) defaults. Server `REGIONAL_DEFAULTS` and
 /// migration `0013` use the same values. Business logic never compares against them.
 enum RegionalDefaults {
@@ -237,5 +266,95 @@ enum DeviceRegion {
         }
         let candidate = "\(language.lowercased())-\(region)"
         return RegionalValidator.isSupportedLocale(candidate) ? candidate : RegionalDefaults.locale
+    }
+}
+
+/// `PATCH /v1/account/settings` body. Nil fields are omitted, so each field changes independently.
+struct RegionalSettingsPatch: Codable, Equatable, Sendable {
+    var locale: String? = nil
+    var countryCode: String? = nil
+    var currencyCode: String? = nil
+    var measurementSystem: MeasurementSystem? = nil
+    var timezone: String? = nil
+
+    var isEmpty: Bool {
+        locale == nil && countryCode == nil && currencyCode == nil && measurementSystem == nil && timezone == nil
+    }
+}
+
+/// The user's regional settings on this device. `pendingUpload` marks device values captured at
+/// onboarding that the account has not received yet.
+struct StoredRegionalSettings: Codable, Equatable, Sendable {
+    var settings: RegionalSettings
+    var pendingUpload: Bool
+
+    static var initial: StoredRegionalSettings {
+        StoredRegionalSettings(settings: RegionalDefaults.user, pendingUpload: false)
+    }
+}
+
+enum RegionalSettingsStore {
+    static let key = "mealroutine.regional.user.v1"
+
+    static func load(defaults: UserDefaults = .standard) -> StoredRegionalSettings {
+        guard let data = defaults.data(forKey: key),
+              let stored = try? JSONDecoder().decode(StoredRegionalSettings.self, from: data) else {
+            return .initial
+        }
+        return stored
+    }
+
+    static func save(_ stored: StoredRegionalSettings, defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(stored) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    /// Puts the stored user settings into `context`. Called once at launch, before any view reads a week.
+    /// The first 5.1 launch seeds them from the device, so weeks keep the device-calendar boundaries
+    /// that 5.0 used.
+    static func bootstrap(
+        context: RegionalContext = .shared,
+        defaults: UserDefaults = .standard,
+        deviceLocale: String = DeviceRegion.locale(),
+        deviceTimezone: String = DeviceRegion.timezone()
+    ) {
+        guard defaults.data(forKey: key) != nil else {
+            captureDevice(locale: deviceLocale, timezone: deviceTimezone, context: context, defaults: defaults)
+            return
+        }
+        context.apply(user: load(defaults: defaults).settings)
+    }
+
+    /// Onboarding: the device locale and timezone become the user's, queued for the account.
+    /// Country, currency and measurement system are left as they are.
+    static func captureDevice(
+        locale: String = DeviceRegion.locale(),
+        timezone: String = DeviceRegion.timezone(),
+        context: RegionalContext = .shared,
+        defaults: UserDefaults = .standard
+    ) {
+        var stored = load(defaults: defaults)
+        stored.settings.locale = locale
+        stored.settings.timezone = timezone
+        stored.pendingUpload = true
+        save(stored, defaults: defaults)
+        context.apply(user: stored.settings)
+    }
+
+    /// The account's settings win, except device values still waiting to be uploaded. Returns the
+    /// settings to use now and the patch to send (nil when nothing is pending).
+    static func reconcile(server: RegionalSettings, stored: StoredRegionalSettings) -> (settings: RegionalSettings, upload: RegionalSettingsPatch?) {
+        guard stored.pendingUpload else { return (server, nil) }
+        var patch = RegionalSettingsPatch()
+        var settings = server
+        if stored.settings.locale != server.locale, RegionalValidator.isSupportedLocale(stored.settings.locale) {
+            patch.locale = stored.settings.locale
+            settings.locale = stored.settings.locale
+        }
+        if stored.settings.timezone != server.timezone, RegionalValidator.isTimezone(stored.settings.timezone) {
+            patch.timezone = stored.settings.timezone
+            settings.timezone = stored.settings.timezone
+        }
+        return (settings, patch.isEmpty ? nil : patch)
     }
 }

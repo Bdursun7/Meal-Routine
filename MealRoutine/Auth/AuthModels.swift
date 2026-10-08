@@ -79,13 +79,19 @@ struct AuthSessionDTO: Codable, Equatable, Sendable {
     var expiresIn: Int
     var account: AuthAccountDTO
     var identities: [AuthIdentityDTO]
+    /// Absent from pre-5.1 servers.
+    var settings: RegionalSettings? = nil
 }
 
 struct AuthMeDTO: Codable, Equatable, Sendable {
     var account: AuthAccountDTO
     var identities: [AuthIdentityDTO]
+    var settings: RegionalSettings? = nil
 }
 
+struct AccountSettingsDTO: Codable, Equatable, Sendable {
+    var settings: RegionalSettings
+}
 struct APIErrorDTO: Codable, Equatable, Sendable {
     var error: String
     var existingProviders: [String]?

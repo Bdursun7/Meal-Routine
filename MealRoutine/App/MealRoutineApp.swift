@@ -10,6 +10,7 @@ struct MealRoutineApp: App {
     private let container: ModelContainer
 
     init() {
+        RegionalSettingsStore.bootstrap()
         do {
             container = try ModelContainerFactory.make()
         } catch {

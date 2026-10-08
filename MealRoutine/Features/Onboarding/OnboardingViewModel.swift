@@ -244,6 +244,9 @@ final class OnboardingViewModel {
                 prefs = UserPrefs()
                 context.insert(prefs)
             }
+            if !prefs.hasCompletedOnboarding {
+                RegionalSettingsStore.captureDevice()
+            }
             prefs.householdSize = HouseholdSizeLimits.clamped(householdSize)
             prefs.eveningsPerWeek = min(max(evenings, 1), MealRecommender.eveningCap)
             prefs.maxCookMinutes = CookTimeOptions.resolved(maxCookMinutes)

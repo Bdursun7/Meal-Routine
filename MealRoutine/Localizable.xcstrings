@@ -266,6 +266,39 @@
     "Yukarı": {},
     "Zor": {},
     "Zorluk": {},
+    "api.error.generic": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunucu isteği tamamlayamadı."
+          }
+        }
+      }
+    },
+    "api.error.invalidRequest": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstek tamamlanamadı."
+          }
+        }
+      }
+    },
+    "api.error.notImplemented": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunucu bu işlemi henüz uygulamıyor."
+          }
+        }
+      }
+    },
     "badge.familiar": {
       "extractionState": "manual",
       "localizations": {
@@ -1245,6 +1278,17 @@
         }
       }
     },
+    "household.status.inviteCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet kodu %@"
+          }
+        }
+      }
+    },
     "household.status.inviteReady": {
       "extractionState": "manual",
       "localizations": {
@@ -1377,6 +1421,17 @@
         }
       }
     },
+    "household.status.regionalUpdated": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bölge ayarları güncellendi."
+          }
+        }
+      }
+    },
     "household.status.renamed": {
       "extractionState": "manual",
       "localizations": {
@@ -1417,6 +1472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonda oturum kapatıldı."
+          }
+        }
+      }
+    },
+    "household.status.testDataCleared": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test verisi silindi."
           }
         }
       }

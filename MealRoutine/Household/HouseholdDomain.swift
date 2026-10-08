@@ -188,6 +188,8 @@ struct Household: Codable, Equatable, Sendable, Identifiable {
     var createdAt: Date
     var revision: Int
     var baseRevision: Int
+    /// Server-owned regional context; nil for local-only households and pre-5.1 snapshots.
+    var regional: HouseholdRegionalSettings? = nil
 }
 
 struct HouseholdMember: Codable, Equatable, Sendable, Identifiable {
@@ -1547,6 +1549,9 @@ enum HouseholdConflictResolver {
     static func merge(local: HouseholdSnapshot, server: HouseholdSnapshot) -> HouseholdSnapshot {
         var result = server
         result.household = mergeHousehold(local: local.household, server: server.household)
+        if result.household != nil, result.household?.regional == nil {
+            result.household?.regional = server.household?.regional ?? local.household?.regional
+        }
         result.members = mergeMembers(local: local.members, server: server.members)
         result.invites = mergeInvites(local: local.invites, server: server.invites)
         result.preference = mergePreference(local: local.preference, server: server.preference)
