@@ -6,6 +6,7 @@ import type {
   InviteRecord,
   MemberRecord,
 } from './householdTypes.js'
+import { accountRegional } from './regional.js'
 import type { AccountRow, MemberRole } from './repository.js'
 
 interface StoredMember extends MemberRecord {
@@ -26,7 +27,7 @@ export function createHouseholdMemory(
     async account(id) {
       const account = accounts.get(id)
       if (!account) return null
-      return { id: account.id, displayName: account.displayName }
+      return { id: account.id, displayName: account.displayName, settings: accountRegional(account) }
     },
     async activeMembership(accountId) {
       const member = members.find((row) => row.accountId === accountId && row.leftAt === null)
@@ -37,7 +38,7 @@ export function createHouseholdMemory(
     },
     async household(id) {
       const household = households.get(id)
-      return household ? { ...household } : null
+      return household ? { ...household, settings: { ...household.settings } } : null
     },
     async lockHousehold() {},
     async members(householdId) {
@@ -64,7 +65,13 @@ export function createHouseholdMemory(
         name: row.name,
         ownerAccountId: row.ownerAccountId,
         deletedAt: null,
+        settings: { ...row.settings },
       })
+    },
+    async saveHouseholdSettings(id, settings) {
+      const household = households.get(id)
+      if (!household || household.deletedAt) throw new AppError('not_found', 404)
+      household.settings = { ...settings }
     },
     async insertMember(row) {
       if (members.some((member) => member.accountId === row.accountId && member.leftAt === null)) {

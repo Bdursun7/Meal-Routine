@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { AppError } from './errors.js'
-import { seedIngredients, type Ingredient } from './ingredients.js'
+import { cloneIngredient, seedIngredients, type Ingredient } from './ingredients.js'
 import type { MemberRole } from './repository.js'
 import { pantryTimestamp, type PantryDraft, type PantryIdempotencyHit, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
 import { parsePantryUnit } from './pantryUnits.js'
 
 type IdempotencyRow = PantryIdempotencyHit & { accountId: string; key: string; householdId: string | null }
 
-/** Mirrors the `unit_bucket` column in 0012: g/kg and ml/l share a row, other units do not. */
+/** Mirrors the `unit_bucket` column (0013): mass and volume units share a row, other units do not. */
 export function unitBucket(unit: string): string {
   return parsePantryUnit(unit).family ?? unit
 }
@@ -20,7 +20,6 @@ export function createMemoryPantry(
   const idempotency = new Map<string, IdempotencyRow>()
   const ingredients = new Map<string, Ingredient>(seedIngredients().map((row) => [row.id, row]))
   const clone = (item: PantryItem): PantryItem => ({ ...item })
-  const cloneIngredient = (row: Ingredient): Ingredient => ({ ...row, synonyms: [...row.synonyms], sourceIds: [...row.sourceIds] })
 
   function duplicate(householdId: string, ingredientId: string, unit: string, except?: string): boolean {
     return [...items.values()].some((item) => item.id !== except && item.householdId === householdId && item.ingredientId === ingredientId && unitBucket(item.unit) === unitBucket(unit))

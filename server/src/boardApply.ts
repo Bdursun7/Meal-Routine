@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { AppError } from './errors.js'
 import { isoTimestamp } from './householdTypes.js'
-import type { ActivityRow, BoardDocument, ChangeRow, GroceryRow, MealRow, PlanRow } from './boardTypes.js'
+import {
+  LEGACY_ACTIVITY_DETAIL,
+  type ActivityDetailCode,
+  type ActivityRow,
+  type BoardDocument,
+  type ChangeRow,
+  type GroceryRow,
+  type MealRow,
+  type PlanRow,
+} from './boardTypes.js'
+import { validWeekStart } from './regional.js'
 
 const PLAN_STATUS = new Set(['draft', 'needsDecisions', 'ready', 'inProgress', 'completed'])
 const MEAL_STATUS = new Set(['proposed', 'accepted', 'vetoed', 'replaced', 'cooked'])
@@ -73,18 +83,18 @@ export function applyMutation(
     row.updatedBy = actor.accountId
     entity = publicGrocery(row)
     revision = row.revision
-    pushActivity(next, actor, now, 'groceryChecked', row.itemKey, row.isChecked ? 'İşaretlendi' : 'İşaret kalktı')
+    pushActivity(next, actor, now, 'groceryChecked', row.itemKey, row.isChecked ? 'checked' : 'unchecked')
   } else if (input.entityType === 'meal' && (input.operationType === 'replace' || input.operationType === 'cook')) {
     const meal = findMeal(next, input.entityId)
     if (meal.revision !== input.baseRevision) conflict('meal', meal.id, publicMeal(meal))
     if (input.operationType === 'cook') {
       meal.status = 'cooked'
-      pushActivity(next, actor, now, 'mealCooked', meal.title, 'Pişti')
+      pushActivity(next, actor, now, 'mealCooked', meal.title, 'cooked')
     } else {
       meal.recipeSlug = text(input.payload.recipeSlug, 'recipeSlug')
       meal.title = text(input.payload.title, 'title')
       meal.status = 'replaced'
-      pushActivity(next, actor, now, 'replacement', meal.title, 'Yemek değişti')
+      pushActivity(next, actor, now, 'replacement', meal.title, 'replaced')
     }
     meal.revision += 1
     entity = publicMeal(meal)
@@ -125,7 +135,7 @@ export function applyMutation(
       now,
       reactionName === 'veto' ? 'veto' : reactionName,
       meal.title,
-      reactionName === 'veto' ? 'Bu hafta olmaz' : 'Tepki güncellendi',
+      reactionName === 'veto' ? 'vetoed' : 'reactionUpdated',
     )
   } else if (input.entityType === 'preference' && input.operationType === 'update') {
     const preference = next.preference
@@ -158,7 +168,7 @@ export function applyMutation(
         meals: mealsFrom(input.payload.meals, uuid(input.entityId)),
       }
       next.plans.push(plan)
-      pushActivity(next, actor, now, 'planGenerated', weekStart, 'Ortak plan kuruldu')
+      pushActivity(next, actor, now, 'planGenerated', weekStart, 'planCreated')
     } else {
       if (plan.revision !== input.baseRevision) conflict('plan', plan.id, publicPlan(plan))
       plan.weekStart = weekStart
@@ -224,7 +234,7 @@ function pushActivity(
   now: Date,
   kind: string,
   mealTitle: string,
-  detail: string,
+  detailCode: ActivityDetailCode,
 ) {
   const row: ActivityRow = {
     id: randomUUID(),
@@ -233,7 +243,8 @@ function pushActivity(
     actorName: actor.displayName,
     kind,
     mealTitle,
-    detail,
+    detail: LEGACY_ACTIVITY_DETAIL[detailCode],
+    detailCode,
     createdAt: isoTimestamp(now),
   }
   document.activity.unshift(row)
@@ -304,7 +315,7 @@ function text(value: unknown, field: string): string {
 function dateText(value: unknown): string {
   const raw = text(value, 'weekStart')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new AppError('invalid_request', 400)
-  return raw
+  return validWeekStart(raw)
 }
 
 function positiveInt(value: unknown, field: string): number {

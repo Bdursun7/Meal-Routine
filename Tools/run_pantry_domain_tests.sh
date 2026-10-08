@@ -22,7 +22,7 @@ for file in \
   ln -sf "$ROOT/MealRoutine/$file" "$PKG/Sources/MealRoutine/$(basename "$file")"
 done
 ln -sf "$ROOT/MealRoutineTests/PantryDomainTests.swift" "$PKG/Tests/PantryDomainTests/PantryDomainTests.swift"
-# The tests look for MealRoutine/Recipes/ingredients.v1.json next to their own path.
+# The tests look for MealRoutine/Recipes/ingredients.v2.json next to their own path.
 ln -sfn "$ROOT/MealRoutine" "$PKG/MealRoutine"
 cat > "$PKG/Package.swift" <<'SWIFT'
 // swift-tools-version:5.9

@@ -66,7 +66,8 @@ describe.skipIf(!databaseUrl)('postgres integration', () => {
     const ownerId = apple.json().account.id as string
     const householdId = '22222222-2222-4222-8222-222222222222'
     await pool.query(
-      `INSERT INTO households (id, name, owner_account_id) VALUES ($1, 'Ev', $2)`,
+      `INSERT INTO households (id, name, owner_account_id, country_code, currency_code, measurement_system, timezone)
+       VALUES ($1, 'Ev', $2, 'TR', 'TRY', 'metric', 'Europe/Istanbul')`,
       [householdId, ownerId],
     )
     await pool.query(
@@ -166,7 +167,7 @@ describe.skipIf(!databaseUrl)('postgres integration', () => {
       operationType: 'upsert',
       baseRevision: 0,
       payload: {
-        weekStart: '2030-06-02',
+        weekStart: '2030-06-03',
         status: 'draft',
         isFinalized: false,
         meals: [{ id: mealId, dayOffset: 0, recipeSlug: 'corba', title: 'Çorba' }],

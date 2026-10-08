@@ -1,0 +1,3259 @@
+{
+  "version": 2,
+  "sourceLocale": "tr-TR",
+  "locales": [
+    "tr-TR"
+  ],
+  "ingredients": [
+    {
+      "id": "achiote",
+      "names": {
+        "tr-TR": "Achiote paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "aji",
+      "names": {
+        "tr-TR": "Aji biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ajiamarillo",
+      "names": {
+        "tr-TR": "Ají amarillo paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ajwain",
+      "names": {
+        "tr-TR": "Ajwain seeds"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "allspice",
+      "names": {
+        "tr-TR": "Yenibahar"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "almonds",
+      "names": {
+        "tr-TR": "Badem"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "amba",
+      "names": {
+        "tr-TR": "Amba"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ancho",
+      "names": {
+        "tr-TR": "Dried ancho chillies"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "anchovy",
+      "names": {
+        "tr-TR": "Hamsi"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Taze hamsi"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "apricots",
+      "names": {
+        "tr-TR": "Kuru kayısı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "artichoke",
+      "names": {
+        "tr-TR": "Enginar"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "asafoetida",
+      "names": {
+        "tr-TR": "Çörtük (hing)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "attieke",
+      "names": {
+        "tr-TR": "Attiéké"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "aubergine",
+      "names": {
+        "tr-TR": "Patlıcan"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Karnıyarık patlıcanı",
+          "Küçük patlıcan"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ayib",
+      "names": {
+        "tr-TR": "Ayib or fresh curd"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bacon",
+      "names": {
+        "tr-TR": "Bacon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "baguette",
+      "names": {
+        "tr-TR": "Baguette"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "baharat",
+      "names": {
+        "tr-TR": "Baharat"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bakingpowder",
+      "names": {
+        "tr-TR": "Kabartma tozu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bananaleaf",
+      "names": {
+        "tr-TR": "Banana leaves"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "barramundi",
+      "names": {
+        "tr-TR": "Barramundi or sea bass"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "basil",
+      "names": {
+        "tr-TR": "Fesleğen"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bay",
+      "names": {
+        "tr-TR": "Defne"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bayleaf",
+      "names": {
+        "tr-TR": "Defne yaprağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "beans",
+      "names": {
+        "tr-TR": "Fasulye"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Haşlanmış kuru fasulye",
+          "Kuru fasulye"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "beansprouts",
+      "names": {
+        "tr-TR": "Filiz"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "beef",
+      "names": {
+        "tr-TR": "Dana eti"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Dana kıyma",
+          "Dana rosto",
+          "İnce dana dilim",
+          "İnce dana eti",
+          "İnce doğranmış dana",
+          "Jülyen dana eti",
+          "Kıyma",
+          "Kuşbaşı dana",
+          "Zırh dana kıyma"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "beer",
+      "names": {
+        "tr-TR": "Bira"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "beetroot",
+      "names": {
+        "tr-TR": "Pancar"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "berbere",
+      "names": {
+        "tr-TR": "Berbere"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "blackpepper",
+      "names": {
+        "tr-TR": "Karabiber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "pepper"
+      ]
+    },
+    {
+      "id": "borlotti",
+      "names": {
+        "tr-TR": "Barbunya"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kuru barbunya",
+          "Taze iç barbunya"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bread",
+      "names": {
+        "tr-TR": "Ekmek"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Bayat ekmek"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "breadcrumbs",
+      "names": {
+        "tr-TR": "Galeta unu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "brinedcheese",
+      "names": {
+        "tr-TR": "Brined white cheese"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "broadbeans",
+      "names": {
+        "tr-TR": "İç bakla"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "brynza",
+      "names": {
+        "tr-TR": "Sheep's brynza"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bucatini",
+      "names": {
+        "tr-TR": "Bucatini"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bulgur",
+      "names": {
+        "tr-TR": "Bulgur"
+      },
+      "aliases": {
+        "tr-TR": [
+          "İnce bulgur",
+          "Pilavlık bulgur"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "bun",
+      "names": {
+        "tr-TR": "Buns"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "butter",
+      "names": {
+        "tr-TR": "Tereyağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "butterbeans",
+      "names": {
+        "tr-TR": "İri fasulye"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "butterfat",
+      "names": {
+        "tr-TR": "Clarified butter or lard"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cabbage",
+      "names": {
+        "tr-TR": "Lahana"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Beyaz lahana"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "caraway",
+      "names": {
+        "tr-TR": "Kimyon (caraway)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cardamom",
+      "names": {
+        "tr-TR": "Kakule"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "carrot",
+      "names": {
+        "tr-TR": "Havuç"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cashew",
+      "names": {
+        "tr-TR": "Cashews"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cassava",
+      "names": {
+        "tr-TR": "Maniyok"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cauliflower",
+      "names": {
+        "tr-TR": "Karnabahar"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "celery",
+      "names": {
+        "tr-TR": "Kereviz"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chard",
+      "names": {
+        "tr-TR": "Pazı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chayote",
+      "names": {
+        "tr-TR": "Chayote or courgette"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cheese",
+      "names": {
+        "tr-TR": "Peynir"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kaşar peyniri",
+          "Kolot veya beyaz peynir"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cherry-tomato",
+      "names": {
+        "tr-TR": "Cherry domates"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chicken",
+      "names": {
+        "tr-TR": "Tavuk"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Bütün tavuk",
+          "Tavuk baget",
+          "Tavuk but",
+          "Tavuk göğsü",
+          "Tavuk parçaları"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chickpeaflour",
+      "names": {
+        "tr-TR": "Chickpea flour"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chickpeas",
+      "names": {
+        "tr-TR": "Nohut"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Haşlanmış nohut"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chilipaste",
+      "names": {
+        "tr-TR": "Sambal paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chilipowder",
+      "names": {
+        "tr-TR": "Chilli powder"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chilli",
+      "names": {
+        "tr-TR": "Acı biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "chili",
+        "chillies"
+      ]
+    },
+    {
+      "id": "chillipowder",
+      "names": {
+        "tr-TR": "Toz acı biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chinesesausage",
+      "names": {
+        "tr-TR": "Chinese sausage"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chives",
+      "names": {
+        "tr-TR": "Frenk soğanı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chourico",
+      "names": {
+        "tr-TR": "Chouriço"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "chutney",
+      "names": {
+        "tr-TR": "Apricot chutney"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cilantro",
+      "names": {
+        "tr-TR": "Kişniş (taze)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cinnamon",
+      "names": {
+        "tr-TR": "Tarçın"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "clams",
+      "names": {
+        "tr-TR": "Clams"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "clove",
+      "names": {
+        "tr-TR": "Karanfil"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "coarsesalt",
+      "names": {
+        "tr-TR": "Coarse salt"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cockles",
+      "names": {
+        "tr-TR": "Cockles or squid"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "coconutmilk",
+      "names": {
+        "tr-TR": "Hindistan cevizi sütü"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cod",
+      "names": {
+        "tr-TR": "Morina"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "codfish",
+      "names": {
+        "tr-TR": "Salt cod"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "coldwater",
+      "names": {
+        "tr-TR": "Iced water for the filling"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "coriander",
+      "names": {
+        "tr-TR": "Kişniş"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "corn",
+      "names": {
+        "tr-TR": "Mısır"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kuru mısır"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cornflour",
+      "names": {
+        "tr-TR": "Mısır nişastası"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cornmeal",
+      "names": {
+        "tr-TR": "Mısır unu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "courgette",
+      "names": {
+        "tr-TR": "Kabak"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Sakız kabağı"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "crab",
+      "names": {
+        "tr-TR": "Mud crab"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "crackers",
+      "names": {
+        "tr-TR": "Oyster crackers"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cream",
+      "names": {
+        "tr-TR": "Krema"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cucumber",
+      "names": {
+        "tr-TR": "Salatalık"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Cucumbers"
+        ]
+      },
+      "sourceIds": [
+        "cucumbers"
+      ]
+    },
+    {
+      "id": "cumin",
+      "names": {
+        "tr-TR": "Kimyon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "curd",
+      "names": {
+        "tr-TR": "Dry curd cheese"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "curdcheese",
+      "names": {
+        "tr-TR": "Lor peyniri"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "curry",
+      "names": {
+        "tr-TR": "Köri"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "curryleaves",
+      "names": {
+        "tr-TR": "Köri yaprağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "currypowder",
+      "names": {
+        "tr-TR": "Köri tozu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "currysauce",
+      "names": {
+        "tr-TR": "Chicken curry with sauce"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "cuttlefish",
+      "names": {
+        "tr-TR": "Cuttlefish"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kalamar"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "daikon",
+      "names": {
+        "tr-TR": "Grated daikon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "darksoy",
+      "names": {
+        "tr-TR": "Dark soy sauce"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "dashi",
+      "names": {
+        "tr-TR": "Dashi"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "dill",
+      "names": {
+        "tr-TR": "Dereotu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "doubanjiang",
+      "names": {
+        "tr-TR": "Doubanjiang"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "douchi",
+      "names": {
+        "tr-TR": "Fermented black beans"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "doughsalt",
+      "names": {
+        "tr-TR": "Salt for the dough"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "driedchilli",
+      "names": {
+        "tr-TR": "Dried chillies"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "driedchili"
+      ]
+    },
+    {
+      "id": "driedmint",
+      "names": {
+        "tr-TR": "Kuru nane"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "dryginger",
+      "names": {
+        "tr-TR": "Ground dry ginger"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "dzavar",
+      "names": {
+        "tr-TR": "Dzavar (cracked wheat)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "egg",
+      "names": {
+        "tr-TR": "Yumurta"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "eggs"
+      ]
+    },
+    {
+      "id": "eggwhite",
+      "names": {
+        "tr-TR": "Egg white"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fat",
+      "names": {
+        "tr-TR": "Yağ / iç yağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fatir",
+      "names": {
+        "tr-TR": "Fatir flatbread"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fennel",
+      "names": {
+        "tr-TR": "Rezene"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fenugreek",
+      "names": {
+        "tr-TR": "Çemen otu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "feta",
+      "names": {
+        "tr-TR": "Beyaz peynir"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "filo",
+      "names": {
+        "tr-TR": "Yufka"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fish",
+      "names": {
+        "tr-TR": "Balık"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Beyaz balık",
+          "Çipura"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fishsauce",
+      "names": {
+        "tr-TR": "Balık sosu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "flatbread",
+      "names": {
+        "tr-TR": "Lavaş / pide"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Lavaş"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "flour",
+      "names": {
+        "tr-TR": "Un"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "freekeh",
+      "names": {
+        "tr-TR": "Freekeh"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "freshmint",
+      "names": {
+        "tr-TR": "Mint and white onion to serve"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fries",
+      "names": {
+        "tr-TR": "Chips"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "fryoil",
+      "names": {
+        "tr-TR": "Oil for frying"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "garammasala",
+      "names": {
+        "tr-TR": "Garam masala"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "garlic",
+      "names": {
+        "tr-TR": "Sarımsak"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ghee",
+      "names": {
+        "tr-TR": "Sade yağ"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ginger",
+      "names": {
+        "tr-TR": "Zencefil"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gingergarlic",
+      "names": {
+        "tr-TR": "Ginger garlic paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gochujang",
+      "names": {
+        "tr-TR": "Gochujang"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gomen",
+      "names": {
+        "tr-TR": "Stewed collard greens"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "goraka",
+      "names": {
+        "tr-TR": "Goraka or tamarind"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "grapeleaves",
+      "names": {
+        "tr-TR": "Asma yaprağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gravy",
+      "names": {
+        "tr-TR": "Meat gravy"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "greenbanana",
+      "names": {
+        "tr-TR": "Green bananas"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "greenbeans",
+      "names": {
+        "tr-TR": "Taze fasulye"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "greenchilli",
+      "names": {
+        "tr-TR": "Yeşil acı biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "greenchili"
+      ]
+    },
+    {
+      "id": "greenpepper",
+      "names": {
+        "tr-TR": "Yeşil biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gruyere",
+      "names": {
+        "tr-TR": "Gruyère"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "guajillo",
+      "names": {
+        "tr-TR": "Dried guajillo chillies"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "guanciale",
+      "names": {
+        "tr-TR": "Guanciale (pancetta olur)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "gundruk",
+      "names": {
+        "tr-TR": "Gundruk"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "halloumi",
+      "names": {
+        "tr-TR": "Hellim"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ham",
+      "names": {
+        "tr-TR": "Jambon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "harissa",
+      "names": {
+        "tr-TR": "Harissa"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "hilsa",
+      "names": {
+        "tr-TR": "Hilsa or herring"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "holybasil",
+      "names": {
+        "tr-TR": "Holy basil"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "honey",
+      "names": {
+        "tr-TR": "Bal"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "icewater",
+      "names": {
+        "tr-TR": "Buzlu su"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "injera",
+      "names": {
+        "tr-TR": "Injera"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ink",
+      "names": {
+        "tr-TR": "Cuttlefish ink"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kajmak",
+      "names": {
+        "tr-TR": "Kaymak"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kale",
+      "names": {
+        "tr-TR": "Karalahana"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kashmirichili",
+      "names": {
+        "tr-TR": "Kashmiri acı biber tozu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "katsuobushi",
+      "names": {
+        "tr-TR": "Bonito flakes"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kecapmanis",
+      "names": {
+        "tr-TR": "Kecap manis"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "kecap"
+      ]
+    },
+    {
+      "id": "kefir",
+      "names": {
+        "tr-TR": "Kefir"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "khmelisuneli",
+      "names": {
+        "tr-TR": "Khmeli suneli"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kirsch",
+      "names": {
+        "tr-TR": "Kirsch"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "kombu",
+      "names": {
+        "tr-TR": "Kombu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lamb",
+      "names": {
+        "tr-TR": "Kuzu eti"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kemikli kuzu",
+          "Kuşbaşı kuzu",
+          "Kuzu incik",
+          "Kuzu kıyma",
+          "Kuzu kol",
+          "Kuzu kuşbaşı",
+          "Kuzu paça",
+          "Kuzu pirzola"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lard",
+      "names": {
+        "tr-TR": "Lard"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "leanbeef",
+      "names": {
+        "tr-TR": "Lean beef"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "leek",
+      "names": {
+        "tr-TR": "Pırasa"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lemon",
+      "names": {
+        "tr-TR": "Limon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lemonmyrtle",
+      "names": {
+        "tr-TR": "Lemon myrtle"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lentils",
+      "names": {
+        "tr-TR": "Mercimek"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kırmızı mercimek",
+          "Yeşil mercimek"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lettuce",
+      "names": {
+        "tr-TR": "Marul"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lightsoy",
+      "names": {
+        "tr-TR": "Light soy sauce"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lime",
+      "names": {
+        "tr-TR": "Misket limonu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lingonberry",
+      "names": {
+        "tr-TR": "Lingonberry jam"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "liver",
+      "names": {
+        "tr-TR": "Ciğer"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kuzu ciğeri",
+          "Tavuk ciğeri"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "lizano",
+      "names": {
+        "tr-TR": "Salsa Lizano"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "macaroni",
+      "names": {
+        "tr-TR": "Kısa makarna"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Small pasta",
+          "Yüksük makarna"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mackerel",
+      "names": {
+        "tr-TR": "Palamut"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Palamut dilim",
+          "Uskumru"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mantou",
+      "names": {
+        "tr-TR": "Mantou buns"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "matsun",
+      "names": {
+        "tr-TR": "Matsun or plain yoghurt"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mayonnaise",
+      "names": {
+        "tr-TR": "Mayonnaise"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "merguez",
+      "names": {
+        "tr-TR": "Merguez sosis"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "methi",
+      "names": {
+        "tr-TR": "Kasuri methi"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "milk",
+      "names": {
+        "tr-TR": "Süt"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mint",
+      "names": {
+        "tr-TR": "Nane"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mirin",
+      "names": {
+        "tr-TR": "Mirin"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "miso",
+      "names": {
+        "tr-TR": "Miso"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mitmita",
+      "names": {
+        "tr-TR": "Mitmita spice"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "molokhia",
+      "names": {
+        "tr-TR": "Molokhia leaves"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "moongdal",
+      "names": {
+        "tr-TR": "Moong dal"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mozzarella",
+      "names": {
+        "tr-TR": "Mozzarella"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mushrooms",
+      "names": {
+        "tr-TR": "Mantar"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mussels",
+      "names": {
+        "tr-TR": "Midye"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mustard",
+      "names": {
+        "tr-TR": "Hardal"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mustardoil",
+      "names": {
+        "tr-TR": "Mustard oil"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "mustardseeds",
+      "names": {
+        "tr-TR": "Mustard seeds"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "naan",
+      "names": {
+        "tr-TR": "Naan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "nigella",
+      "names": {
+        "tr-TR": "Nigella seeds"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "noodles",
+      "names": {
+        "tr-TR": "Erişte"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "nutmeg",
+      "names": {
+        "tr-TR": "Muskat"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "oil",
+      "names": {
+        "tr-TR": "Yağ"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "okra",
+      "names": {
+        "tr-TR": "Bamya"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "oliveoil",
+      "names": {
+        "tr-TR": "Zeytinyağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "olives",
+      "names": {
+        "tr-TR": "Zeytin"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "onion",
+      "names": {
+        "tr-TR": "Soğan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "onions"
+      ]
+    },
+    {
+      "id": "oregano",
+      "names": {
+        "tr-TR": "Kekik (oregano)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "oystersauce",
+      "names": {
+        "tr-TR": "İstiridye sosu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "palmsugar",
+      "names": {
+        "tr-TR": "Hurma şekeri"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pancakeflour",
+      "names": {
+        "tr-TR": "Flour for pancakes"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pandan",
+      "names": {
+        "tr-TR": "Pandan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "paneer",
+      "names": {
+        "tr-TR": "Paneer (beyaz peynir yedek)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "papaya",
+      "names": {
+        "tr-TR": "Green papaya paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "paprika",
+      "names": {
+        "tr-TR": "Toz biber"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Tatlı toz biber"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "parmesan",
+      "names": {
+        "tr-TR": "Parmesan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "parsley",
+      "names": {
+        "tr-TR": "Maydanoz"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pasta",
+      "names": {
+        "tr-TR": "Makarna"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pastirma",
+      "names": {
+        "tr-TR": "Pastırma"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "peanuts",
+      "names": {
+        "tr-TR": "Fıstık"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "peas",
+      "names": {
+        "tr-TR": "Bezelye"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pecorino",
+      "names": {
+        "tr-TR": "Pecorino (kaşar/parmesan yedek)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "peppercorns",
+      "names": {
+        "tr-TR": "Black peppercorns"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pepperflakes",
+      "names": {
+        "tr-TR": "Pul biber"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pepperpaste",
+      "names": {
+        "tr-TR": "Biber salçası"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "peppers",
+      "names": {
+        "tr-TR": "Biber"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Çarliston biber",
+          "Dolmalık biber",
+          "Sivri biber"
+        ]
+      },
+      "sourceIds": [
+        "biber"
+      ]
+    },
+    {
+      "id": "pide",
+      "names": {
+        "tr-TR": "Pide"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pineapple",
+      "names": {
+        "tr-TR": "Pineapple"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pinenuts",
+      "names": {
+        "tr-TR": "Çam fıstığı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "piripiri",
+      "names": {
+        "tr-TR": "Piri-piri chillies"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pita",
+      "names": {
+        "tr-TR": "Pita ekmeği"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "plantain",
+      "names": {
+        "tr-TR": "Plantain"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pomegranate",
+      "names": {
+        "tr-TR": "Nar"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Nar ekşisi"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pork",
+      "names": {
+        "tr-TR": "Domuz eti"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "porkbelly",
+      "names": {
+        "tr-TR": "Domuz göbeği"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "potato",
+      "names": {
+        "tr-TR": "Patates"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "potatoes"
+      ]
+    },
+    {
+      "id": "prawns",
+      "names": {
+        "tr-TR": "Karides"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "prosciutto",
+      "names": {
+        "tr-TR": "Prosciutto"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "prunes",
+      "names": {
+        "tr-TR": "Prunes"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "pumpkin",
+      "names": {
+        "tr-TR": "Balkabağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "qurut",
+      "names": {
+        "tr-TR": "Qurut"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "rabbit",
+      "names": {
+        "tr-TR": "Rabbit, in pieces"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "radish",
+      "names": {
+        "tr-TR": "Turp"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "raisins",
+      "names": {
+        "tr-TR": "Kuru üzüm"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kuş üzümü"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "redcabbage",
+      "names": {
+        "tr-TR": "Pickled red cabbage"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ribs",
+      "names": {
+        "tr-TR": "Smoked ribs"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "rice",
+      "names": {
+        "tr-TR": "Pirinç"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ricenoodles",
+      "names": {
+        "tr-TR": "Pirinç eriştesi"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "rocket",
+      "names": {
+        "tr-TR": "Rocket"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "rosemary",
+      "names": {
+        "tr-TR": "Biberiye"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "roti",
+      "names": {
+        "tr-TR": "Roti or paratha"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "ryebread",
+      "names": {
+        "tr-TR": "Rye bread"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "saffron",
+      "names": {
+        "tr-TR": "Safran"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sake",
+      "names": {
+        "tr-TR": "Sake"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "salmon",
+      "names": {
+        "tr-TR": "Somon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "salmonbones",
+      "names": {
+        "tr-TR": "Salmon head and bones"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "salt",
+      "names": {
+        "tr-TR": "Tuz"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sambal",
+      "names": {
+        "tr-TR": "Sambal"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sardines",
+      "names": {
+        "tr-TR": "Sardines"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sausage",
+      "names": {
+        "tr-TR": "Sosis"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "savory",
+      "names": {
+        "tr-TR": "Summer savory"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "scotchbonnet",
+      "names": {
+        "tr-TR": "Scotch bonnet"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "seabass",
+      "names": {
+        "tr-TR": "Levrek"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Levrek fileto"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "semolina",
+      "names": {
+        "tr-TR": "İrmik"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sesameoil",
+      "names": {
+        "tr-TR": "Susam yağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sesameseeds",
+      "names": {
+        "tr-TR": "Sesame seeds"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sevenspice",
+      "names": {
+        "tr-TR": "Seven-spice mix"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "shallot",
+      "names": {
+        "tr-TR": "Arpacık soğan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "shallots"
+      ]
+    },
+    {
+      "id": "sichuanpepper",
+      "names": {
+        "tr-TR": "Sichuan biberi"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "soda",
+      "names": {
+        "tr-TR": "Soda"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "somun",
+      "names": {
+        "tr-TR": "Somun ekmek"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Somun flatbreads"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sourcream",
+      "names": {
+        "tr-TR": "Ekşi krema"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "soy",
+      "names": {
+        "tr-TR": "Soya"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "soybeans",
+      "names": {
+        "tr-TR": "Soybeans"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "soysauce",
+      "names": {
+        "tr-TR": "Soya sosu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "spaghetti",
+      "names": {
+        "tr-TR": "Spagetti"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sparklingwater",
+      "names": {
+        "tr-TR": "Sparkling water"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "spinach",
+      "names": {
+        "tr-TR": "Ispanak"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "springonion",
+      "names": {
+        "tr-TR": "Taze soğan"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": [
+        "scallion",
+        "spring"
+      ]
+    },
+    {
+      "id": "starch",
+      "names": {
+        "tr-TR": "Nişasta"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "stock",
+      "names": {
+        "tr-TR": "Et suyu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "stockcube",
+      "names": {
+        "tr-TR": "Bulyon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sucuk",
+      "names": {
+        "tr-TR": "Sucuk"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sugar",
+      "names": {
+        "tr-TR": "Şeker"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sumac",
+      "names": {
+        "tr-TR": "Sumak"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sunfloweroil",
+      "names": {
+        "tr-TR": "Ayçiçek yağı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "sweetpotato",
+      "names": {
+        "tr-TR": "Sweet potato"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tahini",
+      "names": {
+        "tr-TR": "Tahin"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tamarind",
+      "names": {
+        "tr-TR": "Demirhindi"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tarhana",
+      "names": {
+        "tr-TR": "Tarhana"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kuru tarhana"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tarragon",
+      "names": {
+        "tr-TR": "Tarhun"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "terasi",
+      "names": {
+        "tr-TR": "Terasi shrimp paste"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "thyme",
+      "names": {
+        "tr-TR": "Kekik"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "timur",
+      "names": {
+        "tr-TR": "Timur pepper"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tofu",
+      "names": {
+        "tr-TR": "Tofu"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tomato",
+      "names": {
+        "tr-TR": "Domates"
+      },
+      "aliases": {
+        "tr-TR": [
+          "İri domates"
+        ]
+      },
+      "sourceIds": [
+        "tomatoes"
+      ]
+    },
+    {
+      "id": "tomatoketchup",
+      "names": {
+        "tr-TR": "Tomato ketchup"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tomatopassata",
+      "names": {
+        "tr-TR": "Süzme domates"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tomatopaste",
+      "names": {
+        "tr-TR": "Domates salçası"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tomatosauce",
+      "names": {
+        "tr-TR": "Tomato sauce"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tortillas",
+      "names": {
+        "tr-TR": "Corn tortillas"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tripe",
+      "names": {
+        "tr-TR": "İşkembe"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "trout",
+      "names": {
+        "tr-TR": "Alabalık"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "tuna",
+      "names": {
+        "tr-TR": "Ton"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "turmeric",
+      "names": {
+        "tr-TR": "Zerdeçal"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "vacherin",
+      "names": {
+        "tr-TR": "Vacherin fribourgeois"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "veal",
+      "names": {
+        "tr-TR": "Dana (buzağı)"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "vegetables",
+      "names": {
+        "tr-TR": "Sweet potato, aubergine, pumpkin, pepper"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "vermicelli",
+      "names": {
+        "tr-TR": "Şehriye"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Tel şehriye"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "vinegar",
+      "names": {
+        "tr-TR": "Sirke"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "wakame",
+      "names": {
+        "tr-TR": "Dried wakame"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "walnuts",
+      "names": {
+        "tr-TR": "Ceviz"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "water",
+      "names": {
+        "tr-TR": "Su"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Kaynar su",
+          "Sıcak su"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "watermelon",
+      "names": {
+        "tr-TR": "Watermelon"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "whitewine",
+      "names": {
+        "tr-TR": "Beyaz şarap"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "wine",
+      "names": {
+        "tr-TR": "Şarap"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "worcestershire",
+      "names": {
+        "tr-TR": "Worcestershire sauce"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "yeast",
+      "names": {
+        "tr-TR": "Maya"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Yaş maya"
+        ]
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "yogurt",
+      "names": {
+        "tr-TR": "Yoğurt"
+      },
+      "aliases": {
+        "tr-TR": [
+          "Süzme yoğurt"
+        ]
+      },
+      "sourceIds": [
+        "yoghurt"
+      ]
+    },
+    {
+      "id": "yolks",
+      "names": {
+        "tr-TR": "Yumurta sarısı"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    },
+    {
+      "id": "zhug",
+      "names": {
+        "tr-TR": "Zhug"
+      },
+      "aliases": {
+        "tr-TR": []
+      },
+      "sourceIds": []
+    }
+  ]
+}

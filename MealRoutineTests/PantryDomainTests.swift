@@ -8,7 +8,7 @@ final class PantryDomainTests: XCTestCase {
         if !IngredientDictionary.shared.entries.isEmpty { return IngredientDictionary.shared }
         var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         for _ in 0..<4 {
-            let url = directory.appendingPathComponent("MealRoutine/Recipes/ingredients.v1.json")
+            let url = directory.appendingPathComponent("MealRoutine/Recipes/ingredients.v2.json")
             if let data = try? Data(contentsOf: url), let loaded = try? IngredientDictionary(data: data) { return loaded }
             directory.deleteLastPathComponent()
         }

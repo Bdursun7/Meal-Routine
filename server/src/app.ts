@@ -39,6 +39,14 @@ import type { AuthRepository } from './repository.js'
 import { createPantryService, pantryRecovery, type PantryService } from './pantryService.js'
 import { pantryTimestamp, type PantryStore } from './pantryTypes.js'
 import { verifyAccessToken } from './tokens.js'
+import { DICTIONARY_SOURCE_LOCALE, publicIngredient } from './ingredients.js'
+import {
+  accountRegional,
+  validateHouseholdSettingsPatch,
+  validateUserSettingsPatch,
+  validLocale,
+  type UserRegionalSettings,
+} from './regional.js'
 
 const appleBody = z.object({
   identityToken: z.string().min(1).max(20_000),
@@ -81,6 +89,23 @@ const memberParams = householdParams.extend({
 const nameBody = z.object({
   name: z.string().min(1).max(80),
 })
+
+/** Regional codes are checked by `regional.ts` so a bad value maps to its own stable error code. */
+const regionalFields = {
+  countryCode: z.unknown().optional(),
+  currencyCode: z.unknown().optional(),
+  measurementSystem: z.unknown().optional(),
+  timezone: z.unknown().optional(),
+}
+
+const householdCreateBody = z.object({
+  name: z.string().min(1).max(80),
+  ...regionalFields,
+})
+
+const householdSettingsBody = z.object(regionalFields).strict()
+
+const accountSettingsBody = z.object({ locale: z.unknown().optional(), ...regionalFields }).strict()
 
 const transferBody = z.object({
   accountId: z.string().uuid(),
@@ -317,7 +342,20 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.get('/v1/auth/me', async (request) => {
     const accountId = await requireAccount(request, options)
     const me = await service.me(accountId)
-    return { account: me.account, identities: me.identities }
+    return { account: me.account, identities: me.identities, settings: me.settings }
+  })
+
+  app.get('/v1/account/settings', async (request) => {
+    const accountId = await requireAccount(request, options)
+    return { settings: await accountSettings(options.repo, accountId) }
+  })
+
+  app.patch('/v1/account/settings', async (request) => {
+    enforceWriteLimit(request, limiter, 'auth')
+    const accountId = await requireAccount(request, options)
+    const patch = validateUserSettingsPatch(parse(accountSettingsBody, request.body))
+    const current = await accountSettings(options.repo, accountId)
+    return { settings: await options.repo.saveAccountSettings(accountId, { ...current, ...patch }) }
   })
 
   app.get('/v1/account/export', async (request) => {
@@ -383,8 +421,17 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   app.post('/v1/households', async (request) => {
     enforceWriteLimit(request, limiter, 'household')
     const accountId = await requireAccount(request, options)
-    const body = parse(nameBody, request.body)
-    return households.create(accountId, body.name)
+    const body = parse(householdCreateBody, request.body)
+    const { name, ...regional } = body
+    return households.create(accountId, name, validateHouseholdSettingsPatch(regional))
+  })
+
+  app.patch('/v1/households/:householdId/settings', async (request) => {
+    enforceWriteLimit(request, limiter, 'household')
+    const accountId = await requireAccount(request, options)
+    const params = parse(householdParams, request.params)
+    const patch = validateHouseholdSettingsPatch(parse(householdSettingsBody, request.body))
+    return households.updateSettings(accountId, params.householdId, patch)
   })
 
   app.get('/v1/households/:householdId', async (request) => {
@@ -625,7 +672,9 @@ async function notifyOthers(
     const members = await repo.transaction(async (tx) => tx.members(householdId))
     for (const member of members) {
       if (member.accountId === actorId) continue
-      await notifications.enqueue(member.accountId, householdId, kind, mealId, inviteCode)
+      const recipient = await repo.getAccount(member.accountId)
+      const locale = recipient ? accountRegional(recipient).locale : undefined
+      await notifications.enqueue(member.accountId, householdId, kind, mealId, inviteCode, locale)
     }
   } catch {
     metrics.notePushFailure()
@@ -721,11 +770,25 @@ const ingredientQuery = z.object({
   householdId: z.string().uuid().optional(),
   q: z.string().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(1000).optional(),
+  locale: z.string().max(35).optional(),
 })
 const ingredientBody = z.object({
   id: z.string().min(1).max(120),
   displayName: z.string().min(1).max(160),
+  locale: z.string().max(35).optional(),
 }).strict()
+
+async function accountSettings(repo: AuthRepository, accountId: string): Promise<UserRegionalSettings> {
+  const account = await repo.getAccount(accountId)
+  if (!account) throw new AppError('not_found', 404)
+  return accountRegional(account)
+}
+
+/** An explicit `locale` must be supported; otherwise the account's own locale applies. */
+async function requestLocale(repo: AuthRepository, accountId: string, raw: string | undefined): Promise<string> {
+  if (raw !== undefined) return validLocale(raw)
+  return (await accountSettings(repo, accountId)).locale
+}
 
 function isPantryRoute(url: string): boolean {
   const path = url.split('?')[0] ?? ''
@@ -743,16 +806,13 @@ function registerPantryRoutes(app: FastifyInstance, options: BuildAppOptions, pa
   app.get('/v1/ingredients', async (request) => {
     const accountId = await requireAccount(request, options)
     const query = parse(ingredientQuery, request.query)
-    const rows = await pantry.ingredients(accountId, query.householdId ?? null, query.q?.trim() ?? '', query.limit ?? 1000)
+    const locale = await requestLocale(options.repo, accountId, query.locale)
+    const rows = await pantry.ingredients(accountId, query.householdId ?? null, query.q?.trim() ?? '', query.limit ?? 1000, locale)
     return {
-      version: 1,
-      ingredients: rows.map((row) => ({
-        id: row.id,
-        displayName: row.displayName,
-        synonyms: row.synonyms,
-        sourceIds: row.sourceIds,
-        scope: row.householdId ? 'household' : 'dictionary',
-      })),
+      version: 2,
+      locale,
+      sourceLocale: DICTIONARY_SOURCE_LOCALE,
+      ingredients: rows.map((row) => publicIngredient(row, locale)),
     }
   })
 
@@ -761,8 +821,9 @@ function registerPantryRoutes(app: FastifyInstance, options: BuildAppOptions, pa
     const accountId = await requireAccount(request, options)
     const { householdId } = parse(householdParams, request.params)
     const body = parse(ingredientBody, request.body)
-    const row = await pantry.registerIngredient(accountId, householdId, body, idempotencyKey(request), clock())
-    return { id: row.id, displayName: row.displayName, synonyms: row.synonyms, sourceIds: row.sourceIds, scope: 'household' }
+    const locale = await requestLocale(options.repo, accountId, body.locale)
+    const row = await pantry.registerIngredient(accountId, householdId, { id: body.id, displayName: body.displayName, locale }, idempotencyKey(request), clock())
+    return publicIngredient(row, locale)
   })
 
   app.get('/v1/households/:householdId/pantry', async (request) => {

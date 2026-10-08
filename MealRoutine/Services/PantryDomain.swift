@@ -1046,12 +1046,14 @@ enum PantryIngredientMatching {
             let unchanged = !pinnedName.isEmpty && IngredientDictionary.fold(pinnedName) == folded
             if let entry = storedEntry(id: pinnedId, dictionary: dictionary, customs: customs) {
                 if unchanged {
-                    if matches(entry, folded: folded) { return .linked(entry) }
-                    return .linked(IngredientEntry(id: entry.id, name: trimmed, synonyms: entry.synonyms, sourceIds: entry.sourceIds))
+                    if matches(entry, folded: folded, locale: dictionary.locale) { return .linked(entry) }
+                    var renamed = entry
+                    renamed.names[dictionary.locale] = trimmed
+                    return .linked(renamed)
                 }
-                if matches(entry, folded: folded) { return .linked(entry) }
+                if matches(entry, folded: folded, locale: dictionary.locale) { return .linked(entry) }
             } else if unchanged {
-                return .linked(IngredientEntry(id: pinnedId, name: trimmed))
+                return .linked(IngredientEntry(id: pinnedId, name: trimmed, locale: dictionary.locale))
             }
         }
         let exact = exactEntries(named: trimmed, dictionary: dictionary, customs: customs)
@@ -1070,7 +1072,7 @@ enum PantryIngredientMatching {
         var seen = Set<String>()
         for entry in customs + dictionary.entries {
             guard seen.insert(entry.id.lowercased()).inserted else { continue }
-            if matches(entry, folded: folded) { found.append(entry) }
+            if matches(entry, folded: folded, locale: dictionary.locale) { found.append(entry) }
         }
         return found
     }
@@ -1085,9 +1087,10 @@ enum PantryIngredientMatching {
         return customs.first { $0.id.lowercased() == lowered }
     }
 
-    private static func matches(_ entry: IngredientEntry, folded: String) -> Bool {
+    /// Exact name or alias in the active locale only. Never a similarity match across ids.
+    private static func matches(_ entry: IngredientEntry, folded: String, locale: String) -> Bool {
         guard !folded.isEmpty else { return false }
-        let names = [entry.name] + entry.synonyms
+        let names = [entry.name(in: locale)] + entry.aliases(in: locale)
         return names.contains { IngredientDictionary.fold($0) == folded }
     }
 }

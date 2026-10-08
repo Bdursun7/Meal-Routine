@@ -94,7 +94,13 @@ describe('account privacy', () => {
     const beaExport = await app.inject({ method: 'GET', url: '/v1/account/export', headers: bea.auth })
     expect(beaExport.statusCode).toBe(200)
     expect(JSON.stringify(beaExport.json())).not.toContain('Gizli menemen')
-    expect(beaExport.json().household).toEqual({ id: household.id, name: 'Ev', role: 'member' })
+    expect(beaExport.json().household).toEqual({
+      id: household.id,
+      name: 'Ev',
+      role: 'member',
+      settings: { countryCode: 'TR', currencyCode: 'TRY', measurementSystem: 'metric', timezone: 'Europe/Istanbul' },
+    })
+    expect(beaExport.json().settings).toEqual({ locale: 'tr-TR', countryCode: 'TR', currencyCode: 'TRY', measurementSystem: 'metric', timezone: 'Europe/Istanbul' })
 
     const removed = await app.inject({ method: 'DELETE', url: '/v1/account', headers: ada.auth })
     expect(removed.json()).toEqual({ deleted: true, household: 'left' })

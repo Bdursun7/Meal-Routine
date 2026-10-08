@@ -8,7 +8,11 @@ import type {
   PlanRow,
   ReactionRow,
 } from './boardTypes.js'
-import { defaultPreference } from './boardTypes.js'
+import { ACTIVITY_DETAIL_CODES, defaultPreference, type ActivityDetailCode } from './boardTypes.js'
+
+function activityDetailCode(raw: string | null): ActivityDetailCode | null {
+  return (ACTIVITY_DETAIL_CODES as readonly string[]).includes(raw ?? '') ? (raw as ActivityDetailCode) : null
+}
 
 export function createPgBoard(pool: Pool): BoardStore {
   return {
@@ -198,9 +202,10 @@ async function loadBoard(client: PoolClient, householdId: string): Promise<Board
     kind: string
     meal_title: string
     detail: string
+    detail_code: string | null
     created_at: Date
   }>(
-    `SELECT id, actor_account_id, actor_name, kind, meal_title, detail, created_at
+    `SELECT id, actor_account_id, actor_name, kind, meal_title, detail, detail_code, created_at
        FROM household_activity
       WHERE household_id = $1
       ORDER BY created_at DESC
@@ -279,6 +284,7 @@ async function loadBoard(client: PoolClient, householdId: string): Promise<Board
       kind: row.kind,
       mealTitle: row.meal_title,
       detail: row.detail,
+      detailCode: activityDetailCode(row.detail_code),
       createdAt: new Date(row.created_at).toISOString().replace(/\.\d{3}Z$/, 'Z'),
     })),
   }
@@ -365,9 +371,9 @@ async function saveBoard(client: PoolClient, householdId: string, document: Boar
   await client.query('DELETE FROM household_activity WHERE household_id = $1', [householdId])
   for (const row of document.activity) {
     await client.query(
-      `INSERT INTO household_activity (id, household_id, actor_account_id, actor_name, kind, meal_title, detail, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [row.id, householdId, row.actorAccountId || null, row.actorName, row.kind, row.mealTitle, row.detail, new Date(row.createdAt)],
+      `INSERT INTO household_activity (id, household_id, actor_account_id, actor_name, kind, meal_title, detail, detail_code, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [row.id, householdId, row.actorAccountId || null, row.actorName, row.kind, row.mealTitle, row.detail, row.detailCode, new Date(row.createdAt)],
     )
   }
 }

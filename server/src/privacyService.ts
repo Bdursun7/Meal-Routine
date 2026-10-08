@@ -5,6 +5,7 @@ import type { MigrationStore } from './migrationService.js'
 import type { NotificationStore } from './notifications.js'
 import type { PantryStore } from './pantryTypes.js'
 import type { AuthRepository } from './repository.js'
+import { accountRegional, type HouseholdRegionalSettings } from './regional.js'
 
 export type HouseholdOutcome = 'none' | 'left' | 'deleted'
 
@@ -31,11 +32,11 @@ export function createPrivacyService(input: {
       const personal = await input.migration.load(accountId)
       const preferences = await input.notifications.preferences(accountId)
       const membership = await input.repo.transaction(async (tx) => tx.activeMembership(accountId))
-      let household: { id: string; name: string; role: string } | null = null
+      let household: { id: string; name: string; role: string; settings: HouseholdRegionalSettings } | null = null
       if (membership) {
         const row = await input.repo.transaction(async (tx) => tx.household(membership.householdId))
         if (row && !row.deletedAt) {
-          household = { id: row.id, name: row.name, role: membership.role }
+          household = { id: row.id, name: row.name, role: membership.role, settings: { ...row.settings } }
         }
       }
       return {
@@ -46,6 +47,7 @@ export function createPrivacyService(input: {
           givenName: account.givenName,
           familyName: account.familyName,
         },
+        settings: accountRegional(account),
         identities: identities.map((row) => ({
           provider: row.provider,
           email: row.email,

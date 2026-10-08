@@ -43,29 +43,141 @@ describe.skipIf(!databaseUrl)('postgres pantry', () => {
     }
   })
 
-  it('applies 0012 on a V4.1 database without losing household, board or account data', async () => {
-    const ada = await devSignIn(app, 'pg-pantry-ada', 'Ada')
-    const household = await app.inject({ method: 'POST', url: '/v1/households', headers: ada.auth, payload: { name: 'Ev' } })
-    const householdId = household.json().household.id as string
-    const plan = await app.inject({
-      method: 'POST', url: `/v1/households/${householdId}/mutations`, headers: { ...ada.auth, 'idempotency-key': 'pg-v41-plan' },
-      payload: {
-        entityType: 'plan', entityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab', operationType: 'upsert', baseRevision: 0,
-        payload: { weekStart: '2030-06-02', status: 'draft', isFinalized: false, meals: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc', dayOffset: 0, recipeSlug: 'menemen', title: 'Menemen' }] },
-      },
-    })
-    expect(plan.statusCode).toBe(200)
+  it('upgrades a V4.1 database through 0012 and 0013 without losing data and with deterministic defaults', async () => {
+    const accountId = '11111111-1111-4111-8111-111111111111'
+    const householdId = '22222222-2222-4222-8222-222222222222'
+    const sundayPlan = '33333333-3333-4333-8333-333333333333'
+    const mondayPlan = '44444444-4444-4444-8444-444444444444'
+    const otherSunday = '55555555-5555-4555-8555-555555555556'
+    await pool.query(`INSERT INTO accounts (id, display_name, given_name) VALUES ($1, 'Ada', 'Ada')`, [accountId])
+    await pool.query(
+      `INSERT INTO auth_identities (id, account_id, provider, subject) VALUES ('66666666-6666-4666-8666-666666666666', $1, 'dev', 'pg-legacy-ada')`,
+      [accountId],
+    )
+    await pool.query(`INSERT INTO households (id, name, owner_account_id) VALUES ($1, 'Ev', $2)`, [householdId, accountId])
+    await pool.query(`INSERT INTO household_members (id, household_id, account_id, role, display_name) VALUES ('77777777-7777-4777-8777-777777777777', $1, $2, 'owner', 'Ada')`, [householdId, accountId])
+    await pool.query(`INSERT INTO household_preferences (household_id) VALUES ($1)`, [householdId])
+    // V5.0 sent Istanbul's Monday 2030-06-03 00:00 through a UTC formatter, which stored Sunday 2030-06-02.
+    await pool.query(`INSERT INTO shared_plans (id, household_id, week_start, status) VALUES ($1, $2, '2030-06-02', 'draft')`, [sundayPlan, householdId])
+    // A Sunday whose Monday is already taken stays put rather than colliding.
+    await pool.query(`INSERT INTO shared_plans (id, household_id, week_start, status) VALUES ($1, $2, '2030-06-10', 'draft')`, [mondayPlan, householdId])
+    await pool.query(`INSERT INTO shared_plans (id, household_id, week_start, status) VALUES ($1, $2, '2030-06-09', 'draft')`, [otherSunday, householdId])
+    await pool.query(
+      `INSERT INTO shared_meals (id, plan_id, day_offset, recipe_slug, title, status) VALUES ('88888888-8888-4888-8888-888888888888', $1, 0, 'menemen', 'Menemen', 'cooked')`,
+      [sundayPlan],
+    )
+    await pool.query(
+      `INSERT INTO household_activity (id, household_id, actor_account_id, actor_name, kind, meal_title, detail)
+       VALUES ('99999999-9999-4999-8999-999999999990', $1, $2, 'Ada', 'mealCooked', 'Menemen', 'Pişti'),
+              ('99999999-9999-4999-8999-99999999999a', $1, $2, 'Ada', 'note', 'Menemen', 'Serbest metin')`,
+      [householdId, accountId],
+    )
     const before = await counts()
 
-    const applied = await migrate(pool)
-    expect(applied).toEqual(['0012_pantry'])
+    const v5Dir = await mkdtemp(path.join(tmpdir(), 'mr-v50-'))
+    for (const file of await listMigrationFiles(migrationsDirectory())) {
+      if (file < '0013') await copyFile(path.join(migrationsDirectory(), file), path.join(v5Dir, file))
+    }
+    expect(await migrate(pool, v5Dir)).toEqual(['0012_pantry'])
+    await rm(v5Dir, { recursive: true, force: true })
+    const custom = 'custom:12121212-1212-4121-8121-121212121212'
+    await pool.query(`INSERT INTO ingredients (id, household_id, display_name, synonyms) VALUES ($1, $2, 'Ev salçası', ARRAY['salca', 'biber salçası'])`, [custom, householdId])
+    await pool.query(
+      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location) VALUES ('abababab-abab-4bab-8bab-abababababab', $1, 'tomato', 'Domates', 400, 'g', 'refrigerator')`,
+      [householdId],
+    )
+
+    expect(await migrate(pool)).toEqual(['0013_globalization'])
     expect(await counts()).toEqual(before)
+    expect(await migrate(pool)).toEqual([])
+
+    const account = await pool.query('SELECT locale, country_code, currency_code, measurement_system, timezone FROM accounts WHERE id = $1', [accountId])
+    expect(account.rows[0]).toEqual({ locale: 'tr-TR', country_code: 'TR', currency_code: 'TRY', measurement_system: 'metric', timezone: 'Europe/Istanbul' })
+    const household = await pool.query('SELECT country_code, currency_code, measurement_system, timezone, revision FROM households WHERE id = $1', [householdId])
+    expect(household.rows[0]).toEqual({ country_code: 'TR', currency_code: 'TRY', measurement_system: 'metric', timezone: 'Europe/Istanbul', revision: 1 })
+    const defaults = await pool.query<{ column_name: string; column_default: string | null }>(
+      `SELECT column_name, column_default FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name IN ('accounts', 'households')
+          AND column_name IN ('locale', 'country_code', 'currency_code', 'measurement_system', 'timezone')`,
+    )
+    expect(defaults.rows).toHaveLength(9)
+    expect(defaults.rows.every((row) => row.column_default === null)).toBe(true)
+
+    const plans = await pool.query<{ id: string; week_start: string; revision: number }>(
+      `SELECT id, to_char(week_start, 'YYYY-MM-DD') AS week_start, revision FROM shared_plans WHERE household_id = $1 ORDER BY id`,
+      [householdId],
+    )
+    expect(plans.rows).toEqual([
+      { id: sundayPlan, week_start: '2030-06-03', revision: 1 },
+      { id: mondayPlan, week_start: '2030-06-10', revision: 1 },
+      { id: otherSunday, week_start: '2030-06-09', revision: 1 },
+    ])
+    const activity = await pool.query<{ detail: string; detail_code: string | null }>(
+      'SELECT detail, detail_code FROM household_activity WHERE household_id = $1 ORDER BY id',
+      [householdId],
+    )
+    expect(activity.rows).toEqual([{ detail: 'Pişti', detail_code: 'cooked' }, { detail: 'Serbest metin', detail_code: null }])
+
+    const names = await pool.query<{ count: string }>(`SELECT count(*) FROM ingredient_names WHERE locale = 'tr-TR'`)
+    expect(Number(names.rows[0]!.count)).toBe(seedIngredients().length + 1)
+    const customAliases = await pool.query('SELECT alias, position FROM ingredient_aliases WHERE ingredient_id = $1 ORDER BY position', [custom])
+    expect(customAliases.rows).toEqual([{ alias: 'salca', position: 1 }, { alias: 'biber salçası', position: 2 }])
+    const pantryRow = await pool.query('SELECT quantity::float AS quantity, unit, unit_bucket FROM pantry_items WHERE household_id = $1', [householdId])
+    expect(pantryRow.rows).toEqual([{ quantity: 400, unit: 'g', unit_bucket: 'mass' }])
+
+    const ada = await devSignIn(app, 'pg-legacy-ada', 'Ada')
+    const me = await app.inject({ method: 'GET', url: '/v1/auth/me', headers: ada.auth })
+    expect(me.json().settings).toEqual({ locale: 'tr-TR', countryCode: 'TR', currencyCode: 'TRY', measurementSystem: 'metric', timezone: 'Europe/Istanbul' })
     const board = await app.inject({ method: 'GET', url: `/v1/households/${householdId}/board`, headers: ada.auth })
     expect(board.statusCode).toBe(200)
+    const plan = board.json().plans.find((row: { id: string }) => row.id === sundayPlan)
+    expect(plan).toMatchObject({ weekStart: '2030-06-03' })
     expect(JSON.stringify(board.json())).toContain('menemen')
+    expect(board.json().activity.find((row: { mealTitle: string; detailCode: string | null }) => row.detailCode === 'cooked')).toMatchObject({ mealTitle: 'Menemen' })
+    const listed = await app.inject({ method: 'GET', url: `/v1/ingredients?householdId=${householdId}&q=salca`, headers: ada.auth })
+    expect(listed.json().ingredients.find((row: { id: string }) => row.id === custom)).toMatchObject({
+      names: { 'tr-TR': 'Ev salçası' },
+      aliases: { 'tr-TR': ['salca', 'biber salçası'] },
+      scope: 'household',
+    })
     const seeded = await pool.query<{ count: string }>('SELECT count(*) FROM ingredients WHERE household_id IS NULL')
     expect(Number(seeded.rows[0]!.count)).toBe(seedIngredients().length)
-    expect(await migrate(pool)).toEqual([])
+  })
+
+  it('stores regional settings, locale-keyed custom ingredients and new units', async () => {
+    const bea = await devSignIn(app, 'pg-regional-bea', 'Bea')
+    const created = await app.inject({
+      method: 'POST', url: '/v1/households', headers: bea.auth,
+      payload: { name: 'Home', countryCode: 'US', currencyCode: 'USD', measurementSystem: 'imperial', timezone: 'America/Los_Angeles' },
+    })
+    expect(created.statusCode).toBe(200)
+    const householdId = created.json().household.id as string
+    expect(created.json().household.settings).toEqual({ countryCode: 'US', currencyCode: 'USD', measurementSystem: 'imperial', timezone: 'America/Los_Angeles' })
+    const stored = await pool.query('SELECT country_code, currency_code, measurement_system, timezone FROM households WHERE id = $1', [householdId])
+    expect(stored.rows[0]).toEqual({ country_code: 'US', currency_code: 'USD', measurement_system: 'imperial', timezone: 'America/Los_Angeles' })
+
+    const patched = await app.inject({ method: 'PATCH', url: '/v1/account/settings', headers: bea.auth, payload: { locale: 'en-US', timezone: 'Pacific/Auckland' } })
+    expect(patched.json().settings).toEqual({ locale: 'en-US', countryCode: 'TR', currencyCode: 'TRY', measurementSystem: 'metric', timezone: 'Pacific/Auckland' })
+    const bad = await app.inject({ method: 'PATCH', url: `/v1/households/${householdId}/settings`, headers: bea.auth, payload: { currencyCode: 'TL' } })
+    expect(bad.statusCode).toBe(400)
+    expect(bad.json()).toMatchObject({ error: 'invalid_currency', field: 'currencyCode' })
+    await expect(pool.query(`UPDATE households SET currency_code = 'tl' WHERE id = $1`, [householdId])).rejects.toMatchObject({ code: '23514' })
+
+    const custom = 'custom:34343434-3434-4343-8343-343434343434'
+    const registered = await app.inject({
+      method: 'POST', url: `/v1/households/${householdId}/ingredients`, headers: { ...bea.auth, 'idempotency-key': 'pg-regional-ingredient' },
+      payload: { id: custom, displayName: 'Hot sauce' },
+    })
+    expect(registered.json()).toMatchObject({ id: custom, names: { 'en-US': 'Hot sauce' }, displayName: 'Hot sauce', scope: 'household' })
+    const names = await pool.query('SELECT locale, display_name FROM ingredient_names WHERE ingredient_id = $1', [custom])
+    expect(names.rows).toEqual([{ locale: 'en-US', display_name: 'Hot sauce' }])
+
+    const post = (key: string, payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: `/v1/households/${householdId}/pantry/items`, headers: { ...bea.auth, 'idempotency-key': key }, payload })
+    expect((await post('pg-regional-lb', { ingredientId: 'rice', displayName: 'Rice', quantity: 1, unit: 'lb', location: 'pantry' })).json()).toMatchObject({ unit: 'lb', quantity: 1 })
+    const merged = await post('pg-regional-oz', { ingredientId: 'rice', displayName: 'Rice', quantity: 8, unit: 'oz', location: 'pantry' })
+    expect(merged.json()).toMatchObject({ unit: 'lb', quantity: 1.5, version: 2 })
+    expect((await post('pg-regional-can', { ingredientId: 'tomato', displayName: 'Tomato', quantity: 2, unit: 'can', location: 'pantry' })).json()).toMatchObject({ unit: 'can', quantity: 2 })
   })
 
   it('enforces the pantry rules in the database and through the API', async () => {

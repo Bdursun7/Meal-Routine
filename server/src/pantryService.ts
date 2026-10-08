@@ -3,6 +3,7 @@ import { AppError } from './errors.js'
 import type { HouseholdStore } from './householdTypes.js'
 import {
   buildIngredientIndex,
+  makeIngredient,
   CUSTOM_INGREDIENT_PATTERN,
   resolveIngredientId,
   searchIngredients,
@@ -42,8 +43,8 @@ export interface PantryService {
   update(accountId: string, householdId: string, itemId: string, patch: PantryPatch, baseVersion: number | undefined, key: string, now: Date, options?: PantryWriteOptions): Promise<PantryItem>
   remove(accountId: string, householdId: string, itemId: string, baseVersion: number | undefined, key: string, now: Date): Promise<{ deleted: true; id: string }>
   reconcile(accountId: string, householdId: string, request: PantryReconcileRequest, key: string, now: Date): Promise<{ lines: PantryReconcileResultLine[]; items: PantryItem[] }>
-  ingredients(accountId: string, householdId: string | null, query: string, limit: number): Promise<Ingredient[]>
-  registerIngredient(accountId: string, householdId: string, input: { id: string; displayName: string }, key: string, now: Date): Promise<Ingredient>
+  ingredients(accountId: string, householdId: string | null, query: string, limit: number, locale: string): Promise<Ingredient[]>
+  registerIngredient(accountId: string, householdId: string, input: { id: string; displayName: string; locale: string }, key: string, now: Date): Promise<Ingredient>
   clearAccount(accountId: string): Promise<void>
   deleteHousehold(householdId: string): Promise<void>
 }
@@ -179,11 +180,11 @@ export function createPantryService(store: PantryStore, households: HouseholdSto
         })
       }) as Promise<{ lines: PantryReconcileResultLine[]; items: PantryItem[] }>
     },
-    async ingredients(accountId, householdId, query, limit) {
+    async ingredients(accountId, householdId, query, limit, locale) {
       if (householdId) await authorize(households, householdId, accountId)
       const { customs } = await dictionary(householdId)
       const entries = [...globalEntries, ...customs]
-      return query ? searchIngredients(entries, query, limit) : entries.slice(0, limit)
+      return query ? searchIngredients(entries, query, limit, locale) : entries.slice(0, limit)
     },
     async registerIngredient(accountId, householdId, input, key, now) {
       await authorize(households, householdId, accountId)
@@ -191,13 +192,13 @@ export function createPantryService(store: PantryStore, households: HouseholdSto
       const displayName = input.displayName.trim()
       if (!CUSTOM_INGREDIENT_PATTERN.test(id)) throw new AppError('invalid_request', 400)
       if (!displayName || displayName.length > 160) throw new AppError('invalid_request', 400)
-      return idempotent(store, accountId, householdId, key, { register: id, displayName }, now, async () => {
+      return idempotent(store, accountId, householdId, key, { register: id, displayName, locale: input.locale }, now, async () => {
         const existing = await store.getIngredient(id)
         if (existing) {
           if (existing.householdId !== householdId) throw new AppError('ingredient_conflict', 409)
           return existing
         }
-        return store.insertIngredient({ id, householdId, displayName, synonyms: [], sourceIds: [] }, now)
+        return store.insertIngredient(makeIngredient({ id, householdId, names: { [input.locale]: displayName } }), now)
       }) as Promise<Ingredient>
     },
     async clearAccount(accountId) {

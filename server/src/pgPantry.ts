@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 import { AppError } from './errors.js'
-import type { Ingredient } from './ingredients.js'
+import { makeIngredient, type Ingredient } from './ingredients.js'
 import { pantryTimestamp, type PantryDraft, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
 import type { MemberRole } from './repository.js'
 
@@ -26,7 +26,15 @@ type IngredientDbRow = {
   display_name: string
   synonyms: string[]
   source_ids: string[]
+  names: Record<string, string> | null
+  aliases: Record<string, string[]> | null
 }
+
+const ingredientColumns = `i.id, i.household_id, i.display_name, i.synonyms, i.source_ids,
+  (SELECT jsonb_object_agg(n.locale, n.display_name) FROM ingredient_names n WHERE n.ingredient_id = i.id) AS names,
+  (SELECT jsonb_object_agg(a.locale, a.list) FROM (
+     SELECT locale, jsonb_agg(alias ORDER BY position, alias) AS list
+       FROM ingredient_aliases WHERE ingredient_id = i.id GROUP BY locale) a) AS aliases`
 
 const columns = `id, household_id, ingredient_id, display_name, quantity, unit, location,
   minimum_quantity, date_type, to_char(date_value, 'YYYY-MM-DD') AS date_value, version, created_at, updated_at`
@@ -50,13 +58,9 @@ function fromRow(row: PantryDbRow): PantryItem {
 }
 
 function ingredientFromRow(row: IngredientDbRow): Ingredient {
-  return {
-    id: row.id,
-    householdId: row.household_id,
-    displayName: row.display_name,
-    synonyms: row.synonyms ?? [],
-    sourceIds: row.source_ids ?? [],
-  }
+  const names = row.names && Object.keys(row.names).length > 0 ? row.names : { 'tr-TR': row.display_name }
+  const aliases = row.aliases ?? (row.names ? {} : { 'tr-TR': row.synonyms ?? [] })
+  return makeIngredient({ id: row.id, householdId: row.household_id, names, aliases, sourceIds: row.source_ids ?? [] })
 }
 
 type Queryable = Pool | PoolClient
@@ -203,26 +207,43 @@ export function createPgPantry(pool: Pool): PantryStore {
     },
     async listIngredients(householdId) {
       const result = householdId
-        ? await pool.query<IngredientDbRow>('SELECT id, household_id, display_name, synonyms, source_ids FROM ingredients WHERE household_id = $1 ORDER BY created_at, id', [householdId])
-        : await pool.query<IngredientDbRow>('SELECT id, household_id, display_name, synonyms, source_ids FROM ingredients WHERE household_id IS NULL ORDER BY id')
+        ? await pool.query<IngredientDbRow>(`SELECT ${ingredientColumns} FROM ingredients i WHERE i.household_id = $1 ORDER BY i.created_at, i.id`, [householdId])
+        : await pool.query<IngredientDbRow>(`SELECT ${ingredientColumns} FROM ingredients i WHERE i.household_id IS NULL ORDER BY i.id`)
       return result.rows.map(ingredientFromRow)
     },
     async getIngredient(id) {
-      const result = await pool.query<IngredientDbRow>('SELECT id, household_id, display_name, synonyms, source_ids FROM ingredients WHERE id = $1', [id])
+      const result = await pool.query<IngredientDbRow>(`SELECT ${ingredientColumns} FROM ingredients i WHERE i.id = $1`, [id])
       return result.rows[0] ? ingredientFromRow(result.rows[0]) : null
     },
     async insertIngredient(ingredient, now) {
+      const client = await pool.connect()
       try {
-        const result = await pool.query<IngredientDbRow>(
+        await client.query('BEGIN')
+        await client.query(
           `INSERT INTO ingredients (id, household_id, display_name, synonyms, source_ids, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING id, household_id, display_name, synonyms, source_ids`,
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [ingredient.id, ingredient.householdId, ingredient.displayName, ingredient.synonyms, ingredient.sourceIds, now],
         )
+        for (const [locale, name] of Object.entries(ingredient.names)) {
+          await client.query('INSERT INTO ingredient_names (ingredient_id, locale, display_name) VALUES ($1, $2, $3)', [ingredient.id, locale, name])
+        }
+        for (const [locale, list] of Object.entries(ingredient.aliases)) {
+          for (const [position, alias] of list.entries()) {
+            await client.query(
+              'INSERT INTO ingredient_aliases (ingredient_id, locale, alias, position) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING',
+              [ingredient.id, locale, alias, position + 1],
+            )
+          }
+        }
+        const result = await client.query<IngredientDbRow>(`SELECT ${ingredientColumns} FROM ingredients i WHERE i.id = $1`, [ingredient.id])
+        await client.query('COMMIT')
         return ingredientFromRow(result.rows[0]!)
       } catch (error) {
+        await client.query('ROLLBACK')
         if (isCode(error, '23505')) throw new AppError('ingredient_conflict', 409)
         throw error
+      } finally {
+        client.release()
       }
     },
   }

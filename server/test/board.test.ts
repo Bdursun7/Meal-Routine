@@ -121,7 +121,7 @@ describe('shared board sync', () => {
       operationType: 'upsert',
       baseRevision: 0,
       payload: {
-        weekStart: '2030-06-02',
+        weekStart: '2030-06-03',
         status: 'draft',
         isFinalized: false,
         meals: [{ id: mealId, dayOffset: 0, recipeSlug: 'corba', title: 'Çorba' }],

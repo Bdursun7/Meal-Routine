@@ -1,3 +1,4 @@
+import type { HouseholdRegionalSettings, UserRegionalSettings } from './regional.js'
 import type { MemberRole } from './repository.js'
 
 export type InviteStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired'
@@ -5,6 +6,7 @@ export type InviteStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | '
 export interface AccountRef {
   id: string
   displayName: string
+  settings: UserRegionalSettings
 }
 
 export interface HouseholdRecord {
@@ -12,6 +14,7 @@ export interface HouseholdRecord {
   name: string
   ownerAccountId: string
   deletedAt: Date | null
+  settings: HouseholdRegionalSettings
 }
 
 export interface MemberRecord {
@@ -47,7 +50,8 @@ export interface HouseholdTx {
   members(householdId: string): Promise<MemberRecord[]>
   pendingInvites(householdId: string): Promise<InviteRecord[]>
   expireInvites(householdId: string, now: Date): Promise<void>
-  insertHousehold(row: { id: string; name: string; ownerAccountId: string; now: Date }): Promise<void>
+  insertHousehold(row: { id: string; name: string; ownerAccountId: string; settings: HouseholdRegionalSettings; now: Date }): Promise<void>
+  saveHouseholdSettings(id: string, settings: HouseholdRegionalSettings, now: Date): Promise<void>
   insertMember(row: MemberRecord & { now: Date }): Promise<void>
   insertPreference(householdId: string): Promise<void>
   rename(id: string, name: string, now: Date): Promise<void>
@@ -86,6 +90,7 @@ export interface PublicHousehold {
   role: MemberRole
   members: PublicMember[]
   invites: PublicInvite[]
+  settings: HouseholdRegionalSettings
 }
 
 export interface HouseholdBody {

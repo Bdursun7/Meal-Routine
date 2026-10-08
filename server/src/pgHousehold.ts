@@ -9,6 +9,7 @@ import type {
   MemberRecord,
   MembershipRef,
 } from './householdTypes.js'
+import type { MeasurementSystem } from './regional.js'
 import type { MemberRole } from './repository.js'
 
 export function createPgHouseholdStore(pool: Pool): HouseholdStore {
@@ -37,12 +38,32 @@ export function createPgHouseholdStore(pool: Pool): HouseholdStore {
 function pgTx(client: PoolClient): HouseholdTx {
   return {
     async account(id) {
-      const result = await client.query<{ id: string; display_name: string }>(
-        'SELECT id, display_name FROM accounts WHERE id = $1 AND deleted_at IS NULL',
+      const result = await client.query<{
+        id: string
+        display_name: string
+        locale: string
+        country_code: string
+        currency_code: string
+        measurement_system: MeasurementSystem
+        timezone: string
+      }>(
+        `SELECT id, display_name, locale, country_code, currency_code, measurement_system, timezone
+           FROM accounts WHERE id = $1 AND deleted_at IS NULL`,
         [id],
       )
       const row = result.rows[0]
-      return row ? { id: row.id, displayName: row.display_name } : null
+      if (!row) return null
+      return {
+        id: row.id,
+        displayName: row.display_name,
+        settings: {
+          locale: row.locale,
+          countryCode: row.country_code,
+          currencyCode: row.currency_code,
+          measurementSystem: row.measurement_system,
+          timezone: row.timezone,
+        },
+      }
     },
     async activeMembership(accountId) {
       const result = await client.query<{ id: string; household_id: string; role: MemberRole }>(
@@ -58,8 +79,18 @@ function pgTx(client: PoolClient): HouseholdTx {
       return membership
     },
     async household(id) {
-      const result = await client.query<{ id: string; name: string; owner_account_id: string; deleted_at: Date | null }>(
-        'SELECT id, name, owner_account_id, deleted_at FROM households WHERE id = $1',
+      const result = await client.query<{
+        id: string
+        name: string
+        owner_account_id: string
+        deleted_at: Date | null
+        country_code: string
+        currency_code: string
+        measurement_system: MeasurementSystem
+        timezone: string
+      }>(
+        `SELECT id, name, owner_account_id, deleted_at, country_code, currency_code, measurement_system, timezone
+           FROM households WHERE id = $1`,
         [id],
       )
       const row = result.rows[0]
@@ -69,6 +100,12 @@ function pgTx(client: PoolClient): HouseholdTx {
         name: row.name,
         ownerAccountId: row.owner_account_id,
         deletedAt: row.deleted_at,
+        settings: {
+          countryCode: row.country_code,
+          currencyCode: row.currency_code,
+          measurementSystem: row.measurement_system,
+          timezone: row.timezone,
+        },
       }
       return household
     },
@@ -113,9 +150,28 @@ function pgTx(client: PoolClient): HouseholdTx {
     },
     async insertHousehold(row) {
       await client.query(
-        `INSERT INTO households (id, name, owner_account_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $4)`,
-        [row.id, row.name, row.ownerAccountId, row.now],
+        `INSERT INTO households
+           (id, name, owner_account_id, created_at, updated_at, country_code, currency_code, measurement_system, timezone)
+         VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8)`,
+        [
+          row.id,
+          row.name,
+          row.ownerAccountId,
+          row.now,
+          row.settings.countryCode,
+          row.settings.currencyCode,
+          row.settings.measurementSystem,
+          row.settings.timezone,
+        ],
+      )
+    },
+    async saveHouseholdSettings(id, settings, now) {
+      await client.query(
+        `UPDATE households
+            SET country_code = $2, currency_code = $3, measurement_system = $4, timezone = $5,
+                revision = revision + 1, updated_at = $6
+          WHERE id = $1 AND deleted_at IS NULL`,
+        [id, settings.countryCode, settings.currencyCode, settings.measurementSystem, settings.timezone, now],
       )
     },
     async insertMember(row) {
@@ -244,6 +300,7 @@ function mapPg(error: unknown): unknown {
   if (!error || typeof error !== 'object' || !('code' in error)) return error
   const code = (error as { code?: string }).code
   const constraint = (error as { constraint?: string }).constraint ?? ''
+  if (code === '23514' && constraint === 'households_regional_codes') return new AppError('invalid_request', 400)
   if (code === '23514') return new AppError('household_full', 409)
   if (code === '23505') {
     if (constraint.includes('pending')) return new AppError('duplicate_invite', 409)

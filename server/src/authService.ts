@@ -3,6 +3,7 @@ import type { AppConfig } from './config.js'
 import { AppError } from './errors.js'
 import type { AccountRow, AuthRepository, IdentityRow, ProviderName } from './repository.js'
 import { hashToken, newRefreshToken, signAccessToken } from './tokens.js'
+import { accountRegional, defaultUserSettings, type UserRegionalSettings } from './regional.js'
 
 export interface VerifiedIdentity {
   provider: 'apple' | 'google'
@@ -33,6 +34,7 @@ export interface PublicSession {
   expiresIn: number
   account: PublicAccount
   identities: PublicIdentity[]
+  settings: UserRegionalSettings
 }
 
 export type SignInResult =
@@ -105,6 +107,7 @@ export function createAuthService(input: {
         familyName: account.familyName,
       },
       identities: identities.map(publicIdentity),
+      settings: accountRegional(account),
     }
   }
 
@@ -153,6 +156,7 @@ export function createAuthService(input: {
         familyName: identity.familyName,
         displayName: displayName(identity.givenName, identity.familyName),
         createdAt: now(),
+        regional: defaultUserSettings(),
       }
       await repo.insertAccountAndIdentity(account, identityRecord(account.id, identity))
       return { kind: 'session', session: await issue(account, randomUUID()) }
@@ -174,6 +178,7 @@ export function createAuthService(input: {
         familyName: '',
         displayName: name,
         createdAt: now(),
+        regional: defaultUserSettings(),
       }
       await repo.insertAccountAndIdentity(account, {
         id: randomUUID(),
@@ -257,6 +262,7 @@ export function createAuthService(input: {
           familyName: account.familyName,
         },
         identities: identities.map(publicIdentity),
+        settings: accountRegional(account),
       }
     },
   }

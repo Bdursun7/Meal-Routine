@@ -55,9 +55,27 @@ export interface ActivityRow {
   actorName: string
   kind: string
   mealTitle: string
+  /** Turkish text kept for pre-V5.1 clients only; current clients render `detailCode`. */
   detail: string
+  /** Stable, language-independent activity detail (`ACTIVITY_DETAIL_CODES`). Null on rows written before 0013. */
+  detailCode: ActivityDetailCode | null
   createdAt: string
 }
+
+export const ACTIVITY_DETAIL_CODES = ['planCreated', 'checked', 'unchecked', 'cooked', 'replaced', 'vetoed', 'reactionUpdated'] as const
+
+export type ActivityDetailCode = (typeof ACTIVITY_DETAIL_CODES)[number]
+
+/** Legacy `detail` text for clients older than V5.1, which display the field verbatim. */
+export const LEGACY_ACTIVITY_DETAIL: Readonly<Record<ActivityDetailCode, string>> = Object.freeze({
+  planCreated: 'Ortak plan kuruldu',
+  checked: 'İşaretlendi',
+  unchecked: 'İşaret kalktı',
+  cooked: 'Pişti',
+  replaced: 'Yemek değişti',
+  vetoed: 'Bu hafta olmaz',
+  reactionUpdated: 'Tepki güncellendi',
+})
 
 export interface ChangeRow {
   cursor: number
@@ -155,6 +173,7 @@ export function publicBoard(document: BoardDocument) {
       kind: row.kind,
       mealTitle: row.mealTitle,
       detail: row.detail,
+      detailCode: row.detailCode,
       createdAt: row.createdAt,
     })),
   }

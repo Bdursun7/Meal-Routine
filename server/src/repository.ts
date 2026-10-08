@@ -4,6 +4,7 @@ import type { HouseholdStore } from './householdTypes.js'
 import { createMemoryBoard } from './memoryBoard.js'
 import { createHouseholdMemory } from './memoryHousehold.js'
 import { createMemoryPantry } from './memoryPantry.js'
+import type { UserRegionalSettings } from './regional.js'
 import type { PantryStore } from './pantryTypes.js'
 
 export type ProviderName = 'apple' | 'google' | 'dev'
@@ -16,6 +17,8 @@ export interface AccountRow {
   familyName: string
   createdAt: Date
   deletedAt?: Date | null
+  /** Absent only for rows built before V5.1 in tests; read through `accountRegional`. */
+  regional?: UserRegionalSettings
 }
 
 export interface IdentityRow {
@@ -59,6 +62,7 @@ export interface AuthRepository {
     names: { givenName: string; familyName: string; displayName: string },
   ): Promise<AccountRow>
   insertIdentity(identity: IdentityRow): Promise<void>
+  saveAccountSettings(accountId: string, settings: UserRegionalSettings): Promise<UserRegionalSettings>
   deleteIdentity(accountId: string, provider: string): Promise<boolean>
   insertSession(session: SessionRow): Promise<void>
   rotateSession(oldHash: string, now: Date, build: (current: SessionDraft) => SessionRow): Promise<RotateResult>
@@ -124,6 +128,11 @@ export function createMemoryRepository(): MemoryRepository {
       }
       accounts.set(account.id, { ...account })
       identities.push({ ...identity })
+    },
+    async saveAccountSettings(accountId, settings) {
+      const account = requireAccount(accountId)
+      account.regional = { ...settings }
+      return { ...settings }
     },
     async updateNamesIfEmpty(accountId, names) {
       const account = requireAccount(accountId)

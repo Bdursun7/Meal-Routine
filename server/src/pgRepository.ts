@@ -5,6 +5,7 @@ import { AppError } from './errors.js'
 import { createPgBoard } from './pgBoard.js'
 import { createPgHouseholdStore } from './pgHousehold.js'
 import { createPgPantry } from './pgPantry.js'
+import { accountRegional, type MeasurementSystem } from './regional.js'
 import type { PantryStore } from './pantryTypes.js'
 import type {
   AccountRow,
@@ -29,6 +30,11 @@ function accountFrom(row: {
   given_name: string
   family_name: string
   created_at: Date
+  locale: string
+  country_code: string
+  currency_code: string
+  measurement_system: MeasurementSystem
+  timezone: string
 }): AccountRow {
   return {
     id: row.id,
@@ -36,6 +42,13 @@ function accountFrom(row: {
     givenName: row.given_name,
     familyName: row.family_name,
     createdAt: new Date(row.created_at),
+    regional: {
+      locale: row.locale,
+      countryCode: row.country_code,
+      currencyCode: row.currency_code,
+      measurementSystem: row.measurement_system,
+      timezone: row.timezone,
+    },
   }
 }
 
@@ -98,7 +111,7 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
     },
     async getAccount(id) {
       const result = await pool.query(
-        `SELECT id, display_name, given_name, family_name, created_at
+        `SELECT id, display_name, given_name, family_name, created_at, locale, country_code, currency_code, measurement_system, timezone
            FROM accounts WHERE id = $1 AND deleted_at IS NULL`,
         [id],
       )
@@ -106,13 +119,27 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
       return row ? accountFrom(row) : null
     },
     async insertAccountAndIdentity(account, identity) {
+      const regional = accountRegional(account)
       const client = await pool.connect()
       try {
         await client.query('BEGIN')
         await client.query(
-          `INSERT INTO accounts (id, display_name, given_name, family_name, created_at)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [account.id, account.displayName, account.givenName, account.familyName, account.createdAt],
+          `INSERT INTO accounts
+             (id, display_name, given_name, family_name, created_at,
+              locale, country_code, currency_code, measurement_system, timezone)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            account.id,
+            account.displayName,
+            account.givenName,
+            account.familyName,
+            account.createdAt,
+            regional.locale,
+            regional.countryCode,
+            regional.currencyCode,
+            regional.measurementSystem,
+            regional.timezone,
+          ],
         )
         await client.query(
           `INSERT INTO auth_identities
@@ -147,16 +174,28 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
             AND given_name = ''
             AND family_name = ''
             AND ($2 <> '' OR $3 <> '')
-        RETURNING id, display_name, given_name, family_name, created_at`,
+        RETURNING id, display_name, given_name, family_name, created_at, locale, country_code, currency_code, measurement_system, timezone`,
         [accountId, names.givenName, names.familyName, names.displayName],
       )
       if (result.rows[0]) return accountFrom(result.rows[0])
       const current = await pool.query(
-        `SELECT id, display_name, given_name, family_name, created_at FROM accounts WHERE id = $1`,
+        `SELECT id, display_name, given_name, family_name, created_at, locale, country_code, currency_code, measurement_system, timezone FROM accounts WHERE id = $1`,
         [accountId],
       )
       if (!current.rows[0]) throw new AppError('not_found', 404)
       return accountFrom(current.rows[0])
+    },
+    async saveAccountSettings(accountId, settings) {
+      const result = await pool.query(
+        `UPDATE accounts
+            SET locale = $2, country_code = $3, currency_code = $4, measurement_system = $5, timezone = $6,
+                updated_at = now()
+          WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, display_name, given_name, family_name, created_at, locale, country_code, currency_code, measurement_system, timezone`,
+        [accountId, settings.locale, settings.countryCode, settings.currencyCode, settings.measurementSystem, settings.timezone],
+      )
+      if (!result.rows[0]) throw new AppError('not_found', 404)
+      return accountRegional(accountFrom(result.rows[0]))
     },
     async insertIdentity(identity) {
       try {

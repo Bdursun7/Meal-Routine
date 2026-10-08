@@ -167,7 +167,7 @@ describe('pantry', () => {
     expect(separate.json()).toMatchObject({ unit: 'piece', quantity: 6 })
     expect(await list(app, auth, householdId)).toHaveLength(2)
 
-    for (const [key, unit] of [['pantry-unit-bad', 'kova'], ['pantry-unit-bad-forced', 'paket']] as const) {
+    for (const [key, unit] of [['pantry-unit-bad', 'kova'], ['pantry-unit-bad-forced', 'avuç']] as const) {
       const invalid = await create(app, auth, householdId, key, { ingredientId: 'flour', displayName: 'Un', quantity: 1, unit, location: 'pantry', confirmSeparate: true })
       expect(invalid.statusCode).toBe(400)
       expect(invalid.json()).toMatchObject({ error: 'invalid_unit', recovery: 'fix-input' })

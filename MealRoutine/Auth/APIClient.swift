@@ -318,18 +318,27 @@ struct PantryReconcileResultLine: Decodable, Sendable {
 
 /// `GET /v1/ingredients` row. `scope` is `dictionary` for the seed and `household` for user-created rows.
 /// Named apart from the catalog `IngredientDTO` in `RecipeCatalogDTO.swift`.
+/// `names` / `aliases` are keyed by locale; `displayName` / `synonyms` are the same data resolved
+/// for the requested locale (and the only fields a pre-V5.1 server sends).
 struct DictionaryIngredientDTO: Decodable, Sendable {
     var id: String
+    var names: [String: String]?
+    var aliases: [String: [String]]?
     var displayName: String
     var synonyms: [String]
     var sourceIds: [String]
     var scope: String
 
-    var entry: IngredientEntry { IngredientEntry(id: id, name: displayName, synonyms: synonyms, sourceIds: sourceIds) }
+    var entry: IngredientEntry {
+        if let names, !names.isEmpty {
+            return IngredientEntry(id: id, names: names, aliases: aliases ?? [:], sourceIds: sourceIds)
+        }
+        return IngredientEntry(id: id, name: displayName, synonyms: synonyms, sourceIds: sourceIds, locale: IngredientEntry.sourceLocale)
+    }
 }
 
-private struct IngredientListDTO: Decodable { var version: Int; var ingredients: [DictionaryIngredientDTO] }
-private struct IngredientRegisterBody: Encodable { var id: String; var displayName: String }
+private struct IngredientListDTO: Decodable { var version: Int; var locale: String?; var ingredients: [DictionaryIngredientDTO] }
+private struct IngredientRegisterBody: Encodable { var id: String; var displayName: String; var locale: String }
 
 struct PantryRepository {
     var client: APIClient
@@ -345,6 +354,7 @@ struct PantryRepository {
         var items = [URLQueryItem(name: "limit", value: String(limit))]
         if let householdId { items.append(URLQueryItem(name: "householdId", value: householdId.uuidString.lowercased())) }
         if !query.isEmpty { items.append(URLQueryItem(name: "q", value: query)) }
+        items.append(URLQueryItem(name: "locale", value: RegionalContext.contentLocale))
         var components = URLComponents()
         components.path = "/v1/ingredients"
         components.queryItems = items
@@ -355,7 +365,7 @@ struct PantryRepository {
 
     /// Registers a `custom:<uuid>` ingredient. Repeating the call with the same id is a no-op on the server.
     func registerIngredient(householdId: UUID, id: String, displayName: String, idempotencyKey: String) async throws -> DictionaryIngredientDTO {
-        let body = try JSONEncoder.mealRoutine.encode(IngredientRegisterBody(id: id, displayName: displayName))
+        let body = try JSONEncoder.mealRoutine.encode(IngredientRegisterBody(id: id, displayName: displayName, locale: RegionalContext.contentLocale))
         let (data, response) = try await client.request(method: "POST", path: "\(base(householdId))/ingredients", body: body, authenticated: true, headers: ["Idempotency-Key": idempotencyKey])
         try throwPantry(response, data: data)
         return try JSONDecoder.mealRoutine.decode(DictionaryIngredientDTO.self, from: data)

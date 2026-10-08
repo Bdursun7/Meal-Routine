@@ -102,32 +102,52 @@ export function allows(prefs: NotificationPreferences, kind: NotificationKind): 
   }
 }
 
-export function notificationCopy(kind: NotificationKind, count: number, mealId: string, inviteCode: string): { title: string; body: string; route: string } {
+interface NotificationText {
+  single: string
+  grouped: (count: string) => string
+}
+
+/**
+ * Push alert text by recipient locale. Only tr-TR ships; any other locale falls back to
+ * `NOTIFICATION_FALLBACK_LOCALE`. Kinds, routes and grouping never depend on the text.
+ */
+export const NOTIFICATION_MESSAGES: Readonly<Record<string, Readonly<Record<NotificationKind, NotificationText>>>> = Object.freeze({
+  'tr-TR': {
+    invite: { single: 'Ev halkı daveti', grouped: (count) => `${count} ev halkı daveti` },
+    weekly_plan: { single: 'Haftalık plan hazır', grouped: (count) => `${count} plan güncellemesi` },
+    meal_veto: { single: 'Bir yemek için bu hafta olmaz', grouped: (count) => `${count} yemek için bu hafta olmaz` },
+    meal_replacement: { single: 'Bir yemek değişti', grouped: (count) => `${count} yemek değişti` },
+    plan_finalized: { single: 'Haftalık plan kesinleşti', grouped: (count) => `${count} plan kesinleşti` },
+  },
+})
+
+export const NOTIFICATION_FALLBACK_LOCALE = 'tr-TR'
+
+export function notificationCopy(
+  kind: NotificationKind,
+  count: number,
+  mealId: string,
+  inviteCode: string,
+  locale: string = NOTIFICATION_FALLBACK_LOCALE,
+): { title: string; body: string; route: string } {
   const grouped = count > 1
   const title = 'MealRoutine'
+  const messageLocale = NOTIFICATION_MESSAGES[locale] ? locale : NOTIFICATION_FALLBACK_LOCALE
+  const text = NOTIFICATION_MESSAGES[messageLocale]![kind]
+  const body = grouped ? text.grouped(new Intl.NumberFormat(messageLocale).format(count)) : text.single
   switch (kind) {
     case 'invite':
       return {
         title,
-        body: grouped ? `${count} ev halkı daveti` : 'Ev halkı daveti',
+        body,
         route: inviteCode ? `mealroutine://household/join?code=${inviteCode}` : 'mealroutine://household/join',
       }
     case 'weekly_plan':
-      return { title, body: grouped ? `${count} plan güncellemesi` : 'Haftalık plan hazır', route: 'mealroutine://week' }
-    case 'meal_veto':
-      return {
-        title,
-        body: grouped ? `${count} yemek için bu hafta olmaz` : 'Bir yemek için bu hafta olmaz',
-        route: grouped || !mealId ? 'mealroutine://week' : `mealroutine://week/meal?id=${mealId}`,
-      }
-    case 'meal_replacement':
-      return {
-        title,
-        body: grouped ? `${count} yemek değişti` : 'Bir yemek değişti',
-        route: grouped || !mealId ? 'mealroutine://week' : `mealroutine://week/meal?id=${mealId}`,
-      }
     case 'plan_finalized':
-      return { title, body: grouped ? `${count} plan kesinleşti` : 'Haftalık plan kesinleşti', route: 'mealroutine://week' }
+      return { title, body, route: 'mealroutine://week' }
+    case 'meal_veto':
+    case 'meal_replacement':
+      return { title, body, route: grouped || !mealId ? 'mealroutine://week' : `mealroutine://week/meal?id=${mealId}` }
   }
 }
 
@@ -282,6 +302,7 @@ export function createNotificationService(store: NotificationStore, sender: Push
       kind: NotificationKind,
       mealId: string,
       inviteCode: string,
+      locale: string = NOTIFICATION_FALLBACK_LOCALE,
     ): Promise<NotificationBatch | null> {
       const prefs = await store.preferences(accountId)
       if (!allows(prefs, kind)) return null
@@ -290,7 +311,7 @@ export function createNotificationService(store: NotificationStore, sender: Push
       const safeInvite = safeCode(inviteCode)
       const open = await store.openBatch(accountId, householdId, kind, clock)
       const count = (open?.eventCount ?? 0) + 1
-      const copy = notificationCopy(kind, count, safeMeal, safeInvite)
+      const copy = notificationCopy(kind, count, safeMeal, safeInvite, locale)
       const batch: NotificationBatch = open
         ? { ...open, eventCount: count, title: copy.title, body: copy.body, route: copy.route, mealId: safeMeal, status: 'pending' }
         : {

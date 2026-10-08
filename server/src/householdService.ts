@@ -11,12 +11,15 @@ import {
   type InviteRecord,
   type PublicHousehold,
 } from './householdTypes.js'
+import { householdSettingsFrom, type HouseholdRegionalSettings } from './regional.js'
 import type { MemberRole } from './repository.js'
 
 const CODE_ATTEMPTS = 6
 
 export interface HouseholdService {
-  create(accountId: string, name: string): Promise<HouseholdBody>
+  /** Fields left out of `settings` copy the creator's own account values. */
+  create(accountId: string, name: string, settings?: Partial<HouseholdRegionalSettings>): Promise<HouseholdBody>
+  updateSettings(accountId: string, householdId: string, patch: Partial<HouseholdRegionalSettings>): Promise<HouseholdBody>
   current(accountId: string): Promise<HouseholdBody>
   rename(accountId: string, householdId: string, name: string): Promise<HouseholdBody>
   createInvite(accountId: string, householdId: string): Promise<HouseholdBody>
@@ -32,13 +35,14 @@ export interface HouseholdService {
 
 export function createHouseholdService(store: HouseholdStore, now: () => Date = () => new Date()): HouseholdService {
   return {
-    async create(accountId, rawName) {
+    async create(accountId, rawName, requested = {}) {
       const name = cleanName(rawName)
       return store.transaction(async (tx) => {
         const account = await requireAccount(tx, accountId)
         if (await tx.activeMembership(accountId)) throw new AppError('already_in_household', 409)
         const householdId = randomUUID()
-        await tx.insertHousehold({ id: householdId, name, ownerAccountId: accountId, now: now() })
+        const settings = householdSettingsFrom(account.settings, requested)
+        await tx.insertHousehold({ id: householdId, name, ownerAccountId: accountId, settings, now: now() })
         await tx.insertMember({
           id: randomUUID(),
           householdId,
@@ -66,6 +70,17 @@ export function createHouseholdService(store: HouseholdStore, now: () => Date = 
         await tx.lockHousehold(householdId)
         await requireOwner(tx, householdId, accountId)
         await tx.rename(householdId, name, now())
+        return present(tx, householdId, accountId, now())
+      })
+    },
+
+    async updateSettings(accountId, householdId, patch) {
+      return store.transaction(async (tx) => {
+        await tx.lockHousehold(householdId)
+        await requireOwner(tx, householdId, accountId)
+        const household = await tx.household(householdId)
+        if (!household) throw new AppError('not_found', 404)
+        await tx.saveHouseholdSettings(householdId, { ...household.settings, ...patch }, now())
         return present(tx, householdId, accountId, now())
       })
     },
@@ -344,6 +359,7 @@ async function present(tx: HouseholdTx, householdId: string, accountId: string, 
       status: invite.status,
       expiresAt: isoTimestamp(invite.expiresAt),
     })),
+    settings: { ...household.settings },
   }
   return { household: body }
 }
