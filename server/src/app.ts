@@ -37,7 +37,7 @@ import {
 import { createRateLimiter, type RateLimiter } from './rateLimit.js'
 import type { AuthRepository } from './repository.js'
 import { createPantryService, pantryRecovery, type PantryService } from './pantryService.js'
-import type { PantryStore } from './pantryTypes.js'
+import { pantryTimestamp, type PantryStore } from './pantryTypes.js'
 import { verifyAccessToken } from './tokens.js'
 
 const appleBody = z.object({
@@ -768,7 +768,7 @@ function registerPantryRoutes(app: FastifyInstance, options: BuildAppOptions, pa
   app.get('/v1/households/:householdId/pantry', async (request) => {
     const accountId = await requireAccount(request, options)
     const { householdId } = parse(householdParams, request.params)
-    return { items: await pantry.list(accountId, householdId), serverTime: clock().toISOString() }
+    return { items: await pantry.list(accountId, householdId), serverTime: pantryTimestamp(clock()) }
   })
 
   app.post('/v1/households/:householdId/pantry/items', async (request) => {
