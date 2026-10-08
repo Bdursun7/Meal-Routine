@@ -22,6 +22,16 @@ export interface PantryItem {
   updatedAt: string
 }
 
+/**
+ * Pantry wire clock. Node `Date.toISOString()`: an ISO-8601 UTC string with
+ * millisecond precision (`2026-10-08T07:12:03.123Z`), including `.000`.
+ * Never a numeric epoch. The iOS decoder accepts this form, the same instant
+ * without a fraction, and epoch milliseconds if an older payload carries one.
+ */
+export function pantryTimestamp(date: Date): string {
+  return date.toISOString()
+}
+
 export interface PantryDraft {
   id: string
   ingredientId: string

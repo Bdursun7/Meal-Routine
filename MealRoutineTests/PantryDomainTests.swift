@@ -441,6 +441,89 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(item.dateType, .useBy)
         XCTAssertEqual(item.dateValue, "2026-10-09")
         XCTAssertEqual(item.location, .refrigerator)
+        XCTAssertEqual(item.updatedAt?.timeIntervalSince1970 ?? -1, 1_791_367_200.123, accuracy: 0.000_5)
+        XCTAssertEqual(item.createdAt?.timeIntervalSince1970 ?? -1, item.updatedAt?.timeIntervalSince1970 ?? -2, accuracy: 0.000_5)
+    }
+
+    func testServerTimestampsAcceptFractionPlainAndEpochAndNeverInventNow() throws {
+        let fractional = try pantryRow(updatedAt: "\"2026-10-08T07:12:03.123Z\"")
+        let plain = try pantryRow(updatedAt: "\"2026-10-08T07:12:03Z\"")
+        let zeroFraction = try pantryRow(updatedAt: "\"2026-10-08T07:12:03.000Z\"")
+        let epoch = try pantryRow(updatedAt: "1791443523123")
+        XCTAssertEqual(fractional.updatedAt?.timeIntervalSince1970 ?? -1, 1_791_443_523.123, accuracy: 0.000_5)
+        XCTAssertEqual(plain.updatedAt?.timeIntervalSince1970 ?? -1, 1_791_443_523, accuracy: 0.000_5)
+        XCTAssertEqual(zeroFraction.updatedAt?.timeIntervalSince1970 ?? -1, plain.updatedAt?.timeIntervalSince1970 ?? -2, accuracy: 0.000_5)
+        XCTAssertEqual(epoch.updatedAt?.timeIntervalSince1970 ?? -1, fractional.updatedAt?.timeIntervalSince1970 ?? -2, accuracy: 0.000_5)
+        XCTAssertEqual(PantryServerClock.parse("2026-10-08T07:12:03.123Z")?.timeIntervalSince1970 ?? -1, PantryServerClock.parseEpochMilliseconds(1_791_443_523_123)?.timeIntervalSince1970 ?? -2, accuracy: 0.000_5)
+
+        let missing = try pantryRow(updatedAt: nil)
+        XCTAssertNil(missing.updatedAt)
+        let stored = Date(timeIntervalSince1970: 1_700_000_000)
+        let server = try XCTUnwrap(fractional.updatedAt)
+        XCTAssertEqual(PantryServerClock.applying(nil, keeping: stored), stored)
+        XCTAssertEqual(PantryServerClock.applying(server, keeping: stored), server)
+        XCTAssertEqual(PantryServerClock.inserting(nil, createdAt: nil), Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(PantryServerClock.inserting(server, createdAt: nil), server)
+
+        XCTAssertThrowsError(try pantryRow(updatedAt: "\"not-a-date\""))
+        let roundTrip = try JSONDecoder().decode(PantryRemoteItem.self, from: JSONEncoder().encode(fractional))
+        XCTAssertEqual(roundTrip.updatedAt?.timeIntervalSince1970 ?? -1, fractional.updatedAt?.timeIntervalSince1970 ?? -2, accuracy: 0.000_5)
+    }
+
+    func testReapplyKeepsTheIdempotencyKeyAndBothChoicesKeepTheRow() {
+        let id = UUID(uuidString: "0B9C7C5E-7F43-4C1E-9D55-0D2B8F2F6A11")!
+        let household = UUID(uuidString: "6F1D2C3B-1A2B-4C5D-8E9F-001122334455")!
+        let key = UUID(uuidString: "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE")!
+        let laterKey = UUID(uuidString: "BBBBBBBB-BBBB-4CCC-8DDD-EEEEEEEEEEEE")!
+        let mine = pantryRemote(id: id, household: household, quantity: 300, version: 3)
+        let later = pantryRemote(id: id, household: household, quantity: 250, version: 4)
+        let server = pantryRemote(id: id, household: household, quantity: 700, version: 5)
+        let conflict = PantryConflictMutation(
+            idempotencyKey: key, action: "update", householdID: household, item: mine, baseVersion: 2,
+            confirmSeparate: false, serverItem: server, serverDeleted: false, rejection: nil
+        )
+        let alone = PantryConflictResolution.reapply([conflict])
+        XCTAssertEqual(alone?.idempotencyKey, key)
+        XCTAssertEqual(alone?.action, "update")
+        XCTAssertEqual(alone?.baseVersion, 5)
+        XCTAssertEqual(alone?.item.quantity, 300)
+        XCTAssertEqual(alone?.item.version, 6)
+        XCTAssertEqual(alone?.displayQuantity, 300)
+        XCTAssertEqual(alone?.displayRevision, 6)
+        XCTAssertEqual(alone?.confirmSeparate, false)
+
+        let followUp = PantryConflictMutation(
+            idempotencyKey: laterKey, action: "update", householdID: household, item: later, baseVersion: 2,
+            confirmSeparate: false, serverItem: nil, serverDeleted: false, rejection: nil
+        )
+        let resolved = PantryConflictResolution.reapply([conflict, followUp])
+        XCTAssertEqual(resolved?.idempotencyKey, key)
+        XCTAssertNotEqual(resolved?.idempotencyKey, laterKey)
+        XCTAssertEqual(resolved?.baseVersion, 5)
+        XCTAssertEqual(resolved?.item.quantity, 250)
+        XCTAssertEqual(resolved?.displayRevision, 6)
+
+        let adopted = PantryConflictResolution.adoptServer([conflict])
+        XCTAssertEqual(adopted?.quantity, 700)
+        XCTAssertEqual(adopted?.revision, 5)
+        XCTAssertNil(PantryConflictResolution.reapply([followUp]))
+    }
+
+    private func pantryRemote(id: UUID, household: UUID, quantity: Double, version: Int) -> PantryRemoteItem {
+        PantryRemoteItem(
+            id: id, householdId: household, ingredientId: "tomato", displayName: "Domates",
+            quantity: quantity, unit: "g", location: .pantry, minimumQuantity: nil,
+            dateType: nil, dateValue: nil, version: version
+        )
+    }
+
+    private func pantryRow(updatedAt: String?) throws -> PantryRemoteItem {
+        let clock = updatedAt.map { ",\"updatedAt\":\($0)" } ?? ""
+        let json = """
+        {"id":"0b9c7c5e-7f43-4c1e-9d55-0d2b8f2f6a11","householdId":"6f1d2c3b-1a2b-4c5d-8e9f-001122334455","ingredientId":"tomato",
+         "displayName":"Domates","quantity":400,"unit":"g","location":"pantry","version":1\(clock)}
+        """
+        return try JSONDecoder().decode(PantryRemoteItem.self, from: Data(json.utf8))
     }
 
     func testPreGatePayloadsStillDecodeSoQueuedEditsAreNotLost() throws {

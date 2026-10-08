@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 import { AppError } from './errors.js'
 import type { Ingredient } from './ingredients.js'
-import type { PantryDraft, PantryItem, PantryPatch, PantryStore } from './pantryTypes.js'
+import { pantryTimestamp, type PantryDraft, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
 import type { MemberRole } from './repository.js'
 
 type PantryDbRow = {
@@ -44,8 +44,8 @@ function fromRow(row: PantryDbRow): PantryItem {
     dateType: row.date_type,
     dateValue: row.date_value === null ? null : String(row.date_value),
     version: row.version,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
+    createdAt: pantryTimestamp(new Date(row.created_at)),
+    updatedAt: pantryTimestamp(new Date(row.updated_at)),
   }
 }
 

@@ -412,7 +412,13 @@ private struct PantryReconcileBody: Encodable {
 }
 
 private extension JSONEncoder { static var mealRoutine: JSONEncoder { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e } }
-private extension JSONDecoder { static var mealRoutine: JSONDecoder { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d } }
+private extension JSONDecoder {
+    static var mealRoutine: JSONDecoder {
+        let decoder = JSONDecoder()
+        PantryServerClock.install(on: decoder)
+        return decoder
+    }
+}
 
 private struct AppleSignInBody: Encodable {
     var identityToken: String

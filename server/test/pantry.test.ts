@@ -7,6 +7,9 @@ import { identityToken, memoryRepo, testConfig, testVerifier } from './helpers.j
 
 type Auth = { authorization: string }
 
+/** What `pantryTimestamp` puts on the wire: millisecond ISO-8601, never an epoch number. */
+const pantryWireTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
 async function signIn(app: FastifyInstance, subject: string): Promise<Auth> {
   const response = await app.inject({ method: 'POST', url: '/v1/auth/apple', payload: { identityToken: identityToken({ subject, givenName: 'Ada' }), givenName: 'Ada' } })
   return { authorization: `Bearer ${response.json().accessToken}` }
@@ -87,7 +90,9 @@ describe('pantry', () => {
       id: clientId, householdId, ingredientId: 'tomato', displayName: 'Domates', quantity: 400, unit: 'g',
       location: 'refrigerator', minimumQuantity: 200, dateType: 'useBy', dateValue: '2030-01-05', version: 1,
     })
-    expect(created.json().createdAt).toBeTruthy()
+    expect(created.json().createdAt).toMatch(pantryWireTimestamp)
+    expect(created.json().updatedAt).toMatch(pantryWireTimestamp)
+    expect(typeof created.json().updatedAt).toBe('string')
     expect(await list(app, auth, householdId)).toHaveLength(1)
     const updated = await app.inject({
       method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=1`,
@@ -126,6 +131,8 @@ describe('pantry', () => {
     })
     expect(stale.statusCode).toBe(409)
     expect(stale.json()).toMatchObject({ error: 'conflict', recovery: 'resolve', current: { quantity: 1, version: 1 } })
+    expect(stale.json().current.updatedAt).toMatch(pantryWireTimestamp)
+    expect(stale.json().current.createdAt).toMatch(pantryWireTimestamp)
     const staleDelete = await app.inject({ method: 'DELETE', url: `/v1/households/${householdId}/pantry/items/${itemId}?baseVersion=7`, headers: { ...auth, 'idempotency-key': 'pantry-conflict-3' } })
     expect(staleDelete.statusCode).toBe(409)
     expect(await list(app, auth, householdId)).toHaveLength(1)

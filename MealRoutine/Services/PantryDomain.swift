@@ -478,6 +478,180 @@ struct PantryCoverageStamp: Equatable, Sendable {
     static let idle = PantryCoverageStamp(applying: false, needs: [], incompatibleCount: 0)
 }
 
+// MARK: - Server clock
+
+/// Pantry `createdAt` / `updatedAt` as the server actually sends them.
+///
+/// Node `Date.toISOString()` (what `server/` writes for every pantry row) is
+/// `2026-10-08T07:12:03.123Z` — always three fractional digits, including `.000`.
+/// The same instant without a fraction (`2026-10-08T07:12:03Z`) is also accepted,
+/// because household routes strip milliseconds. A JSON number is Unix epoch
+/// milliseconds, in case a payload is ever emitted that way. Numbers are never
+/// what the server sends today.
+///
+/// A missing timestamp stays missing. Callers must not substitute `.now`: that
+/// makes a server row look freshly written and scrambles last-write ordering.
+enum PantryServerClock {
+    /// Timestamp to store when a server row lands on a cache row that already exists.
+    /// No server clock → keep `existing`.
+    static func applying(_ server: Date?, keeping existing: Date) -> Date {
+        server ?? existing
+    }
+
+    /// Timestamp for a cache row that did not exist yet. Unknown server time is the
+    /// Unix epoch, not `.now`, so the new row cannot win a last-write comparison by accident.
+    static func inserting(_ server: Date?, createdAt: Date?) -> Date {
+        server ?? createdAt ?? Date(timeIntervalSince1970: 0)
+    }
+
+    /// ISO-8601 UTC with millisecond precision, matching Node `Date.toISOString()`.
+    static func string(from date: Date) -> String {
+        let millis = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        let instant = Date(timeIntervalSince1970: Double(millis) / 1000)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: instant)
+        var fraction = Int(millis % 1000)
+        if fraction < 0 { fraction += 1000 }
+        return String(
+            format: "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+            parts.year ?? 0,
+            parts.month ?? 0,
+            parts.day ?? 0,
+            parts.hour ?? 0,
+            parts.minute ?? 0,
+            parts.second ?? 0,
+            fraction
+        )
+    }
+
+    static func parse(_ text: String) -> Date? {
+        let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard raw.count >= 20, let tIndex = raw.firstIndex(of: "T") else { return nil }
+        let body: String
+        let offsetSeconds: Int
+        if raw.hasSuffix("Z") || raw.hasSuffix("z") {
+            body = String(raw.dropLast())
+            offsetSeconds = 0
+        } else {
+            let timePart = raw[raw.index(after: tIndex)...]
+            guard let sign = timePart.lastIndex(where: { $0 == "+" || $0 == "-" }) else { return nil }
+            guard let offset = timeZoneOffsetSeconds(String(raw[sign...])) else { return nil }
+            body = String(raw[..<sign])
+            offsetSeconds = offset
+        }
+        let halves = body.split(separator: "T", maxSplits: 1, omittingEmptySubsequences: false)
+        guard halves.count == 2 else { return nil }
+        let datePieces = halves[0].split(separator: "-", omittingEmptySubsequences: false)
+        guard datePieces.count == 3,
+              datePieces[0].count == 4, let year = Int(datePieces[0]),
+              datePieces[1].count == 2, let month = Int(datePieces[1]),
+              datePieces[2].count == 2, let day = Int(datePieces[2]) else { return nil }
+        let timeAndFraction = halves[1].split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        let clock = timeAndFraction[0].split(separator: ":", omittingEmptySubsequences: false)
+        guard clock.count == 3,
+              clock[0].count == 2, let hour = Int(clock[0]),
+              clock[1].count == 2, let minute = Int(clock[1]),
+              clock[2].count == 2, let second = Int(clock[2]) else { return nil }
+        guard (1...12).contains(month), (1...31).contains(day),
+              (0...23).contains(hour), (0...59).contains(minute), (0...59).contains(second) else { return nil }
+        var fraction = 0.0
+        if timeAndFraction.count == 2 {
+            let digits = timeAndFraction[1]
+            guard !digits.isEmpty, digits.allSatisfy({ $0.isNumber }) else { return nil }
+            guard let value = Double("0." + digits) else { return nil }
+            fraction = value
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        guard let utc = calendar.date(from: components) else { return nil }
+        return utc.addingTimeInterval(fraction).addingTimeInterval(TimeInterval(-offsetSeconds))
+    }
+
+    static func parseEpochMilliseconds(_ value: Double) -> Date? {
+        guard value.isFinite else { return nil }
+        return Date(timeIntervalSince1970: value / 1000)
+    }
+
+    /// Absent or JSON null → nil. A present value that is not a timestamp throws,
+    /// so the row is rejected instead of stored with a made-up clock.
+    static func decodeIfPresent<Key: CodingKey>(_ container: KeyedDecodingContainer<Key>, forKey key: Key) throws -> Date? {
+        guard container.contains(key) else { return nil }
+        if try container.decodeNil(forKey: key) { return nil }
+        if let text = try? container.decode(String.self, forKey: key) {
+            guard let date = parse(text) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: key,
+                    in: container,
+                    debugDescription: "Unreadable pantry timestamp '\(text)'. Expected ISO-8601."
+                )
+            }
+            return date
+        }
+        if let millis = try? container.decode(Double.self, forKey: key) {
+            guard let date = parseEpochMilliseconds(millis) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: key,
+                    in: container,
+                    debugDescription: "Unreadable pantry epoch milliseconds."
+                )
+            }
+            return date
+        }
+        throw DecodingError.dataCorruptedError(
+            forKey: key,
+            in: container,
+            debugDescription: "Pantry timestamp must be an ISO-8601 string or epoch milliseconds."
+        )
+    }
+
+    static func install(on decoder: JSONDecoder) {
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            if let text = try? container.decode(String.self) {
+                guard let date = parse(text) else {
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unreadable pantry timestamp '\(text)'.")
+                }
+                return date
+            }
+            if let millis = try? container.decode(Double.self), let date = parseEpochMilliseconds(millis) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Pantry timestamp must be ISO-8601 or epoch milliseconds.")
+        }
+    }
+
+    private static func timeZoneOffsetSeconds(_ suffix: String) -> Int? {
+        guard let signChar = suffix.first, signChar == "+" || signChar == "-" else { return nil }
+        let sign = signChar == "+" ? 1 : -1
+        let rest = suffix.dropFirst()
+        if rest.contains(":") {
+            let pieces = rest.split(separator: ":", omittingEmptySubsequences: false)
+            guard pieces.count == 2, pieces[0].count == 2, pieces[1].count == 2,
+                  let hour = Int(pieces[0]), let minute = Int(pieces[1]),
+                  (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+            return sign * (hour * 3600 + minute * 60)
+        }
+        guard rest.count == 2 || rest.count == 4, rest.allSatisfy({ $0.isNumber }) else { return nil }
+        guard let hour = Int(rest.prefix(2)), (0...23).contains(hour) else { return nil }
+        var minute = 0
+        if rest.count == 4 {
+            guard let parsed = Int(rest.suffix(2)), (0...59).contains(parsed) else { return nil }
+            minute = parsed
+        }
+        return sign * (hour * 3600 + minute * 60)
+    }
+}
+
 // MARK: - Wire format
 
 /// One household pantry row as `GET /v1/households/:id/pantry` returns it.
@@ -556,8 +730,10 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         version = try container.decodeIfPresent(Int.self, forKey: .version)
             ?? container.decodeIfPresent(Int.self, forKey: .revision)
             ?? 1
-        createdAt = try? container.decodeIfPresent(Date.self, forKey: .createdAt)
-        updatedAt = try? container.decodeIfPresent(Date.self, forKey: .updatedAt)
+        // Not `decode(Date.self)`: `.iso8601` rejects fractional seconds, and `try?`
+        // used to turn that into nil. A bad clock fails the row; a missing one stays nil.
+        createdAt = try PantryServerClock.decodeIfPresent(container, forKey: .createdAt)
+        updatedAt = try PantryServerClock.decodeIfPresent(container, forKey: .updatedAt)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -573,8 +749,8 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         try container.encodeIfPresent(dateType, forKey: .dateType)
         try container.encodeIfPresent(dateValue, forKey: .dateValue)
         try container.encode(version, forKey: .version)
-        try container.encodeIfPresent(createdAt, forKey: .createdAt)
-        try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
+        if let createdAt { try container.encode(PantryServerClock.string(from: createdAt), forKey: .createdAt) }
+        if let updatedAt { try container.encode(PantryServerClock.string(from: updatedAt), forKey: .updatedAt) }
     }
 }
 
@@ -729,6 +905,105 @@ struct PantryQueuedPayload: Codable, Equatable, Sendable {
         try container.encodeIfPresent(serverItem, forKey: .serverItem)
         try container.encode(serverDeleted, forKey: .serverDeleted)
         try container.encodeIfPresent(rejection, forKey: .rejection)
+    }
+}
+
+/// One queued pantry mutation, as conflict resolution sees it.
+/// `idempotencyKey` is the work item id. It stays the same when the user reapplies.
+struct PantryConflictMutation: Equatable, Sendable {
+    var idempotencyKey: UUID
+    var action: String
+    var householdID: UUID
+    var item: PantryRemoteItem?
+    var baseVersion: Int?
+    var confirmSeparate: Bool
+    var serverItem: PantryRemoteItem?
+    var serverDeleted: Bool
+    var rejection: String?
+}
+
+/// The single outbox item "Değişikliğimi yeniden uygula" puts back.
+/// `displayQuantity == nil` means the local row is removed (the user was deleting it).
+struct PantryReapplyResult: Equatable, Sendable {
+    var idempotencyKey: UUID
+    var action: String
+    var householdID: UUID
+    var item: PantryRemoteItem
+    var baseVersion: Int?
+    var confirmSeparate: Bool
+    var displayQuantity: Double?
+    var displayRevision: Int
+}
+
+/// What "Sunucudaki hali kullan" shows. A nil quantity means the local row goes away.
+struct PantryAdoptedServer: Equatable, Sendable {
+    var quantity: Double?
+    var revision: Int?
+}
+
+/// Pure conflict choices for one pantry row. Both keep data: reapply resends the user's
+/// latest values on the server version, with the same Idempotency-Key; adopt-server
+/// shows the server row and drops the queued edits only because the user asked.
+enum PantryConflictResolution {
+    static func isConflict(_ mutation: PantryConflictMutation) -> Bool {
+        mutation.serverItem != nil || mutation.serverDeleted || mutation.rejection == "pantry_unit_choice"
+    }
+
+    /// Nil when there is no user edit or no conflict. The caller must then leave the queue untouched.
+    static func reapply(_ mutations: [PantryConflictMutation]) -> PantryReapplyResult? {
+        guard let last = mutations.last else { return nil }
+        guard let conflict = mutations.first(where: { isConflict($0) }) else { return nil }
+        if last.action == "delete" {
+            guard let server = conflict.serverItem else { return nil }
+            return PantryReapplyResult(
+                idempotencyKey: conflict.idempotencyKey,
+                action: "delete",
+                householdID: last.householdID,
+                item: server,
+                baseVersion: server.version,
+                confirmSeparate: false,
+                displayQuantity: nil,
+                displayRevision: server.version
+            )
+        }
+        guard var mine = last.item else { return nil }
+        if conflict.serverDeleted || conflict.rejection == "pantry_unit_choice" {
+            mine.version = 1
+            return PantryReapplyResult(
+                idempotencyKey: conflict.idempotencyKey,
+                action: "create",
+                householdID: last.householdID,
+                item: mine,
+                baseVersion: nil,
+                confirmSeparate: true,
+                displayQuantity: mine.quantity,
+                displayRevision: 1
+            )
+        }
+        guard let server = conflict.serverItem else { return nil }
+        mine.version = server.version + 1
+        return PantryReapplyResult(
+            idempotencyKey: conflict.idempotencyKey,
+            action: "update",
+            householdID: last.householdID,
+            item: mine,
+            baseVersion: server.version,
+            confirmSeparate: false,
+            displayQuantity: mine.quantity,
+            displayRevision: server.version + 1
+        )
+    }
+
+    /// Nil when nothing in the queue is a conflict. The caller drops every queued edit for the row.
+    static func adoptServer(_ mutations: [PantryConflictMutation]) -> PantryAdoptedServer? {
+        guard let conflict = mutations.first(where: { isConflict($0) }) else { return nil }
+        if let server = conflict.serverItem {
+            return PantryAdoptedServer(quantity: server.quantity, revision: server.version)
+        }
+        if conflict.serverDeleted || conflict.rejection == "pantry_unit_choice" {
+            return PantryAdoptedServer(quantity: nil, revision: nil)
+        }
+        return nil
     }
 }
 

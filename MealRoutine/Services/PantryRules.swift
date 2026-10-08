@@ -21,6 +21,8 @@ extension PantryItem {
     }
 
     /// Server state wins for every field on the row.
+    /// A server row with no `updatedAt` keeps the clock already stored here.
+    /// `.now` would look like a fresh write and scramble last-write ordering.
     func apply(_ remote: PantryRemoteItem) {
         ingredientID = remote.ingredientId
         displayName = remote.displayName
@@ -30,7 +32,7 @@ extension PantryItem {
         minimumQuantity = remote.minimumQuantity
         setDate(remote.dateType, remote.dateValue.flatMap { PantryDay.date(from: $0) })
         revision = remote.version
-        updatedAt = remote.updatedAt ?? .now
+        updatedAt = PantryServerClock.applying(remote.updatedAt, keeping: updatedAt)
     }
 
     convenience init(remote: PantryRemoteItem) {
@@ -46,7 +48,7 @@ extension PantryItem {
             dateType: remote.dateType,
             dateValue: remote.dateValue.flatMap { PantryDay.date(from: $0) },
             revision: remote.version,
-            updatedAt: remote.updatedAt ?? .now
+            updatedAt: PantryServerClock.inserting(remote.updatedAt, createdAt: remote.createdAt)
         )
     }
 
@@ -148,7 +150,7 @@ enum PantrySync {
 
     private static func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        PantryServerClock.install(on: decoder)
         return decoder
     }
 }
@@ -301,38 +303,63 @@ enum PantryOutbox {
     }
 
     /// "Değişikliğimi yeniden uygula": the user's last values, sent on top of the server version.
+    /// The Idempotency-Key of the mutation that hit the server is kept. The queued item is
+    /// replaced only after the replacement encodes; a failed decision leaves the conflict in place.
+    /// This does not go through `record`, which refuses to queue when household sync is off and
+    /// would mint a new key — that dropped the user's edit (`testConflictShowsTheServerRow…`).
     static func reapply(entityId: String, in context: ModelContext) {
         let all = PendingOperationStore.items(in: context)
         let mine = all.filter { PantrySync.isPantry($0) && $0.entityId == entityId }
-        let payloads = mine.compactMap(PantrySync.payload(of:))
-        guard let lastEdit = payloads.last, let conflict = payloads.first(where: { $0.serverItem != nil || $0.serverDeleted || $0.rejection == "pantry_unit_choice" }) else { return }
-        PendingOperationStore.replace(all.filter { !(PantrySync.isPantry($0) && $0.entityId == entityId) }, in: context)
+        let mutations = mine.compactMap { work -> PantryConflictMutation? in
+            guard let payload = PantrySync.payload(of: work) else { return nil }
+            return PantryConflictMutation(
+                idempotencyKey: work.id,
+                action: payload.action,
+                householdID: payload.householdID,
+                item: payload.item,
+                baseVersion: payload.baseVersion,
+                confirmSeparate: payload.confirmSeparate,
+                serverItem: payload.serverItem,
+                serverDeleted: payload.serverDeleted,
+                rejection: payload.rejection
+            )
+        }
+        guard let resolved = PantryConflictResolution.reapply(mutations) else { return }
+        let payload = PantryQueuedPayload(
+            action: resolved.action,
+            householdID: resolved.householdID,
+            item: resolved.item,
+            baseVersion: resolved.baseVersion,
+            confirmSeparate: resolved.confirmSeparate
+        )
+        guard let data = PantrySync.encode(payload) else { return }
+        let createdAt = mine.first { $0.id == resolved.idempotencyKey }?.createdAt ?? .now
         let rows = (try? context.fetch(FetchDescriptor<PantryItem>())) ?? []
-        if lastEdit.action == "delete" {
-            guard let server = conflict.serverItem else { return }
-            let row = rows.first { $0.uuid == server.id }
-            if let row { context.delete(row) }
-            try? context.save()
-            let ghost = PantryItem(remote: server)
-            enqueueRaw(.delete, ghost, householdID: lastEdit.householdID, baseVersion: server.version, confirmSeparate: false, in: context)
-            return
-        }
-        guard let mineItem = lastEdit.item else { return }
-        let local = rows.first { $0.uuid == mineItem.id } ?? {
-            let inserted = PantryItem(remote: mineItem)
+        if resolved.displayQuantity == nil {
+            if let row = rows.first(where: { $0.uuid == resolved.item.id }) { context.delete(row) }
+        } else if let existing = rows.first(where: { $0.uuid == resolved.item.id }) {
+            existing.apply(resolved.item)
+            existing.revision = resolved.displayRevision
+        } else {
+            let inserted = PantryItem(remote: resolved.item)
+            inserted.revision = resolved.displayRevision
             context.insert(inserted)
-            return inserted
-        }()
-        local.apply(mineItem)
-        if conflict.serverDeleted || conflict.rejection == "pantry_unit_choice" {
-            local.revision = 1
-            try? context.save()
-            record(.create, local, baseVersion: nil, confirmSeparate: true, in: context)
-        } else if let server = conflict.serverItem {
-            local.revision = server.version + 1
-            try? context.save()
-            record(.update, local, baseVersion: server.version, in: context)
         }
+        try? context.save()
+        let kept = all.filter { item in
+            PantrySync.isPantry(item) == false || item.entityId != entityId
+        }
+        let work = SyncWorkItem(
+            id: resolved.idempotencyKey,
+            entityType: PantrySync.entityType,
+            entityId: entityId,
+            operationType: resolved.action,
+            payload: data,
+            createdAt: createdAt,
+            retryCount: 0,
+            status: .pending
+        )
+        PendingOperationStore.replace(kept + [work], in: context)
     }
 
     static func retryFailed(in context: ModelContext) {
@@ -357,15 +384,6 @@ enum PantryOutbox {
             context.delete(row)
         }
         try? context.save()
-    }
-
-    private static func enqueueRaw(_ action: Action, _ item: PantryItem, householdID: UUID, baseVersion: Int?, confirmSeparate: Bool, in context: ModelContext) {
-        let payload = PantryQueuedPayload(action: action.rawValue, householdID: householdID, item: item.remote(householdID: householdID), baseVersion: baseVersion, confirmSeparate: confirmSeparate)
-        guard let data = PantrySync.encode(payload) else { return }
-        PendingOperationStore.upsert(
-            SyncWorkItem(id: UUID(), entityType: PantrySync.entityType, entityId: item.uuid.uuidString.lowercased(), operationType: action.rawValue, payload: data, createdAt: .now, retryCount: 0, status: .pending),
-            in: context
-        )
     }
 }
 

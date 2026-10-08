@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { AppError } from './errors.js'
 import { seedIngredients, type Ingredient } from './ingredients.js'
 import type { MemberRole } from './repository.js'
-import type { PantryDraft, PantryIdempotencyHit, PantryItem, PantryPatch, PantryStore } from './pantryTypes.js'
+import { pantryTimestamp, type PantryDraft, type PantryIdempotencyHit, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
 import { parsePantryUnit } from './pantryUnits.js'
 
 type IdempotencyRow = PantryIdempotencyHit & { accountId: string; key: string; householdId: string | null }
@@ -33,11 +33,11 @@ export function createMemoryPantry(
   function build(householdId: string, draft: PantryDraft, now: Date): PantryItem {
     requireIngredient(draft.ingredientId)
     if (duplicate(householdId, draft.ingredientId, draft.unit)) throw new AppError('pantry_duplicate', 409)
-    return { ...draft, id: draft.id || randomUUID(), householdId, version: 1, createdAt: now.toISOString(), updatedAt: now.toISOString() }
+    return { ...draft, id: draft.id || randomUUID(), householdId, version: 1, createdAt: pantryTimestamp(now), updatedAt: pantryTimestamp(now) }
   }
 
   function patched(current: PantryItem, patch: PantryPatch, now: Date): PantryItem {
-    const next = { ...current, ...patch, version: current.version + 1, updatedAt: now.toISOString() }
+    const next = { ...current, ...patch, version: current.version + 1, updatedAt: pantryTimestamp(now) }
     if (next.quantity < 0 || (next.minimumQuantity !== null && next.minimumQuantity < 0)) throw new AppError('invalid_request', 400)
     if ((next.dateType === null) !== (next.dateValue === null)) throw new AppError('invalid_date', 400)
     requireIngredient(next.ingredientId)
