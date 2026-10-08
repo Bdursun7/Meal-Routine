@@ -266,6 +266,28 @@
     "Yukarı": {},
     "Zor": {},
     "Zorluk": {},
+    "badge.familiar": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanıdık"
+          }
+        }
+      }
+    },
+    "badge.new": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni"
+          }
+        }
+      }
+    },
     "date.today": {
       "extractionState": "manual",
       "localizations": {
@@ -277,7 +299,1371 @@
         }
       }
     },
+    "grocery.category.dairyAndEggs": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Süt ve yumurta"
+          }
+        }
+      }
+    },
+    "grocery.category.other": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer"
+          }
+        }
+      }
+    },
+    "grocery.category.pantry": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kiler"
+          }
+        }
+      }
+    },
+    "grocery.category.produce": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sebze ve meyve"
+          }
+        }
+      }
+    },
+    "grocery.category.protein": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protein"
+          }
+        }
+      }
+    },
+    "grocery.category.spicesAndSauces": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baharat ve soslar"
+          }
+        }
+      }
+    },
+    "household.conflict.mealUpdated": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu yemek başka bir cihazda güncellendi."
+          }
+        }
+      }
+    },
+    "household.replace.intent.bothWillLike": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkiniz de seversiniz"
+          }
+        }
+      }
+    },
+    "household.replace.intent.different": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundan farklı"
+          }
+        }
+      }
+    },
+    "household.replace.intent.noMushrooms": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantarsız"
+          }
+        }
+      }
+    },
+    "household.replace.intent.surprise": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bizi şaşırt"
+          }
+        }
+      }
+    },
+    "household.replace.reason.bothLike": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkiniz de sever"
+          }
+        }
+      }
+    },
+    "household.replace.reason.fitsThisWeek": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta için uygun"
+          }
+        }
+      }
+    },
+    "household.replace.reason.householdFit": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev uyumu"
+          }
+        }
+      }
+    },
+    "household.replace.reason.surprise": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta için sürpriz"
+          }
+        }
+      }
+    },
+    "household.replace.reason.youUsuallyLike": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen genellikle seversin"
+          }
+        }
+      }
+    },
+    "household.status.closed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkı kapandı. Kişisel verin duruyor."
+          }
+        }
+      }
+    },
+    "household.status.createInviteFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bir davet kodu oluştur."
+          }
+        }
+      }
+    },
+    "household.status.created": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkı kuruldu. Partnerini davet edebilirsin."
+          }
+        }
+      }
+    },
+    "household.status.deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkı silindi. Kişisel planın duruyor."
+          }
+        }
+      }
+    },
+    "household.status.groceryEmpty": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Market listesinde satır yok."
+          }
+        }
+      }
+    },
+    "household.status.inviteCancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet geri alındı."
+          }
+        }
+      }
+    },
+    "household.status.inviteReady": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet hazır."
+          }
+        }
+      }
+    },
+    "household.status.inviteReadyLocal": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet kodu bu telefonda hazır."
+          }
+        }
+      }
+    },
+    "household.status.inviteReadyLocalNoCloud": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet kodu bu telefonda hazır. iCloud açılınca bağlantı da paylaşılır."
+          }
+        }
+      }
+    },
+    "household.status.inviteResent": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet yeniden gönderildi."
+          }
+        }
+      }
+    },
+    "household.status.inviteResentCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet yeniden gönderildi. Kod %@"
+          }
+        }
+      }
+    },
+    "household.status.joined": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkına katıldın."
+          }
+        }
+      }
+    },
+    "household.status.left": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkından ayrıldın. Kişisel verin duruyor."
+          }
+        }
+      }
+    },
+    "household.status.leftAfterTransfer": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev sahipliği devredildi. Ortak plan evde kaldı. Kişisel verin duruyor."
+          }
+        }
+      }
+    },
+    "household.status.leftPlanStays": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkından ayrıldın. Ortak plan evde kaldı."
+          }
+        }
+      }
+    },
+    "household.status.memberRemoved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üye çıkarıldı. Kişisel verisi duruyor. Ortak plan evde kaldı."
+          }
+        }
+      }
+    },
+    "household.status.planFinalized": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan netleşti."
+          }
+        }
+      }
+    },
+    "household.status.planReady": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortak plan hazır. İkiniz de bakabilirsiniz."
+          }
+        }
+      }
+    },
+    "household.status.renamed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkının adı güncellendi."
+          }
+        }
+      }
+    },
+    "household.status.serverPlanApplied": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunucudaki plan uygulandı."
+          }
+        }
+      }
+    },
+    "household.status.signInTestFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce test olarak gir."
+          }
+        }
+      }
+    },
+    "household.status.signedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonda oturum kapatıldı."
+          }
+        }
+      }
+    },
+    "household.status.testModeOff": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test modu kapalı."
+          }
+        }
+      }
+    },
+    "household.status.testModeOn": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test modu açık. Apple, iCloud ve bildirim yok."
+          }
+        }
+      }
+    },
+    "household.status.testPartnerChecked": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test Partner bir malzemeyi işaretledi."
+          }
+        }
+      }
+    },
+    "household.status.testPartnerFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce Test Partner katılsın."
+          }
+        }
+      }
+    },
+    "household.status.testPartnerJoined": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test Partner katıldı."
+          }
+        }
+      }
+    },
+    "household.status.testPartnerUnchecked": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test Partner işareti kaldırdı."
+          }
+        }
+      }
+    },
+    "household.status.testSignInRequired": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test modunda önce Test olarak gir."
+          }
+        }
+      }
+    },
+    "household.status.testSignedIn": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test oturumu açıldı. Apple kimliği yok."
+          }
+        }
+      }
+    },
+    "household.status.testSignedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test oturumu kapatıldı. Ev verisi bu telefonda duruyor."
+          }
+        }
+      }
+    },
+    "household.status.transferred": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev sahipliği devredildi. Ortak plan evde kaldı."
+          }
+        }
+      }
+    },
+    "insight.lovedAny": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son zamanlarda %ld tarifi sevdin."
+          }
+        }
+      }
+    },
+    "insight.lovedProtein": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son zamanlarda %ld %@ tarifini sevdin."
+          }
+        }
+      }
+    },
+    "insight.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tercihlerin netleşiyor"
+          }
+        }
+      }
+    },
+    "pattern.pastaLoved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%ld makarna tarifini sevmiş gibisin."
+          }
+        }
+      }
+    },
+    "pattern.poultryOften": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tavuk tariflerini sık pişiriyor gibisin."
+          }
+        }
+      }
+    },
+    "pattern.quickMeals": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 dakikanın altındaki yemekleri tercih ediyor gibisin."
+          }
+        }
+      }
+    },
+    "plan.explanation.balancedNew": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dengeli bir hafta: hafta içi hızlı yemekler ve keşfedilecek %ld yeni tarif."
+          }
+        }
+      }
+    },
+    "plan.explanation.emptyPool": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu filtrelere uyan tarif kalmadı. Süre sınırını yükselt veya sevmediğin malzemeleri azalt."
+          }
+        }
+      }
+    },
+    "plan.explanation.familiarRhythm": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta alışık olduğun sürelere yakın yemeklerden kuruldu."
+          }
+        }
+      }
+    },
+    "plan.explanation.householdInstalled": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta %@ için kuruldu."
+          }
+        }
+      }
+    },
+    "plan.explanation.lockedMeals": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pişirilen akşamlar kilitli. Onların üzerine yazılmaz."
+          }
+        }
+      }
+    },
+    "plan.explanation.lovedLean": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta daha önce sevdiğin yemeklere yaslanıyor, biraz çeşitlilikle."
+          }
+        }
+      }
+    },
+    "plan.explanation.noMemory": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta süre sınırına ve sevmediğin malzemelere göre kuruldu."
+          }
+        }
+      }
+    },
+    "plan.explanation.shortPool": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeterli tarif yok. %ld akşam kurulabildi, %ld istendi."
+          }
+        }
+      }
+    },
+    "plan.explanation.triesNew": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta sevdiğin tarzlardan %ld yeni tarif deniyor."
+          }
+        }
+      }
+    },
+    "protein.inline.dairy": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "süt ürünü"
+          }
+        }
+      }
+    },
+    "protein.inline.egg": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yumurta"
+          }
+        }
+      }
+    },
+    "protein.inline.legume": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bakliyat"
+          }
+        }
+      }
+    },
+    "protein.inline.poultry": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tavuk"
+          }
+        }
+      }
+    },
+    "protein.inline.redMeat": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kırmızı et"
+          }
+        }
+      }
+    },
+    "protein.inline.seafood": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "balık"
+          }
+        }
+      }
+    },
+    "protein.inline.tofu": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tofu"
+          }
+        }
+      }
+    },
+    "reason.cookedBefore": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daha önce pişirdiğin bir tarif"
+          }
+        }
+      }
+    },
+    "reason.cookedSeveralTimes": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunu birkaç kez pişirmiştin"
+          }
+        }
+      }
+    },
+    "reason.fitsUsualTime": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alışık olduğun pişirme süresine uyar"
+          }
+        }
+      }
+    },
+    "reason.lovedBefore": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunu daha önce sevmiştin"
+          }
+        }
+      }
+    },
+    "reason.newFromLovedCategory": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin bir kategoriden yeni bir tarif"
+          }
+        }
+      }
+    },
+    "reason.newFromLovedCuisine": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin bir mutfaktan yeni bir tarif"
+          }
+        }
+      }
+    },
+    "reason.newFromLovedProtein": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin bir proteinden yeni bir tarif"
+          }
+        }
+      }
+    },
+    "reason.similarToLoved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin bir tarife benziyor"
+          }
+        }
+      }
+    },
+    "reason.similarToLovedProtein": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin %@ tariflerine benziyor"
+          }
+        }
+      }
+    },
+    "reason.wouldMakeAgain": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunu yine yapmak istemiştin"
+          }
+        }
+      }
+    },
+    "recipe.attribution.external": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynak: dış tarif"
+          }
+        }
+      }
+    },
+    "recipe.attribution.original": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarif: MealRoutine (özgün metin)"
+          }
+        }
+      }
+    },
+    "recipe.attribution.source": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynak: %@"
+          }
+        }
+      }
+    },
+    "recipe.placeholderTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedilen tarif"
+          }
+        }
+      }
+    },
+    "recipe.source.messages": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar"
+          }
+        }
+      }
+    },
+    "recipe.source.notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notlar"
+          }
+        }
+      }
+    },
+    "recipe.source.other": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer"
+          }
+        }
+      }
+    },
+    "recipe.source.unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilinmeyen kaynak"
+          }
+        }
+      }
+    },
+    "recipe.source.website": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web sitesi"
+          }
+        }
+      }
+    },
+    "replace.chip.different": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamamen farklı"
+          }
+        }
+      }
+    },
+    "replace.chip.faster": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daha hızlı"
+          }
+        }
+      }
+    },
+    "replace.chip.loved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir favori kullan"
+          }
+        }
+      }
+    },
+    "replace.chip.noChicken": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tavuksuz"
+          }
+        }
+      }
+    },
+    "replace.chip.similarLoved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğime benzer"
+          }
+        }
+      }
+    },
+    "replace.chip.surprise": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürpriz"
+          }
+        }
+      }
+    },
+    "replace.chip.tryNew": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni bir tarif"
+          }
+        }
+      }
+    },
+    "replace.chip.usual": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıştığım gibi"
+          }
+        }
+      }
+    },
+    "replace.chip.vegetarian": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vejetaryen"
+          }
+        }
+      }
+    },
+    "replace.reason.differentProtein": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çeşit için farklı bir protein"
+          }
+        }
+      }
+    },
+    "replace.reason.faster": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daha kısa sürer"
+          }
+        }
+      }
+    },
+    "replace.reason.fitsTimeLimit": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Süre sınırına uyar"
+          }
+        }
+      }
+    },
+    "replace.reason.fitsTonight": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu akşam için uygun"
+          }
+        }
+      }
+    },
+    "replace.reason.likeLovedMeal": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sevdiğin bir yemeğe benziyor"
+          }
+        }
+      }
+    },
+    "replace.reason.surprise": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürpriz bir alternatif"
+          }
+        }
+      }
+    },
+    "replace.reason.untried": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz denemediğin bir tarif"
+          }
+        }
+      }
+    },
+    "replace.reason.usualStyle": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alışık olduğun tarza yakın"
+          }
+        }
+      }
+    },
+    "share.action.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapat"
+          }
+        }
+      }
+    },
+    "share.action.completeNow": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi tamamla"
+          }
+        }
+      }
+    },
+    "share.action.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti"
+          }
+        }
+      }
+    },
+    "share.action.openRecipe": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarifi aç"
+          }
+        }
+      }
+    },
+    "share.action.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deneyeceğim"
+          }
+        }
+      }
+    },
+    "share.action.saveAnyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yine de kaydet"
+          }
+        }
+      }
+    },
+    "share.duplicate.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aynı adres veya çok benzer bir ad sessizce üzerine yazılmaz."
+          }
+        }
+      }
+    },
+    "share.duplicate.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kaynak zaten kayıtlı"
+          }
+        }
+      }
+    },
+    "share.empty.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paylaşılan bağlantı, metin veya görsel bulunamadı."
+          }
+        }
+      }
+    },
+    "share.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedilecek bir şey yok"
+          }
+        }
+      }
+    },
+    "share.failed.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paylaşım klasörü yazılamadı. Simülatörde uygulama grubu imzası gerekir."
+          }
+        }
+      }
+    },
+    "share.failed.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedilemedi"
+          }
+        }
+      }
+    },
+    "share.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakılıyor…"
+          }
+        }
+      }
+    },
+    "share.saved.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denenecek tariflerin arasında. Malzeme şimdi gerekmez."
+          }
+        }
+      }
+    },
+    "share.saved.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydedildi"
+          }
+        }
+      }
+    },
     "theunitools.com/en/data": {},
+    "thisWeek.featured.last": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son akşam"
+          }
+        }
+      }
+    },
+    "thisWeek.featured.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradaki akşam"
+          }
+        }
+      }
+    },
+    "thisWeek.featured.tonight": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu akşam"
+          }
+        }
+      }
+    },
     "weekday.friday": {
       "extractionState": "manual",
       "localizations": {

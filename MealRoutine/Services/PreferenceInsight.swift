@@ -20,16 +20,16 @@ enum PreferenceInsightBuilder {
         let cutoff = now.addingTimeInterval(-Double(recentWindowDays * 86_400))
         let recent = loved.filter { $0.createdAt >= cutoff }
         let pool = recent.count >= minimumLovedCount ? recent : loved
-        let title = "Tercihlerin netleşiyor"
+        let title = L10n.text("insight.title", "Tercihlerin netleşiyor")
         if let top = dominant(in: pool), let label = proteinTitle(top.protein) {
             return PreferenceInsight(
                 title: title,
-                message: "Son zamanlarda \(top.count) \(label) tarifini sevdin."
+                message: L10n.format("insight.lovedProtein", "Son zamanlarda %ld %@ tarifini sevdin.", top.count, label)
             )
         }
         return PreferenceInsight(
             title: title,
-            message: "Son zamanlarda \(pool.count) tarifi sevdin."
+            message: L10n.format("insight.lovedAny", "Son zamanlarda %ld tarifi sevdin.", pool.count)
         )
     }
 
@@ -48,15 +48,16 @@ enum PreferenceInsightBuilder {
         return (top.key, top.value)
     }
 
+    /// Lowercase in-sentence name for a catalog protein family code.
     static func proteinTitle(_ protein: String) -> String? {
         switch protein.lowercased() {
-        case "poultry": "tavuk"
-        case "red-meat": "kırmızı et"
-        case "seafood": "balık"
-        case "egg": "yumurta"
-        case "legume": "bakliyat"
-        case "tofu": "tofu"
-        case "dairy": "süt ürünü"
+        case "poultry": L10n.text("protein.inline.poultry", "tavuk")
+        case "red-meat": L10n.text("protein.inline.redMeat", "kırmızı et")
+        case "seafood": L10n.text("protein.inline.seafood", "balık")
+        case "egg": L10n.text("protein.inline.egg", "yumurta")
+        case "legume": L10n.text("protein.inline.legume", "bakliyat")
+        case "tofu": L10n.text("protein.inline.tofu", "tofu")
+        case "dairy": L10n.text("protein.inline.dairy", "süt ürünü")
         default: nil
         }
     }

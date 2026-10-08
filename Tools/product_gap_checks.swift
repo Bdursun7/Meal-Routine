@@ -153,7 +153,7 @@ private func checkReplacement() {
     )
     check(faster.allSatisfy { $0.minutes < 50 }, "faster is strictly shorter \(faster)")
     check(!faster.map(\.slug).contains("kofte"), "55 minutes is not faster than 50")
-    check(faster.contains { $0.reason == "Daha kısa sürer" }, "faster reason")
+    check(faster.contains { $0.reasonCode == .faster }, "faster reason")
 
     let noChicken = MealReplacement.choices(
         catalog: catalog,

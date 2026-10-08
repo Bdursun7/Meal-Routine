@@ -76,6 +76,19 @@ enum PantryCopy {
     ]
 }
 
+/// Why a planned meal mentions the pantry. Stored and compared as a code; `text` is display only.
+enum PantryPlanningNote: String, Codable, Sendable {
+    case usesStock
+    case approachingExpiry
+
+    var text: String {
+        switch self {
+        case .usesStock: return PantryCopy.usesStock
+        case .approachingExpiry: return PantryCopy.approachingExpiry
+        }
+    }
+}
+
 enum PantryLocation: String, CaseIterable, Codable, Identifiable, Sendable {
     case pantry, refrigerator, freezer, other
     var id: String { rawValue }
@@ -1214,19 +1227,37 @@ struct PantryFormDraft: Equatable {
 extension PantryPlanningSignal {
     static let expiryWindowDays = PantryDateStatus.approachingWindowDays
 
+    static func note(
+        candidate: PickerCandidate,
+        stock: [PantryPlanningStock],
+        now: Date = .now,
+        dictionary: IngredientDictionary = .shared
+    ) -> PantryPlanningNote? {
+        guard !stock.isEmpty else { return nil }
+        let matches = usable(stock, now: now, dictionary: dictionary).filter { candidateKeys(candidate, dictionary).contains($0.key) }
+        guard !matches.isEmpty else { return nil }
+        return matches.contains(where: { $0.status.isApproaching }) ? .approachingExpiry : .usesStock
+    }
+
     static func explanation(
         candidate: PickerCandidate,
         stock: [PantryPlanningStock],
         now: Date = .now,
         dictionary: IngredientDictionary = .shared
     ) -> String? {
+        note(candidate: candidate, stock: stock, now: now, dictionary: dictionary)?.text
+    }
+
+    /// The strongest note across a plan's candidates: an approaching date beats plain stock use.
+    static func strongestNote(
+        candidates: [PickerCandidate],
+        stock: [PantryPlanningStock],
+        now: Date = .now,
+        dictionary: IngredientDictionary = .shared
+    ) -> PantryPlanningNote? {
         guard !stock.isEmpty else { return nil }
-        let matches = usable(stock, now: now, dictionary: dictionary).filter { candidateKeys(candidate, dictionary).contains($0.key) }
-        guard !matches.isEmpty else { return nil }
-        if matches.contains(where: { $0.status.isApproaching }) {
-            return PantryCopy.approachingExpiry
-        }
-        return PantryCopy.usesStock
+        let notes = candidates.compactMap { note(candidate: $0, stock: stock, now: now, dictionary: dictionary) }
+        return notes.contains(.approachingExpiry) ? .approachingExpiry : notes.first
     }
 
     static func annotated(
@@ -1236,9 +1267,7 @@ extension PantryPlanningSignal {
         now: Date = .now,
         dictionary: IngredientDictionary = .shared
     ) -> String {
-        guard !stock.isEmpty else { return explanation }
-        let notes = candidates.compactMap { self.explanation(candidate: $0, stock: stock, now: now, dictionary: dictionary) }
-        guard let note = notes.first(where: { $0 == PantryCopy.approachingExpiry }) ?? notes.first else { return explanation }
+        guard let note = strongestNote(candidates: candidates, stock: stock, now: now, dictionary: dictionary)?.text else { return explanation }
         if explanation.isEmpty { return note }
         return "\(explanation) \(note)"
     }

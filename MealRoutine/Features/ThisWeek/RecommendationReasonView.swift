@@ -15,12 +15,12 @@ struct RecommendationReasonView: View {
 }
 
 struct FamiliarityBadgeLabel: View {
-    var title: String
+    var badge: FamiliarityBadge
     /// Hero photos need a solid capsule. Cream cards use a light tint of the same color.
     var onDarkBackground = false
 
-    private var isNew: Bool { title == FamiliarityBadge.new.title }
-    private var tint: Color { isNew ? Theme.accent : Theme.sage }
+    private var title: String { badge.title }
+    private var tint: Color { badge == .new ? Theme.accent : Theme.sage }
 
     var body: some View {
         Text(title)

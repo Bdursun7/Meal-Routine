@@ -3,8 +3,22 @@ import Foundation
 /// Cautious pattern copy. Hidden until three data points exist.
 /// Wording stays soft: "gibisin", never "her zaman".
 struct MealPattern: Equatable, Identifiable, Sendable {
+    /// Stable id (`quick-meals`, `poultry-often`, `pasta-loved`); dismissals are stored by id.
     var id: String
-    var message: String
+    var count: Int = 0
+
+    var message: String {
+        switch id {
+        case "quick-meals":
+            return L10n.text("pattern.quickMeals", "30 dakikanın altındaki yemekleri tercih ediyor gibisin.")
+        case "poultry-often":
+            return L10n.text("pattern.poultryOften", "Tavuk tariflerini sık pişiriyor gibisin.")
+        case "pasta-loved":
+            return L10n.format("pattern.pastaLoved", "%ld makarna tarifini sevmiş gibisin.", count)
+        default:
+            return ""
+        }
+    }
 }
 
 enum MealPatternService {
@@ -37,10 +51,7 @@ enum MealPatternService {
         }
         if cooked.count >= 3, quickCooks.count * 3 >= cooked.count * 2 {
             found.append(
-                MealPattern(
-                    id: "quick-meals",
-                    message: "30 dakikanın altındaki yemekleri tercih ediyor gibisin."
-                )
+                MealPattern(id: "quick-meals")
             )
         }
 
@@ -49,10 +60,7 @@ enum MealPatternService {
         }
         if poultryCooks >= 3 {
             found.append(
-                MealPattern(
-                    id: "poultry-often",
-                    message: "Tavuk tariflerini sık pişiriyor gibisin."
-                )
+                MealPattern(id: "poultry-often")
             )
         }
 
@@ -61,21 +69,19 @@ enum MealPatternService {
         }
         if pastaLoved.count >= 3 {
             found.append(
-                MealPattern(
-                    id: "pasta-loved",
-                    message: "\(pastaLoved.count) makarna tarifini sevmiş gibisin."
-                )
+                MealPattern(id: "pasta-loved", count: pastaLoved.count)
             )
         }
 
         return found.filter { !dismissed.contains($0.id) }
     }
 
+    /// Catalog tag / category code. Never a display name.
+    private static let pastaTag = "pasta"
+
     private static func isPasta(_ candidate: PickerCandidate?) -> Bool {
         guard let candidate else { return false }
-        let tags = candidate.tags.map { $0.lowercased() }
-        if tags.contains("pasta") || tags.contains("makarna") { return true }
-        let category = candidate.category.lowercased()
-        return category.contains("pasta") || category.contains("makarna")
+        if candidate.tags.contains(where: { $0.lowercased() == pastaTag }) { return true }
+        return candidate.category.lowercased().contains(pastaTag)
     }
 }

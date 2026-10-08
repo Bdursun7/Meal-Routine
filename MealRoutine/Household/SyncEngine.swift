@@ -39,7 +39,9 @@ enum SyncBackoff {
 }
 
 enum SharedConflictNotice {
-    static let mealUpdated = "Bu yemek başka bir cihazda güncellendi."
+    static var mealUpdated: String {
+        L10n.text("household.conflict.mealUpdated", "Bu yemek başka bir cihazda güncellendi.")
+    }
 
     /// The server moved the meal after this device started editing it.
     static func mealOverridden(localBase: Int, localRevision: Int, serverRevision: Int) -> Bool {

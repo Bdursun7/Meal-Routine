@@ -15,7 +15,7 @@ struct WeekMealPresentation: Identifiable, Equatable {
     var rating: MealRating?
     var slug: String
     var reason: String = ""
-    var badgeTitle: String?
+    var badge: FamiliarityBadge?
     var isSkipped: Bool = false
     var household: HouseholdMealChrome? = nil
 
@@ -49,9 +49,9 @@ final class ThisWeekViewModel {
     }
 
     func featuredEveningTitle(for meal: WeekMealPresentation) -> String {
-        if meal.isToday { return "Bu akşam" }
-        if meal.isCooked { return "Son akşam" }
-        return "Sıradaki akşam"
+        if meal.isToday { return L10n.text("thisWeek.featured.tonight", "Bu akşam") }
+        if meal.isCooked { return L10n.text("thisWeek.featured.last", "Son akşam") }
+        return L10n.text("thisWeek.featured.next", "Sıradaki akşam")
     }
 
     func preferenceInsight(
@@ -85,7 +85,7 @@ final class ThisWeekViewModel {
 
     func explanation(weeks: [PlanWeek], now: Date = .now) -> String {
         let start = WeekCalendar.weekStart(containing: now)
-        return weeks.first { WeekCalendar.isSameDay($0.weekStart, start) }?.explanation ?? ""
+        return weeks.first { WeekCalendar.isSameDay($0.weekStart, start) }?.displayExplanation ?? ""
     }
 
     func meals(
@@ -155,7 +155,7 @@ final class ThisWeekViewModel {
                     rating: ratings[meal.recipeSlug],
                     slug: meal.recipeSlug,
                     reason: reason,
-                    badgeTitle: badge?.title,
+                    badge: badge,
                     isSkipped: SkipControl.recordsAsSkipped(skippedAt: meal.skippedAt, cookedAt: meal.cookedAt)
                 )
             }
@@ -176,9 +176,10 @@ final class ThisWeekViewModel {
         var hasher = Hasher()
         hasher.combine(indexKey)
         hasher.combine(householdSize)
-        hasher.combine(Calendar.current.startOfDay(for: now).timeIntervalSinceReferenceDate)
+        hasher.combine(WeekCalendar.calendar(RegionalContext.timeZone).startOfDay(for: now).timeIntervalSinceReferenceDate)
         hasher.combine(week.weekStart.timeIntervalSinceReferenceDate)
         hasher.combine(week.explanation)
+        hasher.combine(week.explanationCode)
         for stock in pantryStock.sorted(by: { $0.ingredientId < $1.ingredientId }) {
             hasher.combine(stock.ingredientId)
             hasher.combine(stock.quantity)

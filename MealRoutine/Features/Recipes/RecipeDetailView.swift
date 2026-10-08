@@ -395,7 +395,7 @@ struct RecipeDetailView: View {
                         .foregroundStyle(Theme.accent)
                         .recipeDetailRow()
                 }
-                Text(Attribution.recipeLine(provider: recipe.sourceProvider, attribution: recipe.sourceAttribution))
+                Text(Attribution.recipeLine(for: recipe))
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                     .recipeDetailRow()
@@ -806,7 +806,7 @@ struct RecipeDetailView: View {
             if isHeroPhotoShown, let credit = RecipePhoto.creditLine(author: recipe.photoAuthor, license: recipe.photoLicense) {
                 Text("Fotoğraf: \(credit)")
             }
-            Text(Attribution.recipeLine(provider: recipe.sourceProvider, attribution: recipe.sourceAttribution))
+            Text(Attribution.recipeLine(for: recipe))
         }
         .font(.caption)
         .foregroundStyle(Theme.secondaryText)

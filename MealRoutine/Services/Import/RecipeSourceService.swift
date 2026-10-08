@@ -16,18 +16,47 @@ enum RecipeSourcePlatform: String, Codable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .website: "Web sitesi"
+        case .website: ShareL10n.text("recipe.source.website", "Web sitesi")
         case .instagram: "Instagram"
         case .tiktok: "TikTok"
         case .youtube: "YouTube"
         case .safari: "Safari"
         case .whatsapp: "WhatsApp"
         case .telegram: "Telegram"
-        case .messages: "Mesajlar"
-        case .notes: "Notlar"
-        case .other: "Diğer"
-        case .unknown: "Bilinmeyen kaynak"
+        case .messages: ShareL10n.text("recipe.source.messages", "Mesajlar")
+        case .notes: ShareL10n.text("recipe.source.notes", "Notlar")
+        case .other: ShareL10n.text("recipe.source.other", "Diğer")
+        case .unknown: ShareL10n.text("recipe.source.unknown", "Bilinmeyen kaynak")
         }
+    }
+}
+
+/// `L10n.text` for files the share extension compiles too. The extension has no string catalog of
+/// its own, so it reads the containing app's; a missing key renders the Turkish source text.
+enum ShareL10n {
+    static let bundle: Bundle = {
+        let main = Bundle.main
+        guard main.bundleURL.pathExtension == "appex" else { return main }
+        let app = main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
+        return Bundle(url: app) ?? main
+    }()
+
+    static func text(_ key: String, _ source: String) -> String {
+        bundle.localizedString(forKey: key, value: source, table: nil)
+    }
+}
+
+/// Title given to a capture that arrives without one. Identity treats it as "no title" in every
+/// display language, including rows saved with the Turkish text before V5.1.
+enum RecipePlaceholderTitle {
+    static let legacyText = "Kaydedilen tarif"
+
+    static var text: String {
+        ShareL10n.text("recipe.placeholderTitle", "Kaydedilen tarif")
+    }
+
+    static func isPlaceholder(normalized: String) -> Bool {
+        normalized == RecipeIdentity.normalizedTitle(legacyText) || normalized == RecipeIdentity.normalizedTitle(text)
     }
 }
 
@@ -133,16 +162,41 @@ enum RecipeSourceService {
 
     static func platform(sourceHint: String?, url: URL?) -> RecipeSourcePlatform {
         let hint = (sourceHint ?? "").lowercased()
-        if hint.contains("instagram") { return .instagram }
-        if hint.contains("tiktok") { return .tiktok }
-        if hint.contains("youtube") { return .youtube }
-        if hint.contains("whatsapp") { return .whatsapp }
-        if hint.contains("telegram") { return .telegram }
-        if hint.contains("safari") { return .safari }
-        if hint.contains("notes") || hint.contains("notlar") { return .notes }
-        if hint.contains("message") || hint.contains("sms") { return .messages }
+        if let match = sourceHints.first(where: { hint.contains($0.token) }) { return match.platform }
         if let url { return platform(for: url) }
         return .unknown
+    }
+
+    /// Tokens seen in share-sheet source hints (bundle ids and app names, which iOS reports in the
+    /// device language), checked in order. Input aliases only; nothing is displayed from here.
+    private static let sourceHints: [(token: String, platform: RecipeSourcePlatform)] = [
+        ("instagram", .instagram),
+        ("tiktok", .tiktok),
+        ("youtube", .youtube),
+        ("whatsapp", .whatsapp),
+        ("telegram", .telegram),
+        ("safari", .safari),
+        ("notes", .notes),
+        ("notlar", .notes),
+        ("message", .messages),
+        ("sms", .messages),
+    ]
+
+    /// The name to credit, or nil when nothing is known about the source.
+    static func knownName(platform: RecipeSourcePlatform, sourceTitle: String, url: String) -> String? {
+        let name = displayName(platform: platform, sourceTitle: sourceTitle, url: url)
+        let title = sourceTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let host = publicURL(url)?.host ?? ""
+        if name.isEmpty || (platform == .unknown && title.isEmpty && host.isEmpty) { return nil }
+        return name
+    }
+
+    /// User data only (the source's own title or host), safe to persist. Platform names are
+    /// rendered from `RecipeSourcePlatform` at display time instead.
+    static func storedName(platform: RecipeSourcePlatform, sourceTitle: String, url: String) -> String {
+        let title = sourceTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty { return title }
+        return publicURL(url)?.host?.replacingOccurrences(of: "www.", with: "") ?? ""
     }
 
     static func displayName(platform: RecipeSourcePlatform, sourceTitle: String, url: String) -> String {
@@ -201,7 +255,7 @@ enum RecipeIdentity {
         let a = normalizedTitle(left)
         let b = normalizedTitle(right)
         guard a.count >= 2, a == b else { return false }
-        return a != normalizedTitle("Kaydedilen tarif")
+        return !RecipePlaceholderTitle.isPlaceholder(normalized: a)
     }
 
     /// Same normalized URL, same non-empty source key, or a near-identical personal title.

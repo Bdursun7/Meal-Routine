@@ -81,9 +81,12 @@ enum PersonalizedScoringService {
         startDayOffset: Int = 0,
         pantryStock: [PantryPlanningStock] = [],
         now: Date = .now
-    ) -> (slugs: [String], explanation: String, scores: [String: RecipeMemoryScore]) {
+    ) -> (slugs: [String], explanation: String, scores: [String: RecipeMemoryScore], summary: PlanExplanation) {
         let limit = min(max(evenings, 0), MealRecommender.eveningCap)
-        guard limit > 0 else { return ([], PlanExplanationBuilder.noMemory, [:]) }
+        guard limit > 0 else {
+            let none = PlanExplanation(.noMemory)
+            return ([], none.text, [:], none)
+        }
 
         let taste = profile(memories: memories, candidates: candidates)
         let strict = pool(
@@ -140,19 +143,21 @@ enum PersonalizedScoringService {
                 wasLoved: (memory?.lovedCount ?? 0) > 0
             )
         }
-        var explanation: String
+        let base: PlanExplanation
         if chosen.chosen.isEmpty {
-            explanation = PlanExplanationBuilder.emptyPool
+            base = PlanExplanation(.emptyPool)
         } else if chosen.chosen.count < limit {
-            explanation = PlanExplanationBuilder.shortPool(filled: chosen.chosen.count, requested: limit)
+            base = PlanExplanation(.shortPool, counts: [chosen.chosen.count, limit])
         } else {
-            explanation = PlanExplanationBuilder.explain(
+            base = PlanExplanationBuilder.summary(
                 picks: picks,
                 hasBehavior: taste.dataPointCount > 0
             )
         }
-        explanation = PantryPlanningSignal.annotated(explanation, candidates: chosen.chosen, stock: pantryStock, now: now)
-        return (chosen.chosen.map(\.slug), explanation, chosen.scores)
+        let summary = base.with(
+            pantryNote: PantryPlanningSignal.strongestNote(candidates: chosen.chosen, stock: pantryStock, now: now)
+        )
+        return (chosen.chosen.map(\.slug), summary.text, chosen.scores, summary)
     }
 
     static func score(

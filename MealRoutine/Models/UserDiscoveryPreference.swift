@@ -127,8 +127,8 @@ enum FamiliarityBadge: String, Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .familiar: "Tanıdık"
-        case .new: "Yeni"
+        case .familiar: L10n.text("badge.familiar", "Tanıdık")
+        case .new: L10n.text("badge.new", "Yeni")
         }
     }
 }

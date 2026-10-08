@@ -191,12 +191,9 @@ enum BoardMutationEncoder {
         )
     }
 
-    static func plan(_ plan: SharedMealPlan, baseRevision: Int) -> Data {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
+    /// `weekStart` is the week identity in the household timezone, so local Monday 00:00 east of
+    /// UTC is still sent as that Monday.
+    static func plan(_ plan: SharedMealPlan, baseRevision: Int, timeZone: TimeZone = RegionalContext.timeZone) -> Data {
         let meals: [[String: Any]] = plan.meals.map { meal in
             [
                 "id": meal.id.uuidString,
@@ -212,7 +209,7 @@ enum BoardMutationEncoder {
             operationType: "upsert",
             baseRevision: baseRevision,
             payload: [
-                "weekStart": formatter.string(from: plan.weekStart),
+                "weekStart": WeekIdentity.string(forWeekContaining: plan.weekStart, timeZone: timeZone),
                 "status": plan.status.rawValue,
                 "isFinalized": plan.isFinalized,
                 "meals": meals,

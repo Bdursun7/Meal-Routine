@@ -13,6 +13,7 @@ OUT="${TMPDIR:-/tmp}/meal-grocery-checks"
   "$ROOT/MealRoutine/Support/RegionalSettings.swift" \
   "$ROOT/MealRoutine/Support/L10n.swift" \
   "$ROOT/MealRoutine/Support/GroceryCategory.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
   "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
   "$ROOT/Tools/grocery_merge_checks.swift"
 (cd "$ROOT" && "$OUT")

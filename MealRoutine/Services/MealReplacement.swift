@@ -16,15 +16,15 @@ enum ReplacementChip: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .faster: "Daha hızlı"
-        case .similarLoved: "Sevdiğime benzer"
-        case .different: "Tamamen farklı"
-        case .loved: "Bir favori kullan"
-        case .tryNew: "Yeni bir tarif"
-        case .noChicken: "Tavuksuz"
-        case .vegetarian: "Vejetaryen"
-        case .usual: "Alıştığım gibi"
-        case .surprise: "Sürpriz"
+        case .faster: L10n.text("replace.chip.faster", "Daha hızlı")
+        case .similarLoved: L10n.text("replace.chip.similarLoved", "Sevdiğime benzer")
+        case .different: L10n.text("replace.chip.different", "Tamamen farklı")
+        case .loved: L10n.text("replace.chip.loved", "Bir favori kullan")
+        case .tryNew: L10n.text("replace.chip.tryNew", "Yeni bir tarif")
+        case .noChicken: L10n.text("replace.chip.noChicken", "Tavuksuz")
+        case .vegetarian: L10n.text("replace.chip.vegetarian", "Vejetaryen")
+        case .usual: L10n.text("replace.chip.usual", "Alıştığım gibi")
+        case .surprise: L10n.text("replace.chip.surprise", "Sürpriz")
         }
     }
 }
@@ -37,12 +37,42 @@ struct ReplacementMemory: Equatable, Sendable {
     var now: Date = .now
 }
 
+/// Why an alternative is offered, as a code. `text` is the display sentence.
+enum ReplacementReason: Equatable, Hashable, Sendable {
+    case surprise
+    case faster
+    case likeLovedMeal
+    case likeLovedRecipe
+    case untried
+    case usualStyle
+    case differentProtein
+    case fitsTimeLimit
+    case fitsTonight
+    case personal(RecommendationReason)
+
+    var text: String {
+        switch self {
+        case .surprise: return L10n.text("replace.reason.surprise", "Sürpriz bir alternatif")
+        case .faster: return L10n.text("replace.reason.faster", "Daha kısa sürer")
+        case .likeLovedMeal: return L10n.text("replace.reason.likeLovedMeal", "Sevdiğin bir yemeğe benziyor")
+        case .likeLovedRecipe: return L10n.text("reason.similarToLoved", "Sevdiğin bir tarife benziyor")
+        case .untried: return L10n.text("replace.reason.untried", "Henüz denemediğin bir tarif")
+        case .usualStyle: return L10n.text("replace.reason.usualStyle", "Alışık olduğun tarza yakın")
+        case .differentProtein: return L10n.text("replace.reason.differentProtein", "Çeşit için farklı bir protein")
+        case .fitsTimeLimit: return L10n.text("replace.reason.fitsTimeLimit", "Süre sınırına uyar")
+        case .fitsTonight: return L10n.text("replace.reason.fitsTonight", "Bu akşam için uygun")
+        case .personal(let reason): return reason.text
+        }
+    }
+}
+
 struct ReplacementChoice: Equatable, Sendable, Identifiable {
     var slug: String
     var minutes: Int
-    var reason: String
+    var reasonCode: ReplacementReason
 
     var id: String { slug }
+    var reason: String { reasonCode.text }
 }
 
 /// Filters the recommender's candidate list for one evening.
@@ -169,31 +199,40 @@ enum MealReplacement {
         maxCookMinutes: Int,
         chips: Set<ReplacementChip>
     ) -> String {
+        reasonCode(for: candidate, current: current, maxCookMinutes: maxCookMinutes, chips: chips).text
+    }
+
+    static func reasonCode(
+        for candidate: PickerCandidate,
+        current: PickerCandidate,
+        maxCookMinutes: Int,
+        chips: Set<ReplacementChip>
+    ) -> ReplacementReason {
         if chips.contains(.surprise) {
-            return "Sürpriz bir alternatif"
+            return .surprise
         }
         if chips.contains(.faster), candidate.totalMinutes < current.totalMinutes {
-            return "Daha kısa sürer"
+            return .faster
         }
         if candidate.rating == .loved || chips.contains(.loved) {
-            return "Sevdiğin bir yemeğe benziyor"
+            return .likeLovedMeal
         }
         if chips.contains(.similarLoved) {
-            return "Sevdiğin bir tarife benziyor"
+            return .likeLovedRecipe
         }
         if chips.contains(.tryNew) {
-            return "Henüz denemediğin bir tarif"
+            return .untried
         }
         if chips.contains(.usual) {
-            return "Alışık olduğun tarza yakın"
+            return .usualStyle
         }
         if !current.protein.isEmpty, candidate.protein != current.protein {
-            return "Çeşit için farklı bir protein"
+            return .differentProtein
         }
         if candidate.totalMinutes <= maxCookMinutes {
-            return "Süre sınırına uyar"
+            return .fitsTimeLimit
         }
-        return "Bu akşam için uygun"
+        return .fitsTonight
     }
 
     private static func matches(
@@ -317,23 +356,23 @@ enum MealReplacement {
         taste: TasteProfile,
         bySlug: [String: PickerCandidate]
     ) -> ReplacementChoice {
-        var text = reason(for: candidate, current: current, maxCookMinutes: maxCookMinutes, chips: chips)
+        var code = reasonCode(for: candidate, current: current, maxCookMinutes: maxCookMinutes, chips: chips)
         if memory.preferences != nil || !memory.memories.isEmpty,
            !chips.contains(.surprise),
            !chips.contains(.faster) {
-            if let personal = RecommendationReasonService.personalReason(
+            if let personal = RecommendationReasonService.personalReasonCode(
                 for: candidate,
                 memory: memory.memories[candidate.slug],
                 profile: taste,
                 catalogBySlug: bySlug
             ) {
-                text = personal
+                code = .personal(personal)
             }
         }
         return ReplacementChoice(
             slug: candidate.slug,
             minutes: candidate.totalMinutes,
-            reason: text
+            reasonCode: code
         )
     }
 

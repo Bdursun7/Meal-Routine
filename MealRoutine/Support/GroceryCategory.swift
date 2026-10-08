@@ -12,15 +12,15 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// Turkish section title. Order matches a typical market walk.
+    /// Section title in the display language. Order matches a typical market walk.
     var title: String {
         switch self {
-        case .produce: "Sebze ve meyve"
-        case .protein: "Protein"
-        case .dairyAndEggs: "Süt ve yumurta"
-        case .pantry: "Kiler"
-        case .spicesAndSauces: "Baharat ve soslar"
-        case .other: "Diğer"
+        case .produce: L10n.text("grocery.category.produce", "Sebze ve meyve")
+        case .protein: L10n.text("grocery.category.protein", "Protein")
+        case .dairyAndEggs: L10n.text("grocery.category.dairyAndEggs", "Süt ve yumurta")
+        case .pantry: L10n.text("grocery.category.pantry", "Kiler")
+        case .spicesAndSauces: L10n.text("grocery.category.spicesAndSauces", "Baharat ve soslar")
+        case .other: L10n.text("grocery.category.other", "Diğer")
         }
     }
 
@@ -153,35 +153,85 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         "sake", "sparklingwater", "water", "whitewine", "wine"
     ]
 
-    private static func inferred(from name: String) -> GroceryCategory {
-        let text = name
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "tr_TR"))
-            .lowercased()
-        func contains(_ needles: [String]) -> Bool {
-            let tokens = text.split { !$0.isLetter }.map(String.init)
-            return needles.contains { needle in
-                if needle.count <= 4 {
-                    return tokens.contains(needle)
-                }
-                return text.contains(needle)
+    /// Typed rows: the exact dictionary entry for the name in the content locale wins, then the
+    /// locale-keyed hint words in `GroceryCategoryHints`. Never decides identity, only the aisle.
+    private static func inferred(from name: String, dictionary: IngredientDictionary = .shared) -> GroceryCategory {
+        if let entry = dictionary.exactMatch(for: name), let known = byID[normalize(entry.id)] {
+            return known
+        }
+        let text = GroceryCategoryHints.fold(name)
+        let tokens = Set(text.split(separator: " ").map(String.init))
+        let hints = GroceryCategoryHints.hints(for: dictionary.locale)
+        for category in GroceryCategoryHints.inferenceOrder {
+            let needles = hints[category] ?? []
+            let hit = needles.contains { needle in
+                needle.count <= 4 ? tokens.contains(needle) : text.contains(needle)
             }
-        }
-        if contains(["yumurta", "sut", "peynir", "tereyag", "yogurt", "krema", "kaymak", "egg", "milk", "cheese", "butter", "cream"]) {
-            return .dairyAndEggs
-        }
-        if contains(["tavuk", "kiyma", "balik", "somon", "karides", "sosis", "jambon", "kuzu", "dana", "chicken", "beef", "fish", "pork", "lamb", "salmon", "tofu", "tuna"]) {
-            return .protein
-        }
-        if contains(["tuz", "karabiber", "kimyon", "tarcin", "kekik", "zerdecal", "salca", "hardal", "sirke", "baharat", "sos", "sauce", "spice", "cumin", "paprika", "vinegar", "salt"]) {
-            return .spicesAndSauces
-        }
-        if contains(["un", "pirinc", "makarna", "ekmek", "zeytinyag", "seker", "nohut", "mercimek", "bulgur", "yag", "flour", "rice", "pasta", "bread", "oil", "sugar", "lentil"]) {
-            return .pantry
-        }
-        if contains(["domates", "sogan", "sarimsak", "patates", "havuc", "salatalik", "limon", "marul", "ispanak", "mantar", "elma", "brokoli", "kabak", "patlican", "tomato", "onion", "garlic", "potato", "carrot", "lemon", "lettuce", "spinach"]) {
-            return .produce
+            if hit { return category }
         }
         return .other
+    }
+}
+
+/// Aisle hint words for typed grocery rows, keyed by content locale (folded to ASCII, lowercase).
+/// English words apply in every locale because recipe sites often mix them in. Data only: a new
+/// country adds a locale here, no code changes.
+enum GroceryCategoryHints {
+    static let inferenceOrder: [GroceryCategory] = [.dairyAndEggs, .protein, .spicesAndSauces, .pantry, .produce]
+    static let sharedLocale = "en"
+
+    static let byLocale: [String: [GroceryCategory: [String]]] = [
+        "tr-TR": [
+            .dairyAndEggs: ["yumurta", "sut", "peynir", "tereyag", "yogurt", "krema", "kaymak"],
+            .protein: ["tavuk", "kiyma", "balik", "somon", "karides", "sosis", "jambon", "kuzu", "dana"],
+            .spicesAndSauces: ["tuz", "karabiber", "kimyon", "tarcin", "kekik", "zerdecal", "salca", "hardal", "sirke", "baharat", "sos"],
+            .pantry: ["un", "pirinc", "makarna", "ekmek", "zeytinyag", "seker", "nohut", "mercimek", "bulgur", "yag"],
+            .produce: ["domates", "sogan", "sarimsak", "patates", "havuc", "salatalik", "limon", "marul", "ispanak", "mantar", "elma", "brokoli", "kabak", "patlican"],
+        ],
+        "en": [
+            .dairyAndEggs: ["egg", "milk", "cheese", "butter", "cream"],
+            .protein: ["chicken", "beef", "fish", "pork", "lamb", "salmon", "tofu", "tuna"],
+            .spicesAndSauces: ["sauce", "spice", "cumin", "paprika", "vinegar", "salt"],
+            .pantry: ["flour", "rice", "pasta", "bread", "oil", "sugar", "lentil"],
+            .produce: ["tomato", "onion", "garlic", "potato", "carrot", "lemon", "lettuce", "spinach"],
+        ],
+    ]
+
+    static func hints(for locale: String) -> [GroceryCategory: [String]] {
+        var merged: [GroceryCategory: [String]] = byLocale[sharedLocale] ?? [:]
+        let language = locale.split(separator: "-").first.map(String.init) ?? locale
+        let local = byLocale[locale]
+            ?? byLocale.keys.sorted().first { $0.hasPrefix(language + "-") }.flatMap { byLocale[$0] }
+            ?? [:]
+        guard locale != sharedLocale else { return merged }
+        for (category, words) in local {
+            merged[category, default: []].append(contentsOf: words)
+        }
+        return merged
+    }
+
+    /// Lowercase ASCII letters and digits; every other character becomes a word break.
+    static func fold(_ raw: String) -> String {
+        let lowered = raw
+            .replacingOccurrences(of: "İ", with: "i")
+            .lowercased()
+            .replacingOccurrences(of: "ı", with: "i")
+            .decomposedStringWithCanonicalMapping
+        var folded = ""
+        var pendingSpace = false
+        for scalar in lowered.unicodeScalars {
+            let value = scalar.value
+            if (0x61...0x7A).contains(value) || (0x30...0x39).contains(value) {
+                if pendingSpace, !folded.isEmpty { folded.append(" ") }
+                folded.unicodeScalars.append(scalar)
+                pendingSpace = false
+            } else if scalar.properties.generalCategory == .nonspacingMark {
+                continue
+            } else {
+                pendingSpace = true
+            }
+        }
+        return folded
     }
 }
 

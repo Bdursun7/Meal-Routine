@@ -26,7 +26,14 @@ final class HouseholdSession {
     var account: HouseholdUser?
     var snapshot: HouseholdSnapshot = .empty()
     var syncState: HouseholdSyncState = .idle
-    var statusMessage: String?
+    private var status = HouseholdStatusLine()
+    /// Display text only. Any assignment clears the conflict flags; code checks the flags, never the text.
+    var statusMessage: String? {
+        get { status.message }
+        set { status = HouseholdStatusLine(message: newValue) }
+    }
+    /// True while `statusMessage` is the shared-meal conflict notice that Bu Hafta shows inline.
+    var statusIsMealConflict: Bool { status.isMealConflict }
     var pendingInviteCode: String?
     var offersPantryTransfer = false
     private var deliveredPushIDs: Set<UUID> = []
@@ -91,7 +98,7 @@ final class HouseholdSession {
             id: HouseholdTestPartner.localUserID,
             displayName: HouseholdTestPartner.localDisplayName
         )
-        statusMessage = "Test oturumu açıldı. Apple kimliği yok."
+        statusMessage = L10n.text("household.status.testSignedIn", "Test oturumu açıldı. Apple kimliği yok.")
     }
 
     func signOut(in context: ModelContext) {
@@ -101,8 +108,8 @@ final class HouseholdSession {
             Task { await AuthSession.shared.signOutTokensOnly() }
         }
         statusMessage = isTestMode
-            ? "Test oturumu kapatıldı. Ev verisi bu telefonda duruyor."
-            : "Bu telefonda oturum kapatıldı."
+            ? L10n.text("household.status.testSignedOut", "Test oturumu kapatıldı. Ev verisi bu telefonda duruyor.")
+            : L10n.text("household.status.signedOut", "Bu telefonda oturum kapatıldı.")
     }
 
     func dropAccount(message: String) {
@@ -124,11 +131,11 @@ final class HouseholdSession {
         PendingOperationStore.replace([], in: context)
         if enabled {
             restoreTestServer(in: context)
-            statusMessage = "Test modu açık. Apple, iCloud ve bildirim yok."
+            statusMessage = L10n.text("household.status.testModeOn", "Test modu açık. Apple, iCloud ve bildirim yok.")
             syncState = .idle
         } else {
             FakeHouseholdBackend.shared.setOffline(false)
-            statusMessage = "Test modu kapalı."
+            statusMessage = L10n.text("household.status.testModeOff", "Test modu kapalı.")
             #if canImport(UIKit)
             if HouseholdTestLaunch.allowsAppleServices {
                 UIApplication.shared.registerForRemoteNotifications()
@@ -173,7 +180,7 @@ final class HouseholdSession {
         }
         do {
             snapshot = try HouseholdReducer.createHousehold(user: account, name: name, now: .now)
-            statusMessage = "Ev halkı kuruldu. Partnerini davet edebilirsin."
+            statusMessage = L10n.text("household.status.created", "Ev halkı kuruldu. Partnerini davet edebilirsin.")
             Analytics.track(.householdCreated)
             persist(in: context)
             offerPantryTransferIfNeeded(in: context)
@@ -219,7 +226,7 @@ final class HouseholdSession {
             return
         }
         if usesHouseholdAPI {
-            await performRemote(in: context, success: "Ev halkına katıldın.", event: .householdJoined) {
+            await performRemote(in: context, success: L10n.text("household.status.joined", "Ev halkına katıldın."), event: .householdJoined) {
                 try await self.lifecycleAPI().accept(code: code)
             }
             pendingInviteCode = nil
@@ -242,7 +249,7 @@ final class HouseholdSession {
             persist(in: context)
             try HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
             await push(in: context)
-            statusMessage = "Ev halkına katıldın."
+            statusMessage = L10n.text("household.status.joined", "Ev halkına katıldın.")
             Analytics.track(.householdJoined)
             Analytics.track(.inviteAccepted)
             offerPantryTransferIfNeeded(in: context)
@@ -292,8 +299,8 @@ final class HouseholdSession {
         if usesHouseholdAPI {
             let transferring = snapshot.role(of: account.id) == .owner && snapshot.members.count > 1
             let message = transferring
-                ? "Ev sahipliği devredildi. Ortak plan evde kaldı. Kişisel verin duruyor."
-                : "Ev halkından ayrıldın. Kişisel verin duruyor."
+                ? L10n.text("household.status.leftAfterTransfer", "Ev sahipliği devredildi. Ortak plan evde kaldı. Kişisel verin duruyor.")
+                : L10n.text("household.status.left", "Ev halkından ayrıldın. Kişisel verin duruyor.")
             Task { await self.leaveRemote(message: message, in: context) }
             return
         }
@@ -309,8 +316,8 @@ final class HouseholdSession {
                 enqueueTestSync { await self.push(in: context) }
             }
             statusMessage = ownerAlone
-                ? "Ev halkı kapandı. Kişisel verin duruyor."
-                : "Ev halkından ayrıldın. Ortak plan evde kaldı."
+                ? L10n.text("household.status.closed", "Ev halkı kapandı. Kişisel verin duruyor.")
+                : L10n.text("household.status.leftPlanStays", "Ev halkından ayrıldın. Ortak plan evde kaldı.")
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -326,7 +333,7 @@ final class HouseholdSession {
             try HouseholdReducer.rename(snapshot: &snapshot, userId: account.id, name: name, now: .now)
             persist(in: context)
             enqueueTestSync { await self.push(in: context) }
-            statusMessage = "Ev halkının adı güncellendi."
+            statusMessage = L10n.text("household.status.renamed", "Ev halkının adı güncellendi.")
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -342,7 +349,7 @@ final class HouseholdSession {
             let invite = try HouseholdReducer.resendInvite(snapshot: &snapshot, userId: account.id, inviteId: inviteId, now: .now)
             persist(in: context)
             enqueueTestSync { await self.publish(invite: invite, in: context) }
-            statusMessage = "Davet yeniden gönderildi. Kod \(invite.inviteCode)"
+            statusMessage = HouseholdSessionCopy.inviteResent(code: invite.inviteCode)
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -366,7 +373,7 @@ final class HouseholdSession {
             try HouseholdReducer.transferOwnership(snapshot: &snapshot, actorId: account.id, memberUserId: memberId, now: .now)
             persist(in: context)
             enqueueTestSync { await self.push(in: context) }
-            statusMessage = "Ev sahipliği devredildi. Ortak plan evde kaldı."
+            statusMessage = L10n.text("household.status.transferred", "Ev sahipliği devredildi. Ortak plan evde kaldı.")
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -381,7 +388,7 @@ final class HouseholdSession {
         do {
             snapshot = try HouseholdReducer.deleteHousehold(snapshot: &snapshot, userId: account.id)
             persist(in: context)
-            statusMessage = "Ev halkı silindi. Kişisel planın duruyor."
+            statusMessage = L10n.text("household.status.deleted", "Ev halkı silindi. Kişisel planın duruyor.")
             let transport = activeTransport()
             Task {
                 try? await transport.deleteBoard(householdId: householdId)
@@ -553,17 +560,17 @@ final class HouseholdSession {
                 now: now
             )
             try HouseholdPlanBridge.apply(snapshot: snapshot, in: context, now: now)
+            let weekSummary: PlanExplanation?
             if openOffsets.isEmpty {
-                statusMessage = PlanExplanationBuilder.lockedMeals
+                weekSummary = PlanExplanation(.lockedMeals)
             } else if slugs.count < openOffsets.count {
-                statusMessage = PlanExplanationBuilder.shortPool(filled: drafts.count, requested: requestedOffsets.count)
+                weekSummary = PlanExplanation(.shortPool, counts: [drafts.count, requestedOffsets.count])
             } else {
-                statusMessage = "Ortak plan hazır. İkiniz de bakabilirsiniz."
+                weekSummary = nil
             }
-            if let message = statusMessage,
-               message != "Ortak plan hazır. İkiniz de bakabilirsiniz.",
-               let week = try WeekPlanService.currentWeek(in: context, now: now) {
-                week.explanation = message
+            statusMessage = weekSummary?.text ?? HouseholdSessionCopy.planReady
+            if let weekSummary, let week = try WeekPlanService.currentWeek(in: context, now: now) {
+                week.setSummary(weekSummary)
                 try context.save()
             }
             persist(in: context)
@@ -678,7 +685,7 @@ final class HouseholdSession {
             persist(in: context)
             notifyPartners()
             Analytics.track(.planFinalized)
-            statusMessage = "Plan netleşti."
+            statusMessage = L10n.text("household.status.planFinalized", "Plan netleşti.")
             if let plan = snapshot.plan {
                 finishSharedEdit(
                     entityType: "plan",
@@ -801,8 +808,8 @@ final class HouseholdSession {
         } catch HouseholdError.offline {
             syncState = .offline
             statusMessage = isTestMode
-                ? "Davet kodu bu telefonda hazır."
-                : "Davet kodu bu telefonda hazır. iCloud açılınca bağlantı da paylaşılır."
+                ? L10n.text("household.status.inviteReadyLocal", "Davet kodu bu telefonda hazır.")
+                : L10n.text("household.status.inviteReadyLocalNoCloud", "Davet kodu bu telefonda hazır. iCloud açılınca bağlantı da paylaşılır.")
         } catch {
             syncState = .failed
             statusMessage = error.localizedDescription
@@ -829,7 +836,7 @@ final class HouseholdSession {
             snapshot = HouseholdConflictResolver.merge(local: snapshot, server: conflict.server)
             let pushed = try await repository.push(snapshot)
             if !isTestMode {
-                statusMessage = "Sunucudaki plan uygulandı."
+                statusMessage = L10n.text("household.status.serverPlanApplied", "Sunucudaki plan uygulandı.")
             }
             return pushed
         }
@@ -863,7 +870,7 @@ final class HouseholdSession {
 
     func simulatePartnerJoin(in context: ModelContext) async {
         guard isTestMode, account != nil else {
-            statusMessage = "Önce test olarak gir."
+            statusMessage = L10n.text("household.status.signInTestFirst", "Önce test olarak gir.")
             return
         }
         guard snapshot.role(of: account?.id ?? "") == .owner else {
@@ -871,7 +878,7 @@ final class HouseholdSession {
             return
         }
         guard let invite = snapshot.invites.last(where: { $0.status == .pending && $0.expiresAt > .now }) else {
-            statusMessage = "Önce bir davet kodu oluştur."
+            statusMessage = L10n.text("household.status.createInviteFirst", "Önce bir davet kodu oluştur.")
             return
         }
         let partner = HouseholdTestPartner.user()
@@ -894,7 +901,7 @@ final class HouseholdSession {
             snapshot = HouseholdConflictResolver.merge(local: snapshot, server: remote)
             persist(in: context)
             try? HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
-            statusMessage = "Test Partner katıldı."
+            statusMessage = L10n.text("household.status.testPartnerJoined", "Test Partner katıldı.")
             syncState = .idle
             notifyPartners()
         } catch {
@@ -936,7 +943,7 @@ final class HouseholdSession {
     func partnerCheckNextGrocery(in context: ModelContext) async {
         let items = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
         guard let item = items.first(where: { !$0.isChecked }) ?? items.first else {
-            statusMessage = "Market listesinde satır yok."
+            statusMessage = L10n.text("household.status.groceryEmpty", "Market listesinde satır yok.")
             return
         }
         let key = HouseholdGroceryKey.make(
@@ -956,7 +963,7 @@ final class HouseholdSession {
             )
         }
         if statusMessage == nil || syncState == .idle {
-            statusMessage = checked ? "Test Partner bir malzemeyi işaretledi." : "Test Partner işareti kaldırdı."
+            statusMessage = checked ? L10n.text("household.status.testPartnerChecked", "Test Partner bir malzemeyi işaretledi.") : L10n.text("household.status.testPartnerUnchecked", "Test Partner işareti kaldırdı.")
         }
     }
 
@@ -967,7 +974,7 @@ final class HouseholdSession {
         guard isTestMode, snapshot.hasHousehold else { return }
         let partner = HouseholdTestPartner.user()
         guard snapshot.member(partner.id) != nil else {
-            statusMessage = "Önce Test Partner katılsın."
+            statusMessage = L10n.text("household.status.testPartnerFirst", "Önce Test Partner katılsın.")
             return
         }
         await testSyncChain?.value
@@ -1113,7 +1120,7 @@ final class HouseholdSession {
                     return item
                 }
                 PendingOperationStore.replace(updated, keeping: PantrySync.entityType, in: context)
-                statusMessage = SharedConflictNotice.mealUpdated
+                noteMealConflict()
                 syncState = .failed
             } catch {
                 syncState = .failed
@@ -1132,10 +1139,14 @@ final class HouseholdSession {
         }
         func notePantryConflict() {
             guard pantryConflicted else { return }
-            if let current = statusMessage, !current.isEmpty, current != PantryCopy.conflict {
-                statusMessage = "\(current) \(PantryCopy.conflict)"
-            } else {
-                statusMessage = PantryCopy.conflict
+            if !status.notesPantryConflict {
+                let message: String
+                if let current = statusMessage, !current.isEmpty {
+                    message = "\(current) \(PantryCopy.conflict)"
+                } else {
+                    message = PantryCopy.conflict
+                }
+                status = HouseholdStatusLine(message: message, notesPantryConflict: true)
             }
             syncState = .failed
         }
@@ -1197,7 +1208,7 @@ final class HouseholdSession {
             item.retryCount > (queued.first { $0.id == item.id }?.retryCount ?? 0)
         }
         if conflicted {
-            statusMessage = SharedConflictNotice.mealUpdated
+            noteMealConflict()
             syncState = .failed
         } else if updated.contains(where: { $0.status == .failed }) {
             syncState = .failed
@@ -1245,7 +1256,7 @@ final class HouseholdSession {
             return item
         }
         PendingOperationStore.replace(resolved + personal, keeping: PantrySync.entityType, in: context)
-        statusMessage = SharedConflictNotice.mealUpdated
+        noteMealConflict()
         syncState = .failed
         return true
     }
@@ -1306,7 +1317,7 @@ final class HouseholdSession {
         )
         PendingOperationStore.upsert(item, in: context)
         persist(in: context)
-        statusMessage = SharedConflictNotice.mealUpdated
+        noteMealConflict()
         syncState = .failed
     }
 
@@ -1364,7 +1375,7 @@ final class HouseholdSession {
     }
 
     private func createRemote(name: String, in context: ModelContext) async {
-        await performRemote(in: context, success: "Ev halkı kuruldu. Partnerini davet edebilirsin.", event: .householdCreated) {
+        await performRemote(in: context, success: L10n.text("household.status.created", "Ev halkı kuruldu. Partnerini davet edebilirsin."), event: .householdCreated) {
             try await self.lifecycleAPI().create(name: name)
         }
         if snapshot.hasHousehold { offerPantryTransferIfNeeded(in: context) }
@@ -1394,14 +1405,14 @@ final class HouseholdSession {
 
     private func renameRemote(name: String, in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Ev halkının adı güncellendi.") {
+        await performRemote(in: context, success: L10n.text("household.status.renamed", "Ev halkının adı güncellendi.")) {
             try await self.lifecycleAPI().rename(householdId: householdId, name: name)
         }
     }
 
     private func inviteRemote(in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Davet hazır.", event: .inviteSent) {
+        await performRemote(in: context, success: L10n.text("household.status.inviteReady", "Davet hazır."), event: .inviteSent) {
             try await self.lifecycleAPI().createInvite(householdId: householdId)
         }
         guard syncState == .idle,
@@ -1411,24 +1422,24 @@ final class HouseholdSession {
 
     private func resendRemote(inviteId: UUID, in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Davet yeniden gönderildi.") {
+        await performRemote(in: context, success: L10n.text("household.status.inviteResent", "Davet yeniden gönderildi.")) {
             try await self.lifecycleAPI().resendInvite(householdId: householdId, inviteId: inviteId)
         }
         guard syncState == .idle,
               let code = snapshot.invites.last(where: { $0.status == .pending })?.inviteCode else { return }
-        statusMessage = "Davet yeniden gönderildi. Kod \(code)"
+        statusMessage = HouseholdSessionCopy.inviteResent(code: code)
     }
 
     private func cancelRemote(inviteId: UUID, in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Davet geri alındı.") {
+        await performRemote(in: context, success: L10n.text("household.status.inviteCancelled", "Davet geri alındı.")) {
             try await self.lifecycleAPI().cancelInvite(householdId: householdId, inviteId: inviteId)
         }
     }
 
     private func removeRemote(memberId: String, in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Üye çıkarıldı. Kişisel verisi duruyor. Ortak plan evde kaldı.") {
+        await performRemote(in: context, success: L10n.text("household.status.memberRemoved", "Üye çıkarıldı. Kişisel verisi duruyor. Ortak plan evde kaldı.")) {
             try await self.lifecycleAPI().removeMember(householdId: householdId, accountId: memberId)
         }
     }
@@ -1443,14 +1454,14 @@ final class HouseholdSession {
 
     private func transferRemote(memberId: String, in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Ev sahipliği devredildi. Ortak plan evde kaldı.") {
+        await performRemote(in: context, success: L10n.text("household.status.transferred", "Ev sahipliği devredildi. Ortak plan evde kaldı.")) {
             try await self.lifecycleAPI().transfer(householdId: householdId, accountId: memberId)
         }
     }
 
     private func deleteRemote(in context: ModelContext) async {
         guard let householdId = snapshot.household?.id else { return }
-        await performRemote(in: context, success: "Ev halkı silindi. Kişisel planın duruyor.") {
+        await performRemote(in: context, success: L10n.text("household.status.deleted", "Ev halkı silindi. Kişisel planın duruyor.")) {
             try await self.lifecycleAPI().deleteHousehold(householdId: householdId)
         }
         if snapshot.household?.id != householdId { PantryAccountPrivacy.dropHouseholdCache(householdID: householdId, in: context) }
@@ -1524,7 +1535,7 @@ final class HouseholdSession {
     }
 
     private var signedInRequired: String {
-        isTestMode ? "Test modunda önce Test olarak gir." : (HouseholdError.notSignedIn.errorDescription ?? "")
+        isTestMode ? L10n.text("household.status.testSignInRequired", "Test modunda önce Test olarak gir.") : (HouseholdError.notSignedIn.errorDescription ?? "")
     }
 
     private func activeTransport() -> any HouseholdSyncTransport {
@@ -1605,5 +1616,29 @@ enum HouseholdNotifier {
         }
         #endif
         #endif
+    }
+}
+
+extension HouseholdSession {
+    func noteMealConflict() {
+        status = HouseholdStatusLine(message: SharedConflictNotice.mealUpdated, isMealConflict: true)
+    }
+}
+
+/// The household status line plus what it says, so logic never compares the displayed text.
+struct HouseholdStatusLine: Equatable, Sendable {
+    var message: String?
+    var isMealConflict = false
+    /// The message already ends with the pantry conflict note.
+    var notesPantryConflict = false
+}
+
+enum HouseholdSessionCopy {
+    static var planReady: String {
+        L10n.text("household.status.planReady", "Ortak plan hazır. İkiniz de bakabilirsiniz.")
+    }
+
+    static func inviteResent(code: String) -> String {
+        L10n.format("household.status.inviteResentCode", "Davet yeniden gönderildi. Kod %@", code)
     }
 }

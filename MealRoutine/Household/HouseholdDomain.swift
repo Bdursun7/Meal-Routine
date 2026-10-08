@@ -1972,13 +1972,33 @@ enum HouseholdReplacementIntent: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .bothWillLike: "İkiniz de seversiniz"
-        case .faster: "Daha hızlı"
-        case .favorite: "Bir favori kullan"
-        case .different: "Bundan farklı"
-        case .noChicken: "Tavuksuz"
-        case .noMushrooms: "Mantarsız"
-        case .surprise: "Bizi şaşırt"
+        case .bothWillLike: L10n.text("household.replace.intent.bothWillLike", "İkiniz de seversiniz")
+        case .faster: L10n.text("replace.chip.faster", "Daha hızlı")
+        case .favorite: L10n.text("replace.chip.loved", "Bir favori kullan")
+        case .different: L10n.text("household.replace.intent.different", "Bundan farklı")
+        case .noChicken: L10n.text("replace.chip.noChicken", "Tavuksuz")
+        case .noMushrooms: L10n.text("household.replace.intent.noMushrooms", "Mantarsız")
+        case .surprise: L10n.text("household.replace.intent.surprise", "Bizi şaşırt")
+        }
+    }
+}
+
+enum HouseholdReplacementReason: String, Equatable, Sendable {
+    case faster
+    case bothLike
+    case householdFit
+    case youUsuallyLike
+    case surprise
+    case fitsThisWeek
+
+    var text: String {
+        switch self {
+        case .faster: L10n.text("replace.reason.faster", "Daha kısa sürer")
+        case .bothLike: L10n.text("household.replace.reason.bothLike", "İkiniz de sever")
+        case .householdFit: L10n.text("household.replace.reason.householdFit", "Ev uyumu")
+        case .youUsuallyLike: L10n.text("household.replace.reason.youUsuallyLike", "Sen genellikle seversin")
+        case .surprise: L10n.text("household.replace.reason.surprise", "Bu hafta için sürpriz")
+        case .fitsThisWeek: L10n.text("household.replace.reason.fitsThisWeek", "Bu hafta için uygun")
         }
     }
 }
@@ -1986,9 +2006,10 @@ enum HouseholdReplacementIntent: String, CaseIterable, Identifiable, Sendable {
 struct HouseholdReplacementChoice: Equatable, Sendable, Identifiable {
     var slug: String
     var minutes: Int
-    var reason: String
+    var reasonCode: HouseholdReplacementReason
 
     var id: String { slug }
+    var reason: String { reasonCode.text }
 }
 
 enum HouseholdReplacement {
@@ -2048,7 +2069,7 @@ enum HouseholdReplacement {
             HouseholdReplacementChoice(
                 slug: candidate.slug,
                 minutes: candidate.totalMinutes,
-                reason: reason(
+                reasonCode: reason(
                     for: candidate,
                     current: current,
                     intent: intent,
@@ -2060,11 +2081,32 @@ enum HouseholdReplacement {
         }
     }
 
-    static func containsMushroom(_ candidate: PickerCandidate) -> Bool {
+    /// Mushroom family by dictionary id (`mushrooms`, `porcini-mushroom`, …). Imported `import:` lines
+    /// resolve through the dictionary; an unresolved one counts when its text contains a mushroom
+    /// entry's source-locale name or alias, so the filter never depends on hard-coded words.
+    static func containsMushroom(_ candidate: PickerCandidate, dictionary: IngredientDictionary = .shared) -> Bool {
         candidate.ingredientIds.contains { id in
-            let lower = id.lowercased()
-            return lower.contains("mushroom") || lower.contains("mantar")
+            if let canonical = dictionary.canonicalId(id) { return isMushroomId(canonical) }
+            if isMushroomId(id) { return true }
+            guard id.hasPrefix("import:") else { return false }
+            let text = IngredientDictionary.fold(String(id.dropFirst("import:".count)))
+            guard !text.isEmpty else { return false }
+            return mushroomNames(dictionary).contains { text.contains($0) }
         }
+    }
+
+    private static func isMushroomId(_ id: String) -> Bool {
+        id.lowercased().contains("mushroom")
+    }
+
+    private static func mushroomNames(_ dictionary: IngredientDictionary) -> [String] {
+        dictionary.entries
+            .filter { isMushroomId($0.id) }
+            .flatMap { entry in
+                ([entry.name(in: IngredientEntry.sourceLocale)] + entry.aliases(in: IngredientEntry.sourceLocale))
+                    .map { IngredientDictionary.fold($0) }
+            }
+            .filter { $0.count >= 3 }
     }
 
     private static func matches(
@@ -2104,25 +2146,25 @@ enum HouseholdReplacement {
         tastes: [MemberTaste],
         memory: [HouseholdMemorySignal],
         currentUserId: String
-    ) -> String {
+    ) -> HouseholdReplacementReason {
         if intent == .faster, candidate.totalMinutes < current.totalMinutes {
-            return "Daha kısa sürer"
+            return .faster
         }
         let mine = HouseholdRecommendation.affinity(tastes.first { $0.userId == currentUserId }?.memories[candidate.slug])
         let others = tastes.filter { $0.userId != currentUserId }.map { HouseholdRecommendation.affinity($0.memories[candidate.slug]) }
         if mine >= 3, !others.isEmpty, others.allSatisfy({ $0 >= 3 }) {
-            return "İkiniz de sever"
+            return .bothLike
         }
         if (memory.first { $0.recipeSlug == candidate.slug }?.bothLiked ?? 0) > 0 || (mine >= 2 && others.allSatisfy { $0 >= 2 } && !others.isEmpty) {
-            return "Ev uyumu"
+            return .householdFit
         }
         if mine >= 3 {
-            return "Sen genellikle seversin"
+            return .youUsuallyLike
         }
         if intent == .surprise {
-            return "Bu hafta için sürpriz"
+            return .surprise
         }
-        return "Bu hafta için uygun"
+        return .fitsThisWeek
     }
 
     private static func stableIndex(seed: String, count: Int) -> Int {

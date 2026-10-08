@@ -19,7 +19,7 @@ final class ShareViewController: UIViewController {
             stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
             stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
-        showMessage("Bakılıyor…")
+        showMessage(ShareL10n.text("share.loading", "Bakılıyor…"))
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -58,42 +58,42 @@ final class ShareViewController: UIViewController {
 
     private func showPreview(_ capture: RecipeCapture) {
         let title = capture.title?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = (title?.isEmpty == false) ? title! : "Kaydedilen tarif"
+        let name = (title?.isEmpty == false) ? title! : RecipePlaceholderTitle.text
         let source = RecipeSourceService.displayName(
             platform: capture.sourcePlatform,
             sourceTitle: capture.sourceTitleFallback,
             url: capture.urlString ?? ""
         )
         replaceContent(title: name, message: source, actions: [
-            button("Deneyeceğim", primary: true) { [weak self] in self?.save(allowDuplicate: false) },
-            button("Kapat", primary: false) { [weak self] in self?.finish() },
+            button(ShareL10n.text("share.action.save", "Deneyeceğim"), primary: true) { [weak self] in self?.save(allowDuplicate: false) },
+            button(ShareL10n.text("share.action.close", "Kapat"), primary: false) { [weak self] in self?.finish() },
         ])
     }
 
     private func showDuplicate() {
         var actions = [
-            button("Yine de kaydet", primary: true) { [weak self] in self?.save(allowDuplicate: true) },
+            button(ShareL10n.text("share.action.saveAnyway", "Yine de kaydet"), primary: true) { [weak self] in self?.save(allowDuplicate: true) },
         ]
         if let slug = duplicateSlug, slug != "pending" {
-            actions.insert(button("Tarifi aç", primary: false) { [weak self] in
+            actions.insert(button(ShareL10n.text("share.action.openRecipe", "Tarifi aç"), primary: false) { [weak self] in
                 self?.openApp("mealroutine://recipe?slug=\(slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug)")
             }, at: 0)
         }
-        actions.append(button("Kapat", primary: false) { [weak self] in self?.finish() })
+        actions.append(button(ShareL10n.text("share.action.close", "Kapat"), primary: false) { [weak self] in self?.finish() })
         replaceContent(
-            title: "Bu kaynak zaten kayıtlı",
-            message: "Aynı adres veya çok benzer bir ad sessizce üzerine yazılmaz.",
+            title: ShareL10n.text("share.duplicate.title", "Bu kaynak zaten kayıtlı"),
+            message: ShareL10n.text("share.duplicate.message", "Aynı adres veya çok benzer bir ad sessizce üzerine yazılmaz."),
             actions: actions
         )
     }
 
     private func showSaved(id: UUID) {
         replaceContent(
-            title: "Kaydedildi",
-            message: "Denenecek tariflerin arasında. Malzeme şimdi gerekmez.",
+            title: ShareL10n.text("share.saved.title", "Kaydedildi"),
+            message: ShareL10n.text("share.saved.message", "Denenecek tariflerin arasında. Malzeme şimdi gerekmez."),
             actions: [
-                button("Bitti", primary: true) { [weak self] in self?.finish() },
-                button("Şimdi tamamla", primary: false) { [weak self] in
+                button(ShareL10n.text("share.action.done", "Bitti"), primary: true) { [weak self] in self?.finish() },
+                button(ShareL10n.text("share.action.completeNow", "Şimdi tamamla"), primary: false) { [weak self] in
                     self?.openApp("mealroutine://complete?capture=\(id.uuidString)")
                 },
             ]
@@ -102,9 +102,9 @@ final class ShareViewController: UIViewController {
 
     private func showEmpty() {
         replaceContent(
-            title: "Kaydedilecek bir şey yok",
-            message: "Paylaşılan bağlantı, metin veya görsel bulunamadı.",
-            actions: [button("Kapat", primary: true) { [weak self] in self?.finish() }]
+            title: ShareL10n.text("share.empty.title", "Kaydedilecek bir şey yok"),
+            message: ShareL10n.text("share.empty.message", "Paylaşılan bağlantı, metin veya görsel bulunamadı."),
+            actions: [button(ShareL10n.text("share.action.close", "Kapat"), primary: true) { [weak self] in self?.finish() }]
         )
     }
 
@@ -123,9 +123,9 @@ final class ShareViewController: UIViewController {
             showSaved(id: capture.id)
         } catch {
             replaceContent(
-                title: "Kaydedilemedi",
-                message: "Paylaşım klasörü yazılamadı. Simülatörde uygulama grubu imzası gerekir.",
-                actions: [button("Kapat", primary: true) { [weak self] in self?.finish() }]
+                title: ShareL10n.text("share.failed.title", "Kaydedilemedi"),
+                message: ShareL10n.text("share.failed.message", "Paylaşım klasörü yazılamadı. Simülatörde uygulama grubu imzası gerekir."),
+                actions: [button(ShareL10n.text("share.action.close", "Kapat"), primary: true) { [weak self] in self?.finish() }]
             )
         }
     }

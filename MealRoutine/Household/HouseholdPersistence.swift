@@ -169,7 +169,7 @@ enum HouseholdPlanBridge {
             try context.save()
         }
         let week = PlanWeek(weekStart: plan.weekStart, householdSize: prefs.householdSize)
-        week.explanation = "Bu hafta \(HouseholdWeekCopy.headline(members: snapshot.members)) için kuruldu."
+        week.setSummary(PlanExplanation(.householdInstalled, subject: HouseholdWeekCopy.headline(members: snapshot.members)))
         context.insert(week)
         for shared in plan.meals.sorted(by: { $0.dayOffset < $1.dayOffset }) {
             let meal = PlannedMeal(

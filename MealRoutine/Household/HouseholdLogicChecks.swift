@@ -240,7 +240,7 @@ enum HouseholdLogicChecks {
         )
         let both = bothChoices.map(\.slug)
         try expect(both.contains("sis"), "both like sis")
-        try expect(bothChoices.contains { $0.slug == "sis" && $0.reason == "İkiniz de sever" }, "both will like reason")
+        try expect(bothChoices.contains { $0.slug == "sis" && $0.reasonCode == .bothLike }, "both will like reason")
         try expect(!both.contains("asla"), "never again out")
         try expect(!both.contains("beyti"), "current veto out")
         try expect(!both.contains("mantarli"), "strong dislike out")

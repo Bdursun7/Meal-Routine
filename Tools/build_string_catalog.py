@@ -5,7 +5,7 @@ Turkish (`tr`) is the development language, so the app renders exactly the copy 
 the catalog existed.
 
   - Keyed strings: every `L10n.text("key", "Türkçe")` / `L10n.format("key", "Türkçe %@", ...)` call
-    becomes a `manual` entry whose `tr` value is the source text passed in code.
+    (and `ShareL10n.text`, used by files the share extension compiles) becomes a `manual` entry whose `tr` value is the source text passed in code.
   - SwiftUI literals: plain `Text("…")`, `Button("…")`, `Label("…", …)` and similar literals without
     interpolation become entries keyed by their Turkish text (Xcode's own extraction format).
     Interpolated literals are added by Xcode's string extraction on the Mac build.
@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "MealRoutine"
+SHARE = ROOT / "ShareExtension"  # reads the app's catalog through `ShareL10n`
 CATALOG = APP / "Localizable.xcstrings"
 SOURCE_LANGUAGE = "tr"
 
@@ -40,7 +41,7 @@ def collect():
     keyed = {}
     literals = set()
     problems = []
-    for file in sorted(APP.rglob("*.swift")):
+    for file in sorted([*APP.rglob("*.swift"), *SHARE.rglob("*.swift")]):
         source = file.read_text()
         relative = file.relative_to(ROOT)
         for match in KEYED.finditer(source):

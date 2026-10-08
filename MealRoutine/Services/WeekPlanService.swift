@@ -191,7 +191,7 @@ enum WeekPlanService {
             weekStart: WeekCalendar.weekStart(containing: now),
             householdSize: request.householdSize
         )
-        week.explanation = selection.explanation
+        week.setSummary(selection.summary)
         context.insert(week)
 
         for (offset, slug) in slugs.enumerated() {
@@ -295,14 +295,14 @@ enum WeekPlanService {
             )
         }
         existing.householdSize = request.householdSize
-        existing.explanation = weekExplanation(
+        existing.setSummary(weekExplanation(
             slots: slots,
             filledNew: filled.count,
             openCount: openOffsets.count,
             requested: span,
             candidates: candidates,
             memories: memories
-        )
+        ))
         try context.save()
         if !filled.isEmpty {
             Analytics.track(.planGenerated)
@@ -346,15 +346,15 @@ enum WeekPlanService {
         requested: Int,
         candidates: [PickerCandidate],
         memories: [String: MealMemorySnapshot]
-    ) -> String {
+    ) -> PlanExplanation {
         if openCount == 0 {
-            return PlanExplanationBuilder.lockedMeals
+            return PlanExplanation(.lockedMeals)
         }
         if filledNew == 0 {
-            return PlanExplanationBuilder.emptyPool
+            return PlanExplanation(.emptyPool)
         }
         if filledNew < openCount {
-            return PlanExplanationBuilder.shortPool(filled: slots.count, requested: requested)
+            return PlanExplanation(.shortPool, counts: [slots.count, requested])
         }
         let bySlug = Dictionary(candidates.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let taste = PersonalizedScoringService.profile(memories: memories, candidates: candidates)
@@ -368,7 +368,7 @@ enum WeekPlanService {
                 wasLoved: (memory?.lovedCount ?? 0) > 0
             )
         }
-        return PlanExplanationBuilder.explain(picks: picks, hasBehavior: taste.dataPointCount > 0)
+        return PlanExplanationBuilder.summary(picks: picks, hasBehavior: taste.dataPointCount > 0)
     }
 
     @MainActor

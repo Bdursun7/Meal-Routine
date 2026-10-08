@@ -8,8 +8,11 @@ final class PlanWeek {
     var weekStart: Date
     var createdAt: Date
     var householdSize: Int
-    /// Deterministic sentence for this plan. Empty until a V2 fill writes one.
+    /// Turkish sentence written by V2–V5.0 builds. Read only as a fallback for weeks that have no
+    /// `explanationCode`; V5.1+ writes the code instead.
     var explanation: String = ""
+    /// `PlanExplanation.code` (language-independent). Empty for weeks written before V5.1.
+    var explanationCode: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \PlannedMeal.week)
     var meals: [PlannedMeal] = []
@@ -27,5 +30,19 @@ final class PlanWeek {
         self.weekStart = weekStart
         self.createdAt = createdAt
         self.householdSize = householdSize
+    }
+
+    var summary: PlanExplanation? {
+        PlanExplanation(code: explanationCode)
+    }
+
+    func setSummary(_ summary: PlanExplanation) {
+        explanationCode = summary.code
+        explanation = ""
+    }
+
+    /// The plan note in the display language.
+    var displayExplanation: String {
+        summary?.text ?? explanation
     }
 }

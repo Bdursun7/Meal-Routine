@@ -695,10 +695,9 @@ enum RecipeCollectionService {
         return recipe
     }
 
+    /// Stores user data only; `Attribution.personalLine` renders the credit in the display language.
     private static func attribution(platform: RecipeSourcePlatform, sourceTitle: String, url: String) -> String {
-        let name = RecipeSourceService.displayName(platform: platform, sourceTitle: sourceTitle, url: url)
-        if name.isEmpty || name == RecipeSourcePlatform.unknown.title { return "Kaynak: dış tarif" }
-        return "Kaynak: \(name)"
+        RecipeSourceService.storedName(platform: platform, sourceTitle: sourceTitle, url: url)
     }
 
     private static func savedName(title: String, text: String) -> String {
@@ -717,7 +716,7 @@ enum RecipeCollectionService {
     private static func fallbackTitle(from text: String) -> String {
         let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "Kaydedilen tarif" }
+        if trimmed.isEmpty { return RecipePlaceholderTitle.text }
         if trimmed.count <= 80 { return trimmed }
         return String(trimmed.prefix(80))
     }

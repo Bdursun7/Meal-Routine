@@ -4,7 +4,7 @@ struct RecommendationCard: View {
     var name: String
     var minutes: Int
     var reason: String
-    var badgeTitle: String?
+    var badge: FamiliarityBadge?
     var photoURL: String
     var photoAuthor: String
     var photoLicense: String
@@ -31,8 +31,8 @@ struct RecommendationCard: View {
                         .font(.headline)
                         .foregroundStyle(Theme.textCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let badgeTitle {
-                        FamiliarityBadgeLabel(title: badgeTitle)
+                    if let badge {
+                        FamiliarityBadgeLabel(badge: badge)
                     }
                 }
                 Text("\(minutes) dk")

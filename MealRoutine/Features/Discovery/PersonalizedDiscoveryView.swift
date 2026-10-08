@@ -16,7 +16,7 @@ struct PersonalizedDiscoveryView: View {
                                 name: recipe.displayName,
                                 minutes: recipe.totalMinutes,
                                 reason: item.reason,
-                                badgeTitle: item.badge?.title,
+                                badge: item.badge,
                                 photoURL: recipe.photoURL,
                                 photoAuthor: recipe.photoAuthor,
                                 photoLicense: recipe.photoLicense,

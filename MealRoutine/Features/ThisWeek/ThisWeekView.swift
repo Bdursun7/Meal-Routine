@@ -200,7 +200,7 @@ struct ThisWeekView: View {
         if household.syncState != .idle {
             HouseholdSyncBanner(state: household.syncState)
         }
-        if let message = household.statusMessage, message == SharedConflictNotice.mealUpdated {
+        if household.statusIsMealConflict, let message = household.statusMessage {
             Text(message)
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
@@ -439,8 +439,8 @@ private struct WeekMealCard: View {
                                 .foregroundStyle(Theme.secondaryText)
                         }
                         Spacer(minLength: 8)
-                        if let badge = meal.badgeTitle {
-                            FamiliarityBadgeLabel(title: badge)
+                        if let badge = meal.badge {
+                            FamiliarityBadgeLabel(badge: badge)
                         }
                         if meal.isCooked {
                             Image(systemName: "checkmark.circle.fill")
@@ -750,8 +750,8 @@ private struct TonightDinnerCard: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(Color.white.opacity(0.16), in: Capsule())
-            if let badge = meal.badgeTitle {
-                FamiliarityBadgeLabel(title: badge, onDarkBackground: true)
+            if let badge = meal.badge {
+                FamiliarityBadgeLabel(badge: badge, onDarkBackground: true)
             }
             if !meal.reason.isEmpty {
                 Text(meal.reason)
