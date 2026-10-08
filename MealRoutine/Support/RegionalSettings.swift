@@ -66,6 +66,17 @@ enum RegionalErrorCode: String, Codable, CaseIterable, Sendable, Error {
     case invalidMeasurementSystem = "invalid_measurement_system"
     case invalidTimezone = "invalid_timezone"
     case invalidCountry = "invalid_country"
+
+    /// The user-facing sentence for a server or local validation code.
+    var message: String {
+        switch self {
+        case .unsupportedLocale: L10n.text("regional.error.unsupportedLocale", "Bu dil ve bölge henüz desteklenmiyor.")
+        case .invalidCurrency: L10n.text("regional.error.invalidCurrency", "Para birimi geçersiz.")
+        case .invalidMeasurementSystem: L10n.text("regional.error.invalidMeasurementSystem", "Ölçü sistemi geçersiz.")
+        case .invalidTimezone: L10n.text("regional.error.invalidTimezone", "Saat dilimi geçersiz.")
+        case .invalidCountry: L10n.text("regional.error.invalidCountry", "Ülke kodu geçersiz.")
+        }
+    }
 }
 
 /// Same rules as the server. The code lists are static so iOS and Linux agree with the server;

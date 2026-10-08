@@ -508,6 +508,105 @@
         }
       }
     },
+    "household.activity.cooked": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pişti"
+          }
+        }
+      }
+    },
+    "household.activity.created": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkı kuruldu"
+          }
+        }
+      }
+    },
+    "household.activity.memberJoined": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ katıldı"
+          }
+        }
+      }
+    },
+    "household.activity.memberLeft": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ayrıldı"
+          }
+        }
+      }
+    },
+    "household.activity.memberRemoved": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ çıkarıldı"
+          }
+        }
+      }
+    },
+    "household.activity.planCreated": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ortak plan kuruldu"
+          }
+        }
+      }
+    },
+    "household.activity.planFinalized": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan netleşti"
+          }
+        }
+      }
+    },
+    "household.activity.planTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta"
+          }
+        }
+      }
+    },
+    "household.activity.replaced": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yerine %@ geldi"
+          }
+        }
+      }
+    },
     "household.conflict.mealUpdated": {
       "extractionState": "manual",
       "localizations": {
@@ -515,6 +614,457 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu yemek başka bir cihazda güncellendi."
+          }
+        }
+      }
+    },
+    "household.error.alreadyInHousehold": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaten bir ev halkındasın. V4'te tek ev vardır."
+          }
+        }
+      }
+    },
+    "household.error.alreadyMember": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaten bu ev halkındasın."
+          }
+        }
+      }
+    },
+    "household.error.duplicateInvite": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaten açık bir davet var. Yeniden gönderebilir veya geri alabilirsin."
+          }
+        }
+      }
+    },
+    "household.error.householdFull": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ev iki kişiyle dolu."
+          }
+        }
+      }
+    },
+    "household.error.inviteClosed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu davet kullanılmış."
+          }
+        }
+      }
+    },
+    "household.error.inviteExpired": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu davetin süresi dolmuş."
+          }
+        }
+      }
+    },
+    "household.error.inviteNotFound": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Davet kodu bulunamadı."
+          }
+        }
+      }
+    },
+    "household.error.inviteRevoked": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu davet geri alınmış."
+          }
+        }
+      }
+    },
+    "household.error.mealNotFound": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu akşam planda yok."
+          }
+        }
+      }
+    },
+    "household.error.nameEmpty": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkına bir ad ver."
+          }
+        }
+      }
+    },
+    "household.error.noAlternative": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu filtrelere uyan başka tarif kalmadı."
+          }
+        }
+      }
+    },
+    "household.error.notMember": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu ev halkının üyesi değilsin."
+          }
+        }
+      }
+    },
+    "household.error.notOwner": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunu yalnızca ev sahibi yapabilir."
+          }
+        }
+      }
+    },
+    "household.error.notSignedIn": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev halkı için Apple ile giriş gerekir."
+          }
+        }
+      }
+    },
+    "household.error.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud şu an yok. Değişiklik bu telefonda duruyor."
+          }
+        }
+      }
+    },
+    "household.error.planNotReady": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan henüz netleşmedi. Önce veto edilen akşamları çözün."
+          }
+        }
+      }
+    },
+    "household.error.serverStatus": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunucu %ld döndü."
+          }
+        }
+      }
+    },
+    "household.error.sessionExpired": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oturumun sona erdi. Tekrar giriş yap."
+          }
+        }
+      }
+    },
+    "household.error.syncFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşitleme tamamlanamadı. %@"
+          }
+        }
+      }
+    },
+    "household.match.goodMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İyi uyum"
+          }
+        }
+      }
+    },
+    "household.match.greatMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkiniz için de uyumlu"
+          }
+        }
+      }
+    },
+    "household.match.needsDecision": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karar gerekiyor"
+          }
+        }
+      }
+    },
+    "household.match.unsure": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biri henüz emin değil"
+          }
+        }
+      }
+    },
+    "household.mealStatus.accepted": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kabul"
+          }
+        }
+      }
+    },
+    "household.mealStatus.cooked": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pişti"
+          }
+        }
+      }
+    },
+    "household.mealStatus.proposed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öneri"
+          }
+        }
+      }
+    },
+    "household.mealStatus.replaced": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişti"
+          }
+        }
+      }
+    },
+    "household.mealStatus.vetoed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veto"
+          }
+        }
+      }
+    },
+    "household.member.fallbackName": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partner"
+          }
+        }
+      }
+    },
+    "household.planStatus.completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamamlandı"
+          }
+        }
+      }
+    },
+    "household.planStatus.draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taslak"
+          }
+        }
+      }
+    },
+    "household.planStatus.inProgress": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devam ediyor"
+          }
+        }
+      }
+    },
+    "household.planStatus.needsDecisions": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karar gerekiyor"
+          }
+        }
+      }
+    },
+    "household.planStatus.ready": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hazır"
+          }
+        }
+      }
+    },
+    "household.push.planFinalized": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu haftanın planı hazır."
+          }
+        }
+      }
+    },
+    "household.push.planReview": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haftalık planın kararını bekliyor."
+          }
+        }
+      }
+    },
+    "household.push.replacement": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ yerine %2$@ önerdi."
+          }
+        }
+      }
+    },
+    "household.push.veto": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@ için bu hafta olmaz dedi."
+          }
+        }
+      }
+    },
+    "household.reaction.okay": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olur"
+          }
+        }
+      }
+    },
+    "household.reaction.veto": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu hafta olmaz"
+          }
+        }
+      }
+    },
+    "household.reaction.want": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İstiyorum"
           }
         }
       }
@@ -614,6 +1164,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sen genellikle seversin"
+          }
+        }
+      }
+    },
+    "household.role.owner": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ev sahibi"
           }
         }
       }
@@ -1428,6 +1989,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Web sitesi"
+          }
+        }
+      }
+    },
+    "regional.error.invalidCountry": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ülke kodu geçersiz."
+          }
+        }
+      }
+    },
+    "regional.error.invalidCurrency": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para birimi geçersiz."
+          }
+        }
+      }
+    },
+    "regional.error.invalidMeasurementSystem": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçü sistemi geçersiz."
+          }
+        }
+      }
+    },
+    "regional.error.invalidTimezone": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saat dilimi geçersiz."
+          }
+        }
+      }
+    },
+    "regional.error.unsupportedLocale": {
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu dil ve bölge henüz desteklenmiyor."
           }
         }
       }

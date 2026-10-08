@@ -30,9 +30,9 @@ enum MealReactionKind: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .want: "İstiyorum"
-        case .okay: "Olur"
-        case .veto: "Bu hafta olmaz"
+        case .want: L10n.text("household.reaction.want", "İstiyorum")
+        case .okay: L10n.text("household.reaction.okay", "Olur")
+        case .veto: L10n.text("household.reaction.veto", "Bu hafta olmaz")
         }
     }
 
@@ -54,11 +54,11 @@ enum SharedMealStatus: String, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .proposed: "Öneri"
-        case .accepted: "Kabul"
-        case .vetoed: "Veto"
-        case .replaced: "Değişti"
-        case .cooked: "Pişti"
+        case .proposed: L10n.text("household.mealStatus.proposed", "Öneri")
+        case .accepted: L10n.text("household.mealStatus.accepted", "Kabul")
+        case .vetoed: L10n.text("household.mealStatus.vetoed", "Veto")
+        case .replaced: L10n.text("household.mealStatus.replaced", "Değişti")
+        case .cooked: L10n.text("household.mealStatus.cooked", "Pişti")
         }
     }
 }
@@ -72,11 +72,11 @@ enum SharedPlanStatus: String, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .draft: "Taslak"
-        case .needsDecisions: "Karar gerekiyor"
-        case .ready: "Hazır"
-        case .inProgress: "Devam ediyor"
-        case .completed: "Tamamlandı"
+        case .draft: L10n.text("household.planStatus.draft", "Taslak")
+        case .needsDecisions: L10n.text("household.planStatus.needsDecisions", "Karar gerekiyor")
+        case .ready: L10n.text("household.planStatus.ready", "Hazır")
+        case .inProgress: L10n.text("household.planStatus.inProgress", "Devam ediyor")
+        case .completed: L10n.text("household.planStatus.completed", "Tamamlandı")
         }
     }
 }
@@ -129,45 +129,48 @@ enum HouseholdError: Error, Equatable, LocalizedError, Sendable {
     case sessionExpired
     case offline
     case syncFailed(String)
+    case regional(RegionalErrorCode)
 
     var errorDescription: String? {
         switch self {
         case .nameEmpty:
-            "Ev halkına bir ad ver."
+            L10n.text("household.error.nameEmpty", "Ev halkına bir ad ver.")
         case .alreadyInHousehold:
-            "Zaten bir ev halkındasın. V4'te tek ev vardır."
+            L10n.text("household.error.alreadyInHousehold", "Zaten bir ev halkındasın. V4'te tek ev vardır.")
         case .notOwner:
-            "Bunu yalnızca ev sahibi yapabilir."
+            L10n.text("household.error.notOwner", "Bunu yalnızca ev sahibi yapabilir.")
         case .notMember:
-            "Bu ev halkının üyesi değilsin."
+            L10n.text("household.error.notMember", "Bu ev halkının üyesi değilsin.")
         case .householdFull:
-            "Bu ev iki kişiyle dolu."
+            L10n.text("household.error.householdFull", "Bu ev iki kişiyle dolu.")
         case .inviteNotFound:
-            "Davet kodu bulunamadı."
+            L10n.text("household.error.inviteNotFound", "Davet kodu bulunamadı.")
         case .inviteExpired:
-            "Bu davetin süresi dolmuş."
+            L10n.text("household.error.inviteExpired", "Bu davetin süresi dolmuş.")
         case .inviteRevoked:
-            "Bu davet geri alınmış."
+            L10n.text("household.error.inviteRevoked", "Bu davet geri alınmış.")
         case .inviteClosed:
-            "Bu davet kullanılmış."
+            L10n.text("household.error.inviteClosed", "Bu davet kullanılmış.")
         case .alreadyMember:
-            "Zaten bu ev halkındasın."
+            L10n.text("household.error.alreadyMember", "Zaten bu ev halkındasın.")
         case .duplicateInvite:
-            "Zaten açık bir davet var. Yeniden gönderebilir veya geri alabilirsin."
+            L10n.text("household.error.duplicateInvite", "Zaten açık bir davet var. Yeniden gönderebilir veya geri alabilirsin.")
         case .mealNotFound:
-            "Bu akşam planda yok."
+            L10n.text("household.error.mealNotFound", "Bu akşam planda yok.")
         case .noAlternative:
-            "Bu filtrelere uyan başka tarif kalmadı."
+            L10n.text("household.error.noAlternative", "Bu filtrelere uyan başka tarif kalmadı.")
         case .planNotReady:
-            "Plan henüz netleşmedi. Önce veto edilen akşamları çözün."
+            L10n.text("household.error.planNotReady", "Plan henüz netleşmedi. Önce veto edilen akşamları çözün.")
         case .notSignedIn:
-            "Ev halkı için Apple ile giriş gerekir."
+            L10n.text("household.error.notSignedIn", "Ev halkı için Apple ile giriş gerekir.")
         case .sessionExpired:
-            "Oturumun sona erdi. Tekrar giriş yap."
+            L10n.text("household.error.sessionExpired", "Oturumun sona erdi. Tekrar giriş yap.")
         case .offline:
-            "iCloud şu an yok. Değişiklik bu telefonda duruyor."
+            L10n.text("household.error.offline", "iCloud şu an yok. Değişiklik bu telefonda duruyor.")
         case .syncFailed(let detail):
-            "Eşitleme tamamlanamadı. \(detail)"
+            L10n.format("household.error.syncFailed", "Eşitleme tamamlanamadı. %@", detail)
+        case .regional(let code):
+            code.message
         }
     }
 }
@@ -334,15 +337,96 @@ struct SharedMealPlan: Codable, Equatable, Sendable, Identifiable {
     var updatedAt: Date
 }
 
+/// What an activity row says, as a code. Rendered per display language by `HouseholdActivity`.
+enum HouseholdActivityDetail: String, Codable, CaseIterable, Sendable {
+    case householdCreated
+    case memberJoined
+    case memberRemoved
+    case memberLeft
+    case planCreated
+    case want
+    case okay
+    case veto
+    case replaced
+    case cooked
+    case planFinalized
+
+    init(reaction: MealReactionKind) {
+        switch reaction {
+        case .want: self = .want
+        case .okay: self = .okay
+        case .veto: self = .veto
+        }
+    }
+
+    /// Whole-week rows have no meal; their title is rendered, not stored.
+    var isPlanLevel: Bool { self == .planCreated || self == .planFinalized }
+
+    /// Text V5.0 and older clients read from `detail` / `mealTitle` in a synced snapshot. Fixed
+    /// Turkish on purpose (it is wire data for those builds, like the server's legacy map); this
+    /// build renders `text(subject:)` instead.
+    func legacyText(subject: String) -> String {
+        switch self {
+        case .householdCreated: "Ev halkı kuruldu"
+        case .memberJoined: "\(subject) katıldı"
+        case .memberRemoved: "\(subject) çıkarıldı"
+        case .memberLeft: "\(subject) ayrıldı"
+        case .planCreated: "Ortak plan kuruldu"
+        case .want: "İstiyorum"
+        case .okay: "Olur"
+        case .veto: "Bu hafta olmaz"
+        case .replaced: "Yerine \(subject) geldi"
+        case .cooked: "Pişti"
+        case .planFinalized: "Plan netleşti"
+        }
+    }
+
+    static let legacyPlanTitle = "Bu hafta"
+
+    func text(subject: String) -> String {
+        switch self {
+        case .householdCreated: L10n.text("household.activity.created", "Ev halkı kuruldu")
+        case .memberJoined: L10n.format("household.activity.memberJoined", "%@ katıldı", subject)
+        case .memberRemoved: L10n.format("household.activity.memberRemoved", "%@ çıkarıldı", subject)
+        case .memberLeft: L10n.format("household.activity.memberLeft", "%@ ayrıldı", subject)
+        case .planCreated: L10n.text("household.activity.planCreated", "Ortak plan kuruldu")
+        case .want: MealReactionKind.want.title
+        case .okay: MealReactionKind.okay.title
+        case .veto: MealReactionKind.veto.title
+        case .replaced: L10n.format("household.activity.replaced", "Yerine %@ geldi", subject)
+        case .cooked: L10n.text("household.activity.cooked", "Pişti")
+        case .planFinalized: L10n.text("household.activity.planFinalized", "Plan netleşti")
+        }
+    }
+}
+
 struct HouseholdActivity: Codable, Equatable, Sendable, Identifiable {
     var id: UUID
     var householdId: UUID
     var actorId: String
     var actorName: String
     var kind: HouseholdActivityKind
+    /// Recipe or household name (user data). Plan-level rows carry the legacy "Bu hafta" text.
     var mealTitle: String
+    /// Legacy Turkish sentence for V5.0 and older clients. Read only when `detailCode` is absent.
     var detail: String
     var createdAt: Date
+    /// `HouseholdActivityDetail` raw value. A string so a code from a newer build still decodes.
+    var detailCode: String? = nil
+    /// Name the detail sentence refers to (member or recipe), user data only.
+    var subject: String? = nil
+
+    var detailKind: HouseholdActivityDetail? { detailCode.flatMap { HouseholdActivityDetail(rawValue: $0) } }
+
+    var displayTitle: String {
+        if detailKind?.isPlanLevel == true { return L10n.text("household.activity.planTitle", "Bu hafta") }
+        return mealTitle
+    }
+
+    var displayDetail: String {
+        guard let kind = detailKind else { return detail }
+        return kind.text(subject: subject ?? "")
+    }
 }
 
 struct HouseholdPush: Equatable, Sendable, Identifiable {
@@ -641,10 +725,10 @@ enum HouseholdCompatibilityLabel: String, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .greatMatch: "İkiniz için de uyumlu"
-        case .goodMatch: "İyi uyum"
-        case .unsure: "Biri henüz emin değil"
-        case .needsDecision: "Karar gerekiyor"
+        case .greatMatch: L10n.text("household.match.greatMatch", "İkiniz için de uyumlu")
+        case .goodMatch: L10n.text("household.match.goodMatch", "İyi uyum")
+        case .unsure: L10n.text("household.match.unsure", "Biri henüz emin değil")
+        case .needsDecision: L10n.text("household.match.needsDecision", "Karar gerekiyor")
         }
     }
 }
@@ -756,7 +840,7 @@ enum HouseholdReducer {
             kind: .householdCreated,
             actor: user,
             title: trimmed,
-            detail: "Ev halkı kuruldu",
+            code: .householdCreated,
             now: now
         )
         return snapshot
@@ -959,7 +1043,8 @@ enum HouseholdReducer {
             kind: .memberJoined,
             actor: user,
             title: household.name,
-            detail: "\(displayName(user)) katıldı",
+            code: .memberJoined,
+            subject: displayName(user),
             now: now
         )
         refreshPlan(&snapshot)
@@ -980,10 +1065,11 @@ enum HouseholdReducer {
             &snapshot,
             kind: .memberRemoved,
             actorId: actorId,
-            actorName: snapshot.member(actorId)?.displayName ?? "Ev sahibi",
+            actorName: snapshot.member(actorId)?.displayName ?? L10n.text("household.role.owner", "Ev sahibi"),
             householdId: snapshot.household?.id ?? UUID(),
             title: member.displayName,
-            detail: "\(member.displayName) çıkarıldı",
+            code: .memberRemoved,
+            subject: member.displayName,
             now: now
         )
         refreshPlan(&snapshot)
@@ -1018,7 +1104,8 @@ enum HouseholdReducer {
             actorName: member.displayName,
             householdId: snapshot.household?.id ?? UUID(),
             title: member.displayName,
-            detail: "\(member.displayName) ayrıldı",
+            code: .memberLeft,
+            subject: member.displayName,
             now: now
         )
         refreshPlan(&snapshot)
@@ -1110,8 +1197,8 @@ enum HouseholdReducer {
             &snapshot,
             kind: .planGenerated,
             actor: actor,
-            title: "Bu hafta",
-            detail: "Ortak plan kuruldu",
+            title: "",
+            code: .planCreated,
             now: now
         )
         touch(&snapshot, now: now)
@@ -1159,7 +1246,7 @@ enum HouseholdReducer {
         case .okay: .okay
         case .veto: .veto
         }
-        append(&snapshot, kind: kind, actor: user, title: meal.title, detail: reaction.title, now: now)
+        append(&snapshot, kind: kind, actor: user, title: meal.title, code: HouseholdActivityDetail(reaction: reaction), now: now)
         refreshPlan(&snapshot)
         touch(&snapshot, now: now)
         return stored
@@ -1200,7 +1287,7 @@ enum HouseholdReducer {
         selected.selectedCount += 1
         selected.revision += 1
         upsertMemory(selected, in: &snapshot)
-        append(&snapshot, kind: .replacement, actor: actor, title: title, detail: "Yerine \(title) geldi", now: now)
+        append(&snapshot, kind: .replacement, actor: actor, title: title, code: .replaced, subject: title, now: now)
         refreshPlan(&snapshot)
         touch(&snapshot, now: now)
     }
@@ -1233,7 +1320,7 @@ enum HouseholdReducer {
             }
             signal.revision += 1
             upsertMemory(signal, in: &snapshot)
-            append(&snapshot, kind: .mealCooked, actor: actor, title: meal.title, detail: "Pişti", now: now)
+            append(&snapshot, kind: .mealCooked, actor: actor, title: meal.title, code: .cooked, now: now)
         }
         refreshPlan(&snapshot)
         touch(&snapshot, now: now)
@@ -1254,7 +1341,7 @@ enum HouseholdReducer {
         plan.revision += 1
         plan.updatedAt = now
         snapshot.plan = plan
-        append(&snapshot, kind: .planFinalized, actor: actor, title: "Bu hafta", detail: "Plan netleşti", now: now)
+        append(&snapshot, kind: .planFinalized, actor: actor, title: "", code: .planFinalized, now: now)
         refreshPlan(&snapshot)
         touch(&snapshot, now: now)
     }
@@ -1371,7 +1458,7 @@ enum HouseholdReducer {
 
     static func displayName(_ user: HouseholdUser) -> String {
         let trimmed = user.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Partner" : trimmed
+        return trimmed.isEmpty ? L10n.text("household.member.fallbackName", "Partner") : trimmed
     }
 
     private static func expireStaleInvites(_ snapshot: inout HouseholdSnapshot, now: Date) {
@@ -1405,7 +1492,8 @@ enum HouseholdReducer {
         kind: HouseholdActivityKind,
         actor: HouseholdUser,
         title: String,
-        detail: String,
+        code: HouseholdActivityDetail,
+        subject: String = "",
         now: Date
     ) {
         append(
@@ -1415,7 +1503,8 @@ enum HouseholdReducer {
             actorName: displayName(actor),
             householdId: snapshot.household?.id ?? UUID(),
             title: title,
-            detail: detail,
+            code: code,
+            subject: subject,
             now: now
         )
     }
@@ -1427,7 +1516,8 @@ enum HouseholdReducer {
         actorName: String,
         householdId: UUID,
         title: String,
-        detail: String,
+        code: HouseholdActivityDetail,
+        subject: String = "",
         now: Date
     ) {
         snapshot.activities.insert(
@@ -1437,9 +1527,11 @@ enum HouseholdReducer {
                 actorId: actorId,
                 actorName: actorName,
                 kind: kind,
-                mealTitle: title,
-                detail: detail,
-                createdAt: now
+                mealTitle: code.isPlanLevel ? HouseholdActivityDetail.legacyPlanTitle : title,
+                detail: code.legacyText(subject: subject),
+                createdAt: now,
+                detailCode: code.rawValue,
+                subject: subject.isEmpty ? nil : subject
             ),
             at: 0
         )
@@ -1694,16 +1786,16 @@ enum HouseholdNotificationPolicy {
         switch activity.kind {
         case .planGenerated:
             kind = .planReview
-            body = "Haftalık planın kararını bekliyor."
+            body = L10n.text("household.push.planReview", "Haftalık planın kararını bekliyor.")
         case .veto:
             kind = .veto
-            body = "\(activity.actorName), \(activity.mealTitle) için bu hafta olmaz dedi."
+            body = L10n.format("household.push.veto", "%1$@, %2$@ için bu hafta olmaz dedi.", activity.actorName, activity.mealTitle)
         case .replacement:
             kind = .replacement
-            body = "\(activity.actorName) yerine \(activity.mealTitle) önerdi."
+            body = L10n.format("household.push.replacement", "%1$@ yerine %2$@ önerdi.", activity.actorName, activity.mealTitle)
         case .planFinalized:
             kind = .planFinalized
-            body = "Bu haftanın planı hazır."
+            body = L10n.text("household.push.planFinalized", "Bu haftanın planı hazır.")
         case .householdCreated, .memberJoined, .memberRemoved, .want, .okay, .mealCooked, .groceryChecked:
             kind = nil
             body = ""

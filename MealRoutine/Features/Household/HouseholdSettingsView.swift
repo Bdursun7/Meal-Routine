@@ -434,12 +434,12 @@ struct HouseholdSettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(activity.actorName)
                             .font(.subheadline.weight(.semibold))
-                        Text("\(activity.mealTitle) · \(activity.detail)")
+                        Text(verbatim: "\(activity.displayTitle) · \(activity.displayDetail)")
                             .font(.footnote)
                             .foregroundStyle(Theme.secondaryText)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(activity.actorName), \(activity.mealTitle), \(activity.detail)")
+                    .accessibilityLabel(Text(verbatim: "\(activity.actorName), \(activity.displayTitle), \(activity.displayDetail)"))
                 }
             }
         } header: {

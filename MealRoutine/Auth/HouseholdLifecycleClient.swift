@@ -145,8 +145,9 @@ struct HouseholdLifecycleAPI: Sendable {
         case "session_expired":
             return .sessionExpired
         default:
+            if let regional = code.flatMap({ RegionalErrorCode(rawValue: $0) }) { return .regional(regional) }
             if status == 401 { return .sessionExpired }
-            return .syncFailed("Sunucu \(status) döndü.")
+            return .syncFailed(L10n.format("household.error.serverStatus", "Sunucu %ld döndü.", status))
         }
     }
 
