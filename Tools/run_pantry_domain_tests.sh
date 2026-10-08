@@ -16,6 +16,8 @@ for file in \
   Services/GroceryListReconciler.swift \
   Services/GroceryMerger.swift \
   Support/Formatters.swift \
+  Support/RegionalSettings.swift \
+  Support/L10n.swift \
   Models/MealRating.swift; do
   ln -sf "$ROOT/MealRoutine/$file" "$PKG/Sources/MealRoutine/$(basename "$file")"
 done

@@ -23,6 +23,8 @@ OUT="${TMPDIR:-/tmp}/household-checks"
   "$ROOT/MealRoutine/Services/PantryDomain.swift" \
   "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
   "$ROOT/MealRoutine/Support/Formatters.swift" \
+  "$ROOT/MealRoutine/Support/RegionalSettings.swift" \
+  "$ROOT/MealRoutine/Support/L10n.swift" \
   "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
   "$ROOT/MealRoutine/Services/GroceryQuantityEdit.swift" \
   "$ROOT/MealRoutine/Services/GroceryListReconciler.swift" \

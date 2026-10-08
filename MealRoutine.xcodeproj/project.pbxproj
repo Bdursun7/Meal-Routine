@@ -158,6 +158,10 @@
 		V41B41A000000000000000B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = V41P41A0000000000000002 /* GoogleSignIn */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
+		75014A293F136FB4EFB580E7 /* RegionalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3571822B9362F1C0EDEAE301 /* RegionalSettings.swift */; };
+		3661BFF3900A12F05EF81E61 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DCA367595A926A4DFA00DF9 /* L10n.swift */; };
+		75098B56D3CE5B432AC4C8C8 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0F54ABA15001AF079D3133 /* Money.swift */; };
+		3D8C1AC0C268C1373A302485 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 9F50195C60D831482E96A1C7 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 
@@ -337,6 +341,10 @@
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		HTLF000000000000000001 /* Debug-Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug-Local.xcconfig; sourceTree = "<group>"; };
+		3571822B9362F1C0EDEAE301 /* RegionalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionalSettings.swift; sourceTree = "<group>"; };
+		0DCA367595A926A4DFA00DF9 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
+		3D0F54ABA15001AF079D3133 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
+		9F50195C60D831482E96A1C7 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -399,6 +407,7 @@
 				CA1F34867F9C14EB179064F8 /* Support */,
 				V4GRP0000000000000001 /* Household */,
 				V41G41A0000000000000001 /* Auth */,
+				9F50195C60D831482E96A1C7 /* Localizable.xcstrings */,
 			);
 			path = MealRoutine;
 			sourceTree = "<group>";
@@ -616,6 +625,9 @@
 				FAECC4845BB7251D105C954C /* RecipeRoute.swift */,
 				FA4AF2A1C5DE9BC8BB60B2CE /* WeekCalendar.swift */,
 				T17F00000000000000000001 /* WeekPresentationRules.swift */,
+				3571822B9362F1C0EDEAE301 /* RegionalSettings.swift */,
+				0DCA367595A926A4DFA00DF9 /* L10n.swift */,
+				3D0F54ABA15001AF079D3133 /* Money.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -885,6 +897,7 @@
 				BA460A646DD6DDF48F7CA56B /* ingredient-aliases.tr.json in Resources */,
 				BA341F75B64DDC998C31DB99 /* recipes.v1.json in Resources */,
 				V50B50A0000000000000005 /* ingredients.v1.json in Resources */,
+				3D8C1AC0C268C1373A302485 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1029,6 +1042,9 @@
 				V44B44A0000000000000002 /* LocalMigrationView.swift in Sources */,
 				V45B45A0000000000000003 /* NotificationsView.swift in Sources */,
 				V41B41A0000000000000008 /* AccountView.swift in Sources */,
+				75014A293F136FB4EFB580E7 /* RegionalSettings.swift in Sources */,
+				3661BFF3900A12F05EF81E61 /* L10n.swift in Sources */,
+				75098B56D3CE5B432AC4C8C8 /* Money.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

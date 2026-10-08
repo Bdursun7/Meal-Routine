@@ -22,6 +22,8 @@ OUT="${TMPDIR:-/tmp}/meal-product-gap-checks"
   "$ROOT/MealRoutine/Services/PreferenceInsight.swift" \
   "$ROOT/MealRoutine/Services/Analytics.swift" \
   "$ROOT/MealRoutine/Support/Formatters.swift" \
+  "$ROOT/MealRoutine/Support/RegionalSettings.swift" \
+  "$ROOT/MealRoutine/Support/L10n.swift" \
   "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
   "$ROOT/MealRoutine/Services/PantryDomain.swift" \
   "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
