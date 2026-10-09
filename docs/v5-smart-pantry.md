@@ -1,8 +1,8 @@
 # MealRoutine V5 — Smart Pantry
 
-**Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Meal Budget
+**Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V5.1 Integration Readiness Fixes (if required) → V6 Balanced Nutrition → V7 Globalization & Localization
 
-**Durum:** V5 kapsamındaki her madde uygulandı; ertelenen kapsam içi iş yok. Merkezi ingredient sözlüğü, `dateType` / `dateValue`, server-authoritative household pantry, offline queue ve conflict çözümü, market ve planner entegrasyonu `V5.0`’a açılan PR’da. Sunucu, Postgres ve iOS domain testleri geçti. Xcode derlemesi, `PantryTests` ve cihazda VoiceOver / Dynamic Type / Dark Mode turu Mac gerektirir; ayrıntı `docs/v5-release-gate.md`.
+**Durum (kod dalı denetimi):** V5.0'ın ana Pantry akışları (merkezi ingredient sözlüğü, dateType / dateValue, server-authoritative household pantry, offline queue, conflict çözümü, market/planner entegrasyonu) V5.0 dalında mevcut. docs/v5-release-gate.md otomatik sunucu/Postgres/domain testlerinin geçtiğini bildiriyor; Xcode derlemesi, PantryTests ve cihazda VoiceOver / Dynamic Type / Dark Mode turu Mac doğrulaması gerektiriyor. Güncellenen ürün kararlarındaki tarih hatırlatmaları, düşük stok bildirimleri ve Cooked sonrası onaylı stok tüketimi bu kod incelemesinde doğrulanmadı; bunlar docs/v5.1-integration-readiness-fixes.md içinde V6 öncesi kapı olarak izlenir.
 
 **V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı tamamlandı. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez.
 
@@ -12,7 +12,7 @@ V5, evde bulunan malzemeleri haftalık plan ve ortak market listesiyle birleşti
 
 Pantry, planı sessizce değiştiren bir otomasyon değildir. Kullanıcı hangi malzemenin hesaba katıldığını, ne kadar eksik kaldığını ve hangi işlemin stoktan düşüm yaptığını görebilir.
 
-V5, V1–V4.1 davranışlarını korur. Bütçe ve maliyet hesabı V6 Meal Budget kapsamındadır.
+V5, V1–V4.1 davranışlarını korur. Fiyat ve bütçe hesabı V5 kapsamı dışındadır; V6 Balanced Nutrition da fiyat/bütçe sürümü değildir.
 
 ## 2. Ürün sınırı
 
@@ -100,7 +100,7 @@ PantryItem
 - `minimumQuantity` boş olabilir; doluysa negatif olamaz ve `quantity` ile aynı birim ailesinde olmalıdır.
 - Tarih bilgisi isteğe bağlıdır. Sistem kullanıcı girmediyse tarih uydurmaz.
 - `dateType` yalnızca `bestBefore` veya `useBy` olabilir.
-- `useBy` gerçek son tüketim tarihini, `bestBefore` ise tavsiye edilen tüketim tarihini ifade eder. Sistem bu iki tarihi aynı anlamda göstermez ve otomatik güvenlik kararı üretmez.
+- useBy ve bestBefore farklı tarih türleridir. Uygulama kullanıcının girdiği tarihi ve tarih türünü gösterir; güvenli/güvensiz gıda kararı vermez. Geçmiş tarih rozeti de güvenlik hükmü değil, yalnızca girilen tarihin geçtiğini bildiren nötr bir uyarı olmalıdır.
 - `updatedAt` ve `version` conflict çözümünde kullanılır.
 
 ### “Bitti” davranışı
@@ -153,7 +153,7 @@ Liste satırı en az şunları gösterir:
 - Minimum miktar varsa eşik bilgisi
 - Tarih bilgisi varsa tarih ve türü
 - Eksik veya yaklaşan durum için açık Türkçe etiket
-- `useBy` tarihi geçmişse güvenlik uyarısı; `bestBefore` tarihi geçmişse kalite/tazelik uyarısı
+- useBy veya bestBefore tarihi geçmişse tarih türünü açıkça belirten, gıdanın güvenli/güvensiz olduğunu iddia etmeyen tarih uyarısı
 
 ### Boş durum
 
@@ -452,4 +452,18 @@ V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır:
 
 Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette yalnızca eksik olan miktarı satın alacak şekilde plan yapabilir. Household üyeleri aynı pantry state'ini server üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
 
-V5, MealRoutine'a stok farkındalığı kazandırır. V5 pantry tarafında fiyat verisi tutmaz ve maliyet hesabı yapmaz. Fiyat, bütçe ve maliyet kararları V6 Meal Budget'a bırakılır.
+V5, MealRoutine'a stok farkındalığı kazandırır. Pantry fiyat veya bütçe verisi tutmaz. V6 Balanced Nutrition haftalık yemek planının çeşitliliğini ve seçilen beslenme yönünü ele alır; kalori/makro hesapları ve fiyat/bütçe özellikleri bu sürümün kapsamı dışındadır.
+
+
+## 22. V5.1 Integration Readiness — V6 öncesi kontrol
+
+Bu bölüm V5.0'da var olduğu kanıtlanan özelliklerle daha sonra eklenen ürün kararlarını birbirinden ayırır. Aşağıdaki maddeler kodda uygulanmış sayılmaz; V6'ya geçmeden önce kod ve testlerle kapatılmalıdır.
+
+- [ ] Kullanıcı tarih hatırlatmalarını açıp kapatabilir; tarih değiştiğinde eski bildirim iptal edilir, yeni tarihe göre planlanır; öğe tüketilince veya silinince bildirim iptal edilir.
+- [ ] Varsayılan tarih hatırlatması kullanıcı tarafından girilen tarih için 2 gün önce ve tarihin kendisindedir; kullanıcı takvimi değiştirebilir. Bildirim teslim zamanı garanti edilmez.
+- [ ] Düşük stok bildirimi isteğe bağlıdır; yalnız eşik üstünden eşik altına geçişte tetiklenir ve aynı düşük stok durumu için tekrarlanmaz.
+- [ ] Minimum stok altına düşünce market listesine otomatik ekleme varsayılan olarak kapalıdır. Kullanıcı açarsa işlem idempotenttir ve mevcut market satırını ikinci kez çoğaltmaz.
+- [ ] Cooked işaretlemesi tek başına stoku değiştirmez. Kullanıcı tarifin malzemelerini ve stokta mevcut miktarı görür, tüketimi açıkça onaylar. Yalnızca mevcut stoktan düşülür; eksik miktar sessizce markete eklenmez.
+- [ ] useBy geçmiş tarihinin metni “Son tüketim tarihi geçti” gibi nötr olmalıdır; güvenli/güvensiz hükmü verilmez. bestBefore ayrı kalite/tazelik açıklaması kullanır.
+- [ ] WidgetKit widget bu V5 kapsamına eklenmez. “Bugünün Yemeği” widget'ı V6 kapsamındadır.
+- [ ] Bu maddelerin her biri için unit/integration/UI testi vardır; V1–V4.1 regresyonu korunur.
