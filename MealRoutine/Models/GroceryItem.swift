@@ -95,9 +95,13 @@ final class PantryItem {
     var unit: String
     var locationRaw: String
     var minimumQuantity: Double?
-    /// The user's date (`dateValue`). The stored name predates the `dateType` split.
+    /// Legacy V5.0 instant. The column stays `Date` so an existing store opens.
+    /// A value here is not a calendar day and is never formatted into `dateValue`.
     var bestBefore: Date?
-    /// `PantryDateType` raw value. Nil on rows saved before V5 had a type; those read as `bestBefore`.
+    /// Canonical pantry day, `YYYY-MM-DD`. Nil when the user entered no date.
+    /// Added as an optional column so stores saved before V5.1 still open.
+    var calendarDay: String? = nil
+    /// `PantryDateType` raw value. Nil when `calendarDay` is nil.
     var dateTypeRaw: String?
     /// Server `version` this cache row was last confirmed at, plus local edits not yet confirmed.
     var revision: Int
@@ -113,34 +117,55 @@ final class PantryItem {
         location: PantryLocation = .pantry,
         minimumQuantity: Double? = nil,
         dateType: PantryDateType? = nil,
-        dateValue: Date? = nil,
+        dateValue: String? = nil,
         revision: Int = 1,
         updatedAt: Date = .now
     ) {
         self.uuid = uuid; self.householdID = householdID; self.ingredientID = ingredientID; self.displayName = displayName
         self.quantity = quantity; self.unit = unit; self.locationRaw = location.rawValue; self.minimumQuantity = minimumQuantity
-        self.bestBefore = dateValue; self.dateTypeRaw = dateValue == nil ? nil : (dateType ?? .bestBefore).rawValue
+        let day = PantryDay.canonical(dateValue)
+        self.calendarDay = day
+        self.bestBefore = nil
+        self.dateTypeRaw = day == nil ? nil : (dateType ?? .bestBefore).rawValue
         self.revision = revision; self.updatedAt = updatedAt
     }
 
     var location: PantryLocation { get { PantryLocation(rawValue: locationRaw) ?? .other } set { locationRaw = newValue.rawValue } }
 
-    var dateValue: Date? { bestBefore }
+    var dateValue: String? { calendarDay }
+
+    /// True when this row still holds a V5.0 instant and no calendar day.
+    var hasLegacyDateInstant: Bool { bestBefore != nil && calendarDay == nil }
 
     var dateType: PantryDateType? {
-        guard bestBefore != nil else { return nil }
+        guard calendarDay != nil else { return nil }
         return dateTypeRaw.flatMap(PantryDateType.init(rawValue:)) ?? .bestBefore
     }
 
-    /// Both or neither: a date never exists without its type.
-    func setDate(_ type: PantryDateType?, _ value: Date?) {
-        if let type, let value {
-            bestBefore = value
-            dateTypeRaw = type.rawValue
-        } else {
-            bestBefore = nil
-            dateTypeRaw = nil
+    var dateAuthority: PantryDateAuthority {
+        if let day = calendarDay, let type = dateType {
+            return .day(type, day)
         }
+        if hasLegacyDateInstant { return .legacyInstant }
+        return .none
+    }
+
+    /// Both or neither. A stored day is `YYYY-MM-DD`. The legacy instant is cleared.
+    func setDate(_ type: PantryDateType?, _ day: String?) {
+        if let type, let day = PantryDay.canonical(day) {
+            calendarDay = day
+            dateTypeRaw = type.rawValue
+            bestBefore = nil
+        } else {
+            calendarDay = nil
+            dateTypeRaw = nil
+            bestBefore = nil
+        }
+    }
+
+    /// Copies the server day and drops any legacy instant. Does not read `bestBefore`.
+    func applyServerDate(type: PantryDateType?, day: String?) {
+        setDate(type, PantryHouseholdDate.canonicalDay(serverDateValue: day))
     }
 
     var isLowStock: Bool { minimumQuantity.map { quantity <= $0 } ?? false }

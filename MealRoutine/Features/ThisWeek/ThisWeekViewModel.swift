@@ -183,7 +183,7 @@ final class ThisWeekViewModel {
             hasher.combine(stock.ingredientId)
             hasher.combine(stock.quantity)
             hasher.combine(stock.dateType?.rawValue ?? "")
-            hasher.combine(stock.dateValue?.timeIntervalSinceReferenceDate ?? -1)
+            hasher.combine(stock.dateValue ?? "")
         }
         for meal in week.meals {
             hasher.combine(meal.uuid)

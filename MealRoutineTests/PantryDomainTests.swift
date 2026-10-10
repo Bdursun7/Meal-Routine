@@ -84,13 +84,12 @@ final class PantryDomainTests: XCTestCase {
     // MARK: Dates
 
     func testUseByAndBestBeforeWarnDifferently() {
-        let now = day("2026-10-07")
-        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, date: day("2026-10-05"), now: now, calendar: utc), .pastUseBy(daysAgo: 2))
-        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-05"), now: now, calendar: utc), .pastBestBefore(daysAgo: 2))
-        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, date: day("2026-10-07"), now: now, calendar: utc), .approaching(daysLeft: 0))
-        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-10"), now: now, calendar: utc), .approaching(daysLeft: 3))
-        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, date: day("2026-10-11"), now: now, calendar: utc), .upcoming(daysLeft: 4))
-        XCTAssertEqual(PantryDateStatus.evaluate(type: nil, date: nil, now: now, calendar: utc), .none)
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, day: "2026-10-05", today: "2026-10-07"), .pastUseBy(daysAgo: 2))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, day: "2026-10-05", today: "2026-10-07"), .pastBestBefore(daysAgo: 2))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, day: "2026-10-07", today: "2026-10-07"), .approaching(daysLeft: 0))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, day: "2026-10-10", today: "2026-10-07"), .approaching(daysLeft: 3))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, day: "2026-10-11", today: "2026-10-07"), .upcoming(daysLeft: 4))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: nil, day: nil, today: "2026-10-07"), .none)
         XCTAssertNotEqual(PantryDateType.useBy.title, PantryDateType.bestBefore.title)
     }
 
@@ -98,48 +97,197 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(PantryDay.string(from: day("2026-02-28"), calendar: utc), "2026-02-28")
         XCTAssertNil(PantryDay.date(from: "2026-02-30", calendar: utc))
         XCTAssertNil(PantryDay.date(from: "yarın", calendar: utc))
+        XCTAssertNil(PantryDay.canonical("2026-02-30"))
+        XCTAssertNil(PantryDay.canonical("2026-10-09T00:00:00Z"))
+        XCTAssertEqual(PantryDay.canonical("2026-10-09"), "2026-10-09")
+    }
+
+    func testCalendarDayStaysPutAcrossTimeZones() throws {
+        let stored = "2026-10-09"
+        let zones = ["Europe/Istanbul", "America/Los_Angeles", "Pacific/Auckland"]
+        let todays = ["2026-10-08", "2026-10-09", "2026-10-10"]
+        for zone in zones {
+            let calendar = gregorian(zone)
+            let picked = PantryDay.date(from: stored, calendar: calendar)
+            XCTAssertEqual(PantryDay.string(from: try XCTUnwrap(picked), calendar: calendar), stored, zone)
+            XCTAssertEqual(PantryDay.format(stored, calendar: calendar), "9 Ekim 2026", zone)
+            for type in [PantryDateType.useBy, PantryDateType.bestBefore] {
+                for today in todays {
+                    let row = PantryRowPresentation.make(
+                        name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
+                        minimumQuantity: nil, dateType: type, dateValue: stored, today: today, calendar: calendar
+                    )
+                    XCTAssertTrue(row.date?.contains("9 Ekim 2026") == true, "\(zone) \(type) \(today) \(row.date ?? "")")
+                    XCTAssertFalse(row.date?.contains("8 Ekim") == true, zone)
+                    XCTAssertFalse(row.date?.contains("10 Ekim") == true, zone)
+                }
+            }
+            let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(datedBody(stored))) as? [String: Any]
+            XCTAssertEqual(body?["dateValue"] as? String, stored, zone)
+            XCTAssertEqual(PantryHouseholdDate.canonicalDay(serverDateValue: stored), stored, zone)
+        }
+        let istanbul = PantryDay.date(from: stored, calendar: gregorian("Europe/Istanbul"))
+        let shifted = PantryDay.string(from: try XCTUnwrap(istanbul), calendar: gregorian("America/Los_Angeles"))
+        XCTAssertEqual(shifted, "2026-10-08")
+        XCTAssertEqual(PantryHouseholdDate.canonicalDay(serverDateValue: stored), stored)
+        XCTAssertNotEqual(PantryHouseholdDate.canonicalDay(serverDateValue: stored), shifted)
+
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, day: stored, today: "2026-10-08"), .approaching(daysLeft: 1))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, day: stored, today: "2026-10-09"), .approaching(daysLeft: 0))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, day: stored, today: "2026-10-10"), .pastUseBy(daysAgo: 1))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .bestBefore, day: stored, today: "2026-10-10"), .pastBestBefore(daysAgo: 1))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: .useBy, day: "2026-10-20", today: stored), .upcoming(daysLeft: 11))
+        XCTAssertEqual(PantryDateStatus.evaluate(type: nil, day: nil, today: stored), .none)
+    }
+
+    func testLegacyPersonalDatedRowsAreRemovedOnce() {
+        let personalDated = LegacyPersonalPantryDateRow(id: UUID(), isPersonal: true, hasLegacyDateInstant: true)
+        let personalPlain = LegacyPersonalPantryDateRow(id: UUID(), isPersonal: true, hasLegacyDateInstant: false)
+        let householdDated = LegacyPersonalPantryDateRow(id: UUID(), isPersonal: false, hasLegacyDateInstant: true)
+        let householdPlain = LegacyPersonalPantryDateRow(id: UUID(), isPersonal: false, hasLegacyDateInstant: false)
+        let rows = [personalDated, personalPlain, householdDated, householdPlain]
+        let first = LegacyPersonalPantryDatePolicy.rowsToDelete(rows, alreadyRan: false)
+        XCTAssertEqual(first, Set([personalDated.id]))
+        XCTAssertFalse(first.contains(personalPlain.id))
+        XCTAssertFalse(first.contains(householdDated.id))
+        XCTAssertFalse(first.contains(householdPlain.id))
+        let kept = rows.filter { first.contains($0.id) == false }
+        XCTAssertTrue(LegacyPersonalPantryDatePolicy.rowsToDelete(kept, alreadyRan: false).isEmpty)
+        XCTAssertTrue(LegacyPersonalPantryDatePolicy.rowsToDelete(rows, alreadyRan: true).isEmpty)
+    }
+
+    func testLegacyHouseholdDateIsNotWrittenBack() throws {
+        let outbound = PantryOutboundDate.make(calendarDay: nil, dateType: nil, hasLegacyInstant: true)
+        XCTAssertEqual(outbound, .omit)
+        let omitted = PantryRemoteItem(
+            id: UUID(), householdId: UUID(), ingredientId: "tomato", displayName: "Domates",
+            quantity: 1, unit: "kg", location: .pantry, minimumQuantity: nil,
+            dateType: outbound.dateType, dateValue: outbound.dateValue, version: 2, sendsDate: outbound.sendsDate
+        )
+        let patch = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(PantryItemBody.patch(omitted))) as? [String: Any])
+        XCTAssertNil(patch["dateValue"])
+        XCTAssertNil(patch["dateType"])
+        XCTAssertEqual(PantryHouseholdDate.canonicalDay(serverDateValue: "2026-10-09"), "2026-10-09")
+
+        let fresh = PantryOutboundDate.make(calendarDay: "2026-10-09", dateType: .useBy, hasLegacyInstant: false)
+        XCTAssertEqual(fresh, .send(type: .useBy, day: "2026-10-09"))
+        let cleared = PantryOutboundDate.make(calendarDay: nil, dateType: nil, hasLegacyInstant: false)
+        XCTAssertEqual(cleared, .send(type: nil, day: nil))
+        XCTAssertEqual(PantryDateForm.edit(authority: .legacyInstant, hasDate: false, type: .useBy, pickedDay: nil), .leave)
+        XCTAssertEqual(PantryDateForm.edit(authority: .none, hasDate: false, type: .useBy, pickedDay: nil), .clear)
+        XCTAssertEqual(PantryDateForm.edit(authority: .legacyInstant, hasDate: true, type: .bestBefore, pickedDay: "2026-10-09"), .set(.bestBefore, "2026-10-09"))
+    }
+
+    private func gregorian(_ identifier: String) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: identifier) ?? utc.timeZone
+        return calendar
+    }
+
+    private func datedBody(_ day: String) -> PantryItemBody {
+        let item = PantryRemoteItem(
+            id: UUID(), householdId: UUID(), ingredientId: "milk", displayName: "Süt",
+            quantity: 1, unit: "l", location: .refrigerator, minimumQuantity: nil,
+            dateType: .useBy, dateValue: day, version: 1
+        )
+        return PantryItemBody.create(item, confirmSeparate: false)
     }
 
     func testRowShowsSafetyForUseByAndQualityForBestBefore() {
-        let now = day("2026-10-07")
         let safety = PantryRowPresentation.make(
             name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
-            minimumQuantity: nil, dateType: .useBy, dateValue: day("2026-10-06"), now: now, calendar: utc
+            minimumQuantity: nil, dateType: .useBy, dateValue: "2026-10-06", today: "2026-10-07", calendar: utc
         )
         XCTAssertEqual(safety.badges.first?.tone, .critical)
-        XCTAssertTrue(safety.badges.first?.text.hasPrefix("Güvenlik uyarısı") == true)
+        XCTAssertEqual(safety.badges.first?.text, PantryCopy.pastUseBy)
         XCTAssertTrue(safety.date?.hasPrefix("Son tüketim tarihi (STT)") == true)
 
         let quality = PantryRowPresentation.make(
             name: "Makarna", ingredientResolved: true, quantity: 500, unit: "g", location: .pantry,
-            minimumQuantity: nil, dateType: .bestBefore, dateValue: day("2026-10-06"), now: now, calendar: utc
+            minimumQuantity: nil, dateType: .bestBefore, dateValue: "2026-10-06", today: "2026-10-07", calendar: utc
         )
         XCTAssertEqual(quality.badges.first?.tone, .warning)
-        XCTAssertTrue(quality.badges.first?.text.hasPrefix("Tazelik uyarısı") == true)
-        XCTAssertFalse(quality.badges.contains { $0.text.contains("Güvenlik") })
+        XCTAssertEqual(quality.badges.first?.text, PantryCopy.pastBestBefore)
         XCTAssertTrue(quality.date?.hasPrefix("Tavsiye edilen tüketim tarihi (TETT)") == true)
+        assertNoSafetyVerdict(in: [safety, quality])
+    }
+
+    /// User-facing pantry date copy only: `PantryCopy`, the two date-type titles, and the
+    /// row text for both types across past, today, and later days. This is not a scan of
+    /// every word that happens to contain "güven".
+    func testDateCopyDoesNotReturnASafetyVerdict() {
+        let phrases = [
+            "Güvenlik uyarısı",
+            "Tazelik uyarısı",
+            "güvenlik içindir",
+            "son güvenli gün",
+            "last safe day",
+            "bu ürün yenmez",
+            "güvenli değildir",
+            "güvenlidir",
+            "yenilmez",
+        ]
+        var texts = PantryCopy.userFacing
+        texts.append(contentsOf: PantryDateType.allCases.flatMap { [$0.title, $0.shortTitle] })
+        let samples = ["2026-10-08", "2026-10-09", "2026-10-10", "2026-10-20"]
+        for type in [PantryDateType.useBy, PantryDateType.bestBefore] {
+            for sample in samples {
+                let row = PantryRowPresentation.make(
+                    name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
+                    minimumQuantity: nil, dateType: type, dateValue: sample, today: "2026-10-09", calendar: utc
+                )
+                texts.append(contentsOf: row.badges.map { $0.text })
+                if let date = row.date { texts.append(date) }
+                texts.append(row.accessibilityLabel)
+            }
+        }
+        let undated = PantryRowPresentation.make(
+            name: "Tuz", ingredientResolved: true, quantity: 1, unit: "kg", location: .pantry,
+            minimumQuantity: nil, dateType: nil, dateValue: nil, today: "2026-10-09", calendar: utc
+        )
+        texts.append(contentsOf: undated.badges.map { $0.text })
+        texts.append(undated.accessibilityLabel)
+        for text in texts {
+            for phrase in phrases {
+                XCTAssertFalse(text.localizedCaseInsensitiveContains(phrase), "\(phrase) in \(text)")
+            }
+        }
+        XCTAssertEqual(PantryCopy.pastUseBy, "Girilen son tüketim tarihi geçti")
+        XCTAssertEqual(PantryCopy.pastBestBefore, "Girilen tavsiye edilen tüketim tarihi geçti")
+        XCTAssertFalse(PantryCopy.dateFooter.localizedCaseInsensitiveContains("güvenlik"))
+    }
+
+    private func assertNoSafetyVerdict(in rows: [PantryRowPresentation]) {
+        let banned = ["Güvenlik uyarısı", "Tazelik uyarısı", "güvenlik içindir", "son güvenli gün"]
+        for row in rows {
+            let texts = row.badges.map { $0.text } + [row.date ?? "", row.accessibilityLabel]
+            for text in texts {
+                for phrase in banned {
+                    XCTAssertFalse(text.localizedCaseInsensitiveContains(phrase), phrase)
+                }
+            }
+        }
     }
 
     func testRowListsEveryGuideFieldAndSpeaksThem() {
-        let now = day("2026-10-07")
         let row = PantryRowPresentation.make(
             name: "Un", ingredientResolved: true, quantity: 200, unit: "g", location: .pantry,
-            minimumQuantity: 500, dateType: .bestBefore, dateValue: day("2026-10-09"), sync: .pending, now: now, calendar: utc
+            minimumQuantity: 500, dateType: .bestBefore, dateValue: "2026-10-09", sync: .pending, today: "2026-10-07", calendar: utc
         )
         XCTAssertEqual(row.amount, "200 g")
         XCTAssertEqual(row.location, "Kiler")
         XCTAssertEqual(row.minimum, "Minimum 500 g")
         XCTAssertEqual(row.date, "Tavsiye edilen tüketim tarihi (TETT): 9 Ekim 2026 (2 gün kaldı)")
-        XCTAssertEqual(row.badges.map(\.text), ["Tavsiye edilen tarih yaklaşıyor", PantryCopy.lowStock, PantryCopy.pending])
+        XCTAssertEqual(row.badges.map { $0.text }, ["Tavsiye edilen tarih yaklaşıyor", PantryCopy.lowStock, PantryCopy.pending])
         for piece in ["Un", "200 g", "Kiler", "Minimum 500 g", "TETT", PantryCopy.lowStock, PantryCopy.pending] {
             XCTAssertTrue(row.accessibilityLabel.contains(piece), piece)
         }
         let plain = PantryRowPresentation.make(
             name: "Tuz", ingredientResolved: false, quantity: 0, unit: "g", location: .other,
-            minimumQuantity: nil, dateType: nil, dateValue: nil, now: now, calendar: utc
+            minimumQuantity: nil, dateType: nil, dateValue: nil, today: "2026-10-07", calendar: utc
         )
         XCTAssertNil(plain.date)
-        XCTAssertEqual(plain.badges.map(\.text), [PantryCopy.outOfStock, PantryCopy.unmatched])
+        XCTAssertEqual(plain.badges.map { $0.text }, [PantryCopy.outOfStock, PantryCopy.unmatched])
     }
 
     // MARK: Units and Bitti
@@ -185,13 +333,15 @@ final class PantryDomainTests: XCTestCase {
     func testEditDraftLoadsTheStoredRowAndNeverSavesAnUnknownUnit() {
         let draft = PantryFormDraft.loaded(
             ingredientId: "tomatoes", name: "Domates", quantity: 500, unit: "g", location: .refrigerator,
-            minimumQuantity: 100, dateType: .useBy, dateValue: day("2026-10-09"), dictionary: dictionary
+            minimumQuantity: 100, dateType: .useBy, dateValue: "2026-10-09", dictionary: dictionary, calendar: utc
         )
         XCTAssertEqual(draft.ingredientId, "tomato")
         XCTAssertEqual(draft.quantityToSave, 500)
         XCTAssertEqual(draft.minimumText, "100")
         XCTAssertEqual(draft.dateType, .useBy)
         XCTAssertTrue(draft.hasDate)
+        XCTAssertEqual(draft.pickedDay(calendar: utc), "2026-10-09")
+        XCTAssertEqual(draft.dateEdit(calendar: utc), .set(.useBy, "2026-10-09"))
         XCTAssertTrue(draft.canSave)
 
         var blank = draft
@@ -394,13 +544,13 @@ final class PantryDomainTests: XCTestCase {
     func testApproachingDatesSignalButAPassedUseByNeverEarnsABonus() {
         let now = day("2026-10-07")
         let menemen = candidate("menemen", ingredients: ["tomatoes"])
-        let soon = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: day("2026-10-08"))]
-        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: soon, now: now, dictionary: dictionary), PantryCopy.approachingExpiry)
-        let expired = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: day("2026-10-06"))]
-        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: expired, now: now, dictionary: dictionary), 0)
-        XCTAssertNil(PantryPlanningSignal.explanation(candidate: menemen, stock: expired, now: now, dictionary: dictionary))
-        let stale = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .bestBefore, dateValue: day("2026-10-06"))]
-        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: stale, now: now, dictionary: dictionary), PantryCopy.usesStock)
+        let soon = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: "2026-10-08")]
+        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: soon, now: now, calendar: utc, dictionary: dictionary), PantryCopy.approachingExpiry)
+        let expired = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .useBy, dateValue: "2026-10-06")]
+        XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: expired, now: now, calendar: utc, dictionary: dictionary), 0)
+        XCTAssertNil(PantryPlanningSignal.explanation(candidate: menemen, stock: expired, now: now, calendar: utc, dictionary: dictionary))
+        let stale = [PantryPlanningStock(ingredientId: "tomato", quantity: 2, unit: "piece", dateType: .bestBefore, dateValue: "2026-10-06")]
+        XCTAssertEqual(PantryPlanningSignal.explanation(candidate: menemen, stock: stale, now: now, calendar: utc, dictionary: dictionary), PantryCopy.usesStock)
         let empty = [PantryPlanningStock(ingredientId: "tomato", quantity: 0, unit: "piece")]
         XCTAssertEqual(PantryPlanningSignal.score(candidate: menemen, stock: empty, now: now, dictionary: dictionary), 0)
     }

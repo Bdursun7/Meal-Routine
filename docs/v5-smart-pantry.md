@@ -5,9 +5,9 @@
 **Durum:** Dört durum birbirinin yerine geçmez.
 
 - **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/src/pantryService.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/WeekPlanService.swift`.
-- **Otomatik testle doğrulanmış (2026-10-10, Linux):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 31/31 geçti (Swift 6.0.3). Diğer `Tools/run_*.sh` betikleri geçti. Ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir. Bu koşu nötr `useBy` metnini doğrulamaz: `testRowShowsSafetyForUseByAndQualityForBestBefore` “Güvenlik uyarısı” önekini bekleyerek geçti. `docs/v5-release-gate.md` içindeki eski satırlar bu çıktının yerine geçmez.
+- **Otomatik testle doğrulanmış (2026-10-10, Linux, V5.1 re-audit):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 35/35 geçti (Swift 6.0.3), nötr rozetler ve `YYYY-MM-DD` matrisi dahil. Diğer `Tools/run_*.sh` betikleri geçti. Ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` §9. Bu satır SwiftData mağazasını ve tarih seçiciyi geçmiş saymaz.
 - **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
-- **Ürün kabul kapısı kapandı:** Hayır. Kapı, doküman–kod uyumu, geçmiş `useBy` için nötr metin ve platforma özgü iOS kontrolleri doğrulanmadan kapanmaz.
+- **Ürün kabul kapısı kapandı:** Hayır. Nötr metin Linux testinde geçti. SwiftData yükseltmesi, tarih seçici ve iOS ekran kontrolleri Not verified (Mac). Not verified, Pass değildir. V6 başlamaz.
 
 > V5.0 pantry işlevleri uygulanmış durumda; V5 kabul kapısının kapanması için doküman-kod uyumu, geçmiş `useBy` tarihindeki nötr metin ve platforma özgü iOS kontrolleri doğrulanmalıdır. Bu belgede test sonucu olarak yalnızca gerçek komut çıktısı veya CI kanıtı bulunan kontroller işaretlenir.
 
@@ -77,7 +77,7 @@ Pantry verisi:
 
 ## 4. Pantry modeli
 
-Kanonik adlar `0012_pantry` SQL, sunucu modeli ve API gövdesinden gelir. Aşağıdaki `bestBefore` alanı bir API alanı değildir. iOS önbelleği tarih değerini eski bir SwiftData özellik adında tutar; teldeki ad `dateValue`’dur. Karşılaştırma bölüm 13’tedir.
+Kanonik adlar `0012_pantry` SQL, sunucu modeli ve API gövdesinden gelir. `bestBefore` bir API alanı değildir. iOS kanonik gün `calendarDay` (`YYYY-MM-DD`) alanındadır; teldeki ad `dateValue`’dur. Eski `bestBefore: Date` kolonu mağazanın açılması için durur. Karşılaştırma bölüm 13’tedir.
 
 ```text
 PantryItem
@@ -107,7 +107,7 @@ PantryItem
 - `unit` bilinmeyen veya geçersizse kayıt reddedilir. Kullanıcı uyumsuz birimi `confirmSeparate: true` ile ayrı satır yapabilir; bilinmeyen birim o bayrakla da reddedilir.
 - `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik, market listesine otomatik satır eklemez.
 - `dateType` yalnız `bestBefore` veya `useBy` olabilir. İkisi aynı anlama gelmez.
-- `dateValue` takvim günüdür (`YYYY-MM-DD`, SQL `DATE`). Saat dilimi anına çevrilip bir gün kaydırılmaz; bu kuralın iOS önbelleğindeki `Date` karşılığı bölüm 13’te kayıtlıdır.
+- `dateValue` takvim günüdür (`YYYY-MM-DD`, SQL `DATE`). Saat dilimi anına çevrilip bir gün kaydırılmaz. iOS kanonik alan `calendarDay` aynı stringi tutar. Ayrıntı ve kabul edilmiş eski kişisel satır istisnası bölüm 13’tedir.
 - Kullanıcı tarih girmediyse sistem tarih uydurmaz. Tarih çifti ya ikisi birden vardır ya hiçbiri (`pantry_items_date_pair`).
 - Sistem tarih üzerinden gıda güvenliği kararı vermez. Geçmiş bir tarih, türüyle birlikte ve tarihin geçmiş olduğu nötr bir metinle gösterilir. “Güvenlik uyarısı”, “Tazelik uyarısı”, “bu ürün yenmez”, “güvenlidir” / “güvenli değildir” ürün metni değildir.
 - Geçmiş `useBy`, tarif öneri puanını artıran olumlu bir stok sinyali değildir (`PantryPlanningSignal.usable` bu satırı eler). Yaklaşan tarih, “Tarihi yaklaşan malzemeyi kullanıyor” açıklamasıyla küçük bir sinyal olabilir; bu bir güvenlik hükmü değildir.
@@ -165,7 +165,7 @@ Liste satırı şunları gösterir:
 - Tarih varsa türün adı ve takvim günü
 - Tarih geçmişse nötr durum: girilen tarihin geçmiş olduğu. Tür (`bestBefore` veya `useBy`) ayrıca görünür. Metin gıdanın güvenli veya güvensiz olduğuna karar vermez.
 
-V5.0 kodu bu nötr metne henüz uymaz. Satır, geçmiş `useBy` için “Güvenlik uyarısı: son tüketim tarihi geçti” ve geçmiş `bestBefore` için “Tazelik uyarısı: tavsiye edilen tarih geçti” yazar (`PantryRowPresentation.make`, `MealRoutine/Services/PantryDomain.swift`). Form alt yazısı “Son tüketim tarihi (STT) güvenlik içindir” der (`PantryCopy.dateFooter`). Bu metinler kabul kapısını kapatmaz. Düzeltme uygulama kodundadır; bu belge o düzeltmeyi yapmış sayılmaz.
+Geçmiş `useBy` rozeti “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` rozeti “Girilen tavsiye edilen tüketim tarihi geçti” (`PantryCopy.pastUseBy`, `PantryCopy.pastBestBefore`). Form alt yazısı paket üzerindeki tarih türünü seçip tarihi aynen girmeyi söyler (`PantryCopy.dateFooter`). “Güvenlik uyarısı”, “Tazelik uyarısı” ve “STT güvenlik içindir” kullanıcıya dönük metin değildir.
 
 ### Boş durum
 
@@ -335,7 +335,7 @@ Karşılaştırma `V5-Alignment-Audit` `1f07663` üzerindedir. “Uyumlu” veya
 | Konum | `location TEXT NOT NULL` | `PantryLocation` | `location` | `locationRaw` | `location` |
 | Minimum | `minimum_quantity NUMERIC(12,3) NULL` `>= 0` | `number \| null` | `minimumQuantity` nullable | `Double?` | `Double?` |
 | Tarih türü | `date_type TEXT NULL` (`bestBefore`, `useBy`) | `dateType \| null` | `dateType` | `dateTypeRaw: String?` | `dateType?` |
-| Tarih | `date_value DATE NULL` | `string \| null` `YYYY-MM-DD` | `dateValue` | depolama adı `bestBefore: Date?`; okuma `dateValue` | `dateValue: String?` |
+| Tarih | `date_value DATE NULL` | `string \| null` `YYYY-MM-DD` | `dateValue` | `calendarDay: String?` (`YYYY-MM-DD`). Eski `bestBefore: Date?` kolonu durur; yeni yazım onu kullanmaz | `dateValue: String?` |
 | Sürüm | `version INT NOT NULL` `>= 1` | `version` | `version` | `revision` | `version` (`revision` yalnız eski yük okuması) |
 | Oluşturma | `created_at TIMESTAMPTZ NOT NULL` | `createdAt` ISO-8601 UTC | `createdAt` | modelde yok | `Date?` |
 | Güncelleme | `updated_at TIMESTAMPTZ NOT NULL` | `updatedAt` ISO-8601 UTC | `updatedAt` | `updatedAt: Date` | `Date?` |
@@ -345,9 +345,13 @@ Tarih çifti: SQL `pantry_items_date_pair` — `date_type` ve `date_value` ikisi
 iOS farkları (davranış değişikliği değildir; kayıtlı eşlemedir):
 
 - Kişisel satırın `householdID` değeri yoktur. SQL household satırı `household_id` olmadan duramaz. Bu, iki sahiplik modelidir.
-- SwiftData tarih değeri `bestBefore` adlı `Date` alanındadır. API bu adı kabul etmez. Tel ve SQL adı `dateValue` / `date_value`’dur.
-- `dateTypeRaw` boş ve `bestBefore` dolu eski satır, okumada `bestBefore` türü sayılır (`GroceryItem.swift` `dateType`). Sunucu yeni yazımda türsüz tarih kabul etmez.
-- `PantryDay.string` / `PantryDay.date` verilen takvimin yıl-ay-gününü kullanır; varsayılan takvim cihaz takvimidir (`PantryDomain.swift`). Sunucu günü `DATE` olarak saklar. Cihaz saat dilimi, önbellekteki `Date` tekrar `YYYY-MM-DD` yazılmadan değişirse takvim günü kayabilir. Bu, bölüm 13’ün açık farkıdır; ürün kuralı günün kaymamasıdır.
+- SwiftData kanonik gün `calendarDay` (`YYYY-MM-DD`) alanındadır. API bu adı görmez. Tel ve SQL adı `dateValue` / `date_value`’dur.
+- `bestBefore: Date?` kolonu durur. Türü `String` yapılmaz. Mevcut mağaza bu yüzden açılır: eski kolonun tipi değişmez, `calendarDay` yeni opsiyonel bir kolondur ve boş satırlarda nil gelir. SwiftData hafif göç bunu açar; özel bir `VersionedSchema` yoktur.
+- Yeni kayıt `calendarDay` yazar ve `bestBefore`’u nil bırakır. Okuma, gösterim, geçmiş/bugün/yaklaşan hesabı ve senkron gövdesi bu stringi kullanır. Saklanan `Date` cihaz saat diliminde tekrar okunmaz.
+- Tarih seçici kenarında geçici bir `Date` üretilebilir. Kayıt, seçicinin takvimiyle okunan `YYYY-MM-DD` stringidir. Aynı string başka saat diliminde de aynı gündür.
+- Eski kişisel satır (`householdID == nil`) hâlâ `bestBefore` anı taşıyorsa, proje sahibinin 2026-10-10 istisnasıyla bir kez silinir. Tarihsiz kişisel satır kalır. Adım `UserDefaults` anahtarı `mealroutine.pantry.v51.legacyPersonalDatedRowsRemoved` ile bir kez çalışır; ikinci açılış bir şey silmez. Bu, spec §2.5 ve §4.5’teki “belirsiz günü sessizce tahmin etme” kuralının veri kaybını kabul eden açık istisnasıdır (spec §6). Gün, cihaz saat diliminden tahmin edilmez.
+- Eski ortak satır bu adımda silinmez ve `bestBefore` anından güne çevrilmez. `PantryCache.apply` sunucunun `YYYY-MM-DD` değerini `calendarDay`’e yazar ve anı siler. An hâlâ dururken giden yazı tarih alanlarını gövdeden çıkarır; sunucudaki günün üzerine kaymış bir gün yazılmaz.
+- `dateTypeRaw` yalnız `calendarDay` doluyken tür olarak okunur. Sunucu yeni yazımda türsüz tarih kabul etmez.
 - `unit_bucket` yalnız veritabanındadır.
 - `createdAt` SwiftData modelinde yoktur. Saat damgaları sunucuda UTC anıdır; `dateValue` bir an değildir.
 
@@ -379,7 +383,7 @@ Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 2. Birim dönüşümü yalnız desteklenen ve aynı birim ailesindeki dönüşümlerde yapılır.
 3. Plan oluşturmak veya planı değiştirmek kiler stokunu sessizce değiştirmez.
 4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. V5.0’da “Pişirdim” stok düşmez; onaylı düşüm akışı yoktur.
-5. Kullanıcının girdiği tarih uydurulmaz. Tarih tek başına gıda güvenliği kararı üretmez.
+5. Kullanıcının girdiği tarih uydurulmaz. Tarih tek başına gıda güvenliği kararı üretmez. V5.1’de eski kişisel tarih anı takvim gününe çevrilmez; proje sahibi 2026-10-10’da bu satırların bir kez silinmesini kabul etti (bölüm 13). Ortak kiler tarihi sunucudan yeniden alınır.
 6. V5’te fiyat, bütçe, fiyat geçmişi veya market sağlayıcı entegrasyonu yoktur.
 7. Kişisel kiler, household kilerine otomatik ve sessizce birleştirilmez.
 8. Stok ve market güncellemeleri tekrar denendiğinde çift kayıt veya çift düşüm üretmeyecek şekilde idempotent olmalıdır.
@@ -407,7 +411,7 @@ SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. `Pa
 
 ### Faz 4 — Pantry UI
 
-Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş `useBy` metni bölüm 6’daki nötr kurala uymaz. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
+Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
 
 ### Faz 5 — Market entegrasyonu
 

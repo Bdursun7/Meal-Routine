@@ -70,7 +70,7 @@ Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövde
 
 - `GET /v1/ingredients`: seed sözlük ve `householdId` verilirse o evin malzemeleri. `scope` `dictionary` veya `household`.
 - `POST …/ingredients`: `{ id: "custom:<uuid>", displayName }`. İstemci, yazılan ad tek bir sözlük veya ev malzemesiyle birebir örtüşmezse bu kimliği üretir ve ortak evde kaydeder. Aynı id ikinci kez gelirse mevcut satır döner. Kişisel evdekilerde özel malzeme yalnız telefonda durur.
-- Pantry gövdesi: `ingredientId`, `displayName`, `quantity`, `unit`, `location`, `minimumQuantity`, `dateType`, `dateValue` (`YYYY-MM-DD`). Şema strict; eski `bestBefore` alanı reddedilir.
+- Pantry gövdesi: `ingredientId`, `displayName`, `quantity`, `unit`, `location`, `minimumQuantity`, `dateType`, `dateValue` (`YYYY-MM-DD`). Şema strict; eski `bestBefore` alanı reddedilir. İstemci bu günü `calendarDay` stringi olarak saklar. Saat dilimi değişince gün kaymaz. Eski kişisel satırda tarih hâlâ `Date` ise V5.1 açılışında o satır bir kez silinir (proje sahibi, 2026-10-10). Tarihsiz kişisel satır kalır. Ortak satır silinmez; sunucudan gelen `YYYY-MM-DD` yazılır.
 - Uyumlu birim aynı `ingredientId` satırına eklenir (g/kg, ml/L). Uyumsuz birim 409 `pantry_unit_choice`; `confirmSeparate: true` ayrı satır açar. Bilinmeyen birim 400.
 - Eski `baseVersion` 409 `conflict` ve gövdede `current` (sunucudaki satır) döner.
 - `reconcile-grocery`: `operation` (`compute-missing`, `consume`, `restock`) ve `lines`. `compute-missing` stoktan düşmez. İşaretli satır aynen kalır. Uyumsuz birim otomatik düşülmez.
@@ -81,7 +81,7 @@ Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövde
 `MARKETING_VERSION` `5.0.0`. Evdekiler, Profil’den açılır.
 
 - Malzeme adı serbest yazılır. Öneriler sözlük adı, eş anlamlı ve evin özel malzemeleridir. Öneriye basılmazsa tekil birebir eşleşme bağlanır; yoksa `custom:<uuid>` oluşur. İkinci onay yoktur. “Domates” ile “Cherry domates” birleşmez.
-- Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince güvenlik uyarısı, “Tavsiye edilen tüketim tarihi (TETT)” geçince tazelik uyarısı görünür.
+- Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince “Girilen son tüketim tarihi geçti”, “Tavsiye edilen tüketim tarihi (TETT)” geçince “Girilen tavsiye edilen tüketim tarihi geçti” görünür. Bu satırlar paketteki türü ve tarihin geçmiş olduğunu söyler; gıdanın güvenli olup olmadığına karar vermez.
 - Market’te “Eksik miktarı hesapla”, satırda “Evdekilerden düş” ve “Evdekilere ekle” vardır. Plan kurmak ve “Pişirdim” stoğu değiştirmez.
 - “Bitti” seçenek ister; seçilmeden ya da İptal ile stok değişmez.
 - Household yazımları önce telefona yazılır, sonra kuyruktan gönderilir. Çevrimdışıyken satırda “Eşitlenmeyi bekliyor” görünür. Çakışmada “Bu malzeme başka bir cihazda güncellendi.” ve iki seçenek çıkar.

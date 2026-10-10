@@ -4,7 +4,8 @@ import SwiftData
 extension PantryItem {
     /// Snapshot of the row as the user saved it. Only household rows ever leave the phone.
     func remote(householdID: UUID) -> PantryRemoteItem {
-        PantryRemoteItem(
+        let date = PantryOutboundDate.make(calendarDay: calendarDay, dateType: dateType, hasLegacyInstant: bestBefore != nil)
+        return PantryRemoteItem(
             id: uuid,
             householdId: householdID,
             ingredientId: ingredientID,
@@ -13,9 +14,10 @@ extension PantryItem {
             unit: unit,
             location: location,
             minimumQuantity: minimumQuantity,
-            dateType: dateType,
-            dateValue: dateValue.map { PantryDay.string(from: $0) },
+            dateType: date.dateType,
+            dateValue: date.dateValue,
             version: revision,
+            sendsDate: date.sendsDate,
             updatedAt: updatedAt
         )
     }
@@ -30,7 +32,7 @@ extension PantryItem {
         unit = remote.unit
         location = remote.location
         minimumQuantity = remote.minimumQuantity
-        setDate(remote.dateType, remote.dateValue.flatMap { PantryDay.date(from: $0) })
+        applyServerDate(type: remote.dateType, day: remote.dateValue)
         revision = remote.version
         updatedAt = PantryServerClock.applying(remote.updatedAt, keeping: updatedAt)
     }
@@ -46,7 +48,7 @@ extension PantryItem {
             location: remote.location,
             minimumQuantity: remote.minimumQuantity,
             dateType: remote.dateType,
-            dateValue: remote.dateValue.flatMap { PantryDay.date(from: $0) },
+            dateValue: PantryHouseholdDate.canonicalDay(serverDateValue: remote.dateValue),
             revision: remote.version,
             updatedAt: PantryServerClock.inserting(remote.updatedAt, createdAt: remote.createdAt)
         )
@@ -522,6 +524,39 @@ enum PantryTransferApply {
         }
         try? context.save()
         return touched
+    }
+}
+
+/// One launch after upgrade. Personal rows that still store a `Date` are deleted.
+/// Household rows are left for the server refetch. The marker makes a later launch a no-op.
+@MainActor
+enum LegacyPersonalPantryDateUpgrade {
+    static func runIfNeeded(in context: ModelContext, defaults: UserDefaults = .standard) {
+        let key = LegacyPersonalPantryDatePolicy.markerKey
+        if defaults.bool(forKey: key) { return }
+        let items: [PantryItem]
+        do {
+            items = try context.fetch(FetchDescriptor<PantryItem>())
+        } catch {
+            return
+        }
+        let rows = items.map { item in
+            LegacyPersonalPantryDateRow(
+                id: item.uuid,
+                isPersonal: item.householdID == nil,
+                hasLegacyDateInstant: item.hasLegacyDateInstant
+            )
+        }
+        let doomed = LegacyPersonalPantryDatePolicy.rowsToDelete(rows, alreadyRan: false)
+        for item in items where doomed.contains(item.uuid) {
+            context.delete(item)
+        }
+        do {
+            try context.save()
+        } catch {
+            return
+        }
+        defaults.set(true, forKey: key)
     }
 }
 
