@@ -193,7 +193,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 | Actual | SQL `date_value DATE` and API `YYYY-MM-DD` stay on that day. Integration create returned `dateValue: '2030-01-05'` unchanged. iOS cache stores `Date` and `PantryDay` uses the calendar it is given, defaulting to `.current` (`PantryDomain.swift:113`, `PantryRules.swift:17` and `:33`). Verbatim copy of `PantryDay.date` / `string`, Swift 6.0.3: Istanbul `2026-10-09` formatted in `America/Los_Angeles` prints `2026-10-08`. Same calendar round-trips `2026-10-09`. Domain test `testCalendarDaysRoundTripAndInvalidDaysAreRejected` passed for one UTC calendar. |
 | Result | Fail |
 | Priority | P1 |
-| Fix | User decision 2026-10-10: this finding is in the V5.1 scope. Implementation options are listed in section 6 and are not chosen here. Acceptance test: a date entered as `2026-10-09` stays `2026-10-09` in storage, display, sync payload, and comparisons (past/today/future) after the device timezone changes (Europe/Istanbul → America/Los_Angeles → Pacific/Auckland), for both personal (local) and household (synced) pantry, including existing cached rows. |
+| Fix | User decision 2026-10-10: Option A. Store the pantry date as a `YYYY-MM-DD` calendar-day value on iOS, matching server `DATE` and the API string. Migration: household cache rows are re-fetched from the server; personal rows (`householdID == nil`) are converted once at upgrade using the device timezone at that moment. Details and the test plan are in §6 and §7. Acceptance test: a date entered as `2026-10-09` stays `2026-10-09` in storage, display, sync payload, and comparisons (past/today/future) after the device timezone changes (Europe/Istanbul → America/Los_Angeles → Pacific/Auckland), for both personal (local) and household (synced) pantry, including existing cached rows. |
 | Test | The acceptance test above. A Linux domain test can cover pure day conversion. SwiftData personal and household rows, and rows already cached as `Date`, need the Mac `PantryTests` path. Server `DATE` already returned `2030-01-05` unchanged in this run. |
 | Status | Open |
 
@@ -281,7 +281,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 
 ## 6. Step 5 draft (not created)
 
-Open P1 findings are `AUD-V5-001` and `AUD-V5-002`. Suggested title: V5.1 Integration Readiness Fixes. The spec file was not created. No implementation is chosen for `AUD-V5-002`.
+Open P1 findings are `AUD-V5-001` and `AUD-V5-002`. Suggested title: V5.1 Integration Readiness Fixes. The spec file was not created. For `AUD-V5-002` the user chose Option A on 2026-10-10.
 
 ### AUD-V5-001
 
@@ -293,34 +293,25 @@ Open P1 findings are `AUD-V5-001` and `AUD-V5-002`. Suggested title: V5.1 Integr
 
 ### AUD-V5-002
 
-User decision 2026-10-10: P1, in this V5.1 scope.
+User decision 2026-10-10: **Option A**. Store the pantry date as a `YYYY-MM-DD` calendar-day value on iOS, matching the server `DATE` and the API string. The fixed-calendar / UTC-noon `Date` option is not chosen.
 
 Acceptance test: a date entered as `2026-10-09` stays `2026-10-09` in storage, display, sync payload, and comparisons (past/today/future) after the device timezone changes (Europe/Istanbul → America/Los_Angeles → Pacific/Auckland), for both personal (local) and household (synced) pantry, including existing cached rows.
 
-Today the server stores `date_value DATE` and the API sends `YYYY-MM-DD`. The iOS cache stores `bestBefore: Date?` (`MealRoutine/Models/GroceryItem.swift:99`). `PantryDay` reads and writes that instant with the calendar it is given, default `.current` (`PantryDomain.swift:113`, `PantryRules.swift:17` and `:33`). Personal rows stay on device (`householdID == nil`). Household rows sync as `dateValue`. The timezone the user was in when the `Date` was saved is not stored.
+Today the server stores `date_value DATE` and the API sends `YYYY-MM-DD`. The iOS cache stores `bestBefore: Date?` (`MealRoutine/Models/GroceryItem.swift:99`). `PantryDay` reads and writes that instant with the calendar it is given, default `.current` (`PantryDomain.swift:113`, `PantryRules.swift:17` and `:33`). Personal rows stay on device (`householdID == nil`). Household rows sync as `dateValue`.
 
-Two options. This report does not pick one.
+**Chosen storage.** The on-device value is the calendar-day string. Display, sync payload, and past/today/future use that string. A `DatePicker` may build a temporary `Date` at the UI edge from the string. Readers do not take year-month-day from `Calendar.current` applied to a stored instant. A timezone change after the string is stored does not rewrite it.
 
-**Store a `YYYY-MM-DD` calendar-day value**
+**Migration policy (user decision 2026-10-10).**
 
-- Pros: the stored value is the calendar day. It matches SQL `DATE` and the API string. Display, sync, and past/today/future can use that string. A later timezone change does not reinterpret an instant.
-- Cons: SwiftData currently persists `Date`. A `String` (or a new property) is a schema change. `DatePicker` still needs a `Date` at the UI edge, built from the string with an explicit calendar. Every reader must stop using `Calendar.current` on the stored value.
-- Existing rows: lightweight migration does not turn a `Date` into `YYYY-MM-DD`. A one-time conversion has to interpret each stored instant. The entry timezone was not saved. Interpreting with the device timezone at upgrade time keeps the day only if the user has not already changed timezone. Interpreting with UTC turns an Istanbul local midnight on `2026-10-09` into `2026-10-08`. That policy is part of the option the user picks.
-- After conversion, personal rows and household cache rows hold the string. The server column is already a day. The sync payload stays `dateValue`.
+- Household pantry cache rows are re-fetched from the server. The authoritative value is the server `DATE` (`YYYY-MM-DD`). The old cached `Date` is not interpreted into the new string.
+- Personal pantry rows (`householdID == nil`) are converted once at upgrade time. The converter reads the stored `Date` with the device’s current timezone at that moment and writes `YYYY-MM-DD`. Later launches do not convert again. A user who already changed timezone before this upgrade can keep the shifted day; that is the accepted policy.
 
-**Keep `Date`, written with a fixed calendar (for example UTC noon) and read only with that calendar**
+**Test plan for Option A**
 
-- Pros: the SwiftData attribute can stay `Date`. Noon on a fixed calendar sits far from midnight, so reading year-month-day in that same calendar does not cross a day for ordinary offsets. Less schema churn than a string column.
-- Cons: the value is still an instant. Any `Calendar.current`, `startOfDay`, or device-zone formatter will move it. UTC noon on `2026-10-09` is the morning of `2026-10-10` in Pacific/Auckland when the device zone is used for display. The fixed calendar has to be used for storage, display, sync formatting, and past/today/future. Missing one call site fails the acceptance test.
-- Existing rows: current rows are device-local midnights, not fixed-calendar noon. They need a rewrite, or reads of old rows stay on the old rule. The same missing entry-timezone problem applies: the conversion must define which calendar decodes the stored instant. Leaving old rows untouched fails the “including existing cached rows” clause.
-
-**Test plan (either option)**
-
-- Linux domain test: build `2026-10-09` under `Europe/Istanbul`, then under `America/Los_Angeles`, then under `Pacific/Auckland`. Storage form, display string, and sync `dateValue` stay `2026-10-09`. Classify past, today, and future against a fixed today of `2026-10-08`, `2026-10-09`, and `2026-10-10` in each of those zones; the item’s day does not change.
-- Both `bestBefore` and `useBy`, and a row with no date (stays empty).
-- Personal pantry (`householdID == nil`) and household pantry (encode `PantryItem.remote`, decode `apply`, server `DATE` unchanged).
-- An existing V5.0 cache row written as a local-midnight `Date` in Istanbul, opened after the zone changes, including the migration the chosen option defines.
-- Mac `PantryTests` for SwiftData. That part is Not verified until Xcode. Server `npm test` should stay green; the wire format is already `YYYY-MM-DD`.
+- Linux domain test: store `2026-10-09` as `YYYY-MM-DD`. Switch the calendar through `Europe/Istanbul`, `America/Los_Angeles`, and `Pacific/Auckland`. The stored string, the display string, and the sync `dateValue` stay `2026-10-09`. Past, today, and future against a fixed today of `2026-10-08`, `2026-10-09`, and `2026-10-10` still name that same day. Cover `bestBefore`, `useBy`, and a row with no date.
+- Personal upgrade: a V5.0 `Date` written as Istanbul local midnight for `2026-10-09`, converted once while the device timezone is still `Europe/Istanbul`, becomes `2026-10-09`. A second launch in `America/Los_Angeles` or `Pacific/Auckland` leaves `2026-10-09`. The conversion does not run again.
+- Household upgrade: the cache row is replaced by a server fetch. The string equals the server `DATE`, including when the device timezone at upgrade differs from the timezone that wrote the old `Date`. The sync payload sent afterward is that same `YYYY-MM-DD`.
+- Mac `PantryTests` covers the SwiftData personal conversion and the household re-fetch. That part is Not verified until Xcode. Server `npm test` should stay green; the wire format is already `YYYY-MM-DD`.
 
 Out of scope for that spec: reminders, low-stock push, auto-add to grocery, cook-deduct, nutrition, prices, version bump, V6, V7 fields, CloudKit.
 
@@ -328,7 +319,9 @@ P2 items stay deferred (section 4): `AUD-DOC-001`, `AUD-DOC-002`, `AUD-DOC-003`,
 
 ## 7. AUD-V5-002 decision
 
-On 2026-10-10 the user promoted `AUD-V5-002` from P2 to P1 and included it in the V5.1 scope. The acceptance test is in section 6. The implementation is not chosen.
+On 2026-10-10 the user promoted `AUD-V5-002` from P2 to P1 and chose **Option A**: store the pantry date as a `YYYY-MM-DD` calendar-day value on iOS, matching the server `DATE` and the API string.
+
+Migration policy, same date: household pantry cache rows are re-fetched from the server (authoritative `DATE`). Personal pantry rows (`householdID == nil`) are converted once at upgrade time using the device’s current timezone at that moment. The fixed-calendar `Date` option is not chosen. The acceptance test and the Option A test plan are in §6.
 
 ## 8. Gate
 
