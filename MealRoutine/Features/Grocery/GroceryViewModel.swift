@@ -129,7 +129,7 @@ final class GroceryViewModel {
                     isChecked: item.isChecked,
                     isManual: item.isManual,
                     remainingDetail: item.uncoveredQuantity.map { remaining in
-                        "\(QuantityFormat.quantityAndUnit(quantity: remaining, unit: item.unit)) kaldı"
+                        PantryCopy.stillToBuy(QuantityFormat.quantityAndUnit(quantity: remaining, unit: item.unit))
                     } ?? (usesPantryCoverage && !item.isManual && !item.isChecked && item.quantity == 0 ? PantryCopy.covered : nil)
                 )
             }

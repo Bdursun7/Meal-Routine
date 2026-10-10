@@ -738,6 +738,14 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(PantryCopy.restock, "Evdekilere ekle")
         XCTAssertEqual(PantryCopy.missingPantry, "Evdekilerde bu malzeme yok.")
         XCTAssertEqual(PantryCopy.separateUnitMessage(existing: "400 g"), "Evdekilerde 400 g var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin.")
+        XCTAssertEqual(PantryCopy.cookConfirmTitle, "Evdekilerden düş")
+        XCTAssertEqual(PantryCopy.cookConfirm, "Düş")
+        XCTAssertEqual(PantryCopy.cookDecline, "Vazgeç")
+        XCTAssertEqual(PantryCopy.stillToBuy("1 adet"), "1 adet daha alınacak")
+        XCTAssertFalse(PantryCopy.stillToBuy("1 adet").contains("kaldı"))
+        XCTAssertEqual(PantryCopy.cookConfirmed(3), "3 malzeme Evdekiler'den düşüldü")
+        XCTAssertEqual(PantryCopy.cookFull(deducted: "200 g", remaining: "300 g"), "200 g düşülür, 300 g kalır")
+        XCTAssertFalse(PantryCopy.cookNotDeducted(shortfall: "2 adet").contains("Stok kadar"))
         for text in PantryCopy.userFacing {
             XCTAssertFalse(text.localizedCaseInsensitiveContains("pantry"), text)
         }
@@ -829,6 +837,128 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(retry.stock.map(\.quantity), [300])
         XCTAssertEqual(PantryStableUUID.make("cook:meal-1:item-1"), PantryStableUUID.make("cook:meal-1:item-1"))
         XCTAssertNotEqual(PantryStableUUID.make("cook:meal-1:item-1"), PantryStableUUID.make("cook:meal-2:item-1"))
+    }
+
+    func testCookSheetClassifiesMatchedInsufficientMissingMismatchAndZeroStock() throws {
+        let matched = PantryCookConsumption.classify(
+            needs: [need(ingredientId: "tomatoes", quantity: 200, unit: "g")],
+            stock: [cookStock(quantity: 500, unit: "g")],
+            dictionary: dictionary
+        )
+        let full = try XCTUnwrap(matched.first)
+        XCTAssertEqual(full.kind, .matched)
+        XCTAssertEqual(full.deductedQuantity, 200)
+        XCTAssertEqual(full.remainingQuantity, 300)
+        XCTAssertEqual(full.shortfallQuantity, 0)
+        XCTAssertTrue(full.canExclude)
+        XCTAssertTrue(full.willDeduct)
+        XCTAssertEqual(full.summary, PantryCopy.cookFull(
+            deducted: PantryCookConsumption.formatAmount(200, unit: "g"),
+            remaining: PantryCookConsumption.formatAmount(300, unit: "g")
+        ))
+        XCTAssertFalse(full.summary.contains("Stok kadar"))
+
+        let short = PantryCookConsumption.classify(
+            needs: [need(quantity: 1, unit: "kg")],
+            stock: [cookStock(quantity: 400, unit: "g", autoAdd: false)],
+            dictionary: dictionary
+        )
+        let partial = try XCTUnwrap(short.first)
+        XCTAssertEqual(partial.kind, .insufficient)
+        XCTAssertEqual(partial.deductedQuantity, 400)
+        XCTAssertEqual(partial.remainingQuantity, 0)
+        XCTAssertEqual(partial.shortfallQuantity, 0.6)
+        XCTAssertEqual(partial.shortfallUnit, "kg")
+        XCTAssertTrue(partial.offerAddMissing)
+        XCTAssertFalse(partial.canExclude)
+        XCTAssertTrue(partial.willDeduct)
+        XCTAssertEqual(partial.summary, PantryCopy.cookPartial(
+            deducted: PantryCookConsumption.formatAmount(400, unit: "g"),
+            shortfall: PantryCookConsumption.formatAmount(0.6, unit: "kg")
+        ))
+        XCTAssertFalse(partial.summary.contains("Stok kadar"))
+
+        let auto = PantryCookConsumption.classify(
+            needs: [need(quantity: 1, unit: "kg")],
+            stock: [cookStock(quantity: 400, unit: "g", autoAdd: true)],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(try XCTUnwrap(auto.first).offerAddMissing, false)
+
+        let zero = PantryCookConsumption.classify(
+            needs: [PantryCookNeed(ingredientId: "tomato", displayName: "Domates", quantity: 2, unit: "piece")],
+            stock: [cookStock(quantity: 0, unit: "piece")],
+            dictionary: dictionary
+        )
+        let empty = try XCTUnwrap(zero.first)
+        XCTAssertEqual(empty.kind, .insufficient)
+        XCTAssertEqual(empty.deductedQuantity, 0)
+        XCTAssertEqual(empty.shortfallQuantity, 2)
+        XCTAssertFalse(empty.willDeduct)
+        XCTAssertTrue(empty.offerAddMissing)
+        XCTAssertEqual(empty.summary, PantryCopy.cookNotDeducted(shortfall: PantryCookConsumption.formatAmount(2, unit: "piece")))
+        XCTAssertFalse(empty.summary.localizedCaseInsensitiveContains("Stok kadar"))
+        XCTAssertFalse(empty.summary.contains(PantryCopy.missingPantry))
+
+        let absent = PantryCookConsumption.classify(
+            needs: [PantryCookNeed(ingredientId: "oregano", displayName: "Kekik", quantity: (0.5).squareRoot(), unit: "tsp")],
+            stock: [cookStock(quantity: 500, unit: "g")],
+            dictionary: dictionary
+        )
+        let missing = try XCTUnwrap(absent.first)
+        XCTAssertEqual(missing.kind, .missing)
+        XCTAssertEqual(missing.deductedQuantity, 0)
+        XCTAssertTrue(missing.summary.isEmpty)
+        XCTAssertNil(missing.stockAmount)
+        XCTAssertFalse(missing.offerAddMissing)
+        XCTAssertFalse(missing.summary.contains(PantryCopy.missingPantry))
+        XCTAssertFalse(missing.recipeAmount.contains("71"), missing.recipeAmount)
+        XCTAssertEqual(missing.recipeAmount, PantryCookConsumption.formatAmount((0.5).squareRoot(), unit: "tsp"))
+
+        let clash = PantryCookConsumption.classify(
+            needs: [PantryCookNeed(ingredientId: "feta", displayName: "Beyaz peynir", quantity: 2, unit: "piece")],
+            stock: [PantryCookStock(id: "cheese", ingredientId: "feta", displayName: "Beyaz peynir", quantity: 200, unit: "g", minimumQuantity: nil, autoAddToGrocery: false, version: 1)],
+            dictionary: dictionary
+        )
+        let mismatch = try XCTUnwrap(clash.first)
+        XCTAssertEqual(mismatch.kind, .unitMismatch)
+        XCTAssertEqual(mismatch.deductedQuantity, 0)
+        XCTAssertFalse(mismatch.willDeduct)
+        XCTAssertEqual(mismatch.reason, PantryCopy.unitMismatch)
+        XCTAssertTrue(mismatch.summary.isEmpty)
+        XCTAssertNil(mismatch.stockAmount)
+        XCTAssertFalse(mismatch.offerAddMissing)
+
+        let twice = PantryCookConsumption.classify(
+            needs: [need(quantity: 300, unit: "g"), need(quantity: 300, unit: "g")],
+            stock: [cookStock(quantity: 400, unit: "g")],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(twice.map(\.kind), [.matched, .insufficient])
+        XCTAssertEqual(twice.map(\.deductedQuantity), [300, 100])
+        XCTAssertEqual(twice.map(\.shortfallQuantity), [0, 200])
+
+        let skipped = PantryCookConsumption.classify(
+            needs: [need(quantity: 300, unit: "g"), need(quantity: 300, unit: "g")],
+            stock: [cookStock(quantity: 400, unit: "g")],
+            excludedNeedIndexes: [0],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(skipped.map(\.kind), [.matched, .matched])
+        XCTAssertEqual(skipped.map(\.willDeduct), [false, true])
+        XCTAssertEqual(skipped.map(\.deductedQuantity), [0, 300])
+        XCTAssertEqual(skipped[1].remainingQuantity, 100)
+
+        let raw = QuantityFormat.quantityAndUnit(quantity: (0.5).squareRoot(), unit: "tsp")
+        XCTAssertTrue(raw.contains("71"), raw)
+        let shown = PantryCookConsumption.formatAmount((0.5).squareRoot(), unit: "tsp")
+        XCTAssertFalse(shown.contains("71"), shown)
+        XCTAssertEqual(shown, QuantityFormat.quantityAndUnit(quantity: 0.75, unit: "tsp"))
+        XCTAssertEqual(
+            PantryCookConsumption.formatAmount(1.125, unit: "kg"),
+            QuantityFormat.quantityAndUnit(quantity: 1.125, unit: "kg")
+        )
+        XCTAssertEqual(PantryCookConsumption.formatAmount(1, unit: "tsp"), QuantityFormat.quantityAndUnit(quantity: 1, unit: "tsp"))
     }
 
     func testLowStockNotifiesOnceThenRearmsOnlyAfterARise() {

@@ -61,11 +61,47 @@ enum PantryCopy {
     static let dateFooter = "Pakette yazan tarih türünü seç ve tarihi aynen gir. Tarih girmezsen uygulama tarih uydurmaz."
     static let pastUseBy = "Girilen son tüketim tarihi geçti"
     static let pastBestBefore = "Girilen tavsiye edilen tüketim tarihi geçti"
-    static let cookConfirmTitle = "Evdekilerden düşülsün mü?"
-    static let cookConfirmMessage = "Tarifin malzemeleri ve evdeki miktarlar aşağıda. Onaylamazsan stok değişmez."
-    static let cookConfirm = "Stoktan düş"
-    static let cookDecline = "Stoktan düşme"
+    static let cookConfirmTitle = "Evdekilerden düş"
+    static let cookConfirmMessage = "Vazgeçersen stok değişmez."
+    static let cookConfirm = "Düş"
+    static let cookDecline = "Vazgeç"
+    static let cookSectionDeduct = "Düşülecek"
+    static let cookSectionShort = "Yetersiz stok"
+    static let cookSectionMissing = "Evdekilerde yok"
+    static let cookSectionMismatch = "Birimi uyuşmuyor"
+    static let cookAddAll = "Tüm eksikleri markete ekle"
+    static let cookAdded = "Markete eklendi"
+    static let cookUnchanged = "Evdekiler değişmedi"
+    static let cookExcludeHint = "Kapatırsan bu malzeme düşülmez"
+    static let cookCancelHint = "Stok değişmez"
+    static let cookDeductHint = "Seçilen malzemeleri evdekilerden düşer"
     static let addMissingToMarket = "Eksik miktarı markete ekle"
+
+    static func cookFull(deducted: String, remaining: String) -> String {
+        "\(deducted) düşülür, \(remaining) kalır"
+    }
+
+    static func cookPartial(deducted: String, shortfall: String) -> String {
+        "\(deducted) düşülür, \(shortfall) eksik"
+    }
+
+    /// Zero stock. Says what is not deducted and the shortfall. Never "Stok kadar düşülür".
+    static func cookNotDeducted(shortfall: String) -> String {
+        "Düşülmez. \(shortfall) eksik"
+    }
+
+    static func cookAddNamed(_ name: String) -> String {
+        "\(name) eksiğini markete ekle"
+    }
+
+    static func cookConfirmed(_ count: Int) -> String {
+        "\(count) malzeme Evdekiler'den düşüldü"
+    }
+
+    /// Grocery remainder still to buy. Not pantry stock left.
+    static func stillToBuy(_ amount: String) -> String {
+        "\(amount) daha alınacak"
+    }
     static let autoAddToggle = "Minimumun altına inince markete ekle"
     static let autoAddFooter = "Kapalıyken eşik, market listesine ürün eklemez. Açınca eksik miktar bir kez yazılır."
     static let lowStockToggle = "Düşük stok bildirimi"
@@ -101,6 +137,12 @@ enum PantryCopy {
         separateUnit, missingPantry, incompatibleCount, pending, failed, failedMessage, discardFailed, conflictBadge,
         unmatched, lowStock, outOfStock, whichIngredient, ingredientFooter, dateSection, dateFooter,
         pastUseBy, pastBestBefore, cookConfirmTitle, cookConfirmMessage, cookConfirm, cookDecline,
+        cookSectionDeduct, cookSectionShort, cookSectionMissing, cookSectionMismatch, cookAddAll, cookAdded,
+        cookUnchanged, cookExcludeHint, cookCancelHint, cookDeductHint,
+        cookFull(deducted: "200 g", remaining: "300 g"),
+        cookPartial(deducted: "400 g", shortfall: "0,6 kg"),
+        cookNotDeducted(shortfall: "2 adet"),
+        cookAddNamed("Domates"), cookConfirmed(3), stillToBuy("1 adet"),
         addMissingToMarket, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
         dateReminderScheduleToggle, dateReminderFooter, notificationPermissionDenied, lowStockNoticeTitle,
         lowStockNoticeBody(name: "Süt"), reminderBestBefore(name: "Süt", day: "9 Ekim 2026"),
@@ -1765,13 +1807,39 @@ struct PantryCookStock: Equatable, Sendable, Identifiable {
     var identifier: String { id }
 }
 
-struct PantryCookPreviewLine: Equatable, Sendable, Identifiable {
+enum PantryCookRowKind: String, Equatable, Sendable {
+    /// Same ingredient, convertible unit, stock covers the recipe amount.
+    case matched
+    /// Same ingredient and unit, but stock is short or zero. Capped deduction, never below zero.
+    case insufficient
+    /// No pantry row for this ingredient.
+    case missing
+    /// Same ingredient, units that do not convert. Nothing is deducted.
+    case unitMismatch
+}
+
+struct PantryCookSheetRow: Equatable, Sendable, Identifiable {
+    var id: String
+    var needIndex: Int
     var ingredientId: String
     var displayName: String
-    var needed: String
-    var stock: String
-    var note: String
-    var id: String { "\(ingredientId)|\(needed)" }
+    var kind: PantryCookRowKind
+    /// Recipe amount, formatted for display.
+    var recipeAmount: String
+    /// Stock amount when a convertible row exists. Nil for missing and unit mismatch.
+    var stockAmount: String?
+    /// What this confirmation will do to stock. Empty for a name-only missing row.
+    var summary: String
+    var reason: String?
+    /// Amount that will be deducted in the stock unit. Zero when excluded, missing, mismatched, or stock is zero.
+    var deductedQuantity: Double
+    var remainingQuantity: Double?
+    var shortfallQuantity: Double
+    var shortfallUnit: String
+    var offerAddMissing: Bool
+    /// Only a full match can be left out. Insufficient rows still deduct the capped amount.
+    var canExclude: Bool
+    var willDeduct: Bool
 }
 
 struct PantryCookDeduction: Equatable, Sendable {
@@ -1813,28 +1881,135 @@ struct PantryCookOutcome: Equatable, Sendable {
 }
 
 enum PantryCookConsumption {
-    static func preview(
+    /// Spoon and count units. A damped scale such as √½ × 1 tsp is 0,707 and formats as 0,71.
+    /// Those display as the nearest quarter-spoon when that is within 0,06. Mass and volume stay exact.
+    private static let kitchenUnits: Set<String> = ["tsp", "tbsp", "piece", "clove", "slice", "sprig", "pinch"]
+
+    static func displayQuantity(_ quantity: Double, unit: String) -> Double {
+        let snapped = PantryUnitPolicy.snap(quantity)
+        let code = UnitNormalization.parse(unit).code
+        guard kitchenUnits.contains(code), snapped > 0 else { return snapped }
+        let quarter = (snapped * 4).rounded() / 4
+        if quarter > 0, abs(quarter - snapped) <= 0.06 {
+            return quarter
+        }
+        return snapped
+    }
+
+    static func formatAmount(_ quantity: Double, unit: String) -> String {
+        QuantityFormat.quantityAndUnit(quantity: displayQuantity(quantity, unit: unit), unit: unit)
+    }
+
+    /// Groups recipe lines the way the cook sheet shows them.
+    /// `excludedNeedIndexes` are full matches the cook turned off. They do not reduce the stock the next line sees.
+    /// The walk matches `apply`: the same ingredient and a convertible unit, capped at what is there, never below zero.
+    static func classify(
         needs: [PantryCookNeed],
         stock: [PantryCookStock],
+        excludedNeedIndexes: Set<Int> = [],
         dictionary: IngredientDictionary = .shared
-    ) -> [PantryCookPreviewLine] {
-        let working = stock
-        return needs.map { need in
-            let needed = QuantityFormat.quantityAndUnit(quantity: need.quantity, unit: need.unit)
-            guard let match = match(need, in: working, dictionary: dictionary) else {
+    ) -> [PantryCookSheetRow] {
+        var working = stock
+        var rows: [PantryCookSheetRow] = []
+        for (index, need) in needs.enumerated() where need.quantity > 0 {
+            let recipeAmount = formatAmount(need.quantity, unit: need.unit)
+            let excluded = excludedNeedIndexes.contains(index)
+            guard let matchIndex = working.firstIndex(where: {
+                sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary)
+                    && PantryUnitPolicy.compatible($0.unit, need.unit)
+            }) else {
                 let same = working.contains { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) }
-                let stockText = same ? PantryCopy.unitMismatch : PantryCopy.missingPantry
-                return PantryCookPreviewLine(ingredientId: need.ingredientId, displayName: need.displayName, needed: needed, stock: stockText, note: stockText)
+                if same {
+                    rows.append(row(
+                        index: index, need: need, recipeAmount: recipeAmount, kind: .unitMismatch,
+                        stockAmount: nil, summary: "", reason: PantryCopy.unitMismatch,
+                        deducted: 0, remaining: nil, shortfall: PantryUnitPolicy.snap(need.quantity),
+                        offerAddMissing: false, canExclude: false, willDeduct: false
+                    ))
+                } else {
+                    rows.append(row(
+                        index: index, need: need, recipeAmount: recipeAmount, kind: .missing,
+                        stockAmount: nil, summary: "", reason: nil,
+                        deducted: 0, remaining: nil, shortfall: PantryUnitPolicy.snap(need.quantity),
+                        offerAddMissing: false, canExclude: false, willDeduct: false
+                    ))
+                }
+                continue
             }
-            let have = QuantityFormat.quantityAndUnit(quantity: match.quantity, unit: match.unit)
-            let note: String
-            if let available = PantryUnitPolicy.converted(match.quantity, from: match.unit, to: need.unit), available + 0.000_1 >= need.quantity {
-                note = "Evde yeterli"
+            let stockRow = working[matchIndex]
+            let neededInStock = PantryUnitPolicy.converted(need.quantity, from: need.unit, to: stockRow.unit) ?? 0
+            let taken = min(max(0, stockRow.quantity), neededInStock)
+            let snappedTaken = PantryUnitPolicy.snap(taken)
+            let remaining = PantryUnitPolicy.snap(max(0, stockRow.quantity - taken))
+            let covered = PantryUnitPolicy.converted(taken, from: stockRow.unit, to: need.unit) ?? 0
+            let gap = PantryUnitPolicy.snap(max(0, need.quantity - covered))
+            let stockAmount = formatAmount(stockRow.quantity, unit: stockRow.unit)
+            let consumes = !excluded && snappedTaken > 0
+            if consumes {
+                working[matchIndex].quantity = remaining
+            }
+            let kind: PantryCookRowKind = gap > 0 || snappedTaken <= 0 ? .insufficient : .matched
+            let summary: String
+            if snappedTaken <= 0 {
+                summary = PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: need.unit))
+            } else if gap > 0 {
+                summary = PantryCopy.cookPartial(
+                    deducted: formatAmount(snappedTaken, unit: stockRow.unit),
+                    shortfall: formatAmount(gap, unit: need.unit)
+                )
             } else {
-                note = "Stok kadar düşülür"
+                summary = PantryCopy.cookFull(
+                    deducted: formatAmount(snappedTaken, unit: stockRow.unit),
+                    remaining: formatAmount(remaining, unit: stockRow.unit)
+                )
             }
-            return PantryCookPreviewLine(ingredientId: need.ingredientId, displayName: need.displayName, needed: needed, stock: have, note: note)
+            rows.append(row(
+                index: index, need: need, recipeAmount: recipeAmount, kind: kind,
+                stockAmount: stockAmount, summary: summary, reason: nil,
+                deducted: consumes ? snappedTaken : 0,
+                remaining: remaining,
+                shortfall: gap,
+                offerAddMissing: gap > 0 && !stockRow.autoAddToGrocery,
+                canExclude: kind == .matched,
+                willDeduct: consumes
+            ))
         }
+        return rows
+    }
+
+    private static func row(
+        index: Int,
+        need: PantryCookNeed,
+        recipeAmount: String,
+        kind: PantryCookRowKind,
+        stockAmount: String?,
+        summary: String,
+        reason: String?,
+        deducted: Double,
+        remaining: Double?,
+        shortfall: Double,
+        offerAddMissing: Bool,
+        canExclude: Bool,
+        willDeduct: Bool
+    ) -> PantryCookSheetRow {
+        PantryCookSheetRow(
+            id: "\(index)|\(need.ingredientId)|\(need.unit)",
+            needIndex: index,
+            ingredientId: need.ingredientId,
+            displayName: need.displayName,
+            kind: kind,
+            recipeAmount: recipeAmount,
+            stockAmount: stockAmount,
+            summary: summary,
+            reason: reason,
+            deductedQuantity: deducted,
+            remainingQuantity: remaining,
+            shortfallQuantity: shortfall,
+            shortfallUnit: GroceryMerger.normalize(need.unit),
+            offerAddMissing: offerAddMissing,
+            canExclude: canExclude,
+            willDeduct: willDeduct
+        )
     }
 
     static func apply(

@@ -55,7 +55,7 @@ Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi ç
 2. `MealRoutineTests` koş; özellikle `PantryTests` ve `PantryDomainTests`.
 3. Pantry ekranında VoiceOver, en büyük Dynamic Type ve Dark Mode ile liste, form, conflict ve hata durumlarını gez.
 4. `Debug-Local` ile yerel sunucuya bağlanıp iki simülatörde aynı satırı düzenleyerek conflict akışını dene.
-5. Planlı bir yemeği pişir, puanı kaydet, “Stoktan düşme” ile stokun durduğunu, “Stoktan düş” ile yalnız çevrilebilir birimin ve eldeki miktarın düştüğünü gör. Uyumsuz birim düşülmez.
+5. Planlı bir yemeği pişir, puanı kaydet. “Evdekilerden düş” sayfası sekmenin üstünde açılır. “Vazgeç” stoku bırakır. “Düş” yalnız çevrilebilir birimi ve eldeki miktarı düşer; sayfa kapanır ve kısa bir onay görünür. Uyumsuz birim düşülmez. Stok 0 “Stok kadar düşülür” demez.
 6. `autoAddToGrocery` kapalıyken eşiğin market satırı açmadığını, açıkken `pantry-auto:` satırının bir kez yazıldığını ve işaretli satırın durduğunu kontrol et. İki simülatör aynı eşiği görünce ikinci market satırı açılmamalı.
 7. Tarih hatırlatmasını aç. İzin verilmezse “Bildirim izni kapalı…” cümlesi görünür ve Evdekiler kaydı yine çalışır. Tarih değişince eski gün, silinince bekleyen hatırlatma kalkar.
 8. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez.

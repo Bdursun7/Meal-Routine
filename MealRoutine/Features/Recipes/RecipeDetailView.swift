@@ -91,7 +91,6 @@ struct RecipeDetailView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar(content: favoriteToolbar)
             .overlay { ratingOverlay }
-            .overlay { cookStockOverlay }
     }
 
     @ToolbarContentBuilder
@@ -121,23 +120,13 @@ struct RecipeDetailView: View {
         }
     }
 
-    private var cookStockOverlay: some View {
-        Group {
-            if viewModel.cookStockMealID != nil || !viewModel.cookShortages.isEmpty, let recipe {
-                PantryCookConfirmSheet(
-                    lines: cookPreview(recipe),
-                    shortages: viewModel.cookShortages,
-                    awaitingDecision: viewModel.cookStockMealID != nil,
-                    onConfirm: {
-                        viewModel.confirmCookStock(needs: cookNeeds(recipe), in: modelContext)
-                    },
-                    onDecline: viewModel.declineCookStock,
-                    onAddMissing: { shortage in
-                        viewModel.addCookShortage(shortage, in: modelContext)
-                    }
-                )
+    private var cookSheetIsPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.cookStockMealID != nil },
+            set: { isPresented in
+                if !isPresented { viewModel.declineCookStock() }
             }
-        }
+        )
     }
 
     private func cookNeeds(_ recipe: Recipe) -> [PantryCookNeed] {
@@ -154,9 +143,9 @@ struct RecipeDetailView: View {
         }
     }
 
-    private func cookPreview(_ recipe: Recipe) -> [PantryCookPreviewLine] {
+    private func cookStock(for recipe: Recipe) -> [PantryCookStock] {
         let householdID = HouseholdSession.shared.snapshot.household?.id
-        let stock = pantryItems.filter { $0.householdID == householdID }.map { item in
+        return pantryItems.filter { $0.householdID == householdID }.map { item in
             PantryCookStock(
                 id: item.uuid.uuidString.lowercased(),
                 ingredientId: item.ingredientID,
@@ -170,7 +159,6 @@ struct RecipeDetailView: View {
                 dateValue: item.dateValue
             )
         }
-        return PantryCookConsumption.preview(needs: cookNeeds(recipe), stock: stock)
     }
 
     private var ratingOverlay: some View {
@@ -203,8 +191,16 @@ struct RecipeDetailView: View {
             .onChange(of: viewModel.savedNotice?.id) { _, newID in
                 announceSavedNotice(newID)
             }
+            .onChange(of: viewModel.cookNotice) { _, notice in
+                if let notice {
+                    AccessibilityNotification.Announcement(notice).post()
+                }
+            }
             .task(id: viewModel.savedNotice?.id) {
                 await dismissSavedNoticeAfterDelay()
+            }
+            .task(id: viewModel.cookNotice) {
+                await dismissCookNoticeAfterDelay()
             }
             .onAppear {
                 Analytics.track(.recipeOpened)
@@ -212,6 +208,21 @@ struct RecipeDetailView: View {
             .sheet(isPresented: $showsImportEditor) {
                 if let recipe {
                     RecipeEditorView(launch: .recipe(recipe.slug))
+                }
+            }
+            .sheet(isPresented: cookSheetIsPresented) {
+                if let recipe {
+                    PantryCookConfirmSheet(
+                        needs: cookNeeds(recipe),
+                        stock: cookStock(for: recipe),
+                        onConfirm: { included in
+                            viewModel.confirmCookStock(needs: included, in: modelContext)
+                        },
+                        onDecline: viewModel.declineCookStock,
+                        onAddMissing: { shortage in
+                            viewModel.addCookShortage(shortage, in: modelContext)
+                        }
+                    )
                 }
             }
             .alert("Tarif silinsin mi?", isPresented: $showsDeleteConfirm) {
@@ -262,6 +273,13 @@ struct RecipeDetailView: View {
         try? await Task.sleep(for: .seconds(3.2))
         guard !Task.isCancelled else { return }
         viewModel.dismissSavedNotice()
+    }
+
+    private func dismissCookNoticeAfterDelay() async {
+        guard viewModel.cookNotice != nil else { return }
+        try? await Task.sleep(for: .seconds(3.2))
+        guard !Task.isCancelled else { return }
+        viewModel.dismissCookNotice()
     }
 
     private func clearPortionDraftIfSaved(_ newContext: PortionContext) {
@@ -723,6 +741,11 @@ struct RecipeDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+            if let notice = viewModel.cookNotice {
+                CookResultToast(message: notice, onDismiss: viewModel.dismissCookNotice)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             let cooked = isCurrentMealCooked
             Button(cooked ? "Pişirildi" : "Bunu pişirdim") {
                 viewModel.markCooked(plannedMealUUID: currentWeekCookMeal?.uuid)
@@ -743,6 +766,7 @@ struct RecipeDetailView: View {
                 .accessibilityHidden(true)
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.savedNotice?.id)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.cookNotice)
     }
 
     /// Evening this screen cooks and shops for. A route without a meal still
@@ -1012,46 +1036,241 @@ private struct DiscoverySelectionTracker: ViewModifier {
 }
 
 private struct PantryCookConfirmSheet: View {
-    var lines: [PantryCookPreviewLine]
-    var shortages: [PantryCookShortage]
-    var awaitingDecision: Bool
-    var onConfirm: () -> Void
+    var needs: [PantryCookNeed]
+    var stock: [PantryCookStock]
+    var onConfirm: ([PantryCookNeed]) -> Void
     var onDecline: () -> Void
     var onAddMissing: (PantryCookShortage) -> Void
 
+    @State private var excluded: Set<Int> = []
+    @State private var added: Set<Int> = []
+
+    private var rows: [PantryCookSheetRow] {
+        PantryCookConsumption.classify(needs: needs, stock: stock, excludedNeedIndexes: excluded)
+    }
+
+    private var matched: [PantryCookSheetRow] { rows.filter { $0.kind == .matched } }
+    private var insufficient: [PantryCookSheetRow] { rows.filter { $0.kind == .insufficient } }
+    private var missing: [PantryCookSheetRow] { rows.filter { $0.kind == .missing } }
+    private var mismatched: [PantryCookSheetRow] { rows.filter { $0.kind == .unitMismatch } }
+
+    private var pendingShortages: [PantryCookSheetRow] {
+        insufficient.filter { $0.offerAddMissing && !added.contains($0.needIndex) }
+    }
+
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.45).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 12) {
-                Text(PantryCopy.cookConfirmTitle).font(.headline)
-                Text(PantryCopy.cookConfirmMessage).font(.subheadline).foregroundStyle(.secondary)
-                ForEach(lines) { line in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(line.displayName).font(.body.weight(.semibold))
-                        Text("Tarif: \(line.needed) · Evdekiler: \(line.stock)")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Text(line.note).font(.footnote)
+        NavigationStack {
+            List {
+                Section {
+                    Text(PantryCopy.cookConfirmMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .listRowBackground(Theme.cardSurface)
+                }
+                if !matched.isEmpty {
+                    Section(PantryCopy.cookSectionDeduct) {
+                        ForEach(matched) { row in
+                            matchedRow(row)
+                        }
                     }
                 }
-                ForEach(shortages.filter(\.offerAddMissing)) { shortage in
-                    Button(PantryCopy.addMissingToMarket) { onAddMissing(shortage) }
-                        .accessibilityLabel("\(PantryCopy.addMissingToMarket), \(shortage.displayName)")
+                if !insufficient.isEmpty {
+                    Section {
+                        ForEach(insufficient) { row in
+                            insufficientRow(row)
+                        }
+                    } header: {
+                        Text(PantryCopy.cookSectionShort)
+                    } footer: {
+                        if pendingShortages.count > 1 {
+                            Button(PantryCopy.cookAddAll) { addAllPending() }
+                                .font(.subheadline.weight(.semibold))
+                                .accessibilityHint("Yetersiz stoktaki eksikleri markete yazar")
+                        }
+                    }
                 }
-                if awaitingDecision {
-                    Button(PantryCopy.cookConfirm, action: onConfirm).buttonStyle(.borderedProminent)
-                    Button(PantryCopy.cookDecline, action: onDecline)
-                } else {
-                    Button("Kapat", action: onDecline)
+                if !missing.isEmpty {
+                    Section(PantryCopy.cookSectionMissing) {
+                        ForEach(missing) { row in
+                            Text(row.displayName)
+                                .font(.body)
+                                .foregroundStyle(Theme.textCharcoal)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel(row.displayName)
+                                .listRowBackground(Theme.cardSurface)
+                        }
+                    }
+                }
+                if !mismatched.isEmpty {
+                    Section(PantryCopy.cookSectionMismatch) {
+                        ForEach(mismatched) { row in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.displayName)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.textCharcoal)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(row.reason ?? PantryCopy.unitMismatch)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Theme.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .listRowBackground(Theme.cardSurface)
+                        }
+                    }
                 }
             }
-            .padding(20)
-            .frame(maxWidth: 420)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .padding(.horizontal, 24)
+            .scrollContentBackground(.hidden)
+            .background(Theme.bgCream)
+            .navigationTitle(PantryCopy.cookConfirmTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.bgCream, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(PantryCopy.cookDecline, action: onDecline)
+                        .accessibilityHint(PantryCopy.cookCancelHint)
+                        .accessibilityIdentifier("cook.cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(PantryCopy.cookConfirm) { confirm() }
+                        .fontWeight(.semibold)
+                        .accessibilityHint(PantryCopy.cookDeductHint)
+                        .accessibilityIdentifier("cook.deduct")
+                }
+            }
         }
-        .accessibilityAddTraits(.isModal)
+        .tint(Theme.accent)
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.bgCream)
+    }
+
+    private func matchedRow(_ row: PantryCookSheetRow) -> some View {
+        Toggle(isOn: includedBinding(row)) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.textCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                amountLine(row)
+                Text(row.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(Theme.accent)
+        .accessibilityLabel(amountAccessibility(row))
+        .accessibilityHint(PantryCopy.cookExcludeHint)
+        .listRowBackground(Theme.cardSurface)
+    }
+
+    private func insufficientRow(_ row: PantryCookSheetRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.textCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                amountLine(row)
+                Text(row.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            if row.offerAddMissing {
+                let already = added.contains(row.needIndex)
+                Button {
+                    onAddMissing(shortage(for: row))
+                    added.insert(row.needIndex)
+                } label: {
+                    Text(already ? PantryCopy.cookAdded : PantryCopy.cookAddNamed(row.displayName))
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .disabled(already)
+                .accessibilityLabel(already ? "\(row.displayName), \(PantryCopy.cookAdded)" : PantryCopy.cookAddNamed(row.displayName))
+            }
+        }
+        .listRowBackground(Theme.cardSurface)
+    }
+
+    private func amountLine(_ row: PantryCookSheetRow) -> some View {
+        Text("Tarif \(row.recipeAmount) · Evdekiler \(row.stockAmount ?? "")")
+            .font(.subheadline)
+            .foregroundStyle(Theme.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func amountAccessibility(_ row: PantryCookSheetRow) -> String {
+        "\(row.displayName), tarif \(row.recipeAmount), evdekiler \(row.stockAmount ?? ""), \(row.summary)"
+    }
+
+    private func includedBinding(_ row: PantryCookSheetRow) -> Binding<Bool> {
+        Binding(
+            get: { !excluded.contains(row.needIndex) },
+            set: { included in
+                if included {
+                    excluded.remove(row.needIndex)
+                } else {
+                    excluded.insert(row.needIndex)
+                }
+            }
+        )
+    }
+
+    private func shortage(for row: PantryCookSheetRow) -> PantryCookShortage {
+        PantryCookShortage(
+            ingredientId: row.ingredientId,
+            displayName: row.displayName,
+            missingQuantity: row.shortfallQuantity,
+            unit: row.shortfallUnit,
+            autoAddToGrocery: false,
+            offerAddMissing: true
+        )
+    }
+
+    private func addAllPending() {
+        for row in pendingShortages {
+            onAddMissing(shortage(for: row))
+            added.insert(row.needIndex)
+        }
+    }
+
+    private func confirm() {
+        let included = needs.enumerated().compactMap { index, need in
+            excluded.contains(index) ? nil : need
+        }
+        onConfirm(included)
+    }
+}
+
+private struct CookResultToast: View {
+    var message: String
+    var onDismiss: () -> Void
+
+    var body: some View {
+        Button(action: onDismiss) {
+            Text(message)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: 340)
+                .background(Theme.card, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Theme.secondaryText.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(message)
+        .accessibilityHint("Kapatmak için dokun")
     }
 }
 
