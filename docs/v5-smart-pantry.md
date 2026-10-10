@@ -1,129 +1,140 @@
 # MealRoutine V5 — Smart Pantry
 
-**Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Meal Budget
+**Roadmap:** V1 Core Meal Planning → V2 Personal Meal Memory → V3 Personal Recipe Collection → V4 Household & Shared Planning → V4.1 Release Hardening → **V5 Smart Pantry** → V6 Balanced Nutrition → V7 Globalization & Localization
 
-**Durum:** V5 kapsamındaki her madde uygulandı; ertelenen kapsam içi iş yok. Merkezi ingredient sözlüğü, `dateType` / `dateValue`, server-authoritative household pantry, offline queue ve conflict çözümü, market ve planner entegrasyonu `V5.0`’a açılan PR’da. Sunucu, Postgres ve iOS domain testleri geçti. Xcode derlemesi, `PantryTests` ve cihazda VoiceOver / Dynamic Type / Dark Mode turu Mac gerektirir; ayrıntı `docs/v5-release-gate.md`.
+**Durum:** Dört durum birbirinin yerine geçmez.
 
-**V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı tamamlandı. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez.
+- **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/src/pantryService.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/WeekPlanService.swift`.
+- **Otomatik testle doğrulanmış:** Bu paragraf bir test geçişi iddia etmez. Bu turda koşulan komutlar ve ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir. `docs/v5-release-gate.md` içindeki eski “geçti” satırları, bu turda yeniden üretilmedikçe kanıt değildir.
+- **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
+- **Ürün kabul kapısı kapandı:** Hayır. Kapı, doküman–kod uyumu, geçmiş `useBy` için nötr metin ve platforma özgü iOS kontrolleri doğrulanmadan kapanmaz.
+
+> V5.0 pantry işlevleri uygulanmış durumda; V5 kabul kapısının kapanması için doküman-kod uyumu, geçmiş `useBy` tarihindeki nötr metin ve platforma özgü iOS kontrolleri doğrulanmalıdır. Bu belgede test sonucu olarak yalnızca gerçek komut çıktısı veya CI kanıtı bulunan kontroller işaretlenir.
+
+**V4.1 ön koşulu:** V4.1 kod ve otomatik test kapsamı V4.1 belgelerinde tanımlıdır. Apple Developer hesabı, gerçek APNs, iki fiziksel cihaz, TestFlight / App Store ve bazı manuel UX kontrolleri bilinçli olarak ertelendi. Bu karar V5 geliştirmesini engellemez. V4.1’in kendi kabul kapısı bu belgenin konusu değildir.
 
 ## 1. Amaç
 
-V5, evde bulunan malzemeleri haftalık plan ve ortak market listesiyle birleştirir. Kullanıcı stoktaki malzemeyi kolayca ekler, miktarı günceller, tüketir ve gerektiğinde eksik miktarı market listesine taşır.
+V5, evde bulunan malzemeleri haftalık plan ve ortak market listesiyle birleştirir. Kullanıcı stoktaki malzemeyi ekler, miktarı günceller, tüketir ve gerektiğinde eksik miktarı market listesine taşır.
 
-Pantry, planı sessizce değiştiren bir otomasyon değildir. Kullanıcı hangi malzemenin hesaba katıldığını, ne kadar eksik kaldığını ve hangi işlemin stoktan düşüm yaptığını görebilir.
+Pantry, planı sessizce değiştiren bir otomasyon değildir. Kullanıcı hangi malzemenin hesaba katıldığını ve hangi işlemin stoku değiştirdiğini görebilir.
 
-V5, V1–V4.1 davranışlarını korur. Bütçe ve maliyet hesabı V6 Meal Budget kapsamındadır.
+V5, V1–V4.1 davranışlarını korur. Fiyat, bütçe, fiyat geçmişi ve market sağlayıcı entegrasyonu V5 kapsamı dışındadır. V6 Balanced Nutrition da kalori, makro, klinik beslenme, fiyat ve bütçe içermez.
 
 ## 2. Ürün sınırı
 
-### V5 kapsamı
+### V5.0 kapsamı
+
+Kodda ve V5.0 testlerinde karşılığı olanlar:
 
 - Pantry malzemesi ekleme, düzenleme, tüketme ve silme
-- Miktar ve birim yönetimi
+- Sayısal miktar ve yapılandırılmış birim
 - Pantry konumu: kiler, buzdolabı, dondurucu veya diğer
-- İsteğe bağlı minimum miktar
-- İsteğe bağlı tarih bilgisi
+- İsteğe bağlı minimum miktar (eşik bilgisidir; tek başına market satırı açmaz)
+- İsteğe bağlı tarih türü ve tarihi (`bestBefore` / `useBy`, `dateValue` takvim günü)
 - Uyumlu birimlerin birleştirilmesi
-- Uyumsuz birimlerin ayrı tutulması
-- Ortak market listesinde eksik miktar hesabı
+- Uyumsuz birimlerin ayrı satırda tutulması (kullanıcı `confirmSeparate` ile onaylar)
+- Ortak market listesinde eksik miktar hesabı (`compute-missing`; stok yazılmaz)
+- Kullanıcının seçtiği satır için pantry’den düşme ve pantry’ye ekleme
+- “Bitti” sonrası açık seçenek: markete ekle, minimuma göre eksik hesapla veya sil
 - Pantry kullanan tarifler için açıklanabilir öneri sinyali
 - Household üyeleri arasında server-authoritative senkronizasyon
 - Offline görüntüleme ve bekleyen işlem kuyruğu
-- Tarif/market/pantry malzemelerini ortak bir `Ingredient` kimliği üzerinden eşleştirme
-- Malzeme eş anlamlıları ve görünen adlarının merkezi sözlükten yönetilmesi
+- Merkezi ingredient sözlüğü ve `custom:<uuid>` ev malzemesi
 
-### V5 kapsamı dışında
+### V5.0 kapsamı dışında
 
+Aşağıdakiler V5.0’da kod ve test olarak yoktur. Bu belge onları mevcut özellik gibi anlatmaz ve V5.0’a ekleme izni vermez. İleride eklenecekse ayrı kapsam kararı, ayar varsayılanı, idempotency kuralı, bildirim davranışı ve test seti gerekir.
+
+- Minimum stok eşiği geçilince market listesine otomatik ekleme (`autoAddToGrocery` yok)
+- Düşük stok bildirimi (satır rozeti “Azaldı” bir push bildirimi değildir)
+- `bestBefore` / `useBy` için otomatik tarih hatırlatması ve hatırlatma takvimi
+- Yemek pişirildikten sonra, onaylı olsa bile, otomatik stok düşümü
 - Barkod tarama
 - Fiş veya OCR ile otomatik stok çıkarma
 - LLM ile malzeme tanıma
 - Tarif sitelerinden otomatik malzeme çıkarma
-- Market fiyatı ve bütçe hesabı
-- Son kullanma / tavsiye edilen tüketim tarihi için dış veri servisi
-- Otomatik son kullanma tarihi tahmini
+- Market fiyatı, bütçe, fiyat geçmişi, market sağlayıcı
+- Son kullanma tarihi için dış veri servisi
+- Otomatik tarih tahmini
 - Household üye sınırını artırma
-- V5 içinde market fiyatı saklama veya fiyat geçmişi oluşturma
+
+V5.0 kuralı: Pantry → Grocery ve Grocery → Pantry değişiklikleri kullanıcı tarafından açıkça başlatılır. Plan değişikliği stok miktarını sessizce düşürmez. “Pişirdim” stok düşürmez.
 
 ## 3. Veri sahipliği
 
-Pantry verisinin ana sahibi household'dır. Household sahibi olan pantry V4.1 mimarisine uygun olarak server-authoritative olur.
+Paylaşılan pantry’nin sahibi household’dır. Ortak pantry V4.1 sunucu modeline uygun olarak server-authoritative’dir.
 
-Household dışı kullanım için V5'te kalıcı ayrı bir server pantry hesabı oluşturulmaz. Household sahibi olmayan kullanıcı yalnızca yerel `Personal Pantry` kullanabilir. Bu veri V5 içinde cihaz üzerinde tutulur.
-
-Kullanıcı daha sonra household oluşturur veya mevcut household'a katılırsa kişisel pantry otomatik olarak ortak veriye karıştırılmaz. Kullanıcıya açık bir aktarım/kopyalama adımı gösterilir. Kullanıcı onaylamazsa kişisel pantry yerel olarak kalır.
-
-Böylece V5'te iki farklı sahiplik modeli bilinçli olarak vardır:
-
-- `Personal Pantry`: yalnızca household dışında kullanılan yerel veri
-- `Household Pantry`: household'a ait, server-authoritative ortak veri
-
-Household pantry oluşturulduktan sonra plan, grocery ve sync entegrasyonlarında yalnızca household pantry kullanılır.
+Household yokken kullanıcı kişisel, yerel pantry kullanır. Bu veri sunucuya yazılmaz (`PantryItem.householdID == nil`, `MealRoutine/Models/GroceryItem.swift`). Household oluşturulunca kişisel pantry otomatik olarak ortak veriye karışmaz. Uygulama aktar, kopyala veya ayrı tut seçeneklerini sunar (`PantryTransferPolicy`, `MealRoutine/Services/PantryDomain.swift`). Kullanıcı onaylamazsa kişisel pantry cihazda kalır.
 
 Pantry verisi:
 
 - Başka bir household tarafından okunamaz veya değiştirilemez.
-- Kişisel Meal Memory'yi değiştirmez.
+- Kişisel Meal Memory’yi değiştirmez.
 - V3 tarifinin sahipliğini değiştirmez.
 - Account deletion kurallarına uyar.
 - Ortak plan ve market listesiyle ilişkilendirilebilir, fakat bunların yerine geçmez.
 
 ## 4. Pantry modeli
 
-Önerilen alanlar:
+Kanonik adlar `0012_pantry` SQL, sunucu modeli ve API gövdesinden gelir. Aşağıdaki `bestBefore` alanı bir API alanı değildir. iOS önbelleği tarih değerini eski bir SwiftData özellik adında tutar; teldeki ad `dateValue`’dur. Karşılaştırma bölüm 13’tedir.
 
 ```text
 PantryItem
   id
-  householdId
+  householdId          -- yanıtta; istek gövdesinde yok. Kişisel satırda iOS’ta nil
   ingredientId
-  displayName
-  quantity
-  unit
+  displayName          -- görünen metin; kimlik değil
+  quantity             -- sayı, >= 0
+  unit                 -- yapılandırılmış birim kodu
   location
-  minimumQuantity?
-  dateType?
-  dateValue?
+  minimumQuantity?     -- aynı satırın birimi; negatif olamaz
+  dateType?            -- bestBefore | useBy; dateValue ile birlikte veya hiçbiri
+  dateValue?           -- YYYY-MM-DD takvim günü
+  version
   createdAt
   updatedAt
-  version
 ```
 
 ### Alan kuralları
 
-- `id` server tarafından kalıcı kimlik olarak tanınır; offline oluşturulan öğe için istemci kimliği idempotent biçimde korunur.
-- `householdId` istek gövdesinden kabul edilmez; erişim belirtecindeki üyelikten doğrulanır.
-- `ingredientId`, tarif, grocery ve pantry tarafında kullanılan merkezi malzeme kimliğidir; görünen metin karşılaştırmasıyla oluşturulmaz.
-- `displayName`, kullanıcının gördüğü Türkçe addır; `ingredientId` yerine geçmez.
-- Aynı `ingredientId` altında bilinen eş anlamlı/alternatif görünen adlar merkezi sözlükte tutulabilir. Örneğin `domates`, `cherry domates` otomatik olarak aynı malzeme kabul edilmez; bunun kararı ingredient sözlüğünde açıkça tanımlanır.
-- `quantity` negatif olamaz.
-- `unit` bilinmeyen veya geçersizse kayıt reddedilir; kullanıcı uyumsuz birim olarak kaydedemez.
-- `minimumQuantity` boş olabilir; doluysa negatif olamaz ve `quantity` ile aynı birim ailesinde olmalıdır.
-- Tarih bilgisi isteğe bağlıdır. Sistem kullanıcı girmediyse tarih uydurmaz.
-- `dateType` yalnızca `bestBefore` veya `useBy` olabilir.
-- `useBy` gerçek son tüketim tarihini, `bestBefore` ise tavsiye edilen tüketim tarihini ifade eder. Sistem bu iki tarihi aynı anlamda göstermez ve otomatik güvenlik kararı üretmez.
+- `id` sunucuda kalıcı kimliktir. Offline oluşturulan öğe için istemci UUID’si idempotent biçimde korunur.
+- `householdId` istek gövdesinden kabul edilmez. Üyelik erişim belirtecinden, household yolu URL’den doğrulanır (`POST /v1/households/:householdId/pantry/items`, gövde şeması strict).
+- `ingredientId`, tarif, market ve pantry sözlüğündeki kimliktir. Görünen metinden türetilen bir anahtar değildir.
+- `displayName` yalnız görüntüleme metnidir. Seed sözlükte Türkçe adlar vardır (`Domates`); İngilizce adlar da vardır (`Achiote paste`, `Cashews`, `0012_pantry.sql`). Dil, kimliği değiştirmez.
+- Yazılan ad, büyük/küçük harf ve diakritik farkı yok sayılarak tek bir maddenin adı veya eş anlamlısıyla birebir örtüşürse o `ingredientId` bağlanır. Örtüşme yoksa veya birden fazla madde aynı ada sahipse `custom:<uuid>` oluşturulur. Ortak evde `POST /v1/households/:id/ingredients` ile kaydedilir. Kişisel pantry’de yalnız cihazda durur. “Domates” ile “Cherry domates” kendiliğinden birleşmez. Eşleşme LLM ile yapılmaz.
+- `quantity` negatif olamaz. Sunucu binde birliğe yuvarlar (`roundPantryQuantity`).
+- `unit` bilinmeyen veya geçersizse kayıt reddedilir. Kullanıcı uyumsuz birimi `confirmSeparate: true` ile ayrı satır yapabilir; bilinmeyen birim o bayrakla da reddedilir.
+- `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik, market listesine otomatik satır eklemez.
+- `dateType` yalnız `bestBefore` veya `useBy` olabilir. İkisi aynı anlama gelmez.
+- `dateValue` takvim günüdür (`YYYY-MM-DD`, SQL `DATE`). Saat dilimi anına çevrilip bir gün kaydırılmaz; bu kuralın iOS önbelleğindeki `Date` karşılığı bölüm 13’te kayıtlıdır.
+- Kullanıcı tarih girmediyse sistem tarih uydurmaz. Tarih çifti ya ikisi birden vardır ya hiçbiri (`pantry_items_date_pair`).
+- Sistem tarih üzerinden gıda güvenliği kararı vermez. Geçmiş bir tarih, türüyle birlikte ve tarihin geçmiş olduğu nötr bir metinle gösterilir. “Güvenlik uyarısı”, “Tazelik uyarısı”, “bu ürün yenmez”, “güvenlidir” / “güvenli değildir” ürün metni değildir.
+- Geçmiş `useBy`, tarif öneri puanını artıran olumlu bir stok sinyali değildir (`PantryPlanningSignal.usable` bu satırı eler). Yaklaşan tarih, “Tarihi yaklaşan malzemeyi kullanıyor” açıklamasıyla küçük bir sinyal olabilir; bu bir güvenlik hükmü değildir.
 - `updatedAt` ve `version` conflict çözümünde kullanılır.
 
 ### “Bitti” davranışı
 
-“Bitti” bir pantry öğesini sessizce silmez. Miktar sıfıra çekilir ve kullanıcıya:
+“Bitti” bir pantry öğesini sessizce silmez. Seçim yapılmadan miktar değişmez. Kullanıcı şunlardan birini seçerse miktar sıfıra çekilir:
 
 1. markete ekle,
 2. minimum miktara göre eksik hesapla,
-3. öğeyi sil
+3. öğeyi sil.
 
-seçenekleri gösterilir.
+İptal mevcut miktarı korur (`PantryFinishedFlow.quantity`).
 
 ## 5. Birim ve miktar kuralları
 
-Mevcut market kuralları V5'te korunur:
+Dönüşüm yalnız desteklenen ve aynı birim ailesindeki çiftlerde yapılır. Dil veya ülke bir dönüşüm kuralı değildir.
 
-- Gram ve kilogram aynı ağırlık ailesinde dönüştürülebilir.
-- Mililitre ve litre aynı hacim ailesinde dönüştürülebilir.
-- Aynı malzemenin uyumlu birimleri birleştirilebilir.
-- Adet, paket, demet, kaşık ve benzeri birimler otomatik olarak grama veya litreye çevrilmez.
-- Uyuşmayan birimler tek pantry satırında birleştirilmez.
-- Kullanıcıya dönüşüm yapılamadığında açık bir seçim gösterilir.
-- Yuvarlama, mevcut grocery birim yuvarlama kurallarıyla aynı olur.
+Kanonik pantry birimleri (`0012_pantry.sql` `unit` kontrolü): `g`, `kg`, `ml`, `l`, `piece`, `tbsp`, `tsp`, `clove`, `pinch`, `slice`, `sprig`, `toTaste`.
+
+- Gram ve kilogram `mass` ailesindedir (`unit_bucket`).
+- Mililitre ve litre `volume` ailesindedir.
+- Adet, kaşık, diş, tutam, dilim, dal ve “damak tadına” otomatik olarak grama veya litreye çevrilmez. Her biri kendi `unit_bucket` değeridir.
+- Uyuşmayan birimler tek satırda birleştirilmez. Aynı household + `ingredientId` + `unit_bucket` tek satırdır.
+- Kullanıcıya dönüşüm yapılamadığında açık bir seçim gösterilir (`pantry_unit_choice`, `confirmSeparate`).
+- Yuvarlama, market birleştirmedeki binde birlik snap ile aynıdır.
 
 Örnekler:
 
@@ -141,19 +152,20 @@ Sonuç: otomatik çıkarma yok; kullanıcı kararı gerekir
 
 ## 6. Pantry ekranı
 
-Pantry, V5'te Market sekmesinden ayrı ve Profil'den erişilebilir bir household alanı olarak tasarlanır. Ortak household açık değilse kişisel yerel pantry durumu gösterilir.
+Pantry, Market sekmesinden ayrıdır ve Profil’den açılır. Ortak household açık değilse kişisel yerel pantry gösterilir.
 
 ### Liste
 
-Liste satırı en az şunları gösterir:
+Liste satırı şunları gösterir:
 
-- Malzeme adı
-- Mevcut miktar ve birim
+- Malzeme adı (`displayName`)
+- Mevcut miktar ve birim (sayı ve birim kodundan; gösterim metninden parse edilmez)
 - Konum
 - Minimum miktar varsa eşik bilgisi
-- Tarih bilgisi varsa tarih ve türü
-- Eksik veya yaklaşan durum için açık Türkçe etiket
-- `useBy` tarihi geçmişse güvenlik uyarısı; `bestBefore` tarihi geçmişse kalite/tazelik uyarısı
+- Tarih varsa türün adı ve takvim günü
+- Tarih geçmişse nötr durum: girilen tarihin geçmiş olduğu. Tür (`bestBefore` veya `useBy`) ayrıca görünür. Metin gıdanın güvenli veya güvensiz olduğuna karar vermez.
+
+V5.0 kodu bu nötr metne henüz uymaz. Satır, geçmiş `useBy` için “Güvenlik uyarısı: son tüketim tarihi geçti” ve geçmiş `bestBefore` için “Tazelik uyarısı: tavsiye edilen tarih geçti” yazar (`PantryRowPresentation.make`, `MealRoutine/Services/PantryDomain.swift`). Form alt yazısı “Son tüketim tarihi (STT) güvenlik içindir” der (`PantryCopy.dateFooter`). Bu metinler kabul kapısını kapatmaz. Düzeltme uygulama kodundadır; bu belge o düzeltmeyi yapmış sayılmaz.
 
 ### Boş durum
 
@@ -169,50 +181,44 @@ Miktar, birim, konum, minimum miktar ve tarih türü/tarihi tek düzenleme akı�
 
 ### Malzeme adı
 
-Kullanıcı adı serbest yazar. Yazarken sözlükteki adlar, eş anlamlılar ve bu evin (ya da kişisel listenin) özel malzemeleri öneri olarak görünür. Öneriye basmak o `ingredientId` ile bağlar.
-
-Öneri seçilmezse kayıt şöyle çözülür:
-
-- Yazılan ad, büyük/küçük harf ve diakritik farkı yok sayılarak **tek** bir maddenin adı veya eş anlamlısıyla birebir örtüşüyorsa o `ingredientId` bağlanır.
-- Örtüşme yoksa ya da birden fazla madde aynı ada sahipse yeni `custom:<uuid>` oluşturulur. Ortak evde bu kimlik mevcut `POST /v1/households/:id/ingredients` ile kaydedilir; kişisel evdekilerde yalnız cihazda durur.
-- “Domates” ile “Cherry domates” gibi benzer adlar asla kendiliğinden birleşmez. Eşleşme LLM ile yapılmaz. Yazılan metin `ingredientId` olmaz.
-
-Market satırında kimlik yoksa aynı kural geçerlidir: alan yazılır, öneriye basılabilir, Kaydet ikinci bir onay istemez.
+Kullanıcı adı serbest yazar. Yazarken sözlükteki adlar, eş anlamlılar ve bu evin (ya da kişisel listenin) özel malzemeleri önerilir. Öneriye basmak o `ingredientId` ile bağlar. Öneri seçilmezse bölüm 4’teki birebir / `custom:<uuid>` kuralı geçerlidir. Market satırında kimlik yoksa aynı kural geçerlidir.
 
 ## 7. Market listesi entegrasyonu
 
-Pantry miktarı ortak market satırını otomatik olarak silmez. Market kullanıcının açıkça onayladığı bir satın alma listesidir.
+Pantry miktarı ortak market satırını otomatik olarak silmez. Market, kullanıcının açıkça onayladığı bir satın alma listesidir.
 
-Desteklenen işlemler:
+V5.0’da desteklenen işlemler:
 
-- **Eksik miktarı hesapla:** Tarif ihtiyacından pantry miktarını düşer.
-- **Evdekilerden düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır.
-- **Evdekilere ekle:** Satın alınan miktarı pantry’ye ekler.
-- **Bitti olarak işaretle:** Pantry miktarını sıfırlar ve markete ekleme önerir.
+- **Eksik miktarı hesapla:** Tarif ihtiyacından pantry miktarını düşerek eksik miktarı hesaplar. Stok yazılmaz (`compute-missing`).
+- **Evdekilerden düş:** Kullanıcının seçtiği market satırını pantry miktarından azaltır (`consume`).
+- **Evdekilere ekle:** Satın alınan miktarı pantry’ye ekler (`restock`).
+- **Bitti olarak işaretle:** Kullanıcı bir seçenek onaylarsa miktarı sıfırlar ve seçeneğe göre markete ekleme veya silme önerir.
 
 Kurallar:
 
 - Pantry miktarı ihtiyacı karşılıyorsa eksik miktar sıfır olur.
-- Pantry miktarı yetersizse yalnızca eksik miktar markete eklenir.
+- Pantry miktarı yetersizse yalnızca eksik miktar markete eklenir. Bu ekleme, “Eksik miktarı hesapla” eylemidir; eşik otomasyonu değildir.
 - İşaretlenmiş market satırları korunur.
-- Aynı mutation retry edildiğinde market miktarı iki kez artmaz.
+- Aynı mutation aynı `Idempotency-Key` ile yeniden gelirse market veya stok ikinci kez değişmez.
 - Uyumsuz birimlerde otomatik çıkarma yapılmaz.
 - Plan değişince pantry miktarı kendiliğinden azalmaz.
-- Pişirme tamamlanınca stoktan otomatik düşüm V5 ilk sürümünde zorunlu değildir; varsa kullanıcı açıkça etkinleştirir.
+- Plan öğesini açmak, işaretlemek veya market satırını tamamlamak stoktan düşüm yapmaz.
+- “Pişirdim” (`WeekPlanService.markCooked`) pantry miktarını değiştirmez. Onaylı pişirme düşümü V5.0’da yoktur.
 
 ## 8. Haftalık plan ve scoring
 
 Pantry, öneri skoruna açıklanabilir bir sinyal olarak eklenebilir.
 
-- Tarif, pantry'deki malzemelerin bir kısmını kullanıyorsa küçük bir avantaj alabilir.
-- Son kullanma tarihi yaklaşan bir malzeme yalnız güvenli ve açıkça eşleşen tariflerde sinyal olur.
+- Tarif, pantry’deki malzemelerin bir kısmını kullanıyorsa küçük bir avantaj alabilir (tavan, sert filtrelerin altında).
+- Geçmiş `useBy` bu avantaja girmez ve “Evdeki malzemeleri kullanıyor” açıklaması üretmez.
+- Geçmiş `bestBefore` güvenlik cezası değildir; stok hâlâ kullanılabilir sinyal olabilir. Metin gıda güvenliği hükmü vermez.
+- Yaklaşan tarih (üç gün penceresi, bugün dahil) “Tarihi yaklaşan malzemeyi kullanıyor” notuyla işaretlenebilir.
 - Pantry hiçbir zaman `Never Again`, household veto, pişirme süresi veya diğer hard filter kurallarını geçersiz kılmaz.
 - Kişisel Meal Memory skorlaması korunur.
-- Pantry sinyali kullanıcıya “Evdeki malzemeleri kullanıyor” gibi kısa bir açıklamayla gösterilir.
 - Plan yeniden oluşturulunca pantry miktarı düşmez.
 - Pantry boşsa mevcut V4.1 planlama davranışı aynen devam eder.
 
-İlk V5 sürümünde pantry otomatik planlama için zorunlu kaynak değildir. Kullanıcı planı pantry kullanmadan da oluşturabilir.
+Pantry, otomatik planlama için zorunlu kaynak değildir. Kullanıcı planı pantry kullanmadan da oluşturabilir.
 
 ## 9. Mimari
 
@@ -232,27 +238,25 @@ Postgres server database
 
 ### Server
 
-- Household üyeliği ve yetki server'da doğrulanır.
-- Pantry item validation server'da tekrarlanır.
-- Server başka household erişimini reddeder.
-- Server conflict response ve version bilgisini döner.
-- Idempotency anahtarı aynı mutation'ın iki kez uygulanmasını engeller.
-- `Ingredient` sözlüğü server tarafında authoritative kaynaktır.
-- Client, yazılan metni `ingredientId` yapmaz. Öneri seçilmezse birebir ve tekil bir ad veya eş anlamlı o kimliğe bağlanır; aksi halde istemci `custom:<uuid>` üretir ve ortak evde bunu `POST /v1/households/:id/ingredients` ile kaydeder. Benzer adlar birleşmez ve LLM eşlemesi yoktur.
-- V5'te ingredient sözlüğünün yönetimi admin paneli gerektirmez; başlangıç sözlüğü migration/seed ile gelir ve uygulama içinden kullanıcıya görünmez.
+- Household üyeliği ve yetki sunucuda doğrulanır.
+- Pantry item validation sunucuda tekrarlanır.
+- Sunucu başka household erişimini reddeder.
+- Sunucu conflict yanıtı ve `version` döner.
+- `Idempotency-Key` aynı mutation’ın iki kez uygulanmasını engeller (24 saat, `pantry_idempotency`).
+- Ingredient sözlüğü sunucuda authoritative kaynaktır. Başlangıç sözlüğü `0012_pantry.sql` seed’idir. Admin paneli yoktur.
 
 ### SwiftData
 
 - Hızlı UI için cache tutar.
 - Offline görüntülemeyi sağlar.
-- Bekleyen pantry mutation'larını saklar.
-- Server state yerine geçmez.
+- Bekleyen pantry mutation’larını saklar.
+- Server state yerine geçmez. Kişisel satırlar (`householdID == nil`) sunucu pantry’sine yazılmaz.
 
 ## 10. Offline ve sync
 
 Offline yapılabilen işlemler:
 
-- Daha önce senkronize edilmiş pantry'yi görüntüleme
+- Daha önce senkronize edilmiş pantry’yi görüntüleme
 - Miktar değiştirme
 - Tüketim kaydetme
 - Konum değiştirme
@@ -273,162 +277,153 @@ status
 idempotencyKey
 ```
 
-Durumlar:
-
-- `pending`
-- `syncing`
-- `completed`
-- `failed`
-- `requiresResolution`
+Durumlar: `pending`, `syncing`, `completed`, `failed`, `requiresResolution`.
 
 Retry exponential backoff ile yapılır. Bağlantı geri geldiğinde işlemler sırayla gönderilir; aynı işlem yeniden gönderilse de sonucu çoğalmaz.
 
 ## 11. Conflict resolution
 
-İki cihaz aynı pantry öğesini değiştirirse server sürümü kazanır. İstemci, kendi pending mutation'ını sessizce silmez; server delta'sını aldıktan sonra işlemi `requiresResolution` durumuna alır veya deterministik merge uygular.
+İki cihaz aynı pantry öğesini değiştirirse sunucu sürümü kazanır. İstemci, kendi pending mutation’ını sessizce silmez. Eski `baseVersion` `409` ve `current` döner. Kuyruk `requiresResolution` olur.
 
-Basit alanlarda:
-
-- Miktar için son server revision'ı geçerli olur.
-- Konum için server revision'ı geçerli olur.
-- Minimum miktar ve son kullanma tarihi aynı revision ailesinde birlikte değerlendirilir.
-
-Kullanıcıya şu anlama gelen Türkçe mesaj gösterilir:
+Kullanıcıya şu metin gösterilir:
 
 > “Bu malzeme başka bir cihazda güncellendi.”
 
-Sessiz veri kaybı kabul edilmez.
+Seçenekler: “Sunucudaki hali kullan” veya “Değişikliğimi yeniden uygula”. Sessiz veri kaybı kabul edilmez.
 
 ## 12. API sözleşmesi
 
-V5 yeni API endpoint'leri ve versioned SQL migration gerektirir. Mevcut `0001`–`0011` migration'ları değiştirilmez.
-
-Önerilen endpoint'ler:
+V5, `0012_pantry` migration’ını ekler. `0001`–`0011` dosyaları değiştirilmez.
 
 ```text
+GET    /v1/ingredients?householdId=&q=&limit=
+POST   /v1/households/:id/ingredients
 GET    /v1/households/:id/pantry
 POST   /v1/households/:id/pantry/items
-PATCH  /v1/households/:id/pantry/items/:itemId
-DELETE /v1/households/:id/pantry/items/:itemId
+PATCH  /v1/households/:id/pantry/items/:itemId?baseVersion=
+DELETE /v1/households/:id/pantry/items/:itemId?baseVersion=
 POST   /v1/households/:id/pantry/reconcile-grocery
-GET    /v1/ingredients
 ```
+
+Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövdeyle ilk cevabı döner; farklı gövde `409` verir.
+
+Gövde alanları: `ingredientId`, `displayName`, `quantity`, `unit`, `location`, `minimumQuantity`, `dateType`, `dateValue` (`YYYY-MM-DD`). Şema strict’tir. Eski `bestBefore` anahtarı oluşturma/yama isteğinde reddedilir (`invalid_request`). İstemci, kapı öncesi kuyrukta kalmış `bestBefore` / `revision` yükünü okuyabilir; telde kanonik ad `dateValue` / `version`’dır.
+
+`reconcile-grocery` işlemi: `compute-missing`, `consume`, `restock`.
 
 Endpoint kuralları:
 
 - Access token zorunludur.
 - Household üyeliği zorunludur.
-- İstemci sahibi request body'den okunmaz.
-- API version header V4.1 sözleşmesine uyar.
+- İstemci sahibi request body’den okunmaz.
 - Geçersiz miktar, birim ve tarih reddedilir.
-- Rate limit ve request size sınırları korunur.
-- Hata gövdeleri istemcinin recovery akışını çalıştıracak şekilde sınıflandırılır.
+- Hata gövdesi `error` ve `recovery` taşır (`resolve`, `choose-unit`, `fix-input`, `new-key`, `refresh-household`, `retry-later`, `reauthenticate`).
 
-## 13. Veritabanı migration
+## 13. Şema karşılaştırması (`0012_pantry`)
 
-Yeni migration pantry öğesi, version ve idempotency kayıtlarını ekleyebilir. Migration:
+Karşılaştırma `V5-Alignment-Audit` `1f07663` üzerindedir. “Uyumlu” veya “tamamlandı” denmez. Aşağısı alan adı, nullability ve tarih temsilidir.
 
-- Önceki migration'ları değiştirmez.
-- Geriye dönük uyumsuz client'ı API version ile reddeder.
-- Household authorization için gerekli foreign key ve index'leri ekler.
-- Aynı household ve ingredient için duplicate davranışını açıkça tanımlar.
-- Account deletion sırasında pantry ownership kurallarını uygular.
+| Kavram | SQL `pantry_items` | Sunucu `PantryItem` | API JSON | iOS SwiftData `PantryItem` | iOS tel `PantryRemoteItem` |
+| --- | --- | --- | --- | --- | --- |
+| Kimlik | `id UUID` PK | `id: string` | `id` | `uuid` | `id` |
+| Sahip | `household_id UUID NOT NULL` | `householdId` | yanıtta var; gövdede yok | `householdID: UUID?` (`nil` = kişisel, sunucuda yok) | `householdId` |
+| Malzeme | `ingredient_id TEXT NOT NULL` FK | `ingredientId` | `ingredientId` | `ingredientID` | `ingredientId` |
+| Görünen ad | `display_name TEXT NOT NULL` | `displayName` | `displayName` | `displayName` | `displayName` |
+| Miktar | `quantity NUMERIC(12,3) NOT NULL` `>= 0` | `number` | `quantity` | `Double` | `Double` |
+| Birim | `unit TEXT NOT NULL` (sabit liste) | `string` | `unit` | `unit` | `unit` |
+| Birim kovası | `unit_bucket` üretildi, saklanır | yok | yok | yok | yok |
+| Konum | `location TEXT NOT NULL` | `PantryLocation` | `location` | `locationRaw` | `location` |
+| Minimum | `minimum_quantity NUMERIC(12,3) NULL` `>= 0` | `number \| null` | `minimumQuantity` nullable | `Double?` | `Double?` |
+| Tarih türü | `date_type TEXT NULL` (`bestBefore`, `useBy`) | `dateType \| null` | `dateType` | `dateTypeRaw: String?` | `dateType?` |
+| Tarih | `date_value DATE NULL` | `string \| null` `YYYY-MM-DD` | `dateValue` | depolama adı `bestBefore: Date?`; okuma `dateValue` | `dateValue: String?` |
+| Sürüm | `version INT NOT NULL` `>= 1` | `version` | `version` | `revision` | `version` (`revision` yalnız eski yük okuması) |
+| Oluşturma | `created_at TIMESTAMPTZ NOT NULL` | `createdAt` ISO-8601 UTC | `createdAt` | modelde yok | `Date?` |
+| Güncelleme | `updated_at TIMESTAMPTZ NOT NULL` | `updatedAt` ISO-8601 UTC | `updatedAt` | `updatedAt: Date` | `Date?` |
 
-V5 yerel cache migration'ı, mevcut V1–V4.1 verisini silmez. Pantry yoksa boş başlar; mevcut plan, market, tarif ve Meal Memory korunur.
+Tarih çifti: SQL `pantry_items_date_pair` — `date_type` ve `date_value` ikisi birden NULL ya da ikisi birden dolu. Sunucu `normalizeDatePair` aynı kuralı uygular ve `YYYY-MM-DD` dışını `invalid_date` ile reddeder. Postgres okuması `to_char(date_value, 'YYYY-MM-DD')` ile takvim gününü string döner (`server/src/pgPantry.ts`).
+
+iOS farkları (davranış değişikliği değildir; kayıtlı eşlemedir):
+
+- Kişisel satırın `householdID` değeri yoktur. SQL household satırı `household_id` olmadan duramaz. Bu, iki sahiplik modelidir.
+- SwiftData tarih değeri `bestBefore` adlı `Date` alanındadır. API bu adı kabul etmez. Tel ve SQL adı `dateValue` / `date_value`’dur.
+- `dateTypeRaw` boş ve `bestBefore` dolu eski satır, okumada `bestBefore` türü sayılır (`GroceryItem.swift` `dateType`). Sunucu yeni yazımda türsüz tarih kabul etmez.
+- `PantryDay.string` / `PantryDay.date` verilen takvimin yıl-ay-gününü kullanır; varsayılan takvim cihaz takvimidir (`PantryDomain.swift`). Sunucu günü `DATE` olarak saklar. Cihaz saat dilimi, önbellekteki `Date` tekrar `YYYY-MM-DD` yazılmadan değişirse takvim günü kayabilir. Bu, bölüm 13’ün açık farkıdır; ürün kuralı günün kaymamasıdır.
+- `unit_bucket` yalnız veritabanındadır.
+- `createdAt` SwiftData modelinde yoktur. Saat damgaları sunucuda UTC anıdır; `dateValue` bir an değildir.
+
+Migration:
+
+- `0001`–`0011` değiştirilmez. `0012_pantry` ingredients, pantry_items ve pantry_idempotency ekler.
+- `0012` öncesi pantry tablosu yoktur. Korunacak eski pantry satırı yoktur. V4.1 household, board ve hesap satırları `0012` uygulanırken silinmemelidir. Bunu `server/test/pantry.integration.test.ts` dener; sonuç audit report’tadır.
+- Tekrar çalıştırma: `schema_migrations` kaydı varken `migrate` `0012`’yi yeniden uygulamaz. Seed `ON CONFLICT (id) DO NOTHING` kullanır.
+- Geri alma: migration dosyasında `DROP TABLE` yoktur. Onarım, yayınlanmamış geliştirme veritabanı için `docs/v5-local-runbook.md` içindeki taslak düşürme notudur. Yayınlanmış şema için otomatik down migration yoktur.
+- Hesap silinince pantry ve idempotency satırları hesap/household silme kurallarıyla gider (`ON DELETE CASCADE`).
+
+Bu tabloda olmayan alanlar (`autoAddToGrocery`, `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`, gövdede `bestBefore`) V5.0 şemasına eklenmez.
 
 ## 14. Account deletion ve privacy
 
 Kullanıcı hesabını sildiğinde:
 
-- Kişisel pantry varsa kişisel veri olarak silinir.
-- Household pantry'si household ownership kuralına göre korunur veya silinir.
-- Silinen üyeye ait access ve refresh token'lar geçersiz kalır.
-- Başka household üyelerinin verisi export'a karışmaz.
-- Pantry item geçmişi kullanıcıya görünmeyen sessiz bir kopya olarak bırakılmaz; saklama kararı ayrıca belgelenir.
+- Kişisel pantry varsa kişisel veri olarak cihazdan silinir.
+- Household pantry’si household ownership kuralına göre korunur veya, household siliniyorsa, household ile birlikte silinir.
+- Silinen üyeye ait access ve refresh token’lar geçersiz kalır.
+- Başka household üyelerinin verisi export’a karışmaz.
+- Pantry idempotency satırı hesapla birlikte silinir. Kullanıcıya görünmeyen ayrı bir pantry kopyası bırakılmaz.
 
-## 15. V5 kilitlenen kararlar
+## 15. Kilitli kararlar
 
-V5'in uygulanması sırasında aşağıdaki kararlar yeniden açılmaz:
+Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 
-1. Pantry'nin ana server sahipliği household'dır.
-2. Household dışındaki kişisel pantry yalnızca local-only'dir; V5'te ayrı kişisel pantry backend'i yoktur.
-3. Ingredient eşleştirmesi görünen isimle değil merkezi `ingredientId` ile yapılır.
-4. V5 otomatik malzeme tanıma veya LLM tabanlı ingredient eşleştirmesi yapmaz.
-5. `bestBefore` ve `useBy` farklı kavramlardır; sistem kullanıcı adına gıda güvenliği kararı vermez.
-6. V5 fiyat, satın alma maliyeti veya bütçe verisi toplamaz.
-7. Plan oluşturmak pantry kullanımına bağlı değildir.
-8. Planın oluşturulması veya tarifin pişirildi olarak işaretlenmesi pantry miktarını sessizce düşürmez.
-9. Pantry → Grocery ve Grocery → Pantry işlemleri kullanıcı tarafından açıkça tetiklenir.
-10. V5'in mevcut branch'inde başlayan `0012` migration çalışması, pantry şemasının kanonik migration'ı olarak tamamlanır.
+1. Ingredient kimliği `ingredientId`’dir. Çevrilmiş veya görünen ad kimlik değildir.
+2. Birim dönüşümü yalnız desteklenen ve aynı birim ailesindeki dönüşümlerde yapılır.
+3. Plan oluşturmak veya planı değiştirmek kiler stokunu sessizce değiştirmez.
+4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. V5.0’da “Pişirdim” stok düşmez; onaylı düşüm akışı yoktur.
+5. Kullanıcının girdiği tarih uydurulmaz. Tarih tek başına gıda güvenliği kararı üretmez.
+6. V5’te fiyat, bütçe, fiyat geçmişi veya market sağlayıcı entegrasyonu yoktur.
+7. Kişisel kiler, household kilerine otomatik ve sessizce birleştirilmez.
+8. Stok ve market güncellemeleri tekrar denendiğinde çift kayıt veya çift düşüm üretmeyecek şekilde idempotent olmalıdır.
+9. V5.0 kapsamı dışında kalan otomasyonlar uygulanmış özellik gibi gösterilmez.
+10. Paylaşılan pantry’nin sunucu sahibi household’dır. Kişisel pantry yalnız cihazdadır; ayrı bir kişisel pantry backend’i yoktur.
+11. V5 otomatik malzeme tanıma veya LLM eşlemesi yapmaz.
+12. Plan oluşturmak pantry kullanmaya bağlı değildir.
+13. `0012_pantry`, pantry şemasının kanonik migration’ıdır. `0001`–`0011` yeniden yazılmaz.
 
-## 15. Uygulama fazları
+## 16. Uygulama fazları
+
+Fazlar V5.0’da nerede durduğunu anlatır. Fazın listelenmiş olması, içindeki her maddenin kabul kapısını kapattığı anlamına gelmez.
 
 ### Faz 1 — Domain ve kararlar
 
-- Pantry domain modeli
-- Ingredient kimliği ve merkezi sözlük
-- Eş anlamlı/alternatif görünen ad kuralları
-- Birim aileleri ve dönüşüm kuralları
-- `bestBefore` / `useBy` tarih ayrımı
-- Household ve kişisel pantry ownership
-- API sözleşmesi
-- Migration tasarımı
+Pantry modeli, sözlük, birim aileleri, `bestBefore` / `useBy`, sahiplik, API ve `0012` tasarımı kodda karşılık buldu.
 
 ### Faz 2 — Server
 
-- CRUD endpoint'leri
-- Validation
-- Household authorization
-- Idempotency
-- Conflict response
-- Migration ve integration testleri
+CRUD, validation, household authorization, idempotency, conflict ve migration test dosyaları vardır. Geçip geçmedikleri audit report’taki komut çıktısıdır.
 
 ### Faz 3 — Local cache ve sync
 
-- SwiftData pantry cache
-- Pending operation modeli
-- Retry ve backoff
-- Delta pull
-- Conflict recovery
+SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. `PantryTests` Mac’te koşar; bu belgede geçti denmez.
 
 ### Faz 4 — Pantry UI
 
-- Liste
-- Ekleme ve düzenleme
-- Konum seçimi
-- Minimum miktar
-- Son kullanma tarihi
-- Empty, loading, error ve offline durumları
+Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş `useBy` metni bölüm 6’daki nötr kurala uymaz. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
 
 ### Faz 5 — Market entegrasyonu
 
-- Eksik miktar hesabı
-- Evdekilerden düşme
-- Evdekilere ekleme
-- İşaretli satır koruması
-- Idempotent replay
+Eksik miktar, evdekilerden düşme, evdekilere ekleme, işaretli satır ve idempotent replay kodda vardır. Otomatik eşik eklemesi yoktur.
 
 ### Faz 6 — Planner sinyali
 
-- Pantry kullanım sinyali
-- Yaklaşan son kullanma tarihi sinyali
-- Açıklama metinleri
-- V1–V4.1 scoring regresyonu
+Pantry kullanım sinyali ve geçmiş `useBy` için bonus verilmemesi kodda vardır. Metin güvenlik hükmü vermez.
 
 ### Faz 7 — QA ve release
 
-- Server testleri
-- iOS unit ve integration testleri
-- Offline ve conflict testleri
-- V1–V4.1 regression
-- Accessibility
-- Dynamic Type
-- Dark Mode
-- Runbook ve release gate
+Sunucu testleri ve Linux domain testleri audit report’ta kayıtlıdır. VoiceOver, Dynamic Type, Dark Mode ve Xcode `PantryTests` doğrulanmamıştır. Kabul kapısı açıktır.
 
-## 16. V5 kabul kapısı
+## 17. V5 kabul kapısı
 
-V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır:
+V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır. Kutular bu belgede işaretlenmez. Sonuç audit report’tadır.
 
 - Pantry CRUD testleri geçer.
 - Household authorization testleri geçer.
@@ -436,20 +431,44 @@ V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır:
 - Uyumlu birimler doğru birleşir.
 - Uyumsuz birimler karıştırılmaz.
 - Aynı ingredient kimliği dışındaki malzemeler yalnız görünen ad benzerliğiyle birleştirilmez.
-- `bestBefore` ve `useBy` kullanıcıya farklı anlamlarla gösterilir.
+- `bestBefore` ve `useBy` ayrı saklanır ve ayrı tür adıyla gösterilir.
+- Kullanıcı girmediyse tarih üretilmez.
+- Geçmiş tarih, nötr metinle gösterilir; gıda güvenliği hükmü verilmez.
 - Eksik miktar hesabı doğru ve idempotent çalışır.
 - İşaretlenmiş market satırları korunur.
+- Plan ve “Pişirdim” stoku değiştirmez.
 - Offline queue bağlantı dönüşünde işlemleri çoğaltmadan gönderir.
-- Conflict server state ile deterministik çözülür.
-- Migration mevcut V1–V4.1 verisini silmez.
+- Conflict sunucu haliyle deterministik çözülür.
+- `0012` mevcut V1–V4.1 verisini silmez.
 - Account deletion pantry ownership kurallarına uyar.
 - V1–V4.1 regresyon testleri korunur.
 - Loading, empty, error, offline ve conflict metinleri Türkçedir.
 - VoiceOver, Dynamic Type ve Dark Mode kontrol edilir.
 - API, migration ve local runbook güncellenir.
 
-## 17. V5 sonunda beklenen ürün davranışı
+## 18. V5.0’da olmayan hatırlatma ve bildirim taslağı
 
-Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette yalnızca eksik olan miktarı satın alacak şekilde plan yapabilir. Household üyeleri aynı pantry state'ini server üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
+v2 taslağının hatırlatma bölümü şunları tarif ediyordu: `bestBefore` için 2 gün önce ve tarihin kendisi, `useBy` için 1 gün önce ve tarihin kendisi; `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`.
 
-V5, MealRoutine'a stok farkındalığı kazandırır. V5 pantry tarafında fiyat verisi tutmaz ve maliyet hesabı yapmaz. Fiyat, bütçe ve maliyet kararları V6 Meal Budget'a bırakılır.
+`1f07663` kodunda bunlar yoktur:
+
+- Sunucu bildirim türleri yalnız `invite`, `weekly_plan`, `meal_veto`, `meal_replacement`, `plan_finalized` (`server/src/notifications.ts`).
+- Pantry için yerel takvim bildirimi, hatırlatma iptali veya düşük stok push’u yoktur.
+- `minimumQuantity` satırda “Azaldı” rozeti üretir; market satırı açmaz.
+
+Bu belge o taslağı V5.0 özelliği yapmaz. İleride eklenirse household timezone, cihaz bildirim izni, tarih değişince yeniden planlama, tüketim veya silmede iptal, idempotency ve testler ayrıca yazılır. Bildirim metni gıda güvenliği garantisi olmaz. Bildirim izni reddedilirse pantry’nin geri kalanı çalışmaya devam eder; bu cümle gelecekteki işin kuralıdır, V5.0’da bir izin ekranı olduğu iddiası değildir.
+
+## 19. Global-readiness kuralları
+
+- Ingredient kimliği daima `ingredientId` olur.
+- Görünen ad sunum katmanındadır. Ayrı bir `IngredientName(locale)` tablosu V5.0 şemasında yoktur; seed `display_name` ve `synonyms` taşır.
+- Quantity ve unit ayrı alanlardır.
+- `dateValue` tarih-only’dir. Hatırlatma saati V5.0’da hesaplanmaz.
+- `TR`, `TRY`, `metric`, `tr-TR` pantry modelinin kalıcı koşulu değildir. Arayüz metinleri Türkçedir; bu, iş kuralının ülkeye kilitlendiği anlamına gelmez.
+- Kullanıcının yazdığı tarif adı, notu ve talimat pantry tarafından çevrilmez.
+
+## 20. V5 sonunda beklenen ürün davranışı
+
+Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette eksik miktarı kendi eylemiyle hesaplar. Household üyeleri aynı pantry state’ini sunucu üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
+
+V5, stok farkındalığı katar. Fiyat ve bütçe V5’te yoktur. V6 Balanced Nutrition ayrı bir ürün belgesindedir: yemek örüntüsü tercihleri (`balanced`, `vegetableForward`, `proteinForward`, `plantForward`). Bu modlar tercih sinyalidir; alerji, `Never Again`, malzeme dışlama ve ev halkı vetosunu geçersiz kılmaz. V6 kalori, makro, klinik iddia, market fiyatı ve bütçe içermez. V7 Globalization & Localization, çok dilli arayüz ve bölgesel/global lansmandır. V6 bu belgeyle başlatılmaz.
