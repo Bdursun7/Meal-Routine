@@ -38,6 +38,7 @@ export function createMemoryPantry(
 
   function patched(current: PantryItem, patch: PantryPatch, now: Date): PantryItem {
     const next = { ...current, ...patch, version: current.version + 1, updatedAt: pantryTimestamp(now) }
+    if (typeof next.autoAddToGrocery !== 'boolean') next.autoAddToGrocery = current.autoAddToGrocery
     if (next.quantity < 0 || (next.minimumQuantity !== null && next.minimumQuantity < 0)) throw new AppError('invalid_request', 400)
     if ((next.dateType === null) !== (next.dateValue === null)) throw new AppError('invalid_date', 400)
     requireIngredient(next.ingredientId)

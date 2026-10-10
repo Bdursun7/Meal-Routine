@@ -15,6 +15,8 @@ export interface PantryItem {
   unit: string
   location: PantryLocation
   minimumQuantity: number | null
+  /** Opt-in. False does not add a grocery row when quantity falls to the minimum. */
+  autoAddToGrocery: boolean
   dateType: PantryDateType | null
   /** Calendar day `YYYY-MM-DD`. Not an instant, and not shifted by a time zone. */
   dateValue: string | null
@@ -41,6 +43,7 @@ export interface PantryDraft {
   unit: string
   location: PantryLocation
   minimumQuantity: number | null
+  autoAddToGrocery: boolean
   dateType: PantryDateType | null
   dateValue: string | null
 }
@@ -52,6 +55,7 @@ export interface PantryPatch {
   unit?: string
   location?: PantryLocation
   minimumQuantity?: number | null
+  autoAddToGrocery?: boolean
   dateType?: PantryDateType | null
   dateValue?: string | null
 }

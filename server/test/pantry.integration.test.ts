@@ -58,7 +58,7 @@ describe.skipIf(!databaseUrl)('postgres pantry', () => {
     const before = await counts()
 
     const applied = await migrate(pool)
-    expect(applied).toEqual(['0012_pantry'])
+    expect(applied).toEqual(['0012_pantry', '0013_pantry_auto_add'])
     expect(await counts()).toEqual(before)
     const board = await app.inject({ method: 'GET', url: `/v1/households/${householdId}/board`, headers: ada.auth })
     expect(board.statusCode).toBe(200)

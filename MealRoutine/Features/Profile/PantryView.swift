@@ -11,6 +11,7 @@ struct PantryFormResult: Equatable, Identifiable {
     var unit: String
     var location: PantryLocation
     var minimum: Double?
+    var autoAddToGrocery: Bool
     var dateEdit: PantryDateEdit
 
     var id: String { "\(ingredientId)|\(unit)" }
@@ -30,6 +31,7 @@ struct PantryView: View {
     @State private var editing: PantryItem?
     @State private var separatePrompt: PantryFormResult?
     @State private var session = HouseholdSession.shared
+    @State private var notificationPreferences = PantryNotificationPreferenceStore.load()
 
     private var householdID: UUID? { session.snapshot.household?.id }
     private var syncsHousehold: Bool { householdID != nil && PantryOutbox.syncsHousehold }
@@ -141,8 +143,51 @@ struct PantryView: View {
         .refreshable { await refreshFromServer() }
     }
 
+    private func preferenceBinding(_ keyPath: WritableKeyPath<PantryNotificationPreferences, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { notificationPreferences[keyPath: keyPath] },
+            set: { value in
+                notificationPreferences[keyPath: keyPath] = value
+                PantryNotificationPreferenceStore.save(notificationPreferences)
+                if value { PantryLocalNotifications.requestAccess() }
+                rescheduleReminders()
+            }
+        )
+    }
+
+    private var scheduleBinding: Binding<Bool> {
+        Binding(
+            get: { notificationPreferences.dateReminderSchedule.enabled },
+            set: { value in
+                notificationPreferences.dateReminderSchedule.enabled = value
+                PantryNotificationPreferenceStore.save(notificationPreferences)
+                if value { PantryLocalNotifications.requestAccess() }
+                rescheduleReminders()
+            }
+        )
+    }
+
+    private func rescheduleReminders() {
+        for item in scoped {
+            PantryStockSideEffects.refreshReminders(for: item, preferences: notificationPreferences)
+        }
+    }
+
     @ViewBuilder
     private var statusSections: some View {
+        Section {
+            Toggle(PantryCopy.lowStockToggle, isOn: preferenceBinding(\.lowStockNotificationsEnabled))
+            Toggle(PantryCopy.dateReminderToggle, isOn: preferenceBinding(\.dateReminderEnabled))
+            Toggle(PantryCopy.dateReminderScheduleToggle, isOn: scheduleBinding)
+                .disabled(!notificationPreferences.dateReminderEnabled)
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(PantryCopy.dateReminderFooter)
+                if UserDefaults.standard.bool(forKey: PantryEffectLedger.permissionKey) {
+                    Text(PantryCopy.notificationPermissionDenied)
+                }
+            }
+        }
         if householdID == nil {
             Section {
                 Label(PantryCopy.personalBanner, systemImage: "iphone")
@@ -302,12 +347,14 @@ struct PantryView: View {
     }
 
     private func commitQuantity(_ item: PantryItem, _ quantity: Double) {
+        let previous = item.quantity
         let base = item.revision
         item.quantity = quantity
         item.revision += 1
         item.updatedAt = .now
         try? modelContext.save()
         write(.update, item, baseVersion: base)
+        PantryStockSideEffects.afterQuantityChange(item: item, previousQuantity: previous, in: modelContext)
     }
 
     private func addMarket(name: String, ingredientId: String, quantity: Double, unit: String) {
@@ -337,9 +384,11 @@ struct PantryView: View {
         case .merge(let total, let storedUnit):
             guard let match else { return }
             let base = match.revision
+            let previous = match.quantity
             match.quantity = total
             match.unit = storedUnit
             match.location = result.location
+            match.autoAddToGrocery = result.autoAddToGrocery
             if let minimum = result.minimum {
                 match.minimumQuantity = PantryUnitPolicy.converted(minimum, from: result.unit, to: storedUnit) ?? minimum
             }
@@ -355,6 +404,7 @@ struct PantryView: View {
             match.updatedAt = .now
             try? modelContext.save()
             write(.update, match, baseVersion: base)
+            PantryStockSideEffects.afterQuantityChange(item: match, previousQuantity: previous, in: modelContext)
         case .separate:
             let item = PantryItem(
                 householdID: householdID,
@@ -364,6 +414,7 @@ struct PantryView: View {
                 unit: UnitNormalization.parse(result.unit).code,
                 location: result.location,
                 minimumQuantity: result.minimum,
+                autoAddToGrocery: result.autoAddToGrocery,
                 dateType: result.dateEdit.storedType,
                 dateValue: result.dateEdit.storedDay
             )
@@ -393,8 +444,10 @@ struct PantryView: View {
             return
         }
         let wasOnServer = item.ingredientResolved
+        let previous = item.quantity
         let base = item.revision
         item.quantity = PantryUnitPolicy.editedQuantity(previousQuantity: item.quantity, previousUnit: item.unit, typedQuantity: result.quantity, newUnit: result.unit)
+        item.autoAddToGrocery = result.autoAddToGrocery
         item.ingredientID = result.ingredientId
         item.displayName = result.name.trimmingCharacters(in: .whitespacesAndNewlines)
         item.unit = UnitNormalization.parse(result.unit).code
@@ -422,6 +475,7 @@ struct PantryView: View {
             try? modelContext.save()
             write(.create, item, baseVersion: nil, confirmSeparate: true)
         }
+        PantryStockSideEffects.afterQuantityChange(item: item, previousQuantity: previous, in: modelContext)
     }
 
     private func change(_ item: PantryItem, by amount: Double) {
@@ -429,9 +483,11 @@ struct PantryView: View {
     }
 
     private func delete(_ item: PantryItem) {
+        let id = item.uuid
         if item.ingredientResolved { write(.delete, item, baseVersion: item.revision) }
         modelContext.delete(item)
         try? modelContext.save()
+        PantryStockSideEffects.deleted(id)
     }
 
     private func delete(at offsets: IndexSet) {
@@ -771,6 +827,7 @@ private struct PantryForm: View {
             unit: item.unit,
             location: item.location,
             minimumQuantity: item.minimumQuantity,
+            autoAddToGrocery: item.autoAddToGrocery,
             dateType: item.dateType,
             dateValue: item.dateValue,
             dateAuthority: item.dateAuthority
@@ -827,9 +884,10 @@ private struct PantryForm: View {
                     if draft.hasMinimum {
                         TextField("Minimum (\(UnitLabels.turkish(draft.unit)))", text: $draft.minimumText)
                             .keyboardType(.decimalPad)
+                        Toggle(PantryCopy.autoAddToggle, isOn: $draft.autoAddToGrocery)
                     }
                 } footer: {
-                    Text("Minimum, miktarla aynı birimdedir. Altına inince satırda “Azaldı” görünür.")
+                    Text(draft.hasMinimum ? PantryCopy.autoAddFooter : "Minimum, miktarla aynı birimdedir. Altına inince satırda “Azaldı” görünür.")
                 }
                 Section {
                     Toggle("Tarih ekle", isOn: $draft.hasDate)
@@ -883,6 +941,7 @@ private struct PantryForm: View {
             unit: draft.unit,
             location: draft.location,
             minimum: draft.minimumToSave,
+            autoAddToGrocery: draft.hasMinimum && draft.autoAddToGrocery,
             dateEdit: draft.dateEdit(calendar: .current)
         ))
         dismiss()

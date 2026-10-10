@@ -1,17 +1,22 @@
 # MealRoutine — V1–V5 Cross-Version Audit Report
 
-**Latest decision (V5.1 re-audit, 2026-10-10):** `FAIL — V6 blocked`  
-**Code under test:** `cursor/v51-integration-readiness-ef13` (commits `7493240` wording, `2bcf807` calendar days). Base is `V5-Alignment-Audit`. `V5.0` was not modified.  
-**Why V6 stays blocked:** `AUD-V5-002` is not `Pass`. The Linux date-only rules passed. The SwiftData upgrade and the DatePicker were not executed. That is **Not verified (Mac)**, and it is not counted as Pass. `AUD-V5-001` string behavior is Pass on Linux. Mac screen rendering of those strings is Not verified (Mac) and is not the Pass.  
-**Accepted exception:** On 2026-10-10 the project owner accepted deleting legacy dated personal rows once, instead of converting them. Spec §2.5 / §4.5, gate §6 “açık istisna”. Recorded in `docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` and §9 below.
+**Latest decision (V5.1 cook, low stock, auto-add, date reminders, 2026-10-10):** `FAIL — V6 blocked`  
+**Code under test:** `V5.1-Cook-Pantry-Notifications`, branched from `V5-Alignment-Audit` `b896938`. `V5.0` was not modified.  
+**Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. The Linux date-only rules passed. The SwiftData upgrade and the DatePicker were not executed. That is **Not verified (Mac)**. `AUD-V5-003` through `AUD-V5-006` are closed on Linux in §10. Their screens, `UNUserNotificationCenter` delivery, and the SwiftData `autoAddToGrocery` column are Not verified (Mac) and are not the Pass.  
+**Accepted exception:** On 2026-10-10 the project owner accepted deleting legacy dated personal rows once, instead of converting them. Spec §2.5 / §4.5, gate §6 “açık istisna”. Recorded in `docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` and §9 below.  
+**STEP 0:** D1 = device time zone for reminder fires (no household timezone column). D2 = migration `0013` `auto_add_to_grocery` only. No other schema change.
 
 ```text
 Open P0 findings: none
 Open P1 findings: AUD-V5-002 (SwiftData / DatePicker Not verified (Mac); Linux rules Pass)
-Closed on Linux: AUD-V5-001 (Pass). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
-Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001
-Repository limits: No Xcode, no device. V6 was not started.
+Closed on Linux: AUD-V5-001 (Pass). AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006 (Pass on Linux, §10). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
+Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001 (household timezone, still V7)
+Repository limits: No Xcode, no device. V6 was not started. Remote pantry push stays deferred until after V6.
 ```
+
+**Previous decision (V5.1 re-audit, 2026-10-10):** `FAIL — V6 blocked`  
+**Code under test:** `cursor/v51-integration-readiness-ef13` (commits `7493240` wording, `2bcf807` calendar days). Base is `V5-Alignment-Audit`. `V5.0` was not modified.  
+**Why V6 stayed blocked then:** `AUD-V5-002` was not `Pass`. `AUD-V5-001` string behavior was Pass on Linux.
 
 `Not verified` is not `Pass`.
 
@@ -425,4 +430,88 @@ The eight `Tools/run_*.sh` scripts and the 65 server tests passed on this revisi
 | Audit report updated; Not verified is not Pass | This section. |
 
 **Decision:** `FAIL — V6 blocked`.
+
+## 10. V5.1 cook deduction, notifications, auto-add, reminders
+
+### Correction
+
+Section 5.3 and the checklist row “V5 cook-confirmation deduct” recorded cook deduction as “Not a V5.0 flow” and “Not verified”, and called the absence a Pass against the trimmed V5.0 spec. That was wrong relative to the V5 v2 guide (`02` §7) and audit `04` §5.6: confirmed cook deduction is a specified V5 behavior. The alignment pass had dropped it from the V5.0 doc, and this audit then treated that drop as “not a feature” instead of a gap. The same section treated low-stock notification, `autoAddToGrocery`, and date reminders as absent non-gaps. v2 §4 and §18–§19 specify them. They are filed below as P1 and closed on Linux by this implementation. Section 5.3 stays as the before evidence.
+
+### Commands (this change)
+
+Host: Ubuntu 24.04, x86_64. Node v22.14.0. Swift 6.0.3. PostgreSQL 16.15. `DATABASE_URL=postgres://mealroutine:mealroutine@localhost:5432/mealroutine`.
+
+`cd server && npm run typecheck` passed. `cd server && npm test` passed 66/66, no skips. `Tools/run_pantry_domain_tests.sh` passed 42/42. The other `Tools/run_*.sh` scripts were not re-run on this branch.
+
+### AUD-V5-003 — confirmed cook deduction
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-003` |
+| Version / area | V5 pantry, v2 §7, audit 04 §5.6 and scenario 4–5 |
+| Class | Specified behavior was recorded as “not a V5.0 feature” |
+| Expected | After a planned meal is marked cooked, show the recipe lines against pantry stock. Decline changes nothing. Confirm deducts only the same `ingredientId` and a convertible unit (g/kg, ml/l), capped at stock, never below zero. Opening, checking, completing a market row, or regenerating the plan does not deduct. |
+| Actual before | `WeekPlanService.markCooked` did not read pantry. The audit called that aligned. |
+| Fix | `PantryCookConsumption` in `MealRoutine/Services/PantryDomain.swift`. The sheet is `PantryCookConfirmSheet` in `RecipeDetailView.swift`. `markCooked` still does not deduct. Confirm writes the household row through `PantryOutbox.record` with a stable Idempotency-Key and the pre-deduction `baseVersion`. |
+| Tests | `testDeclineAndOtherPlanEventsDoNotChangeStock`, `testConfirmDeductsOnlyConvertibleStockAndCapsAtWhatIsThere`, `testUnitMismatchIsSkippedAndASecondNeedSeesTheReducedStock`, `testCookRetryDoesNotDeductAgain`. |
+| Status | Closed on Linux. The sheet, VoiceOver, and `PantryTests.testPlanningAndCookingNeverChangePantry` are Not verified (Mac). |
+
+### AUD-V5-004 — low-stock notification
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-004` |
+| Version / area | V5 pantry, v2 §4 |
+| Class | Specified optional notification was absent |
+| Expected | User-enabled. One notice when quantity goes from above the minimum to at or under it (the same line as the “Azaldı” badge). No repeat while it stays low. Re-arm after it rises above. |
+| Actual before | The badge existed. No local notification. |
+| Fix | `PantryLowStockNotifications` decides. `PantryLocalNotifications` delivers on device. Enabling the toggle while the row is already low does not fire. Remote push is not implemented; APNs stays deferred until after V6. |
+| Tests | `testLowStockNotifiesOnceThenRearmsOnlyAfterARise`. |
+| Status | Closed on Linux for the decision. OS delivery and the permission-denied banner are Not verified (Mac). |
+
+### AUD-V5-005 — autoAddToGrocery
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-005` |
+| Version / area | V5 pantry, v2 §4 and §7 |
+| Class | Specified opt-in replenishment was absent |
+| Expected | Default off. When on, the first crossing to the minimum adds the shortfall once. Retry and a second device do not create a second row. A checked row stays. |
+| Actual before | No column and no grocery write on threshold. |
+| Fix | `0013_pantry_auto_add.sql` only. API create/list/patch carries `autoAddToGrocery`. A quantity patch does not clear it. Grocery uses `mode: "set"` on item key `pantry-auto:<ingredientId>\|<unit>`. Meal-plan rows keep `ingredientId\|unit` and are not incremented or overwritten. A cook shortage with the flag on uses `pantry-cook:<mealId>:…` and does not replace the threshold row. Household quantity remains the existing integer 1–999. |
+| Tests | `testAutoAddIsOffByDefaultAndSetsTheShortfallOnce`. `pantry.test.ts` create/patch keeps the flag. `board.test.ts` “sets a pantry shortfall once across two members and leaves a checked row”. Integration applies `0013` without dropping V4.1 rows. |
+| Status | Closed on Linux. Two-simulator grocery and the SwiftData flag are Not verified (Mac). |
+
+### AUD-V5-006 — date reminders
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-006` |
+| Version / area | V5 pantry, v2 §18–§19, audit 04 scenario 7 |
+| Class | Specified reminders were absent |
+| Expected | Only when the user entered a date and enabled reminders. `bestBefore`: 2 days before and on the day. `useBy`: 1 day before and on the day. Reschedule when the date changes. Cancel when the item is consumed or deleted. No food-safety claim. Permission denial does not block pantry. |
+| Actual before | No scheduler. |
+| Fix | `PantryDateReminders` plans 09:00 on the stored calendar day in the device time zone (D1). Household timezone is not stored (`AUD-GLOB-001`, V7). Preferences stay in UserDefaults. Copy is in `PantryCopy` and is covered by `testDateCopyDoesNotReturnASafetyVerdict`. |
+| Tests | `testDateRemindersUseTheCalendarDayInEachDeviceZone` (Europe/Istanbul, Pacific/Auckland, America/Los_Angeles). Quantity 0, reminders off, schedule off, and a missing date return no fires, which is the cancel input. |
+| Status | Closed on Linux for the calendar-day plan. OS scheduling, cancel, and the denied-permission sentence are Not verified (Mac). |
+
+### Audit 04 §5.6 and §7 scenarios 4–7
+
+| Check | Result |
+| --- | --- |
+| Stable id, structured quantity and unit | Pass. Unchanged. `0013` does not alter those columns. |
+| Plan does not deduct | Pass on Linux. `PantryStockEvent` open, check, complete market, and regenerate do not deduct. |
+| Deduct only after cooked and confirmed | Pass on Linux. Decline and `markCooked` itself do not deduct. Confirm does. Mac sheet Not verified. |
+| Partial stock; no silent grocery add | Pass on Linux. 400 g against 1 kg leaves 0 g and a 0.6 kg shortage with `offerAddMissing` when the flag is off. |
+| Minimum replenishment opt-in and idempotent | Pass on Linux. Default off. Second reduce stays at the shortfall. Checked row unchanged. Two members, one grocery row. |
+| Date types distinct; reminders are not a safety verdict | Pass on Linux strings. Reminder bodies are in `PantryCopy.userFacing`. |
+| Edit, consume, delete updates or cancels reminders | Pass for the pure plan: a new date produces the new days; quantity 0 returns an empty plan; `allIdentifiers` is what the app cancels. OS cancel Not verified (Mac). |
+| Scenario 4 stock unchanged until cooked and confirmed | Pass on Linux. |
+| Scenario 5 cap and explicit shortage action | Pass on Linux. |
+| Scenario 6 replenishment twice, no duplicate | Pass on Linux, including the server `mode: set` test. |
+| Scenario 7 reminder reschedule or cancel | Pass for the plan. Mac notification center Not verified. |
+| Scenario 8 migration keeps prior rows | Pass. Integration expects `0012_pantry` then `0013_pantry_auto_add`. |
+| Non-`tr-TR` / non-TRY | Still Fail. `AUD-GLOB-001` (P2, V7). Device-zone reminder fires do not add a household timezone. |
+
+**Decision:** `FAIL — V6 blocked`. `AUD-V5-002` remains open.
 

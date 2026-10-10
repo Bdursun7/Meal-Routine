@@ -694,6 +694,7 @@ const pantryItemFields = {
   unit: z.string().min(1).max(40),
   location: pantryLocation,
   minimumQuantity: z.number().nonnegative().nullable().optional(),
+  autoAddToGrocery: z.boolean().optional(),
   dateType: pantryDateType.nullable().optional(),
   dateValue: z.string().max(10).nullable().optional(),
   confirmSeparate: z.boolean().optional(),
@@ -784,6 +785,7 @@ function registerPantryRoutes(app: FastifyInstance, options: BuildAppOptions, pa
       unit: body.unit,
       location: body.location,
       minimumQuantity: body.minimumQuantity ?? null,
+      autoAddToGrocery: body.autoAddToGrocery ?? false,
       dateType: body.dateType ?? null,
       dateValue: body.dateValue ?? null,
     }, idempotencyKey(request), clock(), { confirmSeparate: confirmSeparate === true })

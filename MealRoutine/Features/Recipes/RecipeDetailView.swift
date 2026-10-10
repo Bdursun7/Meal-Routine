@@ -24,6 +24,7 @@ struct RecipeDetailView: View {
     @Query private var plannedMeals: [PlannedMeal]
     @Query private var ingredientChecks: [IngredientCheck]
     @Query private var memories: [MealMemory]
+    @Query private var pantryItems: [PantryItem]
     @State private var showsImportEditor = false
     @State private var showsDeleteConfirm = false
     @State private var placeMessage: String?
@@ -90,6 +91,7 @@ struct RecipeDetailView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar(content: favoriteToolbar)
             .overlay { ratingOverlay }
+            .overlay { cookStockOverlay }
     }
 
     @ToolbarContentBuilder
@@ -117,6 +119,58 @@ struct RecipeDetailView: View {
                 favoriteHeart(isLoved: currentRating == .loved)
             }
         }
+    }
+
+    private var cookStockOverlay: some View {
+        Group {
+            if viewModel.cookStockMealID != nil || !viewModel.cookShortages.isEmpty, let recipe {
+                PantryCookConfirmSheet(
+                    lines: cookPreview(recipe),
+                    shortages: viewModel.cookShortages,
+                    awaitingDecision: viewModel.cookStockMealID != nil,
+                    onConfirm: {
+                        viewModel.confirmCookStock(needs: cookNeeds(recipe), in: modelContext)
+                    },
+                    onDecline: viewModel.declineCookStock,
+                    onAddMissing: { shortage in
+                        viewModel.addCookShortage(shortage, in: modelContext)
+                    }
+                )
+            }
+        }
+    }
+
+    private func cookNeeds(_ recipe: Recipe) -> [PantryCookNeed] {
+        let meal = viewModel.cookStockMealID.flatMap { id in plannedMeals.first { $0.uuid == id } } ?? currentWeekCookMeal
+        let servings = ActiveServings.resolve(mealServings: meal?.servings, householdSize: prefs.first?.householdSize ?? 1)
+        return recipe.ingredients.compactMap { line in
+            guard let quantity = PortionScaler.scale(
+                quantity: line.quantity,
+                scaling: line.scaling,
+                baseServings: recipe.baseServings,
+                householdSize: servings
+            ), quantity > 0 else { return nil }
+            return PantryCookNeed(ingredientId: line.ingredientId, displayName: line.displayName, quantity: quantity, unit: line.unit)
+        }
+    }
+
+    private func cookPreview(_ recipe: Recipe) -> [PantryCookPreviewLine] {
+        let householdID = HouseholdSession.shared.snapshot.household?.id
+        let stock = pantryItems.filter { $0.householdID == householdID }.map { item in
+            PantryCookStock(
+                id: item.uuid.uuidString.lowercased(),
+                ingredientId: item.ingredientID,
+                displayName: item.displayName,
+                quantity: item.quantity,
+                unit: item.unit,
+                minimumQuantity: item.minimumQuantity,
+                autoAddToGrocery: item.autoAddToGrocery,
+                version: item.revision,
+                dateType: item.dateType,
+                dateValue: item.dateValue
+            )
+        }
+        return PantryCookConsumption.preview(needs: cookNeeds(recipe), stock: stock)
     }
 
     private var ratingOverlay: some View {
@@ -954,6 +1008,50 @@ private struct DiscoverySelectionTracker: ViewModifier {
                 properties: ["section": sectionID]
             )
         }
+    }
+}
+
+private struct PantryCookConfirmSheet: View {
+    var lines: [PantryCookPreviewLine]
+    var shortages: [PantryCookShortage]
+    var awaitingDecision: Bool
+    var onConfirm: () -> Void
+    var onDecline: () -> Void
+    var onAddMissing: (PantryCookShortage) -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 12) {
+                Text(PantryCopy.cookConfirmTitle).font(.headline)
+                Text(PantryCopy.cookConfirmMessage).font(.subheadline).foregroundStyle(.secondary)
+                ForEach(lines) { line in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(line.displayName).font(.body.weight(.semibold))
+                        Text("Tarif: \(line.needed) · Evdekiler: \(line.stock)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Text(line.note).font(.footnote)
+                    }
+                }
+                ForEach(shortages.filter(\.offerAddMissing)) { shortage in
+                    Button(PantryCopy.addMissingToMarket) { onAddMissing(shortage) }
+                        .accessibilityLabel("\(PantryCopy.addMissingToMarket), \(shortage.displayName)")
+                }
+                if awaitingDecision {
+                    Button(PantryCopy.cookConfirm, action: onConfirm).buttonStyle(.borderedProminent)
+                    Button(PantryCopy.cookDecline, action: onDecline)
+                } else {
+                    Button("Kapat", action: onDecline)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 420)
+            .background(Theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 24)
+        }
+        .accessibilityAddTraits(.isModal)
     }
 }
 

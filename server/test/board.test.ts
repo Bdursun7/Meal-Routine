@@ -111,6 +111,61 @@ describe('shared board sync', () => {
     await app.close()
   })
 
+  it('sets a pantry shortfall once across two members and leaves a checked row', async () => {
+    const { app } = session()
+    const ada = await signIn(app, 'ada-set', 'Ada')
+    const bea = await signIn(app, 'bea-set', 'Bea')
+    const householdId = await createHousehold(app, ada.auth)
+    const invite = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${householdId}/invites`,
+      headers: ada.auth,
+    })
+    expect(invite.statusCode).toBe(200)
+    const code = invite.json().household.invites[0].code as string
+    const joined = await app.inject({
+      method: 'POST',
+      url: `/v1/invites/${code}/accept`,
+      headers: bea.auth,
+    })
+    expect(joined.statusCode).toBe(200)
+
+    const key = 'pantry-auto:tomato|g'
+    const set = (auth: { authorization: string }, idempotency: string, entityId: string) => mutate(app, householdId, auth, idempotency, {
+      entityType: 'grocery',
+      entityId,
+      operationType: 'add',
+      baseRevision: 0,
+      payload: { itemKey: key, quantity: 200, mode: 'set' },
+    })
+    const first = await set(ada.auth, 'auto-ada', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')
+    expect(first.statusCode).toBe(200)
+    expect(first.json().entity).toMatchObject({ itemKey: key, quantity: 200, isChecked: false, revision: 1 })
+    const second = await set(bea.auth, 'auto-bea', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+    expect(second.statusCode).toBe(200)
+    expect(second.json().entity).toMatchObject({ quantity: 200, revision: 1 })
+    const replay = await set(ada.auth, 'auto-ada-retry', 'ffffffff-ffff-4fff-8fff-ffffffffffff')
+    expect(replay.statusCode).toBe(200)
+    expect(replay.json().entity.quantity).toBe(200)
+
+    const checked = await mutate(app, householdId, ada.auth, 'auto-check', {
+      entityType: 'grocery',
+      entityId: first.json().entity.id,
+      operationType: 'check',
+      baseRevision: 1,
+      payload: { isChecked: true },
+    })
+    expect(checked.statusCode).toBe(200)
+    const afterCheck = await set(bea.auth, 'auto-bea-checked', '99999999-9999-4999-8999-999999999999')
+    expect(afterCheck.statusCode).toBe(200)
+    expect(afterCheck.json().entity).toMatchObject({ quantity: 200, isChecked: true })
+
+    const board = await app.inject({ method: 'GET', url: `/v1/households/${householdId}/board`, headers: ada.auth })
+    const rows = board.json().grocery as { itemKey: string; quantity: number }[]
+    expect(rows.filter((row) => row.itemKey === key)).toEqual([expect.objectContaining({ quantity: 200 })])
+    await app.close()
+  })
+
   it('returns a delta since the cursor and keeps meal, reaction, plan, and preference versions', async () => {
     const { app } = session()
     const ada = await signIn(app, 'ada', 'Ada')
