@@ -128,6 +128,7 @@ export function createPantryService(store: PantryStore, households: HouseholdSto
               displayName: normalized.displayName,
               location: normalized.location,
               minimumQuantity: mergeMinimum(compatible, normalized),
+              autoAddToGrocery: compatible.autoAddToGrocery || normalized.autoAddToGrocery,
               dateType: hasDate ? normalized.dateType : compatible.dateType,
               dateValue: hasDate ? normalized.dateValue : compatible.dateValue,
             }, compatible.version, now)
@@ -256,6 +257,7 @@ function applyLine(
         unit,
         location: line.location ?? 'pantry',
         minimumQuantity: null,
+        autoAddToGrocery: false,
         dateType: null,
         dateValue: null,
         version: 0,
@@ -298,6 +300,7 @@ async function persistWorking(store: PantryStore, householdId: string, original:
         unit: item.unit,
         location: item.location,
         minimumQuantity: null,
+        autoAddToGrocery: false,
         dateType: null,
         dateValue: null,
       })
@@ -327,6 +330,7 @@ function normalizeDraft(draft: PantryCreateInput, resolve: Resolve): PantryCreat
     unit,
     location: draft.location,
     minimumQuantity: minimum === null ? null : roundPantryQuantity(minimum),
+    autoAddToGrocery: draft.autoAddToGrocery === true,
     ...date,
   }
 }
@@ -372,6 +376,9 @@ function normalizePatch(current: PantryItem, patch: PantryPatch, resolve: Resolv
   }
   if (next.quantity !== undefined) next.quantity = roundPantryQuantity(next.quantity)
   if (typeof next.minimumQuantity === 'number') next.minimumQuantity = roundPantryQuantity(next.minimumQuantity)
+  if (patch.autoAddToGrocery !== undefined && typeof patch.autoAddToGrocery !== 'boolean') {
+    throw new AppError('invalid_request', 400)
+  }
   return next
 }
 

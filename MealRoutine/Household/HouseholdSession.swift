@@ -693,6 +693,30 @@ final class HouseholdSession {
         }
     }
 
+    /// Sets one replenishment row to an absolute quantity. A second phone that sends
+    /// the same amount does not add it again (`mode: set` on the server).
+    func notePantryGrocerySet(itemKey: String, quantity: Double, crossingKey: String, in context: ModelContext) {
+        guard let account, snapshot.hasHousehold else { return }
+        let whole = GrocerySyncQuantity.whole(quantity)
+        let previous = snapshot.groceryCompletions.first { $0.itemKey == itemKey }
+        let id = PantryStableUUID.make("grocery-set:\(crossingKey)")
+        let body = BoardMutationEncoder.grocerySet(
+            id: id,
+            itemKey: itemKey,
+            quantity: whole,
+            baseRevision: previous?.revision ?? 0
+        )
+        finishSharedEdit(
+            entityType: "grocery",
+            entityId: id.uuidString,
+            operationType: "add",
+            body: body,
+            workID: id,
+            in: context
+        )
+        _ = account
+    }
+
     func noteGrocery(id: UUID, in context: ModelContext) {
         guard let account, snapshot.hasHousehold else { return }
         guard let item = try? context.fetch(FetchDescriptor<GroceryItem>()).first(where: { $0.uuid == id }) else { return }
@@ -1259,6 +1283,7 @@ final class HouseholdSession {
         entityId: String,
         operationType: String,
         body: Data,
+        workID: UUID = UUID(),
         in context: ModelContext
     ) {
         guard queuesSharedEdits else {
@@ -1266,7 +1291,7 @@ final class HouseholdSession {
             return
         }
         let item = SyncWorkItem(
-            id: UUID(),
+            id: workID,
             entityType: entityType,
             entityId: entityId,
             operationType: operationType,

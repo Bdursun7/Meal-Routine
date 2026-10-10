@@ -195,11 +195,13 @@ final class GroceryViewModel {
                 errorMessage = PantryCopy.unitMismatch
                 return
             }
+            let previous = match.quantity
             let base = match.revision
             match.quantity = next
             match.updatedAt = .now
             match.revision += 1
             try? context.save()
+            PantryStockSideEffects.afterQuantityChange(item: match, previousQuantity: previous, in: context)
             if PantryOutbox.record(.update, match, baseVersion: base, in: context) {
                 Task { await PantryOutbox.flush(in: context) }
             }

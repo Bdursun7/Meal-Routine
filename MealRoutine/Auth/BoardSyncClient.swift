@@ -181,6 +181,16 @@ enum BoardMutationEncoder {
         )
     }
 
+    static func grocerySet(id: UUID, itemKey: String, quantity: Int, baseRevision: Int) -> Data {
+        encode(
+            entityType: "grocery",
+            entityId: id.uuidString,
+            operationType: "add",
+            baseRevision: baseRevision,
+            payload: ["itemKey": itemKey, "quantity": quantity, "mode": "set"]
+        )
+    }
+
     static func groceryAdd(id: UUID, itemKey: String, quantity: Int, baseRevision: Int) -> Data {
         encode(
             entityType: "grocery",

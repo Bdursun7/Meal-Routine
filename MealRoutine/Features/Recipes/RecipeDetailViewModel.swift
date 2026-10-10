@@ -19,6 +19,8 @@ final class RecipeDetailViewModel {
     var errorMessage: String?
     var savedNotice: SavedRatingNotice?
     var portionStatusMessage: String?
+    var cookStockMealID: UUID?
+    var cookShortages: [PantryCookShortage] = []
     private var pendingCooked = false
     private var pendingPlannedMealUUID: UUID?
     private var isSavingRating = false
@@ -57,7 +59,7 @@ final class RecipeDetailViewModel {
         defer { isSavingRating = false }
         do {
             if pendingCooked {
-                try markPendingMealCooked(slug: slug, in: context)
+                cookStockMealID = try markPendingMealCooked(slug: slug, in: context)
             }
             try WeekPlanService.recordFeedback(
                 slug: slug,
@@ -91,15 +93,36 @@ final class RecipeDetailViewModel {
         }
     }
 
-    private func markPendingMealCooked(slug: String, in context: ModelContext) throws {
+    @discardableResult
+    private func markPendingMealCooked(slug: String, in context: ModelContext) throws -> UUID? {
         if let pendingPlannedMealUUID {
             try WeekPlanService.markCooked(uuid: pendingPlannedMealUUID, in: context)
             HouseholdSession.shared.noteCooked(mealID: pendingPlannedMealUUID, in: context)
+            return pendingPlannedMealUUID
         } else if let week = try WeekPlanService.currentWeek(in: context),
                   let meal = week.meals.first(where: { $0.recipeSlug == slug }) {
             try WeekPlanService.markCooked(uuid: meal.uuid, in: context)
             HouseholdSession.shared.noteCooked(mealID: meal.uuid, in: context)
+            return meal.uuid
         }
+        return nil
+    }
+
+    func declineCookStock() {
+        cookStockMealID = nil
+        cookShortages = []
+    }
+
+    func confirmCookStock(needs: [PantryCookNeed], in context: ModelContext) {
+        guard let cookStockMealID else { return }
+        let outcome = PantryStockSideEffects.confirmCook(mealId: cookStockMealID, needs: needs, in: context)
+        cookShortages = outcome.shortages.filter(\.offerAddMissing)
+        self.cookStockMealID = nil
+    }
+
+    func addCookShortage(_ shortage: PantryCookShortage, in context: ModelContext) {
+        PantryStockSideEffects.addMissing(shortage, in: context)
+        cookShortages.removeAll { $0.ingredientId == shortage.ingredientId && $0.unit == shortage.unit }
     }
 
     func dismissSavedNotice() {

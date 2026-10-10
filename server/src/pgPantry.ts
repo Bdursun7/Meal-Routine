@@ -13,6 +13,7 @@ type PantryDbRow = {
   unit: string
   location: PantryItem['location']
   minimum_quantity: string | number | null
+  auto_add_to_grocery: boolean
   date_type: PantryItem['dateType']
   date_value: string | Date | null
   version: number
@@ -29,7 +30,7 @@ type IngredientDbRow = {
 }
 
 const columns = `id, household_id, ingredient_id, display_name, quantity, unit, location,
-  minimum_quantity, date_type, to_char(date_value, 'YYYY-MM-DD') AS date_value, version, created_at, updated_at`
+  minimum_quantity, auto_add_to_grocery, date_type, to_char(date_value, 'YYYY-MM-DD') AS date_value, version, created_at, updated_at`
 
 function fromRow(row: PantryDbRow): PantryItem {
   return {
@@ -41,6 +42,7 @@ function fromRow(row: PantryDbRow): PantryItem {
     unit: row.unit,
     location: row.location,
     minimumQuantity: row.minimum_quantity === null ? null : Number(row.minimum_quantity),
+    autoAddToGrocery: row.auto_add_to_grocery === true,
     dateType: row.date_type,
     dateValue: row.date_value === null ? null : String(row.date_value),
     version: row.version,
@@ -65,10 +67,10 @@ async function insertRow(db: Queryable, householdId: string, draft: PantryDraft,
   const result = await db.query<PantryDbRow>(
     `INSERT INTO pantry_items
        (id, household_id, ingredient_id, display_name, quantity, unit, location,
-        minimum_quantity, date_type, date_value, version, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11)
+        minimum_quantity, auto_add_to_grocery, date_type, date_value, version, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1, $12, $12)
      RETURNING ${columns}`,
-    [draft.id, householdId, draft.ingredientId, draft.displayName, draft.quantity, draft.unit, draft.location, draft.minimumQuantity, draft.dateType, draft.dateValue, now],
+    [draft.id, householdId, draft.ingredientId, draft.displayName, draft.quantity, draft.unit, draft.location, draft.minimumQuantity, draft.autoAddToGrocery, draft.dateType, draft.dateValue, now],
   )
   return fromRow(result.rows[0]!)
 }
@@ -84,11 +86,11 @@ async function updateRow(db: Queryable, current: PantryItem, patch: PantryPatch,
   const result = await db.query<PantryDbRow>(
     `UPDATE pantry_items
         SET ingredient_id = $3, display_name = $4, quantity = $5, unit = $6,
-            location = $7, minimum_quantity = $8, date_type = $9, date_value = $10,
-            version = version + 1, updated_at = $11
-      WHERE household_id = $1 AND id = $2 AND version = $12
+            location = $7, minimum_quantity = $8, auto_add_to_grocery = $9, date_type = $10, date_value = $11,
+            version = version + 1, updated_at = $12
+      WHERE household_id = $1 AND id = $2 AND version = $13
     RETURNING ${columns}`,
-    [current.householdId, current.id, next.ingredientId, next.displayName, next.quantity, next.unit, next.location, next.minimumQuantity, next.dateType, next.dateValue, now, current.version],
+    [current.householdId, current.id, next.ingredientId, next.displayName, next.quantity, next.unit, next.location, next.minimumQuantity, next.autoAddToGrocery, next.dateType, next.dateValue, now, current.version],
   )
   return result.rows[0] ? fromRow(result.rows[0]) : null
 }

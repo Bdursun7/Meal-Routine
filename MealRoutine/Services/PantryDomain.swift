@@ -61,6 +61,31 @@ enum PantryCopy {
     static let dateFooter = "Pakette yazan tarih türünü seç ve tarihi aynen gir. Tarih girmezsen uygulama tarih uydurmaz."
     static let pastUseBy = "Girilen son tüketim tarihi geçti"
     static let pastBestBefore = "Girilen tavsiye edilen tüketim tarihi geçti"
+    static let cookConfirmTitle = "Evdekilerden düşülsün mü?"
+    static let cookConfirmMessage = "Tarifin malzemeleri ve evdeki miktarlar aşağıda. Onaylamazsan stok değişmez."
+    static let cookConfirm = "Stoktan düş"
+    static let cookDecline = "Stoktan düşme"
+    static let addMissingToMarket = "Eksik miktarı markete ekle"
+    static let autoAddToggle = "Minimumun altına inince markete ekle"
+    static let autoAddFooter = "Kapalıyken eşik, market listesine ürün eklemez. Açınca eksik miktar bir kez yazılır."
+    static let lowStockToggle = "Düşük stok bildirimi"
+    static let dateReminderToggle = "Tarih hatırlatması"
+    static let dateReminderScheduleToggle = "Hatırlatma günleri"
+    static let dateReminderFooter = "Tavsiye edilen tarih için 2 gün önce ve o gün. Son tüketim tarihi için 1 gün önce ve o gün. Bu bir hatırlatmadır."
+    static let notificationPermissionDenied = "Bildirim izni kapalı. Evdekiler çalışmaya devam eder; hatırlatma gönderilmez."
+    static let lowStockNoticeTitle = "Evdekiler"
+
+    static func lowStockNoticeBody(name: String) -> String {
+        "\(name) minimum miktara ulaştı."
+    }
+
+    static func reminderBestBefore(name: String, day: String) -> String {
+        "\(name): girdiğin tavsiye edilen tarih \(day)."
+    }
+
+    static func reminderUseBy(name: String, day: String) -> String {
+        "\(name): girdiğin son tüketim tarihi \(day)."
+    }
 
     static func separateUnitMessage(existing: String) -> String {
         "Evdekilerde \(existing) var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin."
@@ -75,7 +100,11 @@ enum PantryCopy {
         transferCopy, transferKeep, covered, computeMissing, showFullNeed, consume, restock, useServer, reapplyMine,
         separateUnit, missingPantry, incompatibleCount, pending, failed, failedMessage, discardFailed, conflictBadge,
         unmatched, lowStock, outOfStock, whichIngredient, ingredientFooter, dateSection, dateFooter,
-        pastUseBy, pastBestBefore,
+        pastUseBy, pastBestBefore, cookConfirmTitle, cookConfirmMessage, cookConfirm, cookDecline,
+        addMissingToMarket, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
+        dateReminderScheduleToggle, dateReminderFooter, notificationPermissionDenied, lowStockNoticeTitle,
+        lowStockNoticeBody(name: "Süt"), reminderBestBefore(name: "Süt", day: "9 Ekim 2026"),
+        reminderUseBy(name: "Süt", day: "9 Ekim 2026"),
     ]
 }
 
@@ -800,6 +829,8 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
     var unit: String
     var location: PantryLocation
     var minimumQuantity: Double?
+    /// Household flag from `0013`. Missing on an older payload means off.
+    var autoAddToGrocery: Bool
     var dateType: PantryDateType?
     var dateValue: String?
     /// When false, the server body omits the date keys so a legacy instant is not written back.
@@ -817,6 +848,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         unit: String,
         location: PantryLocation,
         minimumQuantity: Double?,
+        autoAddToGrocery: Bool = false,
         dateType: PantryDateType?,
         dateValue: String?,
         version: Int,
@@ -832,6 +864,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         self.unit = unit
         self.location = location
         self.minimumQuantity = minimumQuantity
+        self.autoAddToGrocery = autoAddToGrocery
         self.dateType = dateType
         self.dateValue = dateValue
         self.sendsDate = sendsDate
@@ -842,7 +875,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, householdId, ingredientId, displayName, quantity, unit, location, minimumQuantity
-        case dateType, dateValue, sendsDate, version, createdAt, updatedAt
+        case autoAddToGrocery, dateType, dateValue, sendsDate, version, createdAt, updatedAt
         case bestBefore, revision
     }
 
@@ -857,6 +890,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         unit = try container.decode(String.self, forKey: .unit)
         location = (try? container.decode(PantryLocation.self, forKey: .location)) ?? .other
         minimumQuantity = try container.decodeIfPresent(Double.self, forKey: .minimumQuantity)
+        autoAddToGrocery = try container.decodeIfPresent(Bool.self, forKey: .autoAddToGrocery) ?? false
         if let value = try container.decodeIfPresent(String.self, forKey: .dateValue) {
             dateValue = value
             dateType = try container.decodeIfPresent(PantryDateType.self, forKey: .dateType) ?? .bestBefore
@@ -887,6 +921,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         try container.encode(unit, forKey: .unit)
         try container.encode(location, forKey: .location)
         try container.encodeIfPresent(minimumQuantity, forKey: .minimumQuantity)
+        try container.encode(autoAddToGrocery, forKey: .autoAddToGrocery)
         try container.encodeIfPresent(dateType, forKey: .dateType)
         try container.encodeIfPresent(dateValue, forKey: .dateValue)
         if sendsDate == false { try container.encode(false, forKey: .sendsDate) }
@@ -907,6 +942,7 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
     var unit: String
     var location: PantryLocation
     var minimumQuantity: Double?
+    var autoAddToGrocery: Bool = false
     var dateType: PantryDateType?
     var dateValue: String?
     var confirmSeparate: Bool?
@@ -922,6 +958,7 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
             unit: item.unit,
             location: item.location,
             minimumQuantity: item.minimumQuantity,
+            autoAddToGrocery: item.autoAddToGrocery,
             dateType: item.sendsDate && item.dateValue != nil ? item.dateType : nil,
             dateValue: item.sendsDate && item.dateType != nil ? item.dateValue : nil,
             confirmSeparate: confirmSeparate ? true : nil,
@@ -936,7 +973,7 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, ingredientId, displayName, quantity, unit, location, minimumQuantity, dateType, dateValue, confirmSeparate
+        case id, ingredientId, displayName, quantity, unit, location, minimumQuantity, autoAddToGrocery, dateType, dateValue, confirmSeparate
     }
 
     func encode(to encoder: Encoder) throws {
@@ -948,6 +985,7 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
         try container.encode(unit, forKey: .unit)
         try container.encode(location, forKey: .location)
         try container.encode(minimumQuantity, forKey: .minimumQuantity)
+        try container.encode(autoAddToGrocery, forKey: .autoAddToGrocery)
         if sendsDate {
             try container.encode(dateType, forKey: .dateType)
             try container.encode(dateValue, forKey: .dateValue)
@@ -1257,6 +1295,7 @@ struct PantryFormDraft: Equatable {
     var location: PantryLocation
     var hasMinimum: Bool
     var minimumText: String
+    var autoAddToGrocery: Bool
     var hasDate: Bool
     var dateType: PantryDateType
     /// Picker value only. The saved day is `pickedDay`, not this instant.
@@ -1274,6 +1313,7 @@ struct PantryFormDraft: Equatable {
         location: .pantry,
         hasMinimum: false,
         minimumText: "",
+        autoAddToGrocery: false,
         hasDate: false,
         dateType: .bestBefore,
         date: Date(timeIntervalSince1970: 0),
@@ -1287,6 +1327,7 @@ struct PantryFormDraft: Equatable {
         unit: String,
         location: PantryLocation,
         minimumQuantity: Double?,
+        autoAddToGrocery: Bool = false,
         dateType: PantryDateType? = nil,
         dateValue: String? = nil,
         dateAuthority: PantryDateAuthority = .none,
@@ -1313,6 +1354,7 @@ struct PantryFormDraft: Equatable {
             draft.hasMinimum = true
             draft.minimumText = QuantityFormat.string(minimumQuantity)
         }
+        draft.autoAddToGrocery = autoAddToGrocery
         if let day = PantryDay.canonical(dateValue), let picked = PantryDay.date(from: day, calendar: calendar) {
             draft.hasDate = true
             draft.dateType = dateType ?? .bestBefore
@@ -1405,5 +1447,553 @@ extension PantryPlanningSignal {
         guard let note = notes.first(where: { $0 == PantryCopy.approachingExpiry }) ?? notes.first else { return explanation }
         if explanation.isEmpty { return note }
         return "\(explanation) \(note)"
+    }
+}
+
+// MARK: - V5.1 cook, threshold, reminders
+
+/// Opening a plan, checking a line, completing a market row, or regenerating a plan
+/// does not deduct. Deduction runs only after the user marks a meal cooked and confirms.
+enum PantryStockEvent: String, Equatable, Sendable {
+    case openPlanItem
+    case checkPlanItem
+    case completeMarketRow
+    case regeneratePlan
+    case markCooked
+
+    static func deducts(_ event: PantryStockEvent, confirmed: Bool) -> Bool {
+        event == .markCooked && confirmed
+    }
+}
+
+/// Low means at or under the minimum, the same line as the "Azaldı" badge.
+enum PantryThreshold {
+    static func isLow(quantity: Double, minimum: Double?) -> Bool {
+        guard let minimum else { return false }
+        return quantity <= minimum + 0.000_1
+    }
+
+    static func crossedIntoLow(previous: Double, next: Double, minimum: Double?) -> Bool {
+        guard let minimum else { return false }
+        return previous > minimum + 0.000_1 && next <= minimum + 0.000_1
+    }
+
+    static func returnedAbove(previous: Double, next: Double, minimum: Double?) -> Bool {
+        guard let minimum else { return false }
+        return previous <= minimum + 0.000_1 && next > minimum + 0.000_1
+    }
+
+    static func shortfall(quantity: Double, minimum: Double?) -> Double {
+        guard let minimum else { return 0 }
+        return PantryUnitPolicy.snap(max(0, minimum - max(0, quantity)))
+    }
+}
+
+struct PantryMarketRow: Equatable, Sendable {
+    var itemKey: String
+    var ingredientId: String
+    var displayName: String
+    var quantity: Double
+    var unit: String
+    var isChecked: Bool
+    var revision: Int
+}
+
+struct PantryGroceryMutation: Equatable, Sendable {
+    var itemKey: String
+    var ingredientId: String
+    var displayName: String
+    var quantity: Double
+    var unit: String
+    /// 0 when the row does not exist yet.
+    var baseRevision: Int
+    var crossingKey: String
+    var creates: Bool
+}
+
+enum PantryAutoGrocery {
+    /// One replenishment row per ingredient and canonical unit. Meal-plan rows use a
+    /// different key and are left alone, including when they are checked.
+    static func itemKey(ingredientId: String, unit: String) -> String {
+        "pantry-auto:\(ingredientId)|\(GroceryMerger.normalize(unit))"
+    }
+
+    static func crossingKey(itemId: String, version: Int) -> String {
+        "low:\(itemId)#\(version)"
+    }
+
+    /// Applies a set-quantity mutation. The same target twice does not grow the row.
+    /// A checked row with this key is returned unchanged and no second row is added.
+    static func reduce(_ rows: [PantryMarketRow], _ mutation: PantryGroceryMutation) -> [PantryMarketRow] {
+        guard mutation.quantity > 0 else { return rows }
+        if let index = rows.firstIndex(where: { $0.itemKey == mutation.itemKey }) {
+            var copy = rows
+            if copy[index].isChecked { return copy }
+            copy[index].quantity = PantryUnitPolicy.snap(mutation.quantity)
+            copy[index].unit = GroceryMerger.normalize(mutation.unit)
+            copy[index].displayName = mutation.displayName
+            return copy
+        }
+        var copy = rows
+        copy.append(PantryMarketRow(
+            itemKey: mutation.itemKey,
+            ingredientId: mutation.ingredientId,
+            displayName: mutation.displayName,
+            quantity: PantryUnitPolicy.snap(mutation.quantity),
+            unit: GroceryMerger.normalize(mutation.unit),
+            isChecked: false,
+            revision: 0
+        ))
+        return copy
+    }
+
+    /// Plans the replenishment for one crossing. `applied` remembers crossings so a
+    /// retry on this phone does not write again. Two phones that have not seen each
+    /// other still propose the same key and the same absolute shortfall.
+    static func plan(
+        itemId: String,
+        ingredientId: String,
+        displayName: String,
+        previousQuantity: Double,
+        nextQuantity: Double,
+        unit: String,
+        minimum: Double?,
+        autoAdd: Bool,
+        version: Int,
+        rows: [PantryMarketRow],
+        applied: Set<String>
+    ) -> (mutation: PantryGroceryMutation?, applied: Set<String>) {
+        let crossing = crossingKey(itemId: itemId, version: version)
+        guard autoAdd, PantryThreshold.crossedIntoLow(previous: previousQuantity, next: nextQuantity, minimum: minimum) else {
+            return (nil, applied)
+        }
+        if applied.contains(crossing) { return (nil, applied) }
+        var nextApplied = applied
+        nextApplied.insert(crossing)
+        let missing = PantryThreshold.shortfall(quantity: nextQuantity, minimum: minimum)
+        guard missing > 0 else { return (nil, nextApplied) }
+        let key = itemKey(ingredientId: ingredientId, unit: unit)
+        if let existing = rows.first(where: { $0.itemKey == key }), existing.isChecked {
+            return (nil, nextApplied)
+        }
+        let canonical = GroceryMerger.normalize(unit)
+        let base = rows.first(where: { $0.itemKey == key })?.revision ?? 0
+        let mutation = PantryGroceryMutation(
+            itemKey: key,
+            ingredientId: ingredientId,
+            displayName: displayName,
+            quantity: missing,
+            unit: canonical,
+            baseRevision: base,
+            crossingKey: crossing,
+            creates: rows.contains(where: { $0.itemKey == key }) == false
+        )
+        return (mutation, nextApplied)
+    }
+}
+
+struct LowStockNotice: Equatable, Sendable {
+    var itemId: String
+    var identifier: String
+    var title: String
+    var body: String
+}
+
+enum PantryLowStockNotifications {
+    static func identifier(itemId: String) -> String { "pantry-low.\(itemId)" }
+
+    /// `armed` holds items already notified for the current low episode.
+    /// The episode is recorded even when notifications are off, so turning them on
+    /// while the row is already low does not fire until it rises and falls again.
+    static func step(
+        itemId: String,
+        name: String,
+        previousQuantity: Double,
+        nextQuantity: Double,
+        minimum: Double?,
+        enabled: Bool,
+        armed: Set<String>
+    ) -> (notice: LowStockNotice?, armed: Set<String>) {
+        var nextArmed = armed
+        if PantryThreshold.returnedAbove(previous: previousQuantity, next: nextQuantity, minimum: minimum) {
+            nextArmed.remove(itemId)
+            return (nil, nextArmed)
+        }
+        guard PantryThreshold.crossedIntoLow(previous: previousQuantity, next: nextQuantity, minimum: minimum) else {
+            if PantryThreshold.isLow(quantity: nextQuantity, minimum: minimum) {
+                nextArmed.insert(itemId)
+            }
+            return (nil, nextArmed)
+        }
+        let already = nextArmed.contains(itemId)
+        nextArmed.insert(itemId)
+        guard enabled, !already else { return (nil, nextArmed) }
+        return (LowStockNotice(
+            itemId: itemId,
+            identifier: identifier(itemId: itemId),
+            title: PantryCopy.lowStockNoticeTitle,
+            body: PantryCopy.lowStockNoticeBody(name: name)
+        ), nextArmed)
+    }
+}
+
+struct PantryDateReminderSchedule: Equatable, Codable, Sendable {
+    var enabled: Bool
+    var bestBeforeDaysBefore: [Int]
+    var useByDaysBefore: [Int]
+
+    static let standard = PantryDateReminderSchedule(enabled: true, bestBeforeDaysBefore: [2, 0], useByDaysBefore: [1, 0])
+
+    func days(for type: PantryDateType) -> [Int] {
+        let raw = type == .useBy ? useByDaysBefore : bestBeforeDaysBefore
+        return Array(Set(raw.filter { $0 >= 0 })).sorted(by: >)
+    }
+}
+
+struct PantryNotificationPreferences: Equatable, Codable, Sendable {
+    var lowStockNotificationsEnabled: Bool
+    var dateReminderEnabled: Bool
+    var dateReminderSchedule: PantryDateReminderSchedule
+
+    static let off = PantryNotificationPreferences(
+        lowStockNotificationsEnabled: false,
+        dateReminderEnabled: false,
+        dateReminderSchedule: .standard
+    )
+}
+
+enum PantryNotificationPreferenceStore {
+    static let key = "mealroutine.pantry.notificationPreferences"
+
+    static func load(_ defaults: UserDefaults = .standard) -> PantryNotificationPreferences {
+        guard let data = defaults.data(forKey: key),
+              let stored = try? JSONDecoder().decode(PantryNotificationPreferences.self, from: data) else { return .off }
+        return stored
+    }
+
+    static func save(_ preferences: PantryNotificationPreferences, _ defaults: UserDefaults = .standard) {
+        if let data = try? JSONEncoder().encode(preferences) {
+            defaults.set(data, forKey: key)
+        }
+    }
+}
+
+struct PantryReminderFire: Equatable, Sendable {
+    var identifier: String
+    var year: Int
+    var month: Int
+    var day: Int
+    var hour: Int
+    var minute: Int
+    var timeZoneIdentifier: String
+    var title: String
+    var body: String
+}
+
+enum PantryDateReminders {
+    static let fireHour = 9
+    static let fireMinute = 0
+    /// Household timezone is not stored. V5.1 fires on the calendar day in the device zone.
+    /// `AUD-GLOB-001` keeps a household timezone for V7.
+
+    static func identifier(itemId: String, type: PantryDateType, daysBefore: Int) -> String {
+        "pantry-date.\(itemId).\(type.rawValue).\(daysBefore)"
+    }
+
+    static func allIdentifiers(itemId: String) -> [String] {
+        PantryDateType.allCases.flatMap { type in
+            [0, 1, 2].map { identifier(itemId: itemId, type: type, daysBefore: $0) }
+        }
+    }
+
+    static func plan(
+        itemId: String,
+        displayName: String,
+        dateType: PantryDateType?,
+        dateValue: String?,
+        quantity: Double,
+        remindersEnabled: Bool,
+        schedule: PantryDateReminderSchedule,
+        timeZone: TimeZone
+    ) -> [PantryReminderFire] {
+        guard remindersEnabled, schedule.enabled, quantity > 0, let dateType, let day = PantryDay.canonical(dateValue) else {
+            return []
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        guard let anchor = PantryDay.date(from: day, calendar: calendar) else { return [] }
+        let zone = timeZone.identifier
+        return schedule.days(for: dateType).compactMap { lead in
+            guard let fire = calendar.date(byAdding: .day, value: -lead, to: anchor) else { return nil }
+            let parts = calendar.dateComponents([.year, .month, .day], from: fire)
+            guard let year = parts.year, let month = parts.month, let dayNumber = parts.day else { return nil }
+            let when = lead == 0 ? "bugün" : (lead == 1 ? "yarın" : "\(lead) gün içinde")
+            let body = dateType == .useBy
+                ? PantryCopy.reminderUseBy(name: displayName, day: when)
+                : PantryCopy.reminderBestBefore(name: displayName, day: when)
+            return PantryReminderFire(
+                identifier: identifier(itemId: itemId, type: dateType, daysBefore: lead),
+                year: year, month: month, day: dayNumber,
+                hour: fireHour, minute: fireMinute,
+                timeZoneIdentifier: zone,
+                title: PantryCopy.lowStockNoticeTitle,
+                body: body
+            )
+        }
+    }
+}
+
+struct PantryCookNeed: Equatable, Sendable {
+    var ingredientId: String
+    var displayName: String
+    var quantity: Double
+    var unit: String
+}
+
+struct PantryCookStock: Equatable, Sendable, Identifiable {
+    var id: String
+    var ingredientId: String
+    var displayName: String
+    var quantity: Double
+    var unit: String
+    var minimumQuantity: Double?
+    var autoAddToGrocery: Bool
+    var version: Int
+    var dateType: PantryDateType? = nil
+    var dateValue: String? = nil
+
+    var identifier: String { id }
+}
+
+struct PantryCookPreviewLine: Equatable, Sendable, Identifiable {
+    var ingredientId: String
+    var displayName: String
+    var needed: String
+    var stock: String
+    var note: String
+    var id: String { "\(ingredientId)|\(needed)" }
+}
+
+struct PantryCookDeduction: Equatable, Sendable {
+    var itemId: String
+    var ingredientId: String
+    var newQuantity: Double
+    var unit: String
+    var baseVersion: Int
+    var deducted: Double
+}
+
+struct PantryCookSkip: Equatable, Sendable {
+    var ingredientId: String
+    var displayName: String
+    var reason: String
+}
+
+struct PantryCookShortage: Equatable, Sendable, Identifiable {
+    var ingredientId: String
+    var displayName: String
+    var missingQuantity: Double
+    var unit: String
+    var autoAddToGrocery: Bool
+    var offerAddMissing: Bool
+    var id: String { "\(ingredientId)|\(unit)|\(missingQuantity)" }
+}
+
+struct PantryCookOutcome: Equatable, Sendable {
+    var deductions: [PantryCookDeduction]
+    var skipped: [PantryCookSkip]
+    var shortages: [PantryCookShortage]
+    var groceryMutations: [PantryGroceryMutation]
+    var stock: [PantryCookStock]
+    var rows: [PantryMarketRow]
+    var appliedMeals: Set<String>
+    var appliedCrossings: Set<String>
+    var armedLow: Set<String>
+    var notices: [LowStockNotice]
+}
+
+enum PantryCookConsumption {
+    static func preview(
+        needs: [PantryCookNeed],
+        stock: [PantryCookStock],
+        dictionary: IngredientDictionary = .shared
+    ) -> [PantryCookPreviewLine] {
+        let working = stock
+        return needs.map { need in
+            let needed = QuantityFormat.quantityAndUnit(quantity: need.quantity, unit: need.unit)
+            guard let match = match(need, in: working, dictionary: dictionary) else {
+                let same = working.contains { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) }
+                let stockText = same ? PantryCopy.unitMismatch : PantryCopy.missingPantry
+                return PantryCookPreviewLine(ingredientId: need.ingredientId, displayName: need.displayName, needed: needed, stock: stockText, note: stockText)
+            }
+            let have = QuantityFormat.quantityAndUnit(quantity: match.quantity, unit: match.unit)
+            let note: String
+            if let available = PantryUnitPolicy.converted(match.quantity, from: match.unit, to: need.unit), available + 0.000_1 >= need.quantity {
+                note = "Evde yeterli"
+            } else {
+                note = "Stok kadar düşülür"
+            }
+            return PantryCookPreviewLine(ingredientId: need.ingredientId, displayName: need.displayName, needed: needed, stock: have, note: note)
+        }
+    }
+
+    static func apply(
+        event: PantryStockEvent,
+        confirmed: Bool,
+        mealId: String,
+        needs: [PantryCookNeed],
+        stock: [PantryCookStock],
+        rows: [PantryMarketRow],
+        appliedMeals: Set<String>,
+        appliedCrossings: Set<String>,
+        armedLow: Set<String>,
+        lowStockEnabled: Bool,
+        dictionary: IngredientDictionary = .shared
+    ) -> PantryCookOutcome {
+        guard PantryStockEvent.deducts(event, confirmed: confirmed), !appliedMeals.contains(mealId) else {
+            return PantryCookOutcome(
+                deductions: [], skipped: [], shortages: [], groceryMutations: [],
+                stock: stock, rows: rows, appliedMeals: appliedMeals, appliedCrossings: appliedCrossings,
+                armedLow: armedLow, notices: []
+            )
+        }
+        var working = stock
+        var deductions: [PantryCookDeduction] = []
+        var skipped: [PantryCookSkip] = []
+        var shortages: [PantryCookShortage] = []
+        var mutations: [PantryGroceryMutation] = []
+        var crossings = appliedCrossings
+        var rowsNow = rows
+        var armed = armedLow
+        var notices: [LowStockNotice] = []
+        var meals = appliedMeals
+        meals.insert(mealId)
+
+        for need in needs where need.quantity > 0 {
+            guard let index = working.firstIndex(where: { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) && PantryUnitPolicy.compatible($0.unit, need.unit) }) else {
+                let same = working.contains { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) }
+                skipped.append(PantryCookSkip(
+                    ingredientId: need.ingredientId,
+                    displayName: need.displayName,
+                    reason: same ? PantryCopy.unitMismatch : PantryCopy.missingPantry
+                ))
+                shortages.append(PantryCookShortage(
+                    ingredientId: need.ingredientId,
+                    displayName: need.displayName,
+                    missingQuantity: PantryUnitPolicy.snap(need.quantity),
+                    unit: GroceryMerger.normalize(need.unit),
+                    autoAddToGrocery: false,
+                    offerAddMissing: true
+                ))
+                continue
+            }
+            let row = working[index]
+            let neededInStock = PantryUnitPolicy.converted(need.quantity, from: need.unit, to: row.unit) ?? 0
+            let taken = min(max(0, row.quantity), neededInStock)
+            let remaining = PantryUnitPolicy.snap(max(0, row.quantity - taken))
+            if taken > 0 {
+                deductions.append(PantryCookDeduction(
+                    itemId: row.id,
+                    ingredientId: row.ingredientId,
+                    newQuantity: remaining,
+                    unit: row.unit,
+                    baseVersion: row.version,
+                    deducted: PantryUnitPolicy.snap(taken)
+                ))
+                let previous = row.quantity
+                working[index].quantity = remaining
+                working[index].version = row.version + 1
+                let low = PantryLowStockNotifications.step(
+                    itemId: row.id, name: row.displayName, previousQuantity: previous, nextQuantity: remaining,
+                    minimum: row.minimumQuantity, enabled: lowStockEnabled, armed: armed
+                )
+                armed = low.armed
+                if let notice = low.notice { notices.append(notice) }
+                let replenish = PantryAutoGrocery.plan(
+                    itemId: row.id, ingredientId: row.ingredientId, displayName: row.displayName,
+                    previousQuantity: previous, nextQuantity: remaining, unit: row.unit,
+                    minimum: row.minimumQuantity, autoAdd: row.autoAddToGrocery, version: working[index].version,
+                    rows: rowsNow, applied: crossings
+                )
+                crossings = replenish.applied
+                if let mutation = replenish.mutation {
+                    mutations.append(mutation)
+                    rowsNow = PantryAutoGrocery.reduce(rowsNow, mutation)
+                }
+            }
+            let covered = PantryUnitPolicy.converted(taken, from: row.unit, to: need.unit) ?? 0
+            let gap = PantryUnitPolicy.snap(max(0, need.quantity - covered))
+            if gap > 0 {
+                shortages.append(PantryCookShortage(
+                    ingredientId: need.ingredientId,
+                    displayName: need.displayName,
+                    missingQuantity: gap,
+                    unit: GroceryMerger.normalize(need.unit),
+                    autoAddToGrocery: row.autoAddToGrocery,
+                    offerAddMissing: !row.autoAddToGrocery
+                ))
+                if row.autoAddToGrocery {
+                    let cookKey = "cook:\(mealId):\(row.ingredientId)|\(GroceryMerger.normalize(need.unit))"
+                    if !crossings.contains(cookKey) {
+                        crossings.insert(cookKey)
+                        let itemKey = "pantry-cook:\(mealId):\(row.ingredientId)|\(GroceryMerger.normalize(need.unit))"
+                        if rowsNow.first(where: { $0.itemKey == itemKey })?.isChecked != true {
+                            let mutation = PantryGroceryMutation(
+                                itemKey: itemKey,
+                                ingredientId: row.ingredientId,
+                                displayName: need.displayName,
+                                quantity: gap,
+                                unit: GroceryMerger.normalize(need.unit),
+                                baseRevision: rowsNow.first(where: { $0.itemKey == itemKey })?.revision ?? 0,
+                                crossingKey: cookKey,
+                                creates: rowsNow.contains(where: { $0.itemKey == itemKey }) == false
+                            )
+                            mutations.append(mutation)
+                            rowsNow = PantryAutoGrocery.reduce(rowsNow, mutation)
+                        }
+                    }
+                }
+            }
+        }
+        return PantryCookOutcome(
+            deductions: deductions, skipped: skipped, shortages: shortages, groceryMutations: mutations,
+            stock: working, rows: rowsNow, appliedMeals: meals, appliedCrossings: crossings,
+            armedLow: armed, notices: notices
+        )
+    }
+
+    private static func match(_ need: PantryCookNeed, in stock: [PantryCookStock], dictionary: IngredientDictionary) -> PantryCookStock? {
+        stock.first { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) && PantryUnitPolicy.compatible($0.unit, need.unit) }
+    }
+
+    private static func sameIngredient(_ lhs: String, _ rhs: String, dictionary: IngredientDictionary) -> Bool {
+        let left = dictionary.canonicalId(lhs) ?? lhs
+        let right = dictionary.canonicalId(rhs) ?? rhs
+        return left == right
+    }
+}
+
+enum PantryStableUUID {
+    /// Same name always yields the same id, so a cook retry keeps one Idempotency-Key.
+    static func make(_ name: String) -> UUID {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        var hash2: UInt64 = 0x8422_2325_cbf2_9ce4
+        for byte in name.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01b3
+            hash2 ^= UInt64(byte)
+            hash2 = hash2 &* 0x0000_0100_0000_01b3 &+ 0x9e37
+        }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        for index in 0..<8 {
+            bytes[index] = UInt8((hash >> (index * 8)) & 0xff)
+            bytes[index + 8] = UInt8((hash2 >> (index * 8)) & 0xff)
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40
+        bytes[8] = (bytes[8] & 0x3f) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }

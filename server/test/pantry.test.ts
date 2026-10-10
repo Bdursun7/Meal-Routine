@@ -88,7 +88,7 @@ describe('pantry', () => {
     expect(created.statusCode).toBe(200)
     expect(created.json()).toMatchObject({
       id: clientId, householdId, ingredientId: 'tomato', displayName: 'Domates', quantity: 400, unit: 'g',
-      location: 'refrigerator', minimumQuantity: 200, dateType: 'useBy', dateValue: '2030-01-05', version: 1,
+      location: 'refrigerator', minimumQuantity: 200, autoAddToGrocery: false, dateType: 'useBy', dateValue: '2030-01-05', version: 1,
     })
     expect(created.json().createdAt).toMatch(pantryWireTimestamp)
     expect(created.json().updatedAt).toMatch(pantryWireTimestamp)
@@ -99,13 +99,30 @@ describe('pantry', () => {
       headers: { ...auth, 'idempotency-key': 'pantry-update-1' }, payload: { quantity: 250, dateType: 'bestBefore', dateValue: '2030-02-01' },
     })
     expect(updated.statusCode).toBe(200)
-    expect(updated.json()).toMatchObject({ quantity: 250, minimumQuantity: 200, dateType: 'bestBefore', dateValue: '2030-02-01', version: 2 })
-    const cleared = await app.inject({
+    expect(updated.json()).toMatchObject({ quantity: 250, minimumQuantity: 200, autoAddToGrocery: false, dateType: 'bestBefore', dateValue: '2030-02-01', version: 2 })
+    const optedIn = await app.inject({
       method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=2`,
+      headers: { ...auth, 'idempotency-key': 'pantry-update-auto' }, payload: { autoAddToGrocery: true },
+    })
+    expect(optedIn.statusCode).toBe(200)
+    expect(optedIn.json()).toMatchObject({ autoAddToGrocery: true, quantity: 250, version: 3 })
+    const kept = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=3`,
+      headers: { ...auth, 'idempotency-key': 'pantry-update-qty-keeps-flag' }, payload: { quantity: 240 },
+    })
+    expect(kept.statusCode).toBe(200)
+    expect(kept.json()).toMatchObject({ autoAddToGrocery: true, quantity: 240, version: 4 })
+    const optedOut = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=4`,
+      headers: { ...auth, 'idempotency-key': 'pantry-update-auto-off' }, payload: { autoAddToGrocery: false },
+    })
+    expect(optedOut.json()).toMatchObject({ autoAddToGrocery: false, version: 5 })
+    const cleared = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=5`,
       headers: { ...auth, 'idempotency-key': 'pantry-update-2' }, payload: { dateType: null, dateValue: null },
     })
-    expect(cleared.json()).toMatchObject({ dateType: null, dateValue: null, version: 3 })
-    const removed = await app.inject({ method: 'DELETE', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=3`, headers: { ...auth, 'idempotency-key': 'pantry-delete-1' } })
+    expect(cleared.json()).toMatchObject({ dateType: null, dateValue: null, autoAddToGrocery: false, version: 6 })
+    const removed = await app.inject({ method: 'DELETE', url: `/v1/households/${householdId}/pantry/items/${clientId}?baseVersion=6`, headers: { ...auth, 'idempotency-key': 'pantry-delete-1' } })
     expect(removed.json()).toEqual({ deleted: true, id: clientId })
     expect(await list(app, auth, householdId)).toEqual([])
   })

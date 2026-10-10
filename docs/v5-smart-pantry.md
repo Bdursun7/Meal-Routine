@@ -4,8 +4,8 @@
 
 **Durum:** Dört durum birbirinin yerine geçmez.
 
-- **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/src/pantryService.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/WeekPlanService.swift`.
-- **Otomatik testle doğrulanmış (2026-10-10, Linux, V5.1 re-audit):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 35/35 geçti (Swift 6.0.3), nötr rozetler ve `YYYY-MM-DD` matrisi dahil. Diğer `Tools/run_*.sh` betikleri geçti. Ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` §9. Bu satır SwiftData mağazasını ve tarih seçiciyi geçmiş saymaz.
+- **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. V5.1 buna ekler: onaylı pişirme düşümü, isteğe bağlı düşük stok bildirimi, `autoAddToGrocery` (varsayılan kapalı) ve cihaz saat diliminde takvim günü hatırlatması. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/db/migrations/0013_pantry_auto_add.sql`, `server/src/pantryService.ts`, `server/src/boardApply.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/PantryRules.swift`.
+- **Otomatik testle doğrulanmış (2026-10-10, Linux, V5.1 pişirme ve bildirim):** `cd server && npm test` Postgres 16.15 ile 66/66 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 42/42 geçti (Swift 6.0.3). Önceki re-audit 65/65 ve 35/35 idi (`docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` §9). Bu satır SwiftData mağazasını, tarih seçiciyi, `UNUserNotificationCenter` teslimini ve pişirme onay sayfasının ekranını geçmiş saymaz.
 - **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
 - **Ürün kabul kapısı kapandı:** Hayır. Nötr metin Linux testinde geçti. SwiftData yükseltmesi, tarih seçici ve iOS ekran kontrolleri Not verified (Mac). Not verified, Pass değildir. V6 başlamaz.
 
@@ -44,12 +44,15 @@ Kodda ve V5.0 testlerinde karşılığı olanlar:
 
 ### V5.0 kapsamı dışında
 
-Aşağıdakiler V5.0’da kod ve test olarak yoktur. Bu belge onları mevcut özellik gibi anlatmaz ve V5.0’a ekleme izni vermez. İleride eklenecekse ayrı kapsam kararı, ayar varsayılanı, idempotency kuralı, bildirim davranışı ve test seti gerekir.
+Aşağıdaki dört madde V5.0 kodunda yoktu. V5.1 onları bölüm 21’deki kurallarla ekler. V5.0 belgesi onları V5.0 özelliği gibi anlatmaz.
 
-- Minimum stok eşiği geçilince market listesine otomatik ekleme (`autoAddToGrocery` yok)
-- Düşük stok bildirimi (satır rozeti “Azaldı” bir push bildirimi değildir)
-- `bestBefore` / `useBy` için otomatik tarih hatırlatması ve hatırlatma takvimi
-- Yemek pişirildikten sonra, onaylı olsa bile, otomatik stok düşümü
+- Minimum stok eşiği geçilince market listesine ekleme (`autoAddToGrocery`, varsayılan kapalı)
+- Düşük stok bildirimi (satır rozeti “Azaldı” tek başına bir bildirim değildir)
+- `bestBefore` / `useBy` için tarih hatırlatması
+- Pişirme sonrası onaylı stok düşümü
+
+Hâlâ kapsam dışı:
+
 - Barkod tarama
 - Fiş veya OCR ile otomatik stok çıkarma
 - LLM ile malzeme tanıma
@@ -59,7 +62,7 @@ Aşağıdakiler V5.0’da kod ve test olarak yoktur. Bu belge onları mevcut öz
 - Otomatik tarih tahmini
 - Household üye sınırını artırma
 
-V5.0 kuralı: Pantry → Grocery ve Grocery → Pantry değişiklikleri kullanıcı tarafından açıkça başlatılır. Plan değişikliği stok miktarını sessizce düşürmez. “Pişirdim” stok düşürmez.
+V5.0 kuralı, V5.1’de de durur: plan değişikliği stok miktarını sessizce düşürmez. “Pişirdim” tek başına stok düşürmez. Düşüm, kullanıcı tüketim sayfasında “Stoktan düş” derse olur. Reddederse stok değişmez. Ayrıntı bölüm 21.
 
 ## 3. Veri sahipliği
 
@@ -89,6 +92,7 @@ PantryItem
   unit                 -- yapılandırılmış birim kodu
   location
   minimumQuantity?     -- aynı satırın birimi; negatif olamaz
+  autoAddToGrocery     -- 0013; varsayılan false. Kişisel satırda da aynı alan, yalnız cihazda
   dateType?            -- bestBefore | useBy; dateValue ile birlikte veya hiçbiri
   dateValue?           -- YYYY-MM-DD takvim günü
   version
@@ -105,7 +109,8 @@ PantryItem
 - Yazılan ad, büyük/küçük harf ve diakritik farkı yok sayılarak tek bir maddenin adı veya eş anlamlısıyla birebir örtüşürse o `ingredientId` bağlanır. Örtüşme yoksa veya birden fazla madde aynı ada sahipse `custom:<uuid>` oluşturulur. Ortak evde `POST /v1/households/:id/ingredients` ile kaydedilir. Kişisel pantry’de yalnız cihazda durur. “Domates” ile “Cherry domates” kendiliğinden birleşmez. Eşleşme LLM ile yapılmaz.
 - `quantity` negatif olamaz. Sunucu binde birliğe yuvarlar (`roundPantryQuantity`).
 - `unit` bilinmeyen veya geçersizse kayıt reddedilir. Kullanıcı uyumsuz birimi `confirmSeparate: true` ile ayrı satır yapabilir; bilinmeyen birim o bayrakla da reddedilir.
-- `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik, market listesine otomatik satır eklemez.
+- `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik tek başına market satırı açmaz. `autoAddToGrocery` kapalıyken (varsayılan) eşik altına inmek market satırı yazmaz. Açıkken kural bölüm 21’dedir.
+- `autoAddToGrocery` `BOOLEAN NOT NULL DEFAULT false` (`0013_pantry_auto_add.sql`). Create, list ve patch gövdesindedir. Gövdede yoksa mevcut değer kalır. Kişisel pantry aynı alanı SwiftData’da tutar; sunucuya gitmez.
 - `dateType` yalnız `bestBefore` veya `useBy` olabilir. İkisi aynı anlama gelmez.
 - `dateValue` takvim günüdür (`YYYY-MM-DD`, SQL `DATE`). Saat dilimi anına çevrilip bir gün kaydırılmaz. iOS kanonik alan `calendarDay` aynı stringi tutar. Ayrıntı ve kabul edilmiş eski kişisel satır istisnası bölüm 13’tedir.
 - Kullanıcı tarih girmediyse sistem tarih uydurmaz. Tarih çifti ya ikisi birden vardır ya hiçbiri (`pantry_items_date_pair`).
@@ -202,8 +207,8 @@ Kurallar:
 - Aynı mutation aynı `Idempotency-Key` ile yeniden gelirse market veya stok ikinci kez değişmez.
 - Uyumsuz birimlerde otomatik çıkarma yapılmaz.
 - Plan değişince pantry miktarı kendiliğinden azalmaz.
-- Plan öğesini açmak, işaretlemek veya market satırını tamamlamak stoktan düşüm yapmaz.
-- “Pişirdim” (`WeekPlanService.markCooked`) pantry miktarını değiştirmez. Onaylı pişirme düşümü V5.0’da yoktur.
+- Plan öğesini açmak, işaretlemek, market satırını tamamlamak veya planı yeniden kurmak stoktan düşüm yapmaz.
+- “Pişirdim” (`WeekPlanService.markCooked`) pantry miktarını değiştirmez. Puan kaydı iptal edilirse yemek pişmiş sayılmaz ve stok da değişmez. Puan kaydedilip yemek pişmiş işaretlenince tüketim onayı açılır. “Stoktan düşme” stoku olduğu gibi bırakır. “Stoktan düş” bölüm 21’deki kuralı uygular.
 
 ## 8. Haftalık plan ve scoring
 
@@ -334,6 +339,7 @@ Karşılaştırma `V5-Alignment-Audit` `1f07663` üzerindedir. “Uyumlu” veya
 | Birim kovası | `unit_bucket` üretildi, saklanır | yok | yok | yok | yok |
 | Konum | `location TEXT NOT NULL` | `PantryLocation` | `location` | `locationRaw` | `location` |
 | Minimum | `minimum_quantity NUMERIC(12,3) NULL` `>= 0` | `number \| null` | `minimumQuantity` nullable | `Double?` | `Double?` |
+| Otomatik market | `auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false` (`0013`) | `boolean` | `autoAddToGrocery` | `Bool`, varsayılan `false` | `Bool`, eski gövdede yoksa `false` |
 | Tarih türü | `date_type TEXT NULL` (`bestBefore`, `useBy`) | `dateType \| null` | `dateType` | `dateTypeRaw: String?` | `dateType?` |
 | Tarih | `date_value DATE NULL` | `string \| null` `YYYY-MM-DD` | `dateValue` | `calendarDay: String?` (`YYYY-MM-DD`). Eski `bestBefore: Date?` kolonu durur; yeni yazım onu kullanmaz | `dateValue: String?` |
 | Sürüm | `version INT NOT NULL` `>= 1` | `version` | `version` | `revision` | `version` (`revision` yalnız eski yük okuması) |
@@ -357,13 +363,13 @@ iOS farkları (davranış değişikliği değildir; kayıtlı eşlemedir):
 
 Migration:
 
-- `0001`–`0011` değiştirilmez. `0012_pantry` ingredients, pantry_items ve pantry_idempotency ekler.
-- `0012` öncesi pantry tablosu yoktur. Korunacak eski pantry satırı yoktur. V4.1 household, board ve hesap satırları `0012` uygulanırken silinmemelidir. Bunu `server/test/pantry.integration.test.ts` dener; sonuç audit report’tadır.
+- `0001`–`0011` değiştirilmez. `0012_pantry` ingredients, pantry_items ve pantry_idempotency ekler. `0013_pantry_auto_add` yalnız `auto_add_to_grocery` kolonunu ekler. Household saat dilimi kolonu yoktur.
+- `0012` öncesi pantry tablosu yoktur. Korunacak eski pantry satırı yoktur. V4.1 household, board ve hesap satırları `0012` ve `0013` uygulanırken silinmemelidir. Bunu `server/test/pantry.integration.test.ts` dener; sonuç audit report §10’dadır. `0013` `DEFAULT false` olduğu için kolonu yazmayan eski `INSERT` durur.
 - Tekrar çalıştırma: `schema_migrations` kaydı varken `migrate` `0012`’yi yeniden uygulamaz. Seed `ON CONFLICT (id) DO NOTHING` kullanır.
 - Geri alma: migration dosyasında `DROP TABLE` yoktur. Onarım, yayınlanmamış geliştirme veritabanı için `docs/v5-local-runbook.md` içindeki taslak düşürme notudur. Yayınlanmış şema için otomatik down migration yoktur.
 - Hesap silinince pantry ve idempotency satırları hesap/household silme kurallarıyla gider (`ON DELETE CASCADE`).
 
-Bu tabloda olmayan alanlar (`autoAddToGrocery`, `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`, gövdede `bestBefore`) V5.0 şemasına eklenmez.
+Şemada olmayan alanlar: `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`. Bunlar cihaz `UserDefaults` anahtarı `mealroutine.pantry.notificationPreferences` içindedir ve senkron edilmez. Gövde `bestBefore` hâlâ reddedilir. Household `timezone` kolonu yoktur; V7 / `AUD-GLOB-001`.
 
 ## 14. Account deletion ve privacy
 
@@ -382,7 +388,7 @@ Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 1. Ingredient kimliği `ingredientId`’dir. Çevrilmiş veya görünen ad kimlik değildir.
 2. Birim dönüşümü yalnız desteklenen ve aynı birim ailesindeki dönüşümlerde yapılır.
 3. Plan oluşturmak veya planı değiştirmek kiler stokunu sessizce değiştirmez.
-4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. V5.0’da “Pişirdim” stok düşmez; onaylı düşüm akışı yoktur.
+4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. “Pişirdim” stok yazmaz. Onay sayfasında “Stoktan düş” denirse bölüm 21 uygulanır. “Stoktan düşme” stoku değiştirmez.
 5. Kullanıcının girdiği tarih uydurulmaz. Tarih tek başına gıda güvenliği kararı üretmez. V5.1’de eski kişisel tarih anı takvim gününe çevrilmez; proje sahibi 2026-10-10’da bu satırların bir kez silinmesini kabul etti (bölüm 13). Ortak kiler tarihi sunucudan yeniden alınır.
 6. V5’te fiyat, bütçe, fiyat geçmişi veya market sağlayıcı entegrasyonu yoktur.
 7. Kişisel kiler, household kilerine otomatik ve sessizce birleştirilmez.
@@ -391,7 +397,7 @@ Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 10. Paylaşılan pantry’nin sunucu sahibi household’dır. Kişisel pantry yalnız cihazdadır; ayrı bir kişisel pantry backend’i yoktur.
 11. V5 otomatik malzeme tanıma veya LLM eşlemesi yapmaz.
 12. Plan oluşturmak pantry kullanmaya bağlı değildir.
-13. `0012_pantry`, pantry şemasının kanonik migration’ıdır. `0001`–`0011` yeniden yazılmaz.
+13. Pantry migration listesi `0012_pantry` ve `0013_pantry_auto_add` dosyalarıdır. `0001`–`0012` yeniden yazılmaz.
 
 ## 16. Uygulama fazları
 
@@ -411,11 +417,11 @@ SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. `Pa
 
 ### Faz 4 — Pantry UI
 
-Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
+Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. V5.1, Evdekiler ekranına düşük stok ve tarih hatırlatması anahtarlarını ekler. İzin reddi `PantryCopy.notificationPermissionDenied` ile yazılır; pantry yazmaya devam eder. Bu ekran Mac’te doğrulanmadı.
 
 ### Faz 5 — Market entegrasyonu
 
-Eksik miktar, evdekilerden düşme, evdekilere ekleme, işaretli satır ve idempotent replay kodda vardır. Otomatik eşik eklemesi yoktur.
+Eksik miktar, evdekilerden düşme, evdekilere ekleme, işaretli satır ve idempotent replay kodda vardır. Eşik eklemesi yalnız `autoAddToGrocery` açıkken ve bölüm 21’deki anahtarla çalışır.
 
 ### Faz 6 — Planner sinyali
 
@@ -440,34 +446,34 @@ V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır. Kutular b
 - Geçmiş tarih, nötr metinle gösterilir; gıda güvenliği hükmü verilmez.
 - Eksik miktar hesabı doğru ve idempotent çalışır.
 - İşaretlenmiş market satırları korunur.
-- Plan ve “Pişirdim” stoku değiştirmez.
+- Plan stoku değiştirmez. “Pişirdim” tek başına stoku değiştirmez. Onaylı düşüm stoktan fazla düşmez.
 - Offline queue bağlantı dönüşünde işlemleri çoğaltmadan gönderir.
 - Conflict sunucu haliyle deterministik çözülür.
-- `0012` mevcut V1–V4.1 verisini silmez.
+- `0012` ve `0013` mevcut V1–V4.1 verisini silmez.
 - Account deletion pantry ownership kurallarına uyar.
 - V1–V4.1 regresyon testleri korunur.
 - Loading, empty, error, offline ve conflict metinleri Türkçedir.
 - VoiceOver, Dynamic Type ve Dark Mode kontrol edilir.
 - API, migration ve local runbook güncellenir.
 
-## 18. V5.0’da olmayan hatırlatma ve bildirim taslağı
+## 18. Bildirimler
 
-v2 taslağının hatırlatma bölümü şunları tarif ediyordu: `bestBefore` için 2 gün önce ve tarihin kendisi, `useBy` için 1 gün önce ve tarihin kendisi; `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`.
+`1f07663` ve V5.0 kodunda pantry bildirimi yoktu. Sunucu türleri hâlâ yalnız `invite`, `weekly_plan`, `meal_veto`, `meal_replacement`, `plan_finalized` (`server/src/notifications.ts`). Uzak household push ve APNs, gerçek Apple hesabı canlı olmadığı için V6 sonrasına ertelenir. V5.1 bildirimleri cihazdaki `UNUserNotificationCenter` kayıtlarıdır.
 
-`1f07663` kodunda bunlar yoktur:
+Tercihler şema değildir: `lowStockNotificationsEnabled`, `dateReminderEnabled`, `dateReminderSchedule`. Varsayılan ikisi de kapalı. `dateReminderSchedule` açıkken `bestBefore` 2 gün önce ve o gün, `useBy` 1 gün önce ve o gündür. Kullanıcı programı kapatabilir.
 
-- Sunucu bildirim türleri yalnız `invite`, `weekly_plan`, `meal_veto`, `meal_replacement`, `plan_finalized` (`server/src/notifications.ts`).
-- Pantry için yerel takvim bildirimi, hatırlatma iptali veya düşük stok push’u yoktur.
-- `minimumQuantity` satırda “Azaldı” rozeti üretir; market satırı açmaz.
+Tarih hatırlatması yalnız kullanıcı tarih girdiyse ve hatırlatma açıksa planlanır. Gün, saklanan `YYYY-MM-DD` değeridir. Saat 09:00, cihazın o anki `TimeZone` değerindedir. Household saat dilimi yoktur; `AUD-GLOB-001` bunu V7’ye bırakır. İstanbul, Auckland ve Los Angeles için aynı takvim günü `PantryDomainTests.testDateRemindersUseTheCalendarDayInEachDeviceZone` içindedir. Tarih değişince yeni günler yazılır. Miktar sıfır, tarih silme veya hatırlatma kapalıyken plan boştur; uygulama `PantryDateReminders.allIdentifiers` kümesini iptal eder. Bu iptalin işletim sistemine ulaşması Mac’te doğrulanır.
 
-Bu belge o taslağı V5.0 özelliği yapmaz. İleride eklenirse household timezone, cihaz bildirim izni, tarih değişince yeniden planlama, tüketim veya silmede iptal, idempotency ve testler ayrıca yazılır. Bildirim metni gıda güvenliği garantisi olmaz. Bildirim izni reddedilirse pantry’nin geri kalanı çalışmaya devam eder; bu cümle gelecekteki işin kuralıdır, V5.0’da bir izin ekranı olduğu iddiası değildir.
+Metin hatırlatmadır. “Güvenli”, “yenmez” veya tazelik hükmü yoktur. İşletim sistemi bildirimi erteleyebilir. İzin reddedilirse `mealroutine.pantry.notificationPermissionDenied` yazılır ve Evdekiler çalışmaya devam eder.
+
+Düşük stok bildirimi, miktar minimumun üstünden minimuma veya altına ilk inince bir kez gider. “Azaldı” rozetiyle aynı çizgi kullanılır: `quantity <= minimumQuantity`. Eşitlikte bildirim bir kez gider; eksik miktar 0 olduğu için market satırı açılmaz. Aynı düşük bölümde tekrar gitmez. Miktar yeniden üstüne çıkınca kuruluş kalkar; tekrar inince yeni bildirim olabilir. Bildirim kapalıyken geçiş olursa kayıt yine tutulur, böylece kullanıcı bölüm ortasında açarsa spam olmaz.
 
 ## 19. Global-readiness kuralları
 
 - Ingredient kimliği daima `ingredientId` olur.
 - Görünen ad sunum katmanındadır. Ayrı bir `IngredientName(locale)` tablosu V5.0 şemasında yoktur; seed `display_name` ve `synonyms` taşır.
 - Quantity ve unit ayrı alanlardır.
-- `dateValue` tarih-only’dir. Hatırlatma saati V5.0’da hesaplanmaz.
+- `dateValue` tarih-only’dir. Hatırlatma saati takvim gününün üstüne, cihazın geçerli saat diliminde 09:00 olarak konur. Gün kaymaz. Household timezone V7’dedir.
 - `TR`, `TRY`, `metric`, `tr-TR` pantry modelinin kalıcı koşulu değildir. Arayüz metinleri Türkçedir; bu, iş kuralının ülkeye kilitlendiği anlamına gelmez.
 - Kullanıcının yazdığı tarif adı, notu ve talimat pantry tarafından çevrilmez.
 
@@ -476,3 +482,32 @@ Bu belge o taslağı V5.0 özelliği yapmaz. İleride eklenirse household timezo
 Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette eksik miktarı kendi eylemiyle hesaplar. Household üyeleri aynı pantry state’ini sunucu üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
 
 V5, stok farkındalığı katar. Fiyat ve bütçe V5’te yoktur. V6 Balanced Nutrition ayrı bir ürün belgesindedir: yemek örüntüsü tercihleri (`balanced`, `vegetableForward`, `proteinForward`, `plantForward`). Bu modlar tercih sinyalidir; alerji, `Never Again`, malzeme dışlama ve ev halkı vetosunu geçersiz kılmaz. V6 kalori, makro, klinik iddia, market fiyatı ve bütçe içermez. V7 Globalization & Localization, çok dilli arayüz ve bölgesel/global lansmandır. V6 bu belgeyle başlatılmaz.
+
+## 21. V5.1 pişirme düşümü ve eşik
+
+Kararlar (2026-10-10): hatırlatma cihazın geçerli saat dilimindedir (D1=a). Tek yeni migration `0013` `auto_add_to_grocery` kolonudur (D2=b). Başka şema değişikliği yoktur.
+
+### Onaylı düşüm
+
+Planlı yemek pişmiş işaretlendikten sonra sayfa, tarif satırlarını ve Evdekiler miktarını listeler. Kişisel pantry `householdID == nil` satırlarını, ortak pantry o evin satırlarını kullanır. Red, stok yazmaz. Onay:
+
+- Yalnız aynı `ingredientId` (sözlük kanonik kimliği; `tomatoes` ve `tomato` birleşir, `cherry-tomato` birleşmez).
+- Yalnız güvenilir dönüşüm: g/kg ve ml/l. Adet ile gram düşülmez; satır atlanır, stok aynı kalır.
+- Düşüm eldeki stokla sınırlıdır ve sıfırın altına inmez.
+- Aynı onayda ikinci ihtiyaç, azalan stoku görür.
+- Aynı yemek kimliği ikinci kez uygulanırsa düşüm tekrarlanmaz.
+- Ortak satır mevcut outbox’a gider: `Idempotency-Key` `PantryStableUUID.make("cook:<mealId>:<itemId>")`, `baseVersion` düşüm öncesi `version`. 409 `requiresResolution` yolu değişmez.
+
+Eksik miktar, `autoAddToGrocery` kapalıysa markete yazılmaz. Sayfa “Eksik miktarı markete ekle” gösterir. Açıksa tarif eksiği `pantry-cook:<mealId>:<ingredientId>|<unit>` anahtarıyla bir kez yazılır.
+
+### Eşik ve market
+
+`autoAddToGrocery` varsayılan kapalıdır. Açıkken satır minimumun üstünden minimuma veya altına ilk inince eksik miktar (`minimum - quantity`, sıfırdan küçük değil) bir kez yazılır. Eşitlikte eksik 0’dır; satır açılmaz.
+
+Market anahtarı `pantry-auto:<ingredientId>|<canonicalUnit>` şeklindedir. Planın `ingredientId|unit` satırına eklenmez ve o satırın miktarı değiştirilmez: plan miktarını artırmak veya mutlak yazmak ya ikiye katlar ya da planı ezer, ayrı bir crossing kolonu da ikinci bir şema değişikliği olurdu. Defter, bu sabit anahtar ve mutlak miktardır.
+
+Sunucu grocery `add` gövdesi `mode` almazsa eskisi gibi artırır. `mode: "set"` miktarı mutlak yazar. İki üye aynı miktarı `baseRevision: 0` ile gönderirse tek satır kalır (`board.test.ts`). Miktar zaten hedefse eski `baseRevision` bile ikinci kez artırmaz. İşaretli satır değişmez ve ikinci satır açılmaz. Ortak miktar `0008` tamsayısıdır (`1`…`999`, `GrocerySyncQuantity.whole`). Daha büyük bir eksik bu kolona sığmaz; kolon genişletilmedi.
+
+Yerel defterler `UserDefaults` anahtarlarıdır: `mealroutine.pantry.autoCrossings`, `mealroutine.pantry.lowStockArmed`, `mealroutine.pantry.cookApplied`. Bunlar şema değildir.
+
+Linux kanıtı: `PantryDomainTests` içindeki decline, tavan, birim uyuşmazlığı, retry, bildirim, autoAdd ve saat dilimi testleri; `pantry.test.ts` bayrağın create/patch/list yolu; `board.test.ts` iki üyeli `mode: set`. Ekran, bildirim izni ve SwiftData Mac kontrol listesindedir.

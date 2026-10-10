@@ -39,6 +39,8 @@ export function applyMutation(
   if (input.entityType === 'grocery' && input.operationType === 'add') {
     const itemKey = text(input.payload.itemKey, 'itemKey')
     const quantity = positiveInt(input.payload.quantity ?? 1, 'quantity')
+    const mode = input.payload.mode === undefined ? 'add' : text(input.payload.mode, 'mode')
+    if (mode !== 'add' && mode !== 'set') throw new AppError('invalid_request', 400)
     const existing = next.grocery.find((row) => row.itemKey === itemKey)
     if (!existing) {
       if (input.baseRevision !== 0) conflict('grocery', input.entityId, null)
@@ -55,6 +57,19 @@ export function applyMutation(
       entity = publicGrocery(created)
       revision = 1
       entityId = created.id
+    } else if (mode === 'set') {
+      // Absolute quantity. A matching amount is a no-op, so two devices that
+      // observe the same shortfall do not add it twice. A checked row stays.
+      entityId = existing.id
+      revision = existing.revision
+      if (!existing.isChecked && existing.quantity !== quantity) {
+        if (existing.revision !== input.baseRevision) conflict('grocery', existing.id, publicGrocery(existing))
+        existing.quantity = quantity
+        existing.revision += 1
+        existing.updatedBy = actor.accountId
+        revision = existing.revision
+      }
+      entity = publicGrocery(existing)
     } else {
       if (existing.revision !== input.baseRevision) conflict('grocery', existing.id, publicGrocery(existing))
       existing.quantity += quantity

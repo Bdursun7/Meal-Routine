@@ -95,6 +95,8 @@ final class PantryItem {
     var unit: String
     var locationRaw: String
     var minimumQuantity: Double?
+    /// `0013` flag. Default false so a store saved before V5.1 still opens.
+    var autoAddToGrocery: Bool = false
     /// Legacy V5.0 instant. The column stays `Date` so an existing store opens.
     /// A value here is not a calendar day and is never formatted into `dateValue`.
     var bestBefore: Date?
@@ -116,6 +118,7 @@ final class PantryItem {
         unit: String,
         location: PantryLocation = .pantry,
         minimumQuantity: Double? = nil,
+        autoAddToGrocery: Bool = false,
         dateType: PantryDateType? = nil,
         dateValue: String? = nil,
         revision: Int = 1,
@@ -123,6 +126,7 @@ final class PantryItem {
     ) {
         self.uuid = uuid; self.householdID = householdID; self.ingredientID = ingredientID; self.displayName = displayName
         self.quantity = quantity; self.unit = unit; self.locationRaw = location.rawValue; self.minimumQuantity = minimumQuantity
+        self.autoAddToGrocery = autoAddToGrocery
         let day = PantryDay.canonical(dateValue)
         self.calendarDay = day
         self.bestBefore = nil

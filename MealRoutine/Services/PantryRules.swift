@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UserNotifications
 
 extension PantryItem {
     /// Snapshot of the row as the user saved it. Only household rows ever leave the phone.
@@ -14,6 +15,7 @@ extension PantryItem {
             unit: unit,
             location: location,
             minimumQuantity: minimumQuantity,
+            autoAddToGrocery: autoAddToGrocery,
             dateType: date.dateType,
             dateValue: date.dateValue,
             version: revision,
@@ -32,6 +34,7 @@ extension PantryItem {
         unit = remote.unit
         location = remote.location
         minimumQuantity = remote.minimumQuantity
+        autoAddToGrocery = remote.autoAddToGrocery
         applyServerDate(type: remote.dateType, day: remote.dateValue)
         revision = remote.version
         updatedAt = PantryServerClock.applying(remote.updatedAt, keeping: updatedAt)
@@ -47,6 +50,7 @@ extension PantryItem {
             unit: remote.unit,
             location: remote.location,
             minimumQuantity: remote.minimumQuantity,
+            autoAddToGrocery: remote.autoAddToGrocery,
             dateType: remote.dateType,
             dateValue: PantryHouseholdDate.canonicalDay(serverDateValue: remote.dateValue),
             revision: remote.version,
@@ -180,6 +184,7 @@ enum PantryOutbox {
         _ item: PantryItem,
         baseVersion: Int?,
         confirmSeparate: Bool = false,
+        idempotencyID: UUID? = nil,
         in context: ModelContext
     ) -> Bool {
         guard syncsHousehold, let householdID = item.householdID else { return false }
@@ -193,7 +198,7 @@ enum PantryOutbox {
         guard let data = PantrySync.encode(payload) else { return false }
         PendingOperationStore.upsert(
             SyncWorkItem(
-                id: UUID(),
+                id: idempotencyID ?? UUID(),
                 entityType: PantrySync.entityType,
                 entityId: item.uuid.uuidString.lowercased(),
                 operationType: action.rawValue,
@@ -588,5 +593,312 @@ enum PantryAccountPrivacy {
         }
         PendingOperationStore.replace(kept, in: context)
         try? context.save()
+    }
+}
+
+enum PantryEffectLedger {
+    static let crossingsKey = "mealroutine.pantry.autoCrossings"
+    static let armedKey = "mealroutine.pantry.lowStockArmed"
+    static let cookedKey = "mealroutine.pantry.cookApplied"
+    static let permissionKey = "mealroutine.pantry.notificationPermissionDenied"
+
+    static func crossings(_ defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: crossingsKey) ?? [])
+    }
+
+    static func saveCrossings(_ values: Set<String>, _ defaults: UserDefaults = .standard) {
+        defaults.set(Array(values).sorted(), forKey: crossingsKey)
+    }
+
+    static func armed(_ defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: armedKey) ?? [])
+    }
+
+    static func saveArmed(_ values: Set<String>, _ defaults: UserDefaults = .standard) {
+        defaults.set(Array(values).sorted(), forKey: armedKey)
+    }
+
+    static func cooked(_ defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: cookedKey) ?? [])
+    }
+
+    static func saveCooked(_ values: Set<String>, _ defaults: UserDefaults = .standard) {
+        defaults.set(Array(values).sorted(), forKey: cookedKey)
+    }
+}
+
+/// Local notification adapter. Permission denial does not block pantry writes.
+enum PantryLocalNotifications {
+    @MainActor
+    static func requestAccess() {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+            UserDefaults.standard.set(!granted, forKey: PantryEffectLedger.permissionKey)
+        }
+    }
+
+    @MainActor
+    static func deliver(_ notices: [LowStockNotice]) {
+        guard !notices.isEmpty else { return }
+        Task { await post(notices.map { ($0.identifier, $0.title, $0.body) }) }
+    }
+
+    @MainActor
+    static func reschedule(itemId: String, fires: [PantryReminderFire]) {
+        Task { await replace(itemId: itemId, fires: fires) }
+    }
+
+    @MainActor
+    static func cancel(itemId: String) {
+        Task { await remove(PantryDateReminders.allIdentifiers(itemId: itemId)) }
+    }
+
+    private static func post(_ notes: [(String, String, String)]) async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        let allowed = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+        if !allowed {
+            UserDefaults.standard.set(true, forKey: PantryEffectLedger.permissionKey)
+            return
+        }
+        UserDefaults.standard.set(false, forKey: PantryEffectLedger.permissionKey)
+        for note in notes {
+            let content = UNMutableNotificationContent()
+            content.title = note.1
+            content.body = note.2
+            let request = UNNotificationRequest(identifier: note.0, content: content, trigger: nil)
+            try? await center.add(request)
+        }
+    }
+
+    private static func replace(itemId: String, fires: [PantryReminderFire]) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: PantryDateReminders.allIdentifiers(itemId: itemId))
+        let settings = await center.notificationSettings()
+        let allowed = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+        if !allowed {
+            if !fires.isEmpty { UserDefaults.standard.set(true, forKey: PantryEffectLedger.permissionKey) }
+            return
+        }
+        UserDefaults.standard.set(false, forKey: PantryEffectLedger.permissionKey)
+        for fire in fires {
+            var components = DateComponents()
+            components.calendar = Calendar(identifier: .gregorian)
+            components.timeZone = TimeZone(identifier: fire.timeZoneIdentifier)
+            components.year = fire.year
+            components.month = fire.month
+            components.day = fire.day
+            components.hour = fire.hour
+            components.minute = fire.minute
+            let content = UNMutableNotificationContent()
+            content.title = fire.title
+            content.body = fire.body
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            try? await center.add(UNNotificationRequest(identifier: fire.identifier, content: content, trigger: trigger))
+        }
+    }
+
+    private static func remove(_ identifiers: [String]) async {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+}
+
+enum PantryStockSideEffects {
+    /// Quantity, date, or deletion changed. Household grocery uses `mode: set` and a stable key.
+    @MainActor
+    static func afterQuantityChange(
+        item: PantryItem,
+        previousQuantity: Double,
+        in context: ModelContext
+    ) {
+        let preferences = PantryNotificationPreferenceStore.load()
+        var armed = PantryEffectLedger.armed()
+        let low = PantryLowStockNotifications.step(
+            itemId: item.uuid.uuidString.lowercased(),
+            name: item.displayName,
+            previousQuantity: previousQuantity,
+            nextQuantity: item.quantity,
+            minimum: item.minimumQuantity,
+            enabled: preferences.lowStockNotificationsEnabled,
+            armed: armed
+        )
+        armed = low.armed
+        PantryEffectLedger.saveArmed(armed)
+        if let notice = low.notice { PantryLocalNotifications.deliver([notice]) }
+        var crossings = PantryEffectLedger.crossings()
+        let rows = marketRows(in: context)
+        let plan = PantryAutoGrocery.plan(
+            itemId: item.uuid.uuidString.lowercased(),
+            ingredientId: item.ingredientID,
+            displayName: item.displayName,
+            previousQuantity: previousQuantity,
+            nextQuantity: item.quantity,
+            unit: item.unit,
+            minimum: item.minimumQuantity,
+            autoAdd: item.autoAddToGrocery,
+            version: item.revision,
+            rows: rows,
+            applied: crossings
+        )
+        crossings = plan.applied
+        PantryEffectLedger.saveCrossings(crossings)
+        if let mutation = plan.mutation {
+            apply(mutation, in: context)
+        }
+        refreshReminders(for: item, preferences: preferences)
+    }
+
+    @MainActor
+    static func refreshReminders(for item: PantryItem, preferences: PantryNotificationPreferences = PantryNotificationPreferenceStore.load()) {
+        let fires = PantryDateReminders.plan(
+            itemId: item.uuid.uuidString.lowercased(),
+            displayName: item.displayName,
+            dateType: item.dateType,
+            dateValue: item.dateValue,
+            quantity: item.quantity,
+            remindersEnabled: preferences.dateReminderEnabled,
+            schedule: preferences.dateReminderSchedule,
+            timeZone: .current
+        )
+        if fires.isEmpty {
+            PantryLocalNotifications.cancel(itemId: item.uuid.uuidString.lowercased())
+        } else {
+            PantryLocalNotifications.reschedule(itemId: item.uuid.uuidString.lowercased(), fires: fires)
+        }
+    }
+
+    @MainActor
+    static func deleted(_ itemId: UUID) {
+        let id = itemId.uuidString.lowercased()
+        var armed = PantryEffectLedger.armed()
+        armed.remove(id)
+        PantryEffectLedger.saveArmed(armed)
+        PantryLocalNotifications.cancel(itemId: id)
+    }
+
+    @MainActor
+    static func confirmCook(
+        mealId: UUID,
+        needs: [PantryCookNeed],
+        in context: ModelContext
+    ) -> PantryCookOutcome {
+        let preferences = PantryNotificationPreferenceStore.load()
+        let householdID = HouseholdSession.shared.snapshot.household?.id
+        let items = ((try? context.fetch(FetchDescriptor<PantryItem>())) ?? []).filter { $0.householdID == householdID }
+        let stock = items.map { item in
+            PantryCookStock(
+                id: item.uuid.uuidString.lowercased(),
+                ingredientId: item.ingredientID,
+                displayName: item.displayName,
+                quantity: item.quantity,
+                unit: item.unit,
+                minimumQuantity: item.minimumQuantity,
+                autoAddToGrocery: item.autoAddToGrocery,
+                version: item.revision,
+                dateType: item.dateType,
+                dateValue: item.dateValue
+            )
+        }
+        let outcome = PantryCookConsumption.apply(
+            event: .markCooked,
+            confirmed: true,
+            mealId: mealId.uuidString.lowercased(),
+            needs: needs,
+            stock: stock,
+            rows: marketRows(in: context),
+            appliedMeals: PantryEffectLedger.cooked(),
+            appliedCrossings: PantryEffectLedger.crossings(),
+            armedLow: PantryEffectLedger.armed(),
+            lowStockEnabled: preferences.lowStockNotificationsEnabled
+        )
+        PantryEffectLedger.saveCooked(outcome.appliedMeals)
+        PantryEffectLedger.saveCrossings(outcome.appliedCrossings)
+        PantryEffectLedger.saveArmed(outcome.armedLow)
+        let byId = Dictionary(uniqueKeysWithValues: items.map { ($0.uuid.uuidString.lowercased(), $0) })
+        for deduction in outcome.deductions {
+            guard let item = byId[deduction.itemId] else { continue }
+            item.quantity = deduction.newQuantity
+            item.revision += 1
+            item.updatedAt = .now
+            let key = PantryStableUUID.make("cook:\(mealId.uuidString.lowercased()):\(deduction.itemId)")
+            PantryOutbox.record(.update, item, baseVersion: deduction.baseVersion, idempotencyID: key, in: context)
+            refreshReminders(for: item, preferences: preferences)
+        }
+        for mutation in outcome.groceryMutations {
+            apply(mutation, in: context)
+        }
+        if !outcome.notices.isEmpty { PantryLocalNotifications.deliver(outcome.notices) }
+        try? context.save()
+        if PantryOutbox.syncsHousehold {
+            Task { await PantryOutbox.flush(in: context) }
+        }
+        return outcome
+    }
+
+    @MainActor
+    static func addMissing(_ shortage: PantryCookShortage, in context: ModelContext) {
+        let mutation = PantryGroceryMutation(
+            itemKey: PantryAutoGrocery.itemKey(ingredientId: shortage.ingredientId, unit: shortage.unit),
+            ingredientId: shortage.ingredientId,
+            displayName: shortage.displayName,
+            quantity: shortage.missingQuantity,
+            unit: shortage.unit,
+            baseRevision: 0,
+            crossingKey: "manual-missing:\(shortage.ingredientId)",
+            creates: true
+        )
+        apply(mutation, in: context)
+    }
+
+    @MainActor
+    private static func marketRows(in context: ModelContext) -> [PantryMarketRow] {
+        let items = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
+        return items.map { item in
+            let key = item.ingredientId.hasPrefix("pantry-auto:") || item.ingredientId.hasPrefix("pantry-cook:")
+                ? item.ingredientId
+                : "\(item.ingredientId)|\(GroceryMerger.normalize(item.unit))"
+            return PantryMarketRow(
+                itemKey: key,
+                ingredientId: item.ingredientId,
+                displayName: item.displayName,
+                quantity: item.quantity ?? 0,
+                unit: item.unit,
+                isChecked: item.isChecked,
+                revision: 0
+            )
+        }
+    }
+
+    @MainActor
+    private static func apply(_ mutation: PantryGroceryMutation, in context: ModelContext) {
+        guard mutation.quantity > 0 else { return }
+        let items = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
+        if let match = items.first(where: { $0.ingredientId == mutation.itemKey }) {
+            if match.isChecked { return }
+            match.quantity = mutation.quantity
+            match.unit = mutation.unit
+            try? context.save()
+        } else if let week = try? WeekPlanService.currentWeek(in: context) {
+            let item = GroceryItem(
+                ingredientId: mutation.itemKey,
+                nameTR: mutation.displayName,
+                nameEN: mutation.displayName,
+                quantity: mutation.quantity,
+                unit: mutation.unit,
+                hasUnitConflict: false,
+                isChecked: false,
+                isManual: true
+            )
+            context.insert(item)
+            item.week = week
+            try? context.save()
+        }
+        HouseholdSession.shared.notePantryGrocerySet(
+            itemKey: mutation.itemKey,
+            quantity: mutation.quantity,
+            crossingKey: mutation.crossingKey,
+            in: context
+        )
     }
 }
