@@ -21,6 +21,8 @@ final class RecipeDetailViewModel {
     var portionStatusMessage: String?
     var cookStockMealID: UUID?
     var cookShortages: [PantryCookShortage] = []
+    /// One line after the cook sheet closes. Nil while the sheet is up.
+    var cookNotice: String?
     private var pendingCooked = false
     private var pendingPlannedMealUUID: UUID?
     private var isSavingRating = false
@@ -59,6 +61,7 @@ final class RecipeDetailViewModel {
         defer { isSavingRating = false }
         do {
             if pendingCooked {
+                cookNotice = nil
                 cookStockMealID = try markPendingMealCooked(slug: slug, in: context)
             }
             try WeekPlanService.recordFeedback(
@@ -116,8 +119,14 @@ final class RecipeDetailViewModel {
     func confirmCookStock(needs: [PantryCookNeed], in context: ModelContext) {
         guard let cookStockMealID else { return }
         let outcome = PantryStockSideEffects.confirmCook(mealId: cookStockMealID, needs: needs, in: context)
-        cookShortages = outcome.shortages.filter(\.offerAddMissing)
+        let count = Set(outcome.deductions.map(\.ingredientId)).count
+        cookNotice = count > 0 ? PantryCopy.cookConfirmed(count) : PantryCopy.cookUnchanged
+        cookShortages = []
         self.cookStockMealID = nil
+    }
+
+    func dismissCookNotice() {
+        cookNotice = nil
     }
 
     func addCookShortage(_ shortage: PantryCookShortage, in context: ModelContext) {

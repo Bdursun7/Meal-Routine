@@ -62,7 +62,7 @@ Hâlâ kapsam dışı:
 - Otomatik tarih tahmini
 - Household üye sınırını artırma
 
-V5.0 kuralı, V5.1’de de durur: plan değişikliği stok miktarını sessizce düşürmez. “Pişirdim” tek başına stok düşürmez. Düşüm, kullanıcı tüketim sayfasında “Stoktan düş” derse olur. Reddederse stok değişmez. Ayrıntı bölüm 21.
+V5.0 kuralı, V5.1’de de durur: plan değişikliği stok miktarını sessizce düşürmez. “Pişirdim” tek başına stok düşürmez. Düşüm, kullanıcı “Evdekilerden düş” sayfasında “Düş” derse olur. “Vazgeç” derse stok değişmez. Ayrıntı bölüm 21.
 
 ## 3. Veri sahipliği
 
@@ -208,7 +208,7 @@ Kurallar:
 - Uyumsuz birimlerde otomatik çıkarma yapılmaz.
 - Plan değişince pantry miktarı kendiliğinden azalmaz.
 - Plan öğesini açmak, işaretlemek, market satırını tamamlamak veya planı yeniden kurmak stoktan düşüm yapmaz.
-- “Pişirdim” (`WeekPlanService.markCooked`) pantry miktarını değiştirmez. Puan kaydı iptal edilirse yemek pişmiş sayılmaz ve stok da değişmez. Puan kaydedilip yemek pişmiş işaretlenince tüketim onayı açılır. “Stoktan düşme” stoku olduğu gibi bırakır. “Stoktan düş” bölüm 21’deki kuralı uygular.
+- “Pişirdim” (`WeekPlanService.markCooked`) pantry miktarını değiştirmez. Puan kaydı iptal edilirse yemek pişmiş sayılmaz ve stok da değişmez. Puan kaydedilip yemek pişmiş işaretlenince “Evdekilerden düş” sayfası açılır. “Vazgeç” stoku olduğu gibi bırakır. “Düş” bölüm 21’deki kuralı uygular.
 
 ## 8. Haftalık plan ve scoring
 
@@ -388,7 +388,7 @@ Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 1. Ingredient kimliği `ingredientId`’dir. Çevrilmiş veya görünen ad kimlik değildir.
 2. Birim dönüşümü yalnız desteklenen ve aynı birim ailesindeki dönüşümlerde yapılır.
 3. Plan oluşturmak veya planı değiştirmek kiler stokunu sessizce değiştirmez.
-4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. “Pişirdim” stok yazmaz. Onay sayfasında “Stoktan düş” denirse bölüm 21 uygulanır. “Stoktan düşme” stoku değiştirmez.
+4. Kullanıcı açıkça onaylamadıkça pişirme akışı stok düşmez. “Pişirdim” stok yazmaz. Onay sayfasında “Düş” denirse bölüm 21 uygulanır. “Vazgeç” stoku değiştirmez.
 5. Kullanıcının girdiği tarih uydurulmaz. Tarih tek başına gıda güvenliği kararı üretmez. V5.1’de eski kişisel tarih anı takvim gününe çevrilmez; proje sahibi 2026-10-10’da bu satırların bir kez silinmesini kabul etti (bölüm 13). Ortak kiler tarihi sunucudan yeniden alınır.
 6. V5’te fiyat, bütçe, fiyat geçmişi veya market sağlayıcı entegrasyonu yoktur.
 7. Kişisel kiler, household kilerine otomatik ve sessizce birleştirilmez.
@@ -489,7 +489,7 @@ Kararlar (2026-10-10): hatırlatma cihazın geçerli saat dilimindedir (D1=a). T
 
 ### Onaylı düşüm
 
-Planlı yemek pişmiş işaretlendikten sonra sayfa, tarif satırlarını ve Evdekiler miktarını listeler. Kişisel pantry `householdID == nil` satırlarını, ortak pantry o evin satırlarını kullanır. Red, stok yazmaz. Onay:
+Planlı yemek pişmiş işaretlendikten sonra tek sayfa açılır: başlık “Evdekilerden düş”, “Vazgeç” stok yazmaz, “Düş” onaydır. Sayfa tarif satırlarını ve Evdekiler miktarını listeler. Kişisel pantry `householdID == nil` satırlarını, ortak pantry o evin satırlarını kullanır. “Düşülecek” satırı kapatılırsa o malzeme bu onayda düşülmez. Red, stok yazmaz. Onay:
 
 - Yalnız aynı `ingredientId` (sözlük kanonik kimliği; `tomatoes` ve `tomato` birleşir, `cherry-tomato` birleşmez).
 - Yalnız güvenilir dönüşüm: g/kg ve ml/l. Adet ile gram düşülmez; satır atlanır, stok aynı kalır.
@@ -498,7 +498,7 @@ Planlı yemek pişmiş işaretlendikten sonra sayfa, tarif satırlarını ve Evd
 - Aynı yemek kimliği ikinci kez uygulanırsa düşüm tekrarlanmaz.
 - Ortak satır mevcut outbox’a gider: `Idempotency-Key` `PantryStableUUID.make("cook:<mealId>:<itemId>")`, `baseVersion` düşüm öncesi `version`. 409 `requiresResolution` yolu değişmez.
 
-Eksik miktar, `autoAddToGrocery` kapalıysa markete yazılmaz. Sayfa “Eksik miktarı markete ekle” gösterir. Açıksa tarif eksiği `pantry-cook:<mealId>:<ingredientId>|<unit>` anahtarıyla bir kez yazılır.
+Eksik miktar, `autoAddToGrocery` kapalıysa markete yazılmaz. Yetersiz stok satırı “Eksiği markete ekle” gösterir. Açıksa tarif eksiği `pantry-cook:<mealId>:<ingredientId>|<unit>` anahtarıyla bir kez yazılır.
 
 ### Eşik ve market
 
