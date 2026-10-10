@@ -9,9 +9,9 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | Komut | Sonuç |
 | --- | --- |
 | `cd server && npm run typecheck` | geçti |
-| `cd server && npm test` | 61 geçti, 4 atlandı (Postgres yok) |
-| `cd server && DATABASE_URL=postgres://… npm test` | 65 / 65 geçti, Postgres 16 |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 29 / 29, XCTest, Swift 6.0.3 Linux |
+| `cd server && npm test` | V5.0 kaydı: 61 geçti, 4 atlandı (Postgres yok). V5.1 re-audit bu satırı kullanmaz |
+| `cd server && DATABASE_URL=postgres://… npm test` | 65 / 65 geçti, Postgres 16.15, atlanan yok (2026-10-10, §9) |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 35 / 35, XCTest, Swift 6.0.3 Linux (2026-10-10, §9) |
 | `Tools/run_recommender_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_product_gap_checks.sh`, `run_grocery_checks.sh`, `run_recipe_photo_checks.sh` | geçti |
 | `Tools/run_portion_checks.sh` | geçti. 125 g + 1 kg `1,125 kg` kalır; market yuvarlaması pantry ile aynı binde birlik snap |
 
@@ -27,7 +27,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Uyumlu birimler | pass | 400 g + 1 kg → 1400 g tek satır; g ↔ kg düzenlemesi stoku korur (`testSwitchingGramsToKilogramsKeepsTheSameStock`) |
 | Uyumsuz birimler | pass | Adet gram satırına karışmaz; `confirmSeparate` ile ayrı satır. Bilinmeyen birim `confirmSeparate` ile de reddedilir |
 | Yalnız ingredient kimliği | pass | Sunucu ve istemci `ingredientId` ile eşler. “Domates” / “Cherry domates” ayrı kalır. Sözlük `0012` ile seed edilir. Serbest ad, tekil birebir ad/eş anlamlıysa ona bağlanır; değilse `custom:<uuid>` olur (`testFreeTextLinksOneExactNameAndOtherwiseCreatesACustomIngredient`) |
-| `bestBefore` / `useBy` | V5.1 metni kodda; komut çıktısı audit report’ta. Mac ekran Not verified | Tarih yalnız kullanıcı girerse vardır. Geçmiş `useBy` “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` “Girilen tavsiye edilen tüketim tarihi geçti” rozetini gösterir. Bu cümleler güvenlik veya tazelik hükmü değildir. Planner geçmiş `useBy` stoğa bonus vermez. Ekranda görünüm Mac’te doğrulanır |
+| `bestBefore` / `useBy` | Linux metin Pass; Mac ekran ve SwiftData Not verified | Tarih yalnız kullanıcı girerse vardır ve `YYYY-MM-DD` olarak kalır. Geçmiş `useBy` “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` “Girilen tavsiye edilen tüketim tarihi geçti”. Bu cümleler güvenlik veya tazelik hükmü değildir. Planner geçmiş `useBy` stoğa bonus vermez. Ekran ve SwiftData mağazası Mac’te doğrulanır. Not verified, Pass sayılmaz |
 | Eksik miktar | pass | 1000 g ihtiyaç, 400 g stok → 600 g. Replay aynı gövdeyi döner, stok değişmez. İstemcide iki kez hesaplamak tekrar düşmez (`PantryTests`) |
 | İşaretli market satırı | pass | `checked` satır hesapta aynen kalır (sunucu ve `testIncompatibleUnitsAndCheckedRowsStayAsWritten`) |
 | Sessiz düşüm yok | pass | Plan kurmak ve “Pişirdim” pantry’yi değiştirmez (`testPlanningAndCookingNeverChangePantry…`). Market → evdekiler yalnız “Evdekilerden düş” / “Evdekilere ekle” ile |

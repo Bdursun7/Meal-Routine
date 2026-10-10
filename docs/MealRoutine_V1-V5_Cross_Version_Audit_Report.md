@@ -1,20 +1,21 @@
 # MealRoutine — V1–V5 Cross-Version Audit Report
 
-**Audit date:** 2026-10-10  
-**Code under test:** `V5-Alignment-Audit` `1f07663` (application and server files unchanged)  
-**Docs:** `cursor/v5-alignment-docs-audit-6904`  
-**Specifications reviewed:** `docs/v5-alignment-execution-order.md`, `docs/v5-smart-pantry.md` (aligned this run), `docs/globalization-readiness.md`, `docs/MealRoutine_V1-V5_Cross_Version_Audit.md`, `docs/v5-release-gate.md`, `docs/v5-local-runbook.md`, `docs/v4-household.md`, `docs/v4.1-release-hardening.md`, V1–V3 docs in `docs/`  
-**Auditor:** Cursor cloud agent. No Xcode, no device.  
-**Decision:** `FAIL — V6 blocked`
+**Latest decision (V5.1 re-audit, 2026-10-10):** `FAIL — V6 blocked`  
+**Code under test:** `cursor/v51-integration-readiness-ef13` (commits `7493240` wording, `2bcf807` calendar days). Base is `V5-Alignment-Audit`. `V5.0` was not modified.  
+**Why V6 stays blocked:** `AUD-V5-002` is not `Pass`. The Linux date-only rules passed. The SwiftData upgrade and the DatePicker were not executed. That is **Not verified (Mac)**, and it is not counted as Pass. `AUD-V5-001` string behavior is Pass on Linux. Mac screen rendering of those strings is Not verified (Mac) and is not the Pass.  
+**Accepted exception:** On 2026-10-10 the project owner accepted deleting legacy dated personal rows once, instead of converting them. Spec §2.5 / §4.5, gate §6 “açık istisna”. Recorded in `docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` and §9 below.
 
 ```text
 Open P0 findings: none
-Open P1 findings: AUD-V5-001, AUD-V5-002
-Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-DOC-003, AUD-GLOB-001
-Repository limits: Mac/Xcode/device items are Not verified (Mac). V6 was not started. V5.1 spec was not created.
+Open P1 findings: AUD-V5-002 (SwiftData / DatePicker Not verified (Mac); Linux rules Pass)
+Closed on Linux: AUD-V5-001 (Pass). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
+Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001
+Repository limits: No Xcode, no device. V6 was not started.
 ```
 
 `Not verified` is not `Pass`.
+
+Sections 1–8 below are the audit of `V5-Alignment-Audit` `1f07663` **before** the V5.1 code fix. They are the before evidence. Section 9 is the re-audit after the fix. Where they disagree, section 9 wins.
 
 ## 1. Commands and output
 
@@ -156,7 +157,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 | V5 shortage not deducted; grocery add is explicit | Pass | `compute-missing` returns stored items unchanged (`pantryService.ts:176`). `pantry.test.ts` “computes missing grocery quantities without double-applying a replay” passed. |
 | V5 minimum-stock replenishment twice | Not verified | Feature absent. No duplicate to assert. Absence matches the aligned spec. |
 | V5 date types not conflated | Pass | `pantry.test.ts` “keeps the two date kinds apart and never invents one” passed. Domain `testUseByAndBestBeforeWarnDifferently` passed. |
-| V5 past-date copy is not a safety verdict | Fail | `AUD-V5-001`. |
+| V5 past-date copy is not a safety verdict | Pass on Linux strings; screen Not verified (Mac) | §9. `AUD-V5-001`. The Mac screen is not this Pass. |
 | V5 reminder cancel on edit/delete | Not verified | No reminder records exist. |
 | V5 household pantry sync | Pass on server; client conflict UI Not verified (Mac) | Conflict `409` + `current` covered by `pantry.test.ts` and the integration stale-write assertion. |
 | V5 empty pantry leaves planning | Pass | Domain test `testEmptyPantryKeepsTheV41PlanAndPantryNeverBeatsHardFilters` passed. |
@@ -180,7 +181,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 | Priority | P1 |
 | Fix | In `PantryRowPresentation.make`, replace both past badges with neutral copy that keeps the date type visible and says the entered date is past. Rewrite `PantryCopy.dateFooter` so it does not say the use-by date is for safety. Point `testRowShowsSafetyForUseByAndQualityForBestBefore` at the new strings and assert the banned phrases are absent for past, today, and future `bestBefore` and `useBy`. Adjust the two “last safe day” comments to the same rule. When the strings change, update `docs/v5-release-gate.md:30` and `docs/v5-local-runbook.md:84`, which still describe the old badges as the expected behavior (`AUD-DOC-003`). Do not add reminders or stock automation. |
 | Test | `Tools/run_pantry_domain_tests.sh` after the assertion update. Search the app sources for `Güvenlik uyarısı` and `güvenlik içindir`. |
-| Status | Open |
+| Status | Closed on Linux. See §9. Before behavior is the Actual row above. |
 
 ### AUD-V5-002
 
@@ -195,7 +196,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 | Priority | P1 |
 | Fix | User decision 2026-10-10: Option A. Store the pantry date as a `YYYY-MM-DD` calendar-day value on iOS, matching server `DATE` and the API string. Migration: household cache rows are re-fetched from the server; personal rows (`householdID == nil`) are converted once at upgrade using the device timezone at that moment. Details and the test plan are in §6 and §7. Acceptance test: a date entered as `2026-10-09` stays `2026-10-09` in storage, display, sync payload, and comparisons (past/today/future) after the device timezone changes (Europe/Istanbul → America/Los_Angeles → Pacific/Auckland), for both personal (local) and household (synced) pantry, including existing cached rows. |
 | Test | The acceptance test above. A Linux domain test can cover pure day conversion. SwiftData personal and household rows, and rows already cached as `Date`, need the Mac `PantryTests` path. Server `DATE` already returned `2030-01-05` unchanged in this run. |
-| Status | Open |
+| Status | Not Pass. Linux rules Pass in §9. SwiftData store and DatePicker are Not verified (Mac). |
 
 ### AUD-DOC-001
 
@@ -240,7 +241,7 @@ Searched for `autoAdd`, `dateReminder`, `UNCalendarNotification`, `lowStockNotif
 | Priority | P2 |
 | Fix | Update both sentences in the same change as `AUD-V5-001`, after the strings exist. Listed in that finding’s fix. |
 | Test | `rg "Güvenlik uyarısı" docs` |
-| Status | Open |
+| Status | Closed for `docs/v5-release-gate.md` and `docs/v5-local-runbook.md`. See §9. Other docs may name the phrase only to forbid it or to record this before state. |
 
 ### AUD-GLOB-001
 
@@ -321,10 +322,107 @@ P2 items stay deferred (section 4): `AUD-DOC-001`, `AUD-DOC-002`, `AUD-DOC-003`,
 
 On 2026-10-10 the user promoted `AUD-V5-002` from P2 to P1 and chose **Option A**: store the pantry date as a `YYYY-MM-DD` calendar-day value on iOS, matching the server `DATE` and the API string.
 
-Migration policy, same date: household pantry cache rows are re-fetched from the server (authoritative `DATE`). Personal pantry rows (`householdID == nil`) are converted once at upgrade time using the device’s current timezone at that moment. The fixed-calendar `Date` option is not chosen. The acceptance test and the Option A test plan are in §6.
+The first migration note in this section said personal rows would be converted once with the device time zone at upgrade. That conversion was **not implemented**. Later the same day the project owner accepted an exception (spec §2.5 / §4.5 and §6 “açık istisna”): dated legacy personal rows are deleted once, not converted. Dateless personal rows stay. Household rows are re-fetched. Section 9 records the tests.
 
 ## 8. Gate
 
-V6 must not start. `AUD-V5-001` and `AUD-V5-002` are open. Mac rows are Not verified and do not count as passes. P2 items are not V6 work.
+V6 must not start. `AUD-V5-002` is not Pass, because the SwiftData path is Not verified (Mac). Mac rows are not counted as passes. P2 items are not V6 work.
 
-`MealRoutine_V5.1_Integration_Readiness_Fixes.md` was not added. That file belongs to execution-order step 5.
+`docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` records the exception. The closure evidence is §9.
+
+## 9. V5.1 re-audit
+
+**Date:** 2026-10-10  
+**Host:** Ubuntu 24.04, x86_64. Node v22.22.2 (`npm` v10.9.7). Swift 6.0.3 (swift-6.0.3-RELEASE). PostgreSQL 16.15.  
+**Database:** `DATABASE_URL=postgres://mealroutine:mealroutine@127.0.0.1:5432/mealroutine`  
+**Auditor:** Cursor cloud agent. No Xcode and no device.
+
+### Commands
+
+`cd server && npm run typecheck` exited 0 (`tsc --noEmit`, no output).
+
+`cd server && npm test` with that `DATABASE_URL` exited 0:
+
+```text
+Test Files  14 passed (14)
+     Tests  65 passed (65)
+ Duration  5.56s
+```
+
+The log has no skipped line. `pantry.integration.test.ts` (2) and `integration.test.ts` (2) ran.
+
+| Script | Exit | Tail |
+| --- | --- | --- |
+| `Tools/run_pantry_domain_tests.sh` | 0 | `Executed 35 tests, with 0 failures` |
+| `Tools/run_recommender_checks.sh` | 0 | `meal recommender checks passed` |
+| `Tools/run_household_checks.sh` | 0 | `household checks passed` (existing unused-result warning at `HouseholdLogicChecks.swift:119`) |
+| `Tools/run_memory_checks.sh` | 0 | `meal memory checks passed` |
+| `Tools/run_product_gap_checks.sh` | 0 | `product gap checks passed` |
+| `Tools/run_grocery_checks.sh` | 0 | `grocery merge checks passed` |
+| `Tools/run_recipe_photo_checks.sh` | 0 | `recipe photos: 195 with, 130 without` |
+| `Tools/run_portion_checks.sh` | 0 | `portion scale checks passed` |
+
+`MealRoutineTests/PantryTests` was not run. SwiftUI and SwiftData files were not compiled.
+
+### AUD-V5-001 — before / after
+
+| | Behavior |
+| --- | --- |
+| Before | Past `useBy`: “Güvenlik uyarısı: son tüketim tarihi geçti”. Past `bestBefore`: “Tazelik uyarısı: tavsiye edilen tarih geçti”. Footer said STT is for safety. Comments called `useBy` the last safe day. |
+| After | `PantryCopy.pastUseBy` is “Girilen son tüketim tarihi geçti” (`PantryDomain.swift:62`). `PantryCopy.pastBestBefore` is “Girilen tavsiye edilen tüketim tarihi geçti”. `dateFooter` (`PantryDomain.swift:61`) tells the user to pick the package’s date kind and enter the day as written. `server/src/pantryTypes.ts:6` says neither kind is a food-safety verdict. |
+
+**Closure evidence:** `testRowShowsSafetyForUseByAndQualityForBestBefore` asserts the two new sentences. `testDateCopyDoesNotReturnASafetyVerdict` checks `PantryCopy.userFacing`, both date-type titles, and row text for `useBy` and `bestBefore` across past, today, later, and no date. The banned list is those verdict phrases (`Güvenlik uyarısı`, `Tazelik uyarısı`, `güvenlik içindir`, `son güvenli gün`, `last safe day`, `bu ürün yenmez`, `güvenli değildir`, `güvenlidir`, `yenilmez`). It is not a scan for the word “güven”. Both tests passed in the 35. App Swift sources no longer contain `Güvenlik uyarısı` or `güvenlik içindir`.
+
+**Result:** Pass for the strings.  
+**Not verified (Mac):** `PantryView` drawing the footer and badges. Not counted as Pass.
+
+### AUD-V5-002 — before / after
+
+| | Behavior |
+| --- | --- |
+| Before | Server `DATE` stayed on the calendar day. iOS stored `bestBefore: Date?` and formatted it with `Calendar.current`. Istanbul `2026-10-09` read in `America/Los_Angeles` became `2026-10-08`. |
+| After | New dates are `calendarDay` (`YYYY-MM-DD`). `bestBefore` stays `Date?` so an existing store can open: the old column type is unchanged, and `calendarDay` is a new optional column (nil on old rows). No `VersionedSchema`. Display, past/today/upcoming, and the sync body use the string. A picker `Date` is read with the same calendar that shows the picker, then discarded. |
+
+**How an existing store opens.** SwiftData lightweight migration keeps `bestBefore: Date?` and adds optional `calendarDay`. Changing `bestBefore` from `Date` to `String` would fail to open the store. That change was not made. On launch, `LegacyPersonalPantryDateUpgrade.runIfNeeded` (`RootView.seedCatalog`) deletes personal rows whose date is still that `Date`, then sets `UserDefaults` key `mealroutine.pantry.v51.legacyPersonalDatedRowsRemoved`. A second launch returns immediately. Household rows are not deleted. `PantryItem.apply` / `applyServerDate` writes `PantryHouseholdDate.canonicalDay` and clears `bestBefore`. It does not format the old instant. If `calendarDay` is nil and `bestBefore` is set, `PantryOutboundDate.make` returns `.omit`, and `PantryItemBody` leaves `dateType` and `dateValue` out of the JSON so the server day is not replaced and not cleared.
+
+**Accepted exception, not a conversion.** The matrix row “Eski kişisel kaydın tek seferlik dönüşümü” is removal, not `2026-10-09`. Spec §2.5 / §4.5, gate §6. Owner decision 2026-10-10. Dogfood data loss of those personal rows is accepted. The pure rule is `LegacyPersonalPantryDatePolicy.rowsToDelete`.
+
+**Linux matrix (`testCalendarDayStaysPutAcrossTimeZones`), stored day `2026-10-09`:**
+
+| Scenario | Istanbul | Los Angeles | Auckland | Result |
+| --- | --- | --- | --- | --- |
+| New personal / new household picker round trip and sync `dateValue` | `2026-10-09` | `2026-10-09` | `2026-10-09` | Pass |
+| Display “9 Ekim 2026”; not 8 or 10 October | same | same | same | Pass |
+| Past / today / upcoming against today `2026-10-08`, `2026-10-09`, `2026-10-10`, both date types, and a row with no date | the stored day stays `2026-10-09` | same | same | Pass |
+| Household canonical day from the server string | `2026-10-09` | `2026-10-09` | `2026-10-09` | Pass |
+| Legacy personal one-time conversion | — | — | — | Not this behavior. Removed by the accepted exception. `testLegacyPersonalDatedRowsAreRemovedOnce`: dated personal id is the only delete; dateless personal and both household rows stay; `alreadyRan: true` deletes nothing; a second plan on the kept rows deletes nothing. Pass |
+| Legacy household reload | server string, not the shifted instant | same | same | Pass. The same test shows an Istanbul midnight `Date` formatted in Los Angeles is `2026-10-08`, and `PantryHouseholdDate.canonicalDay` does not return that. `testLegacyHouseholdDateIsNotWrittenBack`: omit drops both date keys; a real day sends `2026-10-09`; a form that did not pick a day on a legacy row returns `.leave`. |
+
+Server `DATE` was already unchanged. `npm test` 65/65 includes the create that returns `dateValue: '2030-01-05'`.
+
+**Result:** Not Pass.  
+**Pass:** the Linux rows in the table.  
+**Not verified (Mac):** `PantryTests.testLegacyPersonalDatedRowsAreRemovedOnceAndHouseholdRowsStay`, `PantryTests.testDateTypeIsStoredWithItsDateAndOldRowsReadAsBestBefore`, opening a real SwiftData store, and the DatePicker in `PantryView`. Not counted as Pass.
+
+### AUD-DOC-003
+
+`docs/v5-release-gate.md` and `docs/v5-local-runbook.md` now quote the neutral sentences. They no longer say the safety and freshness badges are the expected behavior. **Pass** for that finding. `rg "Güvenlik uyarısı" docs` still hits this report (before text), the alignment instruction, and sentences that forbid the phrase. Those are not the release-gate claim.
+
+### Regressions
+
+The eight `Tools/run_*.sh` scripts and the 65 server tests passed on this revision. No new skip. Planner still drops a past `useBy` (`testApproachingDatesSignalButAPassedUseByNeverEarnsABonus` passed). Empty pantry still does not beat hard filters.
+
+### V6 gate (spec §6)
+
+| Gate item | Result |
+| --- | --- |
+| AUD-V5-001 Pass and recorded | Pass for the tested strings. Mac pixels Not verified (Mac), not used as the Pass. |
+| AUD-V5-002 Pass and recorded | Not met. Linux rules Pass. SwiftData / DatePicker Not verified (Mac). |
+| Regression commands run and passed | Met for the Linux commands in this section. |
+| Legacy personal conversion and household refetch verified | Household refetch rule Pass on Linux. Personal path is the accepted delete, Pass as a pure function. SwiftData execution Not verified (Mac). |
+| V5 and Globalization docs match the code | Met for the wording, the `YYYY-MM-DD` rule, and the written exception. |
+| No open P0/P1, or an accepted exception | The delete exception is accepted and written down. `AUD-V5-002` is still not Pass because the Mac store was not run. |
+| Audit report updated; Not verified is not Pass | This section. |
+
+**Decision:** `FAIL — V6 blocked`.
+
