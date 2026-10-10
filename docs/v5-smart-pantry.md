@@ -5,7 +5,7 @@
 **Durum:** Dört durum birbirinin yerine geçmez.
 
 - **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/src/pantryService.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/WeekPlanService.swift`.
-- **Otomatik testle doğrulanmış:** Bu paragraf bir test geçişi iddia etmez. Bu turda koşulan komutlar ve ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir. `docs/v5-release-gate.md` içindeki eski “geçti” satırları, bu turda yeniden üretilmedikçe kanıt değildir.
+- **Otomatik testle doğrulanmış (2026-10-10, Linux):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 31/31 geçti (Swift 6.0.3). Diğer `Tools/run_*.sh` betikleri geçti. Ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir. Bu koşu nötr `useBy` metnini doğrulamaz: `testRowShowsSafetyForUseByAndQualityForBestBefore` “Güvenlik uyarısı” önekini bekleyerek geçti. `docs/v5-release-gate.md` içindeki eski satırlar bu çıktının yerine geçmez.
 - **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
 - **Ürün kabul kapısı kapandı:** Hayır. Kapı, doküman–kod uyumu, geçmiş `useBy` için nötr metin ve platforma özgü iOS kontrolleri doğrulanmadan kapanmaz.
 
