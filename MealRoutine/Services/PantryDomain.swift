@@ -58,7 +58,9 @@ enum PantryCopy {
     static let whichIngredient = "Hangi malzeme?"
     static let ingredientFooter = "Yazdıkça sözlük ve evin malzemeleri önerilir. Öneriye basmazsan ad tek bir malzemeyle birebir örtüşürse ona bağlanır; yoksa yeni malzeme olarak kaydedilir. Benzer adlar birleşmez."
     static let dateSection = "Tarih"
-    static let dateFooter = "Son tüketim tarihi (STT) güvenlik içindir. Tavsiye edilen tüketim tarihi (TETT) tat ve tazelik içindir. Tarih girmezsen uygulama tarih uydurmaz."
+    static let dateFooter = "Pakette yazan tarih türünü seç ve tarihi aynen gir. Tarih girmezsen uygulama tarih uydurmaz."
+    static let pastUseBy = "Girilen son tüketim tarihi geçti"
+    static let pastBestBefore = "Girilen tavsiye edilen tüketim tarihi geçti"
 
     static func separateUnitMessage(existing: String) -> String {
         "Evdekilerde \(existing) var. Birimler birbirine çevrilemiyor; ayrı satır olarak ekleyebilirsin."
@@ -73,6 +75,7 @@ enum PantryCopy {
         transferCopy, transferKeep, covered, computeMissing, showFullNeed, consume, restock, useServer, reapplyMine,
         separateUnit, missingPantry, incompatibleCount, pending, failed, failedMessage, discardFailed, conflictBadge,
         unmatched, lowStock, outOfStock, whichIngredient, ingredientFooter, dateSection, dateFooter,
+        pastUseBy, pastBestBefore,
     ]
 }
 
@@ -86,7 +89,8 @@ enum PantryLocation: String, CaseIterable, Codable, Identifiable, Sendable {
 
 // MARK: - Dates
 
-/// `useBy` is the last safe day; `bestBefore` is quality. They are never shown as the same thing.
+/// Date kind the user copied from the package. `useBy` and `bestBefore` stay distinct.
+/// Neither kind is a food-safety verdict.
 enum PantryDateType: String, Codable, CaseIterable, Identifiable, Sendable {
     case bestBefore
     case useBy
@@ -129,9 +133,9 @@ enum PantryDateStatus: Equatable, Sendable {
     case none
     case upcoming(daysLeft: Int)
     case approaching(daysLeft: Int)
-    /// Safety warning. The app never decides for the user whether the food is still safe.
+    /// The entered use-by day is before today. Not a statement that the food is unsafe.
     case pastUseBy(daysAgo: Int)
-    /// Quality and freshness warning only.
+    /// The entered best-before day is before today. Not a freshness or safety verdict.
     case pastBestBefore(daysAgo: Int)
 
     static let approachingWindowDays = 3
@@ -204,9 +208,9 @@ struct PantryRowPresentation: Equatable, Sendable {
         var badges: [PantryBadge] = []
         switch status {
         case .pastUseBy:
-            badges.append(PantryBadge(text: "Güvenlik uyarısı: son tüketim tarihi geçti", symbol: "exclamationmark.octagon.fill", tone: .critical))
+            badges.append(PantryBadge(text: PantryCopy.pastUseBy, symbol: "exclamationmark.octagon.fill", tone: .critical))
         case .pastBestBefore:
-            badges.append(PantryBadge(text: "Tazelik uyarısı: tavsiye edilen tarih geçti", symbol: "leaf", tone: .warning))
+            badges.append(PantryBadge(text: PantryCopy.pastBestBefore, symbol: "leaf", tone: .warning))
         case .approaching:
             badges.append(type == .useBy
                 ? PantryBadge(text: "Son tüketim tarihi yaklaşıyor", symbol: "clock.badge.exclamationmark", tone: .warning)

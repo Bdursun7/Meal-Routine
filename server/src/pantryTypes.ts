@@ -3,7 +3,7 @@ import type { MemberRole } from './repository.js'
 
 export type PantryLocation = 'pantry' | 'refrigerator' | 'freezer' | 'other'
 
-/** `useBy` is the real last safe day; `bestBefore` is quality. The server never derives one. */
+/** Date kind the user copied from the package. `useBy` and `bestBefore` stay distinct. Neither kind is a food-safety verdict. The server never derives one. */
 export type PantryDateType = 'bestBefore' | 'useBy'
 
 export interface PantryItem {

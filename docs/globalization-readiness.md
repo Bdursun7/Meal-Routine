@@ -144,7 +144,7 @@ These bullets are audit targets. They are not claims that the current code has p
 - Pantry records reference `ingredientId`, not localized display name.
 - Quantity and unit are structured; conversion only occurs within supported compatible unit families. Language or country is not a conversion rule.
 - `bestBefore` and `useBy` are distinct date types. `dateValue` is date-only (`YYYY-MM-DD` / SQL `DATE`), not a UTC instant, and must not shift by a timezone conversion.
-- User-entered dates are never invented or inferred from country or ingredient. A date is not a food-safety decision.
+- User-entered dates are never invented or inferred from country or ingredient. A date is not a food-safety decision. Past-date UI names the entered kind and that the entered day is past (`Girilen son tüketim tarihi geçti`, `Girilen tavsiye edilen tüketim tarihi geçti`). It does not use a safety or freshness verdict such as “Güvenlik uyarısı” or “Tazelik uyarısı”.
 - V5.0 does not implement date reminders, low-stock notifications, or automatic add-to-grocery. Do not describe those as implemented features. If a later version adds reminders, that version must define household timezone, device notification permission, reschedule and cancel rules, idempotency, and tests. Notification copy must stay a reminder, not a food-safety guarantee.
 - V5.0 does not deduct pantry stock when a meal is planned or marked cooked. Stock changes only by an explicit user action. A cook-confirmation deduct flow is not a V5.0 feature.
 - `minimumQuantity` is an optional threshold on the row. In V5.0 it does not create a grocery line.

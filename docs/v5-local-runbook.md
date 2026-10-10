@@ -81,7 +81,7 @@ Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövde
 `MARKETING_VERSION` `5.0.0`. Evdekiler, Profil’den açılır.
 
 - Malzeme adı serbest yazılır. Öneriler sözlük adı, eş anlamlı ve evin özel malzemeleridir. Öneriye basılmazsa tekil birebir eşleşme bağlanır; yoksa `custom:<uuid>` oluşur. İkinci onay yoktur. “Domates” ile “Cherry domates” birleşmez.
-- Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince güvenlik uyarısı, “Tavsiye edilen tüketim tarihi (TETT)” geçince tazelik uyarısı görünür.
+- Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince “Girilen son tüketim tarihi geçti”, “Tavsiye edilen tüketim tarihi (TETT)” geçince “Girilen tavsiye edilen tüketim tarihi geçti” görünür. Bu satırlar paketteki türü ve tarihin geçmiş olduğunu söyler; gıdanın güvenli olup olmadığına karar vermez.
 - Market’te “Eksik miktarı hesapla”, satırda “Evdekilerden düş” ve “Evdekilere ekle” vardır. Plan kurmak ve “Pişirdim” stoğu değiştirmez.
 - “Bitti” seçenek ister; seçilmeden ya da İptal ile stok değişmez.
 - Household yazımları önce telefona yazılır, sonra kuyruktan gönderilir. Çevrimdışıyken satırda “Eşitlenmeyi bekliyor” görünür. Çakışmada “Bu malzeme başka bir cihazda güncellendi.” ve iki seçenek çıkar.

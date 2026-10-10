@@ -107,7 +107,7 @@ final class PantryDomainTests: XCTestCase {
             minimumQuantity: nil, dateType: .useBy, dateValue: day("2026-10-06"), now: now, calendar: utc
         )
         XCTAssertEqual(safety.badges.first?.tone, .critical)
-        XCTAssertTrue(safety.badges.first?.text.hasPrefix("Güvenlik uyarısı") == true)
+        XCTAssertEqual(safety.badges.first?.text, PantryCopy.pastUseBy)
         XCTAssertTrue(safety.date?.hasPrefix("Son tüketim tarihi (STT)") == true)
 
         let quality = PantryRowPresentation.make(
@@ -115,9 +115,67 @@ final class PantryDomainTests: XCTestCase {
             minimumQuantity: nil, dateType: .bestBefore, dateValue: day("2026-10-06"), now: now, calendar: utc
         )
         XCTAssertEqual(quality.badges.first?.tone, .warning)
-        XCTAssertTrue(quality.badges.first?.text.hasPrefix("Tazelik uyarısı") == true)
-        XCTAssertFalse(quality.badges.contains { $0.text.contains("Güvenlik") })
+        XCTAssertEqual(quality.badges.first?.text, PantryCopy.pastBestBefore)
         XCTAssertTrue(quality.date?.hasPrefix("Tavsiye edilen tüketim tarihi (TETT)") == true)
+        assertNoSafetyVerdict(in: [safety, quality])
+    }
+
+    /// User-facing pantry date copy only: `PantryCopy`, the two date-type titles, and the
+    /// row text for both types across past, today, and later days. This is not a scan of
+    /// every word that happens to contain "güven".
+    func testDateCopyDoesNotReturnASafetyVerdict() {
+        let phrases = [
+            "Güvenlik uyarısı",
+            "Tazelik uyarısı",
+            "güvenlik içindir",
+            "son güvenli gün",
+            "last safe day",
+            "bu ürün yenmez",
+            "güvenli değildir",
+            "güvenlidir",
+            "yenilmez",
+        ]
+        var texts = PantryCopy.userFacing
+        texts.append(contentsOf: PantryDateType.allCases.flatMap { [$0.title, $0.shortTitle] })
+        let now = day("2026-10-09")
+        let samples = ["2026-10-08", "2026-10-09", "2026-10-10", "2026-10-20"]
+        for type in [PantryDateType.useBy, PantryDateType.bestBefore] {
+            for sample in samples {
+                let row = PantryRowPresentation.make(
+                    name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
+                    minimumQuantity: nil, dateType: type, dateValue: day(sample), now: now, calendar: utc
+                )
+                texts.append(contentsOf: row.badges.map { $0.text })
+                if let date = row.date { texts.append(date) }
+                texts.append(row.accessibilityLabel)
+            }
+        }
+        let undated = PantryRowPresentation.make(
+            name: "Tuz", ingredientResolved: true, quantity: 1, unit: "kg", location: .pantry,
+            minimumQuantity: nil, dateType: nil, dateValue: nil, now: now, calendar: utc
+        )
+        texts.append(contentsOf: undated.badges.map { $0.text })
+        texts.append(undated.accessibilityLabel)
+        for text in texts {
+            for phrase in phrases {
+                XCTAssertFalse(text.localizedCaseInsensitiveContains(phrase), "\(phrase) in \(text)")
+            }
+        }
+        XCTAssertEqual(PantryCopy.pastUseBy, "Girilen son tüketim tarihi geçti")
+        XCTAssertEqual(PantryCopy.pastBestBefore, "Girilen tavsiye edilen tüketim tarihi geçti")
+        XCTAssertFalse(PantryCopy.dateFooter.localizedCaseInsensitiveContains("güvenlik"))
+    }
+
+    private func assertNoSafetyVerdict(in rows: [PantryRowPresentation]) {
+        let banned = ["Güvenlik uyarısı", "Tazelik uyarısı", "güvenlik içindir", "son güvenli gün"]
+        for row in rows {
+            let texts = row.badges.map { $0.text } + [row.date ?? "", row.accessibilityLabel]
+            for text in texts {
+                for phrase in banned {
+                    XCTAssertFalse(text.localizedCaseInsensitiveContains(phrase), phrase)
+                }
+            }
+        }
     }
 
     func testRowListsEveryGuideFieldAndSpeaksThem() {

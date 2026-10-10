@@ -5,7 +5,7 @@
 **Durum:** Dört durum birbirinin yerine geçmez.
 
 - **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/src/pantryService.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/WeekPlanService.swift`.
-- **Otomatik testle doğrulanmış (2026-10-10, Linux):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 31/31 geçti (Swift 6.0.3). Diğer `Tools/run_*.sh` betikleri geçti. Ham çıktı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir. Bu koşu nötr `useBy` metnini doğrulamaz: `testRowShowsSafetyForUseByAndQualityForBestBefore` “Güvenlik uyarısı” önekini bekleyerek geçti. `docs/v5-release-gate.md` içindeki eski satırlar bu çıktının yerine geçmez.
+- **Otomatik testle doğrulanmış (2026-10-10, Linux, V5.0 denetimi):** `cd server && npm test` Postgres 16.15 ile 65/65 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 31/31 geçti (Swift 6.0.3). Diğer `Tools/run_*.sh` betikleri geçti. O koşunun ham çıktısı `docs/MealRoutine_V1-V5_Cross_Version_Audit_Report.md` içindedir ve nötr tarih metnini kapsamaz: o sürümdeki test “Güvenlik uyarısı” önekini bekliyordu. V5.1 kodu bu öneki kaldırdı. V5.1 komut çıktısı aynı raporda, bu cümlenin yerine geçecek şekilde yenilenir; bu paragraf tek başına V5.1 testinin geçtiği anlamına gelmez.
 - **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
 - **Ürün kabul kapısı kapandı:** Hayır. Kapı, doküman–kod uyumu, geçmiş `useBy` için nötr metin ve platforma özgü iOS kontrolleri doğrulanmadan kapanmaz.
 
@@ -165,7 +165,7 @@ Liste satırı şunları gösterir:
 - Tarih varsa türün adı ve takvim günü
 - Tarih geçmişse nötr durum: girilen tarihin geçmiş olduğu. Tür (`bestBefore` veya `useBy`) ayrıca görünür. Metin gıdanın güvenli veya güvensiz olduğuna karar vermez.
 
-V5.0 kodu bu nötr metne henüz uymaz. Satır, geçmiş `useBy` için “Güvenlik uyarısı: son tüketim tarihi geçti” ve geçmiş `bestBefore` için “Tazelik uyarısı: tavsiye edilen tarih geçti” yazar (`PantryRowPresentation.make`, `MealRoutine/Services/PantryDomain.swift`). Form alt yazısı “Son tüketim tarihi (STT) güvenlik içindir” der (`PantryCopy.dateFooter`). Bu metinler kabul kapısını kapatmaz. Düzeltme uygulama kodundadır; bu belge o düzeltmeyi yapmış sayılmaz.
+Geçmiş `useBy` rozeti “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` rozeti “Girilen tavsiye edilen tüketim tarihi geçti” (`PantryCopy.pastUseBy`, `PantryCopy.pastBestBefore`). Form alt yazısı paket üzerindeki tarih türünü seçip tarihi aynen girmeyi söyler (`PantryCopy.dateFooter`). “Güvenlik uyarısı”, “Tazelik uyarısı” ve “STT güvenlik içindir” kullanıcıya dönük metin değildir.
 
 ### Boş durum
 
@@ -407,7 +407,7 @@ SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. `Pa
 
 ### Faz 4 — Pantry UI
 
-Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş `useBy` metni bölüm 6’daki nötr kurala uymaz. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
+Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. Bildirim izni ve hatırlatma tercihleri V5.0’da yoktur.
 
 ### Faz 5 — Market entegrasyonu
 
