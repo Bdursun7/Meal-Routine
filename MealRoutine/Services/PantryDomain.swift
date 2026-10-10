@@ -112,20 +112,63 @@ enum PantryDateType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Calendar days as the server stores them (`YYYY-MM-DD`), read in the phone's own time zone.
+/// Calendar days as `YYYY-MM-DD`. The stored value is the string. A `Date` exists only
+/// at the date-picker edge, and it is read back with the same calendar that built it.
 enum PantryDay {
+    /// Fixed calendar for comparing two calendar-day strings. Not the device zone.
+    private static let comparison: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        if let zone = TimeZone(secondsFromGMT: 0) {
+            calendar.timeZone = zone
+        }
+        return calendar
+    }()
+
+    /// `YYYY-MM-DD` when `text` is that day and a real Gregorian date. Otherwise nil.
+    static func canonical(_ text: String?) -> String? {
+        guard let text, text.count == 10 else { return nil }
+        guard date(from: text, calendar: comparison) != nil else { return nil }
+        return text
+    }
+
+    /// Day count used only to compare two canonical days. Nil when the text is not a day.
+    static func ordinal(_ text: String) -> Int? {
+        guard let date = date(from: text, calendar: comparison) else { return nil }
+        return comparison.ordinality(of: .day, in: .era, for: date)
+    }
+
+    static func isBefore(_ lhs: String, _ rhs: String) -> Bool {
+        guard let left = ordinal(lhs), let right = ordinal(rhs) else { return false }
+        return left < right
+    }
+
+    /// Year-month-day of a picker `Date`, using `calendar`. Call this with the calendar
+    /// that is showing the picker, then store the string. Do not store the `Date`.
     static func string(from date: Date, calendar: Calendar = .current) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
+    /// Temporary picker value for a stored day. Built in `calendar` so the picker shows that day.
     static func date(from text: String, calendar: Calendar = .current) -> Date? {
-        let pieces = text.prefix(10).split(separator: "-").compactMap { Int($0) }
-        guard pieces.count == 3 else { return nil }
+        let pieces = text.split(separator: "-").compactMap { Int($0) }
+        guard text.count == 10, pieces.count == 3 else { return nil }
         var parts = DateComponents()
-        parts.year = pieces[0]; parts.month = pieces[1]; parts.day = pieces[2]
-        guard let date = calendar.date(from: parts), string(from: date, calendar: calendar) == String(text.prefix(10)) else { return nil }
+        parts.year = pieces[0]
+        parts.month = pieces[1]
+        parts.day = pieces[2]
+        guard let date = calendar.date(from: parts), string(from: date, calendar: calendar) == text else { return nil }
         return date
+    }
+
+    static func format(_ day: String, calendar: Calendar) -> String {
+        guard let date = date(from: day, calendar: calendar) else { return day }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: date)
     }
 }
 
@@ -140,11 +183,10 @@ enum PantryDateStatus: Equatable, Sendable {
 
     static let approachingWindowDays = 3
 
-    static func evaluate(type: PantryDateType?, date: Date?, now: Date, calendar: Calendar = .current) -> PantryDateStatus {
-        guard let date else { return .none }
-        let start = calendar.startOfDay(for: now)
-        let day = calendar.startOfDay(for: date)
-        let distance = calendar.dateComponents([.day], from: start, to: day).day ?? 0
+    /// `day` and `today` are `YYYY-MM-DD`. The device time zone does not change either string.
+    static func evaluate(type: PantryDateType?, day: String?, today: String) -> PantryDateStatus {
+        guard let day, let dayNumber = PantryDay.ordinal(day), let todayNumber = PantryDay.ordinal(today) else { return .none }
+        let distance = dayNumber - todayNumber
         if distance < 0 {
             return (type ?? .bestBefore) == .useBy ? .pastUseBy(daysAgo: -distance) : .pastBestBefore(daysAgo: -distance)
         }
@@ -153,6 +195,103 @@ enum PantryDateStatus: Equatable, Sendable {
 
     var isPastUseBy: Bool { if case .pastUseBy = self { return true }; return false }
     var isApproaching: Bool { if case .approaching = self { return true }; return false }
+}
+
+/// What a household write may do with the date. A legacy instant is not turned into a day.
+enum PantryOutboundDate: Equatable, Sendable {
+    case send(type: PantryDateType?, day: String?)
+    case omit
+
+    var sendsDate: Bool {
+        if case .omit = self { return false }
+        return true
+    }
+
+    var dateType: PantryDateType? {
+        if case .send(let type, _) = self { return type }
+        return nil
+    }
+
+    var dateValue: String? {
+        if case .send(_, let day) = self { return day }
+        return nil
+    }
+
+    /// `calendarDay` is the stored `YYYY-MM-DD`. `hasLegacyInstant` means the old `Date` column is set.
+    static func make(calendarDay: String?, dateType: PantryDateType?, hasLegacyInstant: Bool) -> PantryOutboundDate {
+        if let day = PantryDay.canonical(calendarDay), let dateType {
+            return .send(type: dateType, day: day)
+        }
+        if hasLegacyInstant {
+            return .omit
+        }
+        return .send(type: nil, day: nil)
+    }
+}
+
+/// Household cache dates come from the server string. The old local instant is not an input.
+enum PantryHouseholdDate {
+    static func canonicalDay(serverDateValue: String?) -> String? {
+        PantryDay.canonical(serverDateValue)
+    }
+}
+
+/// One personal row as the upgrade step sees it. No `Date`, so the step cannot guess a day.
+struct LegacyPersonalPantryDateRow: Equatable, Sendable {
+    var id: UUID
+    var isPersonal: Bool
+    var hasLegacyDateInstant: Bool
+}
+
+/// Deletes personal rows whose date is still the old `Date`. Dateless personal rows stay.
+/// Household rows stay. A second call with `alreadyRan` deletes nothing.
+enum LegacyPersonalPantryDatePolicy {
+    static let markerKey = "mealroutine.pantry.v51.legacyPersonalDatedRowsRemoved"
+
+    static func rowsToDelete(_ rows: [LegacyPersonalPantryDateRow], alreadyRan: Bool) -> Set<UUID> {
+        guard !alreadyRan else { return [] }
+        var ids = Set<UUID>()
+        for row in rows where row.isPersonal && row.hasLegacyDateInstant {
+            ids.insert(row.id)
+        }
+        return ids
+    }
+}
+
+/// Date the form loaded. `.legacyInstant` is a household row not yet replaced by the server day.
+enum PantryDateAuthority: Equatable, Sendable {
+    case day(PantryDateType, String)
+    case none
+    case legacyInstant
+}
+
+/// What save does with the date. `.leave` does not clear and does not invent a day.
+enum PantryDateEdit: Equatable, Sendable {
+    case set(PantryDateType, String)
+    case clear
+    case leave
+
+    var storedType: PantryDateType? {
+        if case .set(let type, _) = self { return type }
+        return nil
+    }
+
+    var storedDay: String? {
+        if case .set(_, let day) = self { return day }
+        return nil
+    }
+}
+
+enum PantryDateForm {
+    static func edit(authority: PantryDateAuthority, hasDate: Bool, type: PantryDateType, pickedDay: String?) -> PantryDateEdit {
+        if hasDate, let day = PantryDay.canonical(pickedDay) {
+            return .set(type, day)
+        }
+        if case .legacyInstant = authority {
+            return .leave
+        }
+        return .clear
+    }
 }
 
 // MARK: - Row presentation
@@ -194,16 +333,18 @@ struct PantryRowPresentation: Equatable, Sendable {
         location: PantryLocation,
         minimumQuantity: Double?,
         dateType: PantryDateType?,
-        dateValue: Date?,
+        dateValue: String?,
         sync: PantrySyncMark = .synced,
-        now: Date = .now,
+        today: String,
         calendar: Calendar = .current
     ) -> PantryRowPresentation {
         let amount = QuantityFormat.quantityAndUnit(quantity: quantity, unit: unit)
         let minimum = minimumQuantity.map { "Minimum \(QuantityFormat.quantityAndUnit(quantity: $0, unit: unit))" }
-        let status = PantryDateStatus.evaluate(type: dateType, date: dateValue, now: now, calendar: calendar)
+        let status = PantryDateStatus.evaluate(type: dateType, day: dateValue, today: today)
         let type = dateType ?? .bestBefore
-        let dateText = dateValue.map { "\(type.title): \(dayText($0, calendar: calendar))\(relativeSuffix(status))" }
+        let dateText = dateValue.flatMap { day in
+            PantryDay.canonical(day).map { "\(type.title): \(PantryDay.format($0, calendar: calendar))\(relativeSuffix(status))" }
+        }
 
         var badges: [PantryBadge] = []
         switch status {
@@ -233,7 +374,7 @@ struct PantryRowPresentation: Equatable, Sendable {
         case .failed: badges.append(PantryBadge(text: PantryCopy.failed, symbol: "xmark.icloud", tone: .critical))
         }
 
-        let spoken = [name, amount, location.title, minimum, dateText].compactMap { $0 } + badges.map(\.text)
+        let spoken = [name, amount, location.title, minimum, dateText].compactMap { $0 } + badges.map { $0.text }
         return PantryRowPresentation(
             title: name,
             amount: amount,
@@ -243,15 +384,6 @@ struct PantryRowPresentation: Equatable, Sendable {
             badges: badges,
             accessibilityLabel: spoken.joined(separator: ", ")
         )
-    }
-
-    private static func dayText(_ date: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "d MMMM yyyy"
-        return formatter.string(from: date)
     }
 
     private static func relativeSuffix(_ status: PantryDateStatus) -> String {
@@ -670,6 +802,8 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
     var minimumQuantity: Double?
     var dateType: PantryDateType?
     var dateValue: String?
+    /// When false, the server body omits the date keys so a legacy instant is not written back.
+    var sendsDate: Bool
     var version: Int
     var createdAt: Date?
     var updatedAt: Date?
@@ -686,6 +820,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         dateType: PantryDateType?,
         dateValue: String?,
         version: Int,
+        sendsDate: Bool = true,
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -699,6 +834,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         self.minimumQuantity = minimumQuantity
         self.dateType = dateType
         self.dateValue = dateValue
+        self.sendsDate = sendsDate
         self.version = version
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -706,7 +842,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, householdId, ingredientId, displayName, quantity, unit, location, minimumQuantity
-        case dateType, dateValue, version, createdAt, updatedAt
+        case dateType, dateValue, sendsDate, version, createdAt, updatedAt
         case bestBefore, revision
     }
 
@@ -731,6 +867,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
             dateValue = nil
             dateType = nil
         }
+        sendsDate = try container.decodeIfPresent(Bool.self, forKey: .sendsDate) ?? true
         version = try container.decodeIfPresent(Int.self, forKey: .version)
             ?? container.decodeIfPresent(Int.self, forKey: .revision)
             ?? 1
@@ -752,6 +889,7 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
         try container.encodeIfPresent(minimumQuantity, forKey: .minimumQuantity)
         try container.encodeIfPresent(dateType, forKey: .dateType)
         try container.encodeIfPresent(dateValue, forKey: .dateValue)
+        if sendsDate == false { try container.encode(false, forKey: .sendsDate) }
         try container.encode(version, forKey: .version)
         if let createdAt { try container.encode(PantryServerClock.string(from: createdAt), forKey: .createdAt) }
         if let updatedAt { try container.encode(PantryServerClock.string(from: updatedAt), forKey: .updatedAt) }
@@ -759,7 +897,8 @@ struct PantryRemoteItem: Codable, Equatable, Sendable {
 }
 
 /// Body for `POST .../pantry/items` and `PATCH .../pantry/items/:id`. The server schema is strict:
-/// `householdId`, `version` and timestamps are never sent, and cleared fields are sent as `null`.
+/// `householdId`, `version` and timestamps are never sent, and a cleared date is sent as `null`.
+/// `sendsDate == false` omits the date keys so a legacy instant is not written back.
 struct PantryItemBody: Encodable, Equatable, Sendable {
     var id: UUID?
     var ingredientId: String
@@ -771,6 +910,8 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
     var dateType: PantryDateType?
     var dateValue: String?
     var confirmSeparate: Bool?
+    /// Local only. Not a server field. False omits `dateType` and `dateValue` from the body.
+    var sendsDate: Bool = true
 
     static func create(_ item: PantryRemoteItem, confirmSeparate: Bool) -> PantryItemBody {
         PantryItemBody(
@@ -781,9 +922,10 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
             unit: item.unit,
             location: item.location,
             minimumQuantity: item.minimumQuantity,
-            dateType: item.dateValue == nil ? nil : item.dateType,
-            dateValue: item.dateType == nil ? nil : item.dateValue,
-            confirmSeparate: confirmSeparate ? true : nil
+            dateType: item.sendsDate && item.dateValue != nil ? item.dateType : nil,
+            dateValue: item.sendsDate && item.dateType != nil ? item.dateValue : nil,
+            confirmSeparate: confirmSeparate ? true : nil,
+            sendsDate: item.sendsDate
         )
     }
 
@@ -806,8 +948,10 @@ struct PantryItemBody: Encodable, Equatable, Sendable {
         try container.encode(unit, forKey: .unit)
         try container.encode(location, forKey: .location)
         try container.encode(minimumQuantity, forKey: .minimumQuantity)
-        try container.encode(dateType, forKey: .dateType)
-        try container.encode(dateValue, forKey: .dateValue)
+        if sendsDate {
+            try container.encode(dateType, forKey: .dateType)
+            try container.encode(dateValue, forKey: .dateValue)
+        }
         try container.encodeIfPresent(confirmSeparate, forKey: .confirmSeparate)
     }
 }
@@ -1115,7 +1259,9 @@ struct PantryFormDraft: Equatable {
     var minimumText: String
     var hasDate: Bool
     var dateType: PantryDateType
+    /// Picker value only. The saved day is `pickedDay`, not this instant.
     var date: Date
+    var dateAuthority: PantryDateAuthority
 
     static let empty = PantryFormDraft(
         ingredientId: nil,
@@ -1130,7 +1276,8 @@ struct PantryFormDraft: Equatable {
         minimumText: "",
         hasDate: false,
         dateType: .bestBefore,
-        date: Date(timeIntervalSince1970: 0)
+        date: Date(timeIntervalSince1970: 0),
+        dateAuthority: .none
     )
 
     static func loaded(
@@ -1141,12 +1288,15 @@ struct PantryFormDraft: Equatable {
         location: PantryLocation,
         minimumQuantity: Double?,
         dateType: PantryDateType? = nil,
-        dateValue: Date? = nil,
+        dateValue: String? = nil,
+        dateAuthority: PantryDateAuthority = .none,
         dictionary: IngredientDictionary = .shared,
-        now: Date = .now
+        now: Date = .now,
+        calendar: Calendar = .current
     ) -> PantryFormDraft {
         var draft = empty
         draft.date = now
+        draft.dateAuthority = dateAuthority
         draft.ingredientId = ingredientId.flatMap { dictionary.canonicalId($0) }
         draft.name = name
         draft.anchorName = name
@@ -1163,12 +1313,23 @@ struct PantryFormDraft: Equatable {
             draft.hasMinimum = true
             draft.minimumText = QuantityFormat.string(minimumQuantity)
         }
-        if let dateValue {
+        if let day = PantryDay.canonical(dateValue), let picked = PantryDay.date(from: day, calendar: calendar) {
             draft.hasDate = true
             draft.dateType = dateType ?? .bestBefore
-            draft.date = dateValue
+            draft.date = picked
+            draft.dateAuthority = .day(draft.dateType, day)
         }
         return draft
+    }
+
+    /// The calendar day the picker is showing, read with the same calendar the picker uses.
+    func pickedDay(calendar: Calendar = .current) -> String? {
+        guard hasDate else { return nil }
+        return PantryDay.canonical(PantryDay.string(from: date, calendar: calendar))
+    }
+
+    func dateEdit(calendar: Calendar = .current) -> PantryDateEdit {
+        PantryDateForm.edit(authority: dateAuthority, hasDate: hasDate, type: dateType, pickedDay: pickedDay(calendar: calendar))
     }
 
     mutating func choose(_ entry: IngredientEntry, isNewCustom: Bool) {
@@ -1219,10 +1380,11 @@ extension PantryPlanningSignal {
         candidate: PickerCandidate,
         stock: [PantryPlanningStock],
         now: Date = .now,
+        calendar: Calendar = .current,
         dictionary: IngredientDictionary = .shared
     ) -> String? {
         guard !stock.isEmpty else { return nil }
-        let matches = usable(stock, now: now, dictionary: dictionary).filter { candidateKeys(candidate, dictionary).contains($0.key) }
+        let matches = usable(stock, now: now, calendar: calendar, dictionary: dictionary).filter { candidateKeys(candidate, dictionary).contains($0.key) }
         guard !matches.isEmpty else { return nil }
         if matches.contains(where: { $0.status.isApproaching }) {
             return PantryCopy.approachingExpiry
@@ -1235,10 +1397,11 @@ extension PantryPlanningSignal {
         candidates: [PickerCandidate],
         stock: [PantryPlanningStock],
         now: Date = .now,
+        calendar: Calendar = .current,
         dictionary: IngredientDictionary = .shared
     ) -> String {
         guard !stock.isEmpty else { return explanation }
-        let notes = candidates.compactMap { self.explanation(candidate: $0, stock: stock, now: now, dictionary: dictionary) }
+        let notes = candidates.compactMap { self.explanation(candidate: $0, stock: stock, now: now, calendar: calendar, dictionary: dictionary) }
         guard let note = notes.first(where: { $0 == PantryCopy.approachingExpiry }) ?? notes.first else { return explanation }
         if explanation.isEmpty { return note }
         return "\(explanation) \(note)"

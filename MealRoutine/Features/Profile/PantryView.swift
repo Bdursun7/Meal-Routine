@@ -11,8 +11,7 @@ struct PantryFormResult: Equatable, Identifiable {
     var unit: String
     var location: PantryLocation
     var minimum: Double?
-    var dateType: PantryDateType?
-    var dateValue: Date?
+    var dateEdit: PantryDateEdit
 
     var id: String { "\(ingredientId)|\(unit)" }
 }
@@ -246,7 +245,8 @@ struct PantryView: View {
             minimumQuantity: item.minimumQuantity,
             dateType: item.dateType,
             dateValue: item.dateValue,
-            sync: marks[item.uuid.uuidString.lowercased()] ?? .synced
+            sync: marks[item.uuid.uuidString.lowercased()] ?? .synced,
+            today: PantryDay.string(from: Date(), calendar: .current)
         )
     }
 
@@ -344,8 +344,12 @@ struct PantryView: View {
                 match.minimumQuantity = PantryUnitPolicy.converted(minimum, from: result.unit, to: storedUnit) ?? minimum
             }
             // Merged stock keeps the earlier date so a warning is never hidden by the newer pack.
-            if let type = result.dateType, let value = result.dateValue, match.dateValue.map({ value < $0 }) ?? true {
-                match.setDate(type, value)
+            if case .set(let type, let value) = result.dateEdit {
+                if let current = match.dateValue {
+                    if PantryDay.isBefore(value, current) { match.setDate(type, value) }
+                } else {
+                    match.setDate(type, value)
+                }
             }
             match.revision += 1
             match.updatedAt = .now
@@ -360,8 +364,8 @@ struct PantryView: View {
                 unit: UnitNormalization.parse(result.unit).code,
                 location: result.location,
                 minimumQuantity: result.minimum,
-                dateType: result.dateType,
-                dateValue: result.dateValue
+                dateType: result.dateEdit.storedType,
+                dateValue: result.dateEdit.storedDay
             )
             modelContext.insert(item)
             try? modelContext.save()
@@ -396,7 +400,14 @@ struct PantryView: View {
         item.unit = UnitNormalization.parse(result.unit).code
         item.location = result.location
         item.minimumQuantity = result.minimum
-        item.setDate(result.dateType, result.dateValue)
+        switch result.dateEdit {
+        case .set(let type, let day):
+            item.setDate(type, day)
+        case .clear:
+            item.setDate(nil, nil)
+        case .leave:
+            break
+        }
         item.revision += 1
         item.updatedAt = .now
         try? modelContext.save()
@@ -761,7 +772,8 @@ private struct PantryForm: View {
             location: item.location,
             minimumQuantity: item.minimumQuantity,
             dateType: item.dateType,
-            dateValue: item.dateValue
+            dateValue: item.dateValue,
+            dateAuthority: item.dateAuthority
         )
     }
 
@@ -871,8 +883,7 @@ private struct PantryForm: View {
             unit: draft.unit,
             location: draft.location,
             minimum: draft.minimumToSave,
-            dateType: draft.hasDate ? draft.dateType : nil,
-            dateValue: draft.hasDate ? Calendar.current.startOfDay(for: draft.date) : nil
+            dateEdit: draft.dateEdit(calendar: .current)
         ))
         dismiss()
     }

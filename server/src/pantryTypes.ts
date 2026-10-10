@@ -16,6 +16,7 @@ export interface PantryItem {
   location: PantryLocation
   minimumQuantity: number | null
   dateType: PantryDateType | null
+  /** Calendar day `YYYY-MM-DD`. Not an instant, and not shifted by a time zone. */
   dateValue: string | null
   version: number
   createdAt: string

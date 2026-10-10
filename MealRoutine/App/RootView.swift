@@ -102,6 +102,7 @@ struct RootView: View {
     private func seedCatalog() async {
         isSeeding = true
         seedError = nil
+        LegacyPersonalPantryDateUpgrade.runIfNeeded(in: modelContext)
         do {
             try await RecipeSeedService.seedIfNeeded(context: modelContext)
             try CatalogIndexCache.warm(in: modelContext)

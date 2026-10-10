@@ -37,7 +37,7 @@ struct PantryPlanningStock: Equatable, Sendable {
     var quantity: Double
     var unit: String
     var dateType: PantryDateType? = nil
-    var dateValue: Date? = nil
+    var dateValue: String? = nil
 }
 
 enum PantryPlanningSignal {
@@ -52,20 +52,27 @@ enum PantryPlanningSignal {
         candidate: PickerCandidate,
         stock: [PantryPlanningStock],
         now: Date = .now,
+        calendar: Calendar = .current,
         dictionary: IngredientDictionary = .shared
     ) -> Int {
         guard !stock.isEmpty else { return 0 }
-        let keys = Set(usable(stock, now: now, dictionary: dictionary).map(\.key))
+        let keys = Set(usable(stock, now: now, calendar: calendar, dictionary: dictionary).map { $0.key })
         let matches = candidateKeys(candidate, dictionary).intersection(keys).count
         return min(24, matches * 8)
     }
 
     /// Stock that may earn a bonus. Unresolved ids never match, and a passed use-by date
     /// is never something the planner nudges the household toward.
-    static func usable(_ stock: [PantryPlanningStock], now: Date, dictionary: IngredientDictionary) -> [UsableStock] {
-        stock.compactMap { line in
+    static func usable(
+        _ stock: [PantryPlanningStock],
+        now: Date,
+        calendar: Calendar = .current,
+        dictionary: IngredientDictionary
+    ) -> [UsableStock] {
+        let today = PantryDay.string(from: now, calendar: calendar)
+        return stock.compactMap { line in
             guard line.quantity > 0, let key = dictionary.canonicalId(line.ingredientId) else { return nil }
-            let status = PantryDateStatus.evaluate(type: line.dateType, date: line.dateValue, now: now)
+            let status = PantryDateStatus.evaluate(type: line.dateType, day: line.dateValue, today: today)
             if status.isPastUseBy { return nil }
             return UsableStock(key: key, status: status)
         }
@@ -158,7 +165,7 @@ enum MealRecommender {
         var pantryBonus: [String: Int] = [:]
         if !pantryStock.isEmpty {
             for candidate in remaining {
-                pantryBonus[candidate.slug] = PantryPlanningSignal.score(candidate: candidate, stock: pantryStock, now: now)
+                pantryBonus[candidate.slug] = PantryPlanningSignal.score(candidate: candidate, stock: pantryStock, now: now, calendar: .current)
             }
         }
 

@@ -216,16 +216,68 @@ final class PantryTests: XCTestCase {
     }
 
     func testDateTypeIsStoredWithItsDateAndOldRowsReadAsBestBefore() {
-        let item = PantryItem(householdID: nil, ingredientID: "milk", displayName: "Süt", quantity: 1, unit: "l", dateType: .useBy, dateValue: Date())
+        let item = PantryItem(householdID: nil, ingredientID: "milk", displayName: "Süt", quantity: 1, unit: "l", dateType: .useBy, dateValue: "2026-10-09")
         XCTAssertEqual(item.dateType, .useBy)
-        item.setDate(nil, Date())
+        XCTAssertEqual(item.calendarDay, "2026-10-09")
+        XCTAssertNil(item.bestBefore)
+        XCTAssertEqual(item.remote(householdID: UUID()).dateValue, "2026-10-09")
+        item.setDate(nil, nil)
         XCTAssertNil(item.dateValue)
         XCTAssertNil(item.dateType)
-        item.bestBefore = Date()
+        item.bestBefore = Date(timeIntervalSince1970: 1_759_968_000)
         item.dateTypeRaw = nil
-        XCTAssertEqual(item.dateType, .bestBefore)
-        let day = PantryDay.string(from: Date())
-        XCTAssertEqual(item.remote(householdID: UUID()).dateValue, day)
+        item.calendarDay = nil
+        XCTAssertNil(item.dateType)
+        XCTAssertFalse(item.remote(householdID: UUID()).sendsDate)
+        XCTAssertNil(item.remote(householdID: UUID()).dateValue)
+    }
+
+    /// Not verified on Linux. Xcode runs this against an in-memory SwiftData store.
+    func testLegacyPersonalDatedRowsAreRemovedOnceAndHouseholdRowsStay() throws {
+        let suite = "mealroutine.pantry.legacy.upgrade.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let context = container.mainContext
+        let personalDated = PantryItem(householdID: nil, ingredientID: "milk", displayName: "Süt", quantity: 1, unit: "l")
+        personalDated.bestBefore = Date(timeIntervalSince1970: 1_759_968_000)
+        personalDated.dateTypeRaw = PantryDateType.useBy.rawValue
+        personalDated.calendarDay = nil
+        let personalPlain = PantryItem(householdID: nil, ingredientID: "salt", displayName: "Tuz", quantity: 1, unit: "kg")
+        let household = UUID()
+        let shared = PantryItem(householdID: household, ingredientID: "tomato", displayName: "Domates", quantity: 1, unit: "kg")
+        shared.bestBefore = Date(timeIntervalSince1970: 1_759_968_000)
+        shared.dateTypeRaw = PantryDateType.bestBefore.rawValue
+        shared.calendarDay = nil
+        context.insert(personalDated)
+        context.insert(personalPlain)
+        context.insert(shared)
+        try context.save()
+
+        LegacyPersonalPantryDateUpgrade.runIfNeeded(in: context, defaults: defaults)
+        var rows = try context.fetch(FetchDescriptor<PantryItem>())
+        XCTAssertNil(rows.first { $0.ingredientID == "milk" })
+        XCTAssertNotNil(rows.first { $0.ingredientID == "salt" })
+        let tomato = try XCTUnwrap(rows.first { $0.ingredientID == "tomato" })
+        XCTAssertNotNil(tomato.bestBefore)
+        XCTAssertNil(tomato.calendarDay)
+        XCTAssertFalse(tomato.remote(householdID: household).sendsDate)
+
+        LegacyPersonalPantryDateUpgrade.runIfNeeded(in: context, defaults: defaults)
+        rows = try context.fetch(FetchDescriptor<PantryItem>())
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertNotNil(rows.first { $0.ingredientID == "tomato" }?.bestBefore)
+
+        let server = PantryRemoteItem(
+            id: tomato.uuid, householdId: household, ingredientId: "tomato", displayName: "Domates",
+            quantity: 1, unit: "kg", location: .pantry, minimumQuantity: nil,
+            dateType: .useBy, dateValue: "2026-10-09", version: 4
+        )
+        tomato.apply(server)
+        XCTAssertEqual(tomato.calendarDay, "2026-10-09")
+        XCTAssertNil(tomato.bestBefore)
+        XCTAssertEqual(tomato.remote(householdID: household).dateValue, "2026-10-09")
+        XCTAssertTrue(tomato.remote(householdID: household).sendsDate)
+        defaults.removePersistentDomain(forName: suite)
     }
 
     func testPlanningAndCookingNeverChangePantryAndMarketCoverageIsIdempotent() throws {
