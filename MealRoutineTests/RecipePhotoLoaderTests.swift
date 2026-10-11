@@ -127,6 +127,90 @@ final class RecipePhotoLoaderTests: XCTestCase {
             ),
             "a tall backdrop is ready; only the detail hero requires a wide frame"
         )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 960,
+                height: 720,
+                minimumWidth: RecipePhoto.heroPointHeight,
+                minimumHeight: RecipePhoto.heroPointHeight,
+                widerThanTall: true
+            ),
+            "the 960 px rendition's own box is the clipped slice, not the plate"
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 320,
+                height: 240,
+                minimumWidth: RecipePhoto.heroPointHeight,
+                minimumHeight: RecipePhoto.heroPointHeight,
+                widerThanTall: true
+            ),
+            "the list thumbnail box must not be scaled up into the hero"
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 2560,
+                height: 1920,
+                minimumWidth: RecipePhoto.heroPointHeight,
+                minimumHeight: RecipePhoto.heroPointHeight,
+                widerThanTall: true
+            ),
+            "the original upload is not the hero plate"
+        )
+        XCTAssertFalse(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 300,
+                height: 220,
+                minimumWidth: RecipePhoto.heroPointHeight,
+                minimumHeight: RecipePhoto.heroPointHeight,
+                widerThanTall: true
+            ),
+            "a narrow measurement is still the cut-off frame"
+        )
+        XCTAssertTrue(
+            RecipePhoto.isReadyPhotoSlot(
+                width: 375,
+                height: 220,
+                minimumWidth: RecipePhoto.heroPointHeight,
+                minimumHeight: RecipePhoto.heroPointHeight,
+                widerThanTall: true
+            ),
+            "the narrowest phone plate can draw"
+        )
+    }
+
+    func testDetailHeroVariantIsSharedByBothTabs() {
+        let hamsi = URL(string: "https://upload.wikimedia.org/wikipedia/commons/b/b3/Hamsi_tava.jpg")!
+        let tariflerDetail = RecipePhoto.renditionURL(for: hamsi, role: .detailHero)
+        let weekDetail = RecipePhoto.renditionURL(for: hamsi, role: .detailHero)
+        let listRow = RecipePhoto.renditionURL(for: hamsi, role: .listThumbnail)
+        XCTAssertEqual(tariflerDetail, weekDetail)
+        XCTAssertEqual(
+            tariflerDetail.absoluteString,
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/960px-Hamsi_tava.jpg"
+        )
+        XCTAssertEqual(
+            listRow.absoluteString,
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/320px-Hamsi_tava.jpg"
+        )
+        XCTAssertNotEqual(tariflerDetail, listRow)
+        XCTAssertNotEqual(
+            RecipePhoto.cacheFileName(for: tariflerDetail),
+            RecipePhoto.cacheFileName(for: listRow)
+        )
+        XCTAssertNotEqual(
+            RecipePhoto.cacheFileName(for: tariflerDetail),
+            RecipePhoto.cacheFileName(for: hamsi)
+        )
+        XCTAssertEqual(RecipePhoto.Role.detailHero.maxPixel, RecipePhoto.heroMaxPixel)
+        XCTAssertEqual(RecipePhoto.Role.listThumbnail.maxPixel, RecipePhoto.thumbnailMaxPixel)
+
+        let fill = RecipePhoto.aspectFillRect(imageWidth: 960, imageHeight: 720, slotWidth: 390, slotHeight: 220)
+        XCTAssertNotNil(fill)
+        XCTAssertEqual(fill?.x ?? 1, 0, accuracy: 0.01)
+        XCTAssertEqual(fill?.width ?? 0, 390, accuracy: 0.01)
+        XCTAssertGreaterThan(fill?.height ?? 0, 220.0)
+        XCTAssertLessThan(fill?.y ?? 0, 0.0)
     }
 
     private func stubSession() -> URLSession {

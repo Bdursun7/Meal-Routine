@@ -41,14 +41,48 @@ enum RecipePhoto {
     static let backdropMaxPixel = 800
     static let thumbnailMaxPixel = 320
 
+    /// Which screen is asking. Tarifler rows stay on the small rendition.
+    /// Detail, whether it was opened from Tarifler or Bu Hafta, always uses the hero.
+    enum Role: Equatable, Sendable {
+        case listThumbnail
+        case cardBackdrop
+        case detailHero
+
+        var maxPixel: Int {
+            switch self {
+            case .listThumbnail: RecipePhoto.thumbnailMaxPixel
+            case .cardBackdrop: RecipePhoto.backdropMaxPixel
+            case .detailHero: RecipePhoto.heroMaxPixel
+            }
+        }
+    }
+
+    /// Point height of the detail hero plate. The bitmap must not change it.
+    static let heroPointHeight: Double = 220
+    /// Narrowest full-bleed hero (about 320 pt across a 220 pt plate).
+    /// A Commons frame is 4:3, which is below this, so that box is not the plate.
+    static let heroMinimumAspect: Double = 1.45
+
+    /// Commons (or other) URL and the cache key for one role.
+    /// Detail from either tab must pass `.detailHero`, never the list thumbnail.
+    static func renditionURL(for remoteURL: URL, role: Role) -> URL {
+        deliveryURL(for: remoteURL, maxPixel: role.maxPixel)
+    }
+
     /// True when the plate is the settled frame, so a bitmap can be drawn.
     ///
     /// List measures a hero before the row width is real. A bitmap in that pass is
     /// clipped to a short or square slot and looks cut off; the next pass, often
     /// when the credit line appears, shows the rest of the photo. A zero edge is
     /// also the slot Core Animation refuses to create. Callers keep the placeholder
-    /// until this is true. `widerThanTall` is the detail hero: a square measurement
-    /// is not the full-bleed frame.
+    /// until this is true.
+    ///
+    /// `widerThanTall` is the detail hero. The old check only required both edges
+    /// to clear 220 pt, so a 4:3 bitmap still passed: the 960×720 rendition, the
+    /// 320×240 list thumbnail, and a full upload. Tarifler pushes a list from a
+    /// list, and that first measurement is the bitmap, which the row then clips.
+    /// Bu Hafta pushes from a scroll view, so the first measurement is already the
+    /// plate. The hero now also requires the plate height and a wide-enough frame.
     static func isReadyPhotoSlot(
         width: Double,
         height: Double,
@@ -59,8 +93,40 @@ enum RecipePhoto {
         guard width.isFinite, height.isFinite, minimumWidth > 1, minimumHeight > 1 else { return false }
         guard width > 1, height > 1 else { return false }
         guard width + 0.5 >= minimumWidth, height + 0.5 >= minimumHeight else { return false }
-        if widerThanTall, width <= height { return false }
+        if widerThanTall {
+            if width <= height { return false }
+            if abs(height - minimumHeight) > 1 { return false }
+            if width + 0.5 < height * heroMinimumAspect { return false }
+        }
         return true
+    }
+
+    struct AspectFillRect: Equatable, Sendable {
+        var x: Double
+        var y: Double
+        var width: Double
+        var height: Double
+    }
+
+    /// Where to draw `image` so it fills `slot` and the overflow is centered.
+    /// The result is the final crop. It is not the bitmap's own pixel box.
+    static func aspectFillRect(
+        imageWidth: Double,
+        imageHeight: Double,
+        slotWidth: Double,
+        slotHeight: Double
+    ) -> AspectFillRect? {
+        let edges = [imageWidth, imageHeight, slotWidth, slotHeight]
+        guard edges.allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+        let scale = max(slotWidth / imageWidth, slotHeight / imageHeight)
+        let width = imageWidth * scale
+        let height = imageHeight * scale
+        return AspectFillRect(
+            x: (slotWidth - width) / 2,
+            y: (slotHeight - height) / 2,
+            width: width,
+            height: height
+        )
     }
 
     /// HTTPS URL from the catalog photo field.
