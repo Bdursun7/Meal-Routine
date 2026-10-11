@@ -1565,8 +1565,7 @@ enum PantryAutoGrocery {
         unit: String,
         dictionary: IngredientDictionary = .shared
     ) -> String {
-        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
-        return "pantry-auto:\(id)|\(GroceryMerger.unitBucket(unit))"
+        GroceryMerger.pantryAutoKey(ingredientId: ingredientId, unit: unit, dictionary: dictionary)
     }
 
     /// Recipe gap written when auto-add is on. A different key from `itemKey`, so it
@@ -2223,7 +2222,7 @@ enum PantryCookConsumption {
                                 baseRevision: rowsNow.first(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) })?.revision ?? 0,
                                 crossingKey: cookKey,
                                 creates: rowsNow.contains(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) }) == false,
-                                lineSource: GroceryLineSource.shortfall.rawValue
+                                lineSource: GroceryLineSource.cookGap.rawValue
                             )
                             mutations.append(mutation)
                             rowsNow = PantryAutoGrocery.reduce(rowsNow, mutation)

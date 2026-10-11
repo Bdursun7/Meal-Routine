@@ -1060,6 +1060,10 @@ final class PantryDomainTests: XCTestCase {
         )
         XCTAssertEqual(both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-auto:") }?.quantity, 200)
         XCTAssertEqual(both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-cook:") }?.quantity, 0.6)
+        XCTAssertEqual(
+            both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-cook:") }?.lineSource,
+            GroceryLineSource.cookGap.rawValue
+        )
         XCTAssertEqual(both.shortages.map(\.offerAddMissing), [false])
     }
 

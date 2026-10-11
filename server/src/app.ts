@@ -117,7 +117,7 @@ const eventBody = z.object({
 const mutationBody = z.object({
   entityType: z.enum(['grocery', 'meal', 'reaction', 'plan', 'preference']),
   entityId: z.string().min(1).max(80),
-  operationType: z.enum(['add', 'check', 'replace', 'set', 'upsert', 'update', 'cook']),
+  operationType: z.enum(['add', 'check', 'replace', 'set', 'upsert', 'update', 'cook', 'remove']),
   baseRevision: z.number().int().nonnegative(),
   payload: z.record(z.string().max(80), z.unknown()).refine((value) => JSON.stringify(value).length <= 16_000),
 })

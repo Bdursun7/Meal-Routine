@@ -428,6 +428,93 @@ private func checkCanonicalIdentity() {
     check(cherryCard.first?.id.hasPrefix("cherry-tomato|") == true, "typed cherry name binds to cherry-tomato, not tomato")
 }
 
+/// 2026-10-11 follow-up: rows saved before the canonical key were still two
+/// “Evdekiler eksiği” parts. A shortfall is a set, so 1 and 2 stay 2, not 3.
+private func checkLegacyShortfallCollapse() {
+    let url = URL(fileURLWithPath: "MealRoutine/Recipes/ingredients.v1.json")
+    guard let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data) else {
+        check(false, "ingredients.v1.json should load for shortfall collapse")
+        return
+    }
+    let sheet = UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!
+    let bitti = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
+    let typed = UUID(uuidString: "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC")!
+    let cook = UUID(uuidString: "DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD")!
+    let plan = UUID(uuidString: "EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE")!
+    let rows = [
+        LegacyGroceryRow(id: sheet, ingredientId: "pantry-auto:tomatoes|piece", quantity: 1, unit: "piece", isChecked: false, isManual: true, sourceRaw: ""),
+        LegacyGroceryRow(id: bitti, ingredientId: "tomatoes", quantity: 2, unit: "adet", isChecked: true, isManual: true, sourceRaw: ""),
+        LegacyGroceryRow(id: typed, ingredientId: "manual:\(typed.uuidString)", quantity: 2, unit: "piece", isChecked: false, isManual: true, sourceRaw: ""),
+        LegacyGroceryRow(id: cook, ingredientId: "pantry-cook:meal-1:tomatoes|piece", quantity: 1, unit: "piece", isChecked: false, isManual: true, sourceRaw: GroceryLineSource.shortfall.rawValue),
+        LegacyGroceryRow(id: plan, ingredientId: "tomato", quantity: 6, unit: "piece", isChecked: false, isManual: false, sourceRaw: ""),
+    ]
+    let collapsed = GroceryShortfallCollapse.plan(rows, dictionary: dictionary)
+    check(collapsed.updates.count == 1, "one shortfall identity \(collapsed.updates)")
+    let update = collapsed.updates.first
+    check(update?.ingredientId == "pantry-auto:tomato|unit:piece", "canonical key \(update?.ingredientId ?? "")")
+    check(update?.quantity == 2, "larger set is kept, not the sum \(update?.quantity ?? -1)")
+    check(update?.isChecked == true, "check survives when that amount was checked")
+    check(update?.keepID == bitti, "the larger row is the survivor")
+    check(update?.deleteIDs == [sheet], "the smaller legacy key is removed \(update?.deleteIDs ?? [])")
+    check(update?.sourceRaw == GroceryLineSource.shortfall.rawValue, "legacy empty source is Evdekiler eksiği")
+    check(collapsed.cookGapIDs == [cook], "cook gap is retitled, not merged into the shortfall")
+    check(!collapsed.updates.contains { $0.deleteIDs.contains(typed) || $0.keepID == typed }, "typed manual: row stays Elle eklendi")
+    check(!collapsed.updates.contains { $0.keepID == plan }, "plan row is not a shortfall")
+
+    let checkedSmaller = GroceryShortfallCollapse.plan([
+        LegacyGroceryRow(id: sheet, ingredientId: "pantry-auto:tomato|piece", quantity: 1, unit: "piece", isChecked: true, isManual: true, sourceRaw: ""),
+        LegacyGroceryRow(id: bitti, ingredientId: "pantry-auto:tomatoes|adet", quantity: 2, unit: "adet", isChecked: false, isManual: true, sourceRaw: ""),
+    ], dictionary: dictionary)
+    check(checkedSmaller.updates.first?.quantity == 2, "unchecked larger set wins")
+    check(checkedSmaller.updates.first?.isChecked == false, "a check on a different amount is not moved")
+
+    let mass = GroceryShortfallCollapse.plan([
+        LegacyGroceryRow(id: sheet, ingredientId: "pantry-auto:tomato|g", quantity: 200, unit: "g", isChecked: false, isManual: true, sourceRaw: GroceryLineSource.threshold.rawValue),
+        LegacyGroceryRow(id: bitti, ingredientId: "pantry-auto:tomatoes|kg", quantity: 1, unit: "kg", isChecked: false, isManual: true, sourceRaw: ""),
+    ], dictionary: dictionary)
+    check(mass.updates.first?.quantity == 1 && mass.updates.first?.unit == "kg", "1 kg beats 200 g \(mass.updates.first?.quantity ?? -1) \(mass.updates.first?.unit ?? "")")
+    check(mass.updates.first?.sourceRaw == GroceryLineSource.shortfall.rawValue, "the row that supplies the amount supplies the label")
+
+    let canonical = "pantry-auto:tomato|unit:piece"
+    let legacy = "pantry-auto:tomatoes|piece"
+    let both = GroceryShortfallCollapse.boardSync(
+        canonicalKey: canonical,
+        existingKeys: [legacy, canonical, "tomato|piece"],
+        deletedIDs: [sheet],
+        dictionary: dictionary
+    )
+    check(both.wireKey == canonical, "canonical server key is kept when it exists \(both.wireKey)")
+    check(both.removeKeys.contains(legacy), "legacy pantry-auto key is retired")
+    check(both.removeKeys.contains("manual:\(sheet.uuidString)"), "deleted row check key is retired")
+    check(!both.removeKeys.contains(canonical), "the wire key is not removed")
+    check(!both.removeKeys.contains("tomato|piece"), "plan key is not a shortfall key")
+    let onlyLegacy = GroceryShortfallCollapse.boardSync(
+        canonicalKey: canonical,
+        existingKeys: [legacy],
+        deletedIDs: [],
+        dictionary: dictionary
+    )
+    check(onlyLegacy.wireKey == legacy && onlyLegacy.removeKeys.isEmpty, "a lone legacy key is updated in place \(onlyLegacy)")
+
+    let cards = GroceryCardGrouper.group([
+        GroceryCardInput(id: sheet, ingredientId: "pantry-auto:tomatoes|piece", name: "Domates", quantity: 1, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: "", remainingDetail: nil),
+        GroceryCardInput(id: bitti, ingredientId: "tomatoes", name: "Domates", quantity: 2, unit: "adet", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: "", remainingDetail: nil),
+        GroceryCardInput(id: cook, ingredientId: "pantry-cook:meal-1:tomatoes|piece", name: "Domates", quantity: 1, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: GroceryLineSource.shortfall.rawValue, remainingDetail: nil),
+        GroceryCardInput(id: plan, ingredientId: "tomato", name: "Domates", quantity: 6, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: false, sourceRaw: "", remainingDetail: nil),
+    ], dictionary: dictionary)
+    let card = cards.first { $0.id.hasSuffix("unit:piece") }
+    let labels = card?.parts.map(\.source) ?? []
+    check(labels.filter { $0 == .shortfall }.count == 1, "one Evdekiler eksiği part \(labels)")
+    check(Set(labels).count == labels.count, "no repeated source label \(labels)")
+    let shortfall = card?.parts.first { $0.source == .shortfall }
+    check(shortfall?.label == "Evdekiler eksiği: 2 adet", "shortfall shows the larger set \(shortfall?.label ?? "")")
+    check(shortfall?.memberIDs.count == 2, "both stored rows stay reachable until reconcile deletes one")
+    check(!(shortfall?.label.contains("3") ?? false), "shortfall label is not a sum")
+    check(card?.parts.first { $0.source == .cookGap }?.label == "Pişirme eksiği: 1 adet", "cook gap has its own label \(card?.breakdown ?? "")")
+    let repeated = Dictionary(grouping: card?.parts ?? [], by: \.source.title)
+    check(repeated.values.allSatisfy { $0.count == 1 }, "a card never has two parts with the same source label")
+}
+
 @main
 struct GroceryMergeChecks {
     static func main() {
@@ -445,6 +532,7 @@ struct GroceryMergeChecks {
         checkGroupingAndQuantityEdits()
         checkEveningLabels()
         checkCanonicalIdentity()
+        checkLegacyShortfallCollapse()
 
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)

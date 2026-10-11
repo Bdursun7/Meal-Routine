@@ -10,7 +10,7 @@ const REACTIONS = new Set(['want', 'okay', 'veto'])
 export interface MutationInput {
   entityType: 'grocery' | 'meal' | 'reaction' | 'plan' | 'preference'
   entityId: string
-  operationType: 'add' | 'check' | 'replace' | 'set' | 'upsert' | 'update' | 'cook'
+  operationType: 'add' | 'check' | 'replace' | 'set' | 'upsert' | 'update' | 'cook' | 'remove'
   baseRevision: number
   payload: Record<string, unknown>
 }
@@ -78,6 +78,19 @@ export function applyMutation(
       entity = publicGrocery(existing)
       revision = existing.revision
       entityId = existing.id
+    }
+  } else if (input.entityType === 'grocery' && input.operationType === 'remove') {
+    const itemKey = text(input.payload.itemKey, 'itemKey')
+    const index = next.grocery.findIndex((row) => row.itemKey === itemKey)
+    if (index >= 0) {
+      const existing = next.grocery[index]
+      next.grocery.splice(index, 1)
+      entity = publicGrocery(existing)
+      entityId = existing.id
+      revision = existing.revision
+    } else {
+      entity = { itemKey, removed: true }
+      revision = 0
     }
   } else if (input.entityType === 'grocery' && input.operationType === 'check') {
     const row = next.grocery.find((item) => item.id === input.entityId)

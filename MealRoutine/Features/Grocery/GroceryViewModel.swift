@@ -144,7 +144,7 @@ final class GroceryViewModel {
             let single = card.singlePart
             return GroceryRowPresentation(
                 id: card.id,
-                partIDs: card.parts.map(\.id),
+                partIDs: card.parts.flatMap { $0.memberIDs.isEmpty ? [$0.id] : $0.memberIDs },
                 name: card.name,
                 detail: single?.amountText ?? card.breakdown,
                 quantity: single?.quantity,

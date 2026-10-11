@@ -211,6 +211,8 @@ struct GroceryCardInput: Equatable, Sendable {
 
 struct GroceryCardPart: Equatable, Sendable, Identifiable {
     var id: UUID
+    /// Every stored row this part still represents. A folded shortfall has one label and one amount.
+    var memberIDs: [UUID]
     var quantity: Double?
     var unit: String
     var source: GroceryLineSource
@@ -218,10 +220,7 @@ struct GroceryCardPart: Equatable, Sendable, Identifiable {
     var isManual: Bool
     var hasUnitConflict: Bool
     var remainingDetail: String?
-
-    var amountText: String {
-        QuantityFormat.quantityAndUnit(quantity: quantity, unit: unit)
-    }
+    var amountText: String
 
     var label: String { "\(source.title): \(amountText)" }
 }
@@ -268,32 +267,89 @@ enum GroceryCardGrouper {
             guard let rows = buckets[key], !rows.isEmpty else { return nil }
             let ingredientId = groupIngredientId(rows, dictionary: dictionary)
             let name = cardName(rows, ingredientId: ingredientId, dictionary: dictionary)
-            let parts = rows.map { row in
-                GroceryCardPart(
+            let parts = fold(rows.map { row in
+                let source = GroceryLineSource.resolve(
+                    ingredientId: row.ingredientId,
+                    isManual: row.isManual,
+                    stored: row.sourceRaw
+                )
+                return GroceryCardPart(
                     id: row.id,
+                    memberIDs: [row.id],
                     quantity: row.quantity,
                     unit: row.unit,
-                    source: GroceryLineSource.resolve(
-                        ingredientId: row.ingredientId,
-                        isManual: row.isManual,
-                        stored: row.sourceRaw
-                    ),
+                    source: source,
                     isChecked: row.isChecked,
                     isManual: row.isManual,
                     hasUnitConflict: row.hasUnitConflict,
-                    remainingDetail: row.remainingDetail
+                    remainingDetail: row.remainingDetail,
+                    amountText: QuantityFormat.quantityAndUnit(quantity: row.quantity, unit: row.unit)
                 )
-            }.sorted { lhs, rhs in
-                if lhs.source.sort != rhs.source.sort { return lhs.source.sort < rhs.source.sort }
-                if lhs.amountText != rhs.amountText { return lhs.amountText < rhs.amountText }
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
+            })
             return GroceryCardModel(
                 id: key,
                 name: name,
                 category: GroceryCategory.classify(ingredientId: ingredientId, name: name),
                 parts: parts
             )
+        }
+    }
+
+    /// One part per source label. Two shortfall rows are one set: the larger amount, not the sum.
+    /// Several cook gaps stay one “Pişirme eksiği” label and list each amount.
+    private static func fold(_ parts: [GroceryCardPart]) -> [GroceryCardPart] {
+        let sorted = parts.sorted { lhs, rhs in
+            if lhs.source.sort != rhs.source.sort { return lhs.source.sort < rhs.source.sort }
+            if lhs.amountText != rhs.amountText { return lhs.amountText < rhs.amountText }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+        var order: [GroceryLineSource] = []
+        var groups: [GroceryLineSource: [GroceryCardPart]] = [:]
+        for part in sorted {
+            if groups[part.source] == nil { order.append(part.source) }
+            groups[part.source, default: []].append(part)
+        }
+        return order.compactMap { source in
+            guard let rows = groups[source], let first = rows.first else { return nil }
+            if rows.count == 1 { return first }
+            let members = rows.flatMap(\.memberIDs)
+            switch source {
+            case .shortfall, .threshold:
+                guard let picked = GroceryShortfallCollapse.largestSet(
+                    rows.map { (quantity: $0.quantity, unit: $0.unit, isChecked: $0.isChecked) }
+                ) else { return first }
+                let winner = rows.max { lhs, rhs in
+                    let left = (lhs.quantity ?? 0) * UnitNormalization.parse(lhs.unit).basePerUnit
+                    let right = (rhs.quantity ?? 0) * UnitNormalization.parse(rhs.unit).basePerUnit
+                    if left != right { return left < right }
+                    return lhs.id.uuidString > rhs.id.uuidString
+                } ?? first
+                return GroceryCardPart(
+                    id: winner.id,
+                    memberIDs: members,
+                    quantity: picked.quantity,
+                    unit: picked.unit,
+                    source: source,
+                    isChecked: picked.isChecked,
+                    isManual: rows.allSatisfy(\.isManual),
+                    hasUnitConflict: rows.contains(where: \.hasUnitConflict),
+                    remainingDetail: winner.remainingDetail,
+                    amountText: QuantityFormat.quantityAndUnit(quantity: picked.quantity, unit: picked.unit)
+                )
+            case .plan, .cookGap, .typed:
+                return GroceryCardPart(
+                    id: first.id,
+                    memberIDs: members,
+                    quantity: nil,
+                    unit: first.unit,
+                    source: source,
+                    isChecked: rows.allSatisfy(\.isChecked),
+                    isManual: rows.allSatisfy(\.isManual),
+                    hasUnitConflict: rows.contains(where: \.hasUnitConflict),
+                    remainingDetail: rows.compactMap(\.remainingDetail).first,
+                    amountText: rows.map(\.amountText).joined(separator: ", ")
+                )
+            }
         }
     }
 

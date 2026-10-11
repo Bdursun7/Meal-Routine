@@ -25,6 +25,7 @@ enum GroceryLineSource: String, Equatable, Sendable {
     case plan
     case shortfall
     case threshold
+    case cookGap
     case typed
 
     var title: String {
@@ -32,6 +33,7 @@ enum GroceryLineSource: String, Equatable, Sendable {
         case .plan: "Plan"
         case .shortfall: "Evdekiler eksiği"
         case .threshold: "Eşik"
+        case .cookGap: "Pişirme eksiği"
         case .typed: "Elle eklendi"
         }
     }
@@ -41,13 +43,16 @@ enum GroceryLineSource: String, Equatable, Sendable {
         case .plan: 0
         case .shortfall: 1
         case .threshold: 2
-        case .typed: 3
+        case .cookGap: 3
+        case .typed: 4
         }
     }
 
     /// Empty `stored` keeps rows saved before the source column existed.
     /// A manual catalog id is a Bitti shortfall. Only `manual:` was typed with +.
+    /// A cook-gap key is never the shortfall label, even when an older write stored `shortfall`.
     static func resolve(ingredientId: String, isManual: Bool, stored: String) -> GroceryLineSource {
+        if ingredientId.hasPrefix("pantry-cook:") { return .cookGap }
         if let known = GroceryLineSource(rawValue: stored), !stored.isEmpty { return known }
         if !isManual { return .plan }
         if ingredientId.hasPrefix("manual:") { return .typed }
@@ -183,6 +188,192 @@ enum GroceryMerger {
             return "family:\(family.rawValue)"
         }
         return "unit:\(unit.code)"
+    }
+
+    /// Canonical replenishment key. `tomatoes` and `piece` / `adet` share one key.
+    static func pantryAutoKey(
+        ingredientId: String,
+        unit: String,
+        dictionary: IngredientDictionary = .shared
+    ) -> String {
+        let id = shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return "pantry-auto:\(id)|\(unitBucket(unit))"
+    }
+
+    static func keyUnitSuffix(_ key: String) -> String {
+        guard let bar = key.lastIndex(of: "|") else { return "" }
+        return String(key[key.index(after: bar)...])
+    }
+}
+
+/// One stored shopping row handed to the legacy-shortfall reconcile.
+struct LegacyGroceryRow: Equatable, Sendable {
+    var id: UUID
+    var ingredientId: String
+    var quantity: Double?
+    var unit: String
+    var isChecked: Bool
+    var isManual: Bool
+    var sourceRaw: String
+}
+
+/// Rewrite one shortfall identity onto `pantry-auto:<canonical>|<bucket>` and drop the extras.
+struct LegacyShortfallUpdate: Equatable, Sendable {
+    var keepID: UUID
+    var ingredientId: String
+    var quantity: Double
+    var unit: String
+    var isChecked: Bool
+    var sourceRaw: String
+    var deleteIDs: [UUID]
+}
+
+/// Which household item keys a shortfall collapse updates, and which it retires.
+struct GroceryBoardSyncPlan: Equatable, Sendable {
+    var wireKey: String
+    var removeKeys: [String]
+}
+
+/// Rows saved before the canonical key still sit in the store.
+///
+/// A shortfall is a set, not a delta. Two rows for the same canonical id and
+/// unit bucket are two writes of one need (`pantry-auto:tomatoes|piece` and a
+/// Bitti row of `tomatoes`, for example). Adding 1 and 2 would buy the need
+/// twice. The larger amount in the shared unit family is the set that still
+/// covers the smaller one, so that amount is kept. Grocery rows have no
+/// timestamp; when the amounts match, the row already on the canonical key
+/// wins, then a checked row, then the lowest id.
+///
+/// A check is kept only when a merged row with that same amount was checked.
+/// A check on a different amount belonged to a different set and is not moved.
+/// `manual:` typed rows and `pantry-cook:` gaps are not shortfall rows.
+enum GroceryShortfallCollapse {
+    static func plan(
+        _ rows: [LegacyGroceryRow],
+        dictionary: IngredientDictionary = .shared
+    ) -> (updates: [LegacyShortfallUpdate], cookGapIDs: [UUID]) {
+        let cookGapIDs = rows.compactMap { row -> UUID? in
+            guard row.ingredientId.hasPrefix("pantry-cook:") else { return nil }
+            return row.sourceRaw == GroceryLineSource.cookGap.rawValue ? nil : row.id
+        }
+        let candidates = rows.filter(isShortfall)
+        let grouped = Dictionary(grouping: candidates) {
+            GroceryMerger.rowIdentity(ingredientId: $0.ingredientId, unit: $0.unit, dictionary: dictionary)
+        }
+        var updates: [LegacyShortfallUpdate] = []
+        for group in grouped.values {
+            guard let update = collapse(group, dictionary: dictionary) else { continue }
+            updates.append(update)
+        }
+        updates.sort { $0.ingredientId < $1.ingredientId }
+        return (updates, cookGapIDs.sorted { $0.uuidString < $1.uuidString })
+    }
+
+    /// The household board has no rename. Reuse a legacy pantry-auto key when it
+    /// is the only one, so the set does not open a second server row. When the
+    /// canonical key is already there, keep that one and retire the other
+    /// pantry-auto keys for the same bucket. Deleted local rows also retire
+    /// their `manual:<uuid>` check keys. Plan keys are left alone.
+    static func boardSync(
+        canonicalKey: String,
+        existingKeys: [String],
+        deletedIDs: [UUID],
+        dictionary: IngredientDictionary = .shared
+    ) -> GroceryBoardSyncPlan {
+        let matches = existingKeys.filter { key in
+            key.hasPrefix("pantry-auto:") && sameAuto(key, canonicalKey, dictionary: dictionary)
+        }
+        let wire = matches.first { $0 == canonicalKey } ?? matches.first ?? canonicalKey
+        var remove = matches.filter { $0 != wire }
+        for id in deletedIDs {
+            remove.append("manual:\(id.uuidString)")
+        }
+        remove = Array(Set(remove)).filter { $0 != wire }.sorted()
+        return GroceryBoardSyncPlan(wireKey: wire, removeKeys: remove)
+    }
+
+    /// Larger set in one family. Used by the card when two shortfall parts
+    /// have not been rewritten yet, so the label is never repeated.
+    static func largestSet(
+        _ rows: [(quantity: Double?, unit: String, isChecked: Bool)]
+    ) -> (quantity: Double?, unit: String, isChecked: Bool)? {
+        guard let winner = rows.max(by: { base($0.quantity, $0.unit) < base($1.quantity, $1.unit) }) else {
+            return nil
+        }
+        guard let quantity = winner.quantity else { return nil }
+        let amount = base(quantity, winner.unit)
+        let checked = rows.contains { $0.isChecked && abs(base($0.quantity, $0.unit) - amount) < 0.000_5 }
+        return (GroceryMerger.roundedQuantity(quantity), GroceryMerger.normalize(winner.unit), checked)
+    }
+
+    private static func collapse(
+        _ group: [LegacyGroceryRow],
+        dictionary: IngredientDictionary
+    ) -> LegacyShortfallUpdate? {
+        let measured = group.filter { $0.quantity != nil }
+        guard !measured.isEmpty else { return nil }
+        let sample = measured[0]
+        let canonical = GroceryMerger.pantryAutoKey(
+            ingredientId: sample.ingredientId,
+            unit: sample.unit,
+            dictionary: dictionary
+        )
+        let winner = measured.sorted { lhs, rhs in
+            let left = base(lhs.quantity, lhs.unit)
+            let right = base(rhs.quantity, rhs.unit)
+            if left != right { return left > right }
+            let leftCanonical = lhs.ingredientId == canonical
+            let rightCanonical = rhs.ingredientId == canonical
+            if leftCanonical != rightCanonical { return leftCanonical }
+            if lhs.isChecked != rhs.isChecked { return lhs.isChecked }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }[0]
+        guard let quantity = winner.quantity else { return nil }
+        let amount = base(quantity, winner.unit)
+        let checked = measured.contains { $0.isChecked && abs(base($0.quantity, $0.unit) - amount) < 0.000_5 }
+        let unit = GroceryMerger.normalize(winner.unit)
+        let source = winner.sourceRaw == GroceryLineSource.threshold.rawValue
+            ? GroceryLineSource.threshold.rawValue
+            : GroceryLineSource.shortfall.rawValue
+        let storedQuantity = GroceryMerger.roundedQuantity(quantity) ?? quantity
+        let deleteIDs = group.map(\.id).filter { $0 != winner.id }.sorted { $0.uuidString < $1.uuidString }
+        let already =
+            group.count == 1
+            && winner.ingredientId == canonical
+            && winner.unit == unit
+            && winner.isChecked == checked
+            && winner.sourceRaw == source
+            && winner.quantity == storedQuantity
+        if already { return nil }
+        return LegacyShortfallUpdate(
+            keepID: winner.id,
+            ingredientId: canonical,
+            quantity: storedQuantity,
+            unit: unit,
+            isChecked: checked,
+            sourceRaw: source,
+            deleteIDs: deleteIDs
+        )
+    }
+
+    private static func isShortfall(_ row: LegacyGroceryRow) -> Bool {
+        if row.ingredientId.hasPrefix("pantry-cook:") || row.ingredientId.hasPrefix("manual:") { return false }
+        if row.ingredientId.hasPrefix("pantry-auto:") { return true }
+        return row.isManual
+    }
+
+    private static func sameAuto(
+        _ lhs: String,
+        _ rhs: String,
+        dictionary: IngredientDictionary
+    ) -> Bool {
+        GroceryMerger.rowIdentity(ingredientId: lhs, unit: GroceryMerger.keyUnitSuffix(lhs), dictionary: dictionary)
+            == GroceryMerger.rowIdentity(ingredientId: rhs, unit: GroceryMerger.keyUnitSuffix(rhs), dictionary: dictionary)
+    }
+
+    private static func base(_ quantity: Double?, _ unit: String) -> Double {
+        guard let quantity else { return -.infinity }
+        return quantity * UnitNormalization.parse(unit).basePerUnit
     }
 }
 
