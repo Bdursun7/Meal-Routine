@@ -358,9 +358,14 @@ struct PantryView: View {
     }
 
     private func addMarket(name: String, ingredientId: String, quantity: Double, unit: String) {
-        do {
-            try GroceryListService.addManual(name: name, quantity: quantity, unit: unit, ingredientId: ingredientId, in: modelContext)
-        } catch {
+        let stored = PantryStockSideEffects.addFinishedToMarket(
+            name: name,
+            ingredientId: ingredientId,
+            quantity: quantity,
+            unit: unit,
+            in: modelContext
+        )
+        if !stored {
             errorMessage = "Önce bu haftanın planını kur. Market listesi o zaman açılır."
         }
     }

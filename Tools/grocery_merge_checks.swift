@@ -97,8 +97,10 @@ private func checkConversions() {
         line("spice", 2, "tsp", nameTR: "Kimyon"),
         line("salt", nil, "toTaste", nameTR: "Tuz"),
         line("salt", 5, "g", nameTR: "Tuz"),
-        line("yoghurt", 200, "g", nameTR: "Yoğurt"),
-        line("yoghurt", 100, "ml", nameTR: "Yoğurt"),
+        // Not `yoghurt`: that spelling is a source id of `yogurt` and now
+        // canonicalizes. This fixture only checks that grams and millilitres do not convert.
+        line("density-check", 200, "g", nameTR: "Yoğurt"),
+        line("density-check", 100, "ml", nameTR: "Yoğurt"),
     ])
 
     let chicken = rows("chicken", in: merged)
@@ -125,8 +127,8 @@ private func checkConversions() {
     check(salt.contains { $0.unit == "toTaste" && $0.quantity == nil }, "toTaste quantity stays nil \(salt)")
     check(salt.contains { $0.unit == "g" && $0.quantity == 5 }, "measured salt stays 5 g \(salt)")
 
-    let yoghurt = rows("yoghurt", in: merged)
-    check(yoghurt.count == 2 && yoghurt.allSatisfy(\.hasUnitConflict), "g and ml do not invent density \(yoghurt)")
+    let density = rows("density-check", in: merged)
+    check(density.count == 2 && density.allSatisfy(\.hasUnitConflict), "g and ml do not invent density \(density)")
 
     let onlyGrams = GroceryMerger.merge([
         line("flour", 800, "g"),
@@ -250,6 +252,8 @@ private func checkCatalog() throws {
     check(rowsBefore == 399, "rows before \(rowsBefore)")
     check(rowsAfter == 388, "rows after \(rowsAfter)")
     check(resolved == ["beef", "chicken", "lamb", "spinach", "stock"], "resolved \(resolved)")
+    // Per raw catalog id. A week list then folds source ids (`tomatoes` → `tomato`);
+    // see checkCanonicalIdentity. This list is not a rule that those ids stay apart.
     check(
         partial == ["fish", "oil", "onion", "potato", "tomato", "tomatoes"],
         "partial \(partial)"
@@ -364,6 +368,66 @@ private func checkEveningLabels() {
     check(!EveningCountOptions.label(4).contains("Evening"), "labels stay Turkish")
 }
 
+/// 2026-10-11: the user approved merging on the dictionary canonical id.
+/// `tomatoes` joins `tomato`. Display text does not. `cherry-tomato` stays apart.
+private func checkCanonicalIdentity() {
+    let url = URL(fileURLWithPath: "MealRoutine/Recipes/ingredients.v1.json")
+    guard let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data) else {
+        check(false, "ingredients.v1.json should load for canonical merge")
+        return
+    }
+    let merged = GroceryMerger.merge([
+        line("tomato", 6, "piece", nameTR: "Domates"),
+        line("tomatoes", 2, "adet", nameTR: "Domates"),
+        line("cherry-tomato", 4, "piece", nameTR: "Cherry domates"),
+    ], dictionary: dictionary)
+    let tomato = rows("tomato", in: merged)
+    check(tomato.count == 1, "tomato and tomatoes are one plan row \(merged)")
+    close(tomato.first?.quantity, 8, "6 + 2 tomatoes")
+    check(tomato.first?.nameTR == "Domates", "canonical name \(tomato.first?.nameTR ?? "")")
+    check(rows("tomatoes", in: merged).isEmpty, "alias id is not a second row")
+    check(rows("cherry-tomato", in: merged).count == 1, "cherry-tomato stays separate")
+    check(
+        GroceryMerger.rowIdentity(ingredientId: "tomatoes", unit: "piece", dictionary: dictionary)
+            == GroceryMerger.rowIdentity(ingredientId: "tomato", unit: "adet", dictionary: dictionary),
+        "alias identity"
+    )
+    check(
+        GroceryMerger.rowIdentity(ingredientId: "cherry-tomato", unit: "piece", dictionary: dictionary)
+            != GroceryMerger.rowIdentity(ingredientId: "tomato", unit: "piece", dictionary: dictionary),
+        "cherry identity"
+    )
+    check(
+        GroceryCategory.classify(ingredientId: "pantry-auto:tomatoes|unit:piece", name: "Domates") == .produce,
+        "aisle uses the canonical id inside a pantry key"
+    )
+
+    let plan = UUID()
+    let shortfall = UUID()
+    let typed = UUID()
+    let threshold = UUID()
+    let cards = GroceryCardGrouper.group([
+        GroceryCardInput(id: plan, ingredientId: "tomatoes", name: "Domates", quantity: 6, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: false, sourceRaw: GroceryLineSource.plan.rawValue, remainingDetail: nil),
+        GroceryCardInput(id: shortfall, ingredientId: "pantry-auto:tomato|unit:piece", name: "Domates", quantity: 1, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: GroceryLineSource.shortfall.rawValue, remainingDetail: nil),
+        GroceryCardInput(id: threshold, ingredientId: "pantry-auto:tomato|family:mass", name: "Domates", quantity: 200, unit: "g", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: GroceryLineSource.threshold.rawValue, remainingDetail: nil),
+        GroceryCardInput(id: typed, ingredientId: "manual:\(UUID().uuidString)", name: "Domates", quantity: 2, unit: "piece", hasUnitConflict: false, isChecked: true, isManual: true, sourceRaw: GroceryLineSource.typed.rawValue, remainingDetail: nil),
+    ], dictionary: dictionary)
+    let piece = cards.filter { $0.id.hasSuffix("unit:piece") }
+    check(piece.count == 1, "piece rows share one card \(cards.map(\.id))")
+    check(piece.first?.parts.count == 3, "plan, shortfall and typed stay separate parts")
+    check(piece.first?.isMixed == true, "one checked part is a mixed card")
+    check(piece.first?.isFullyChecked == false, "mixed card is not fully checked")
+    check(piece.first?.breakdown == "Plan: 6 adet · Evdekiler eksiği: 1 adet · Elle eklendi: 2 adet", "breakdown \(piece.first?.breakdown ?? "")")
+    check(!((piece.first?.breakdown ?? "").contains("8")), "breakdown does not sum plan and shortfall")
+    let mass = cards.filter { $0.id.hasSuffix("family:mass") }
+    check(mass.count == 1 && mass.first?.parts.first?.source == .threshold, "threshold stays on its own bucket \(cards.map(\.breakdown))")
+    check(mass.first?.parts.first?.label == "Eşik: 200 g", "threshold label \(mass.first?.breakdown ?? "")")
+    let cherryCard = GroceryCardGrouper.group([
+        GroceryCardInput(id: UUID(), ingredientId: "manual:\(UUID().uuidString)", name: "Cherry domates", quantity: 1, unit: "piece", hasUnitConflict: false, isChecked: false, isManual: true, sourceRaw: "", remainingDetail: nil),
+    ], dictionary: dictionary)
+    check(cherryCard.first?.id.hasPrefix("cherry-tomato|") == true, "typed cherry name binds to cherry-tomato, not tomato")
+}
+
 @main
 struct GroceryMergeChecks {
     static func main() {
@@ -380,6 +444,7 @@ struct GroceryMergeChecks {
         checkAisles()
         checkGroupingAndQuantityEdits()
         checkEveningLabels()
+        checkCanonicalIdentity()
 
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)

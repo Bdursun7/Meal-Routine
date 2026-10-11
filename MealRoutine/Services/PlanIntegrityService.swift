@@ -107,7 +107,8 @@ enum PlanIntegrityService {
                 quantity: item.quantity,
                 unit: item.unit,
                 hasUnitConflict: item.hasUnitConflict,
-                isChecked: item.isChecked
+                isChecked: item.isChecked,
+                sourceRaw: item.sourceRaw
             )
         }
     }
@@ -127,7 +128,8 @@ enum PlanIntegrityService {
                 unit: manual.unit,
                 hasUnitConflict: manual.hasUnitConflict,
                 isChecked: manual.isChecked,
-                isManual: true
+                isManual: true,
+                sourceRaw: manual.sourceRaw
             )
             context.insert(item)
             item.week = week
@@ -143,4 +145,5 @@ private struct ManualGrocerySnapshot {
     var unit: String
     var hasUnitConflict: Bool
     var isChecked: Bool
+    var sourceRaw: String
 }

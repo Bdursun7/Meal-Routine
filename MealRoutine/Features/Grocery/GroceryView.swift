@@ -221,7 +221,7 @@ struct GroceryView: View {
             }
         }
         Section {
-            Text("Aynı malzeme kimliği toplanır. Her akşam kendi porsiyonuna göre ölçeklenir; bu, ev halkı ya da tarifte kaydettiğin akşamdır. Eş anlamlı birimler birleşir; gram–kilogram ve mililitre–litre çevrilir. Alınan ürünler listenin altına iner.")
+            Text("Aynı sözlük kimliği toplanır. Domatesin iki katalog kimliği tek satırdır; görünür ad tek başına birleştirmez. Plan, evdekiler eksiği ve elle eklenen miktar aynı kartta ayrı ayrı durur, toplanmaz. Eş anlamlı birimler birleşir. Alınan ürünler listenin altına iner.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -262,8 +262,12 @@ struct GroceryView: View {
 
     private func groceryAccessibilityLabel(_ row: GroceryRowPresentation) -> String {
         if row.isChecked { return "\(row.name) alındı" }
+        if row.isMixed { return "\(row.name), bir kısmı alındı. \(row.detail)" }
         if let remaining = row.remainingDetail {
             return "\(row.name), \(remaining)"
+        }
+        if let caption = row.sourceCaption {
+            return "\(row.name), \(caption), alınacak"
         }
         return "\(row.name) alınacak"
     }
@@ -301,9 +305,9 @@ struct GroceryView: View {
         @Bindable var viewModel = self.viewModel
         return HStack(alignment: .top, spacing: 12) {
             Button {
-                viewModel.toggle(row.id, in: modelContext)
+                viewModel.toggleCard(row, in: modelContext)
             }             label: {
-                MealCheckBox(isChecked: row.isChecked)
+                MealCheckBox(isChecked: row.isChecked, isMixed: row.isMixed)
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.borderless)
@@ -328,41 +332,45 @@ struct GroceryView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
-                if showsAisle {
-                    Text(row.category.title)
+                if let caption = row.sourceCaption {
+                    Text(caption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if row.isManual {
-                    Text("Elle eklendi")
+                if showsAisle {
+                    Text(row.category.title)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .swipeActions {
-            Button {
-                viewModel.consumeFromPantry(row.id, in: modelContext)
-            } label: {
-                Label(PantryCopy.consume, systemImage: "minus.circle")
-            }
-            .tint(Theme.sage)
-            Button {
-                viewModel.addToPantry(row.id, in: modelContext)
-            } label: {
-                Label(PantryCopy.restock, systemImage: "plus.circle")
+            if let partID = row.primaryPartID {
+                Button {
+                    viewModel.consumeFromPantry(partID, in: modelContext)
+                } label: {
+                    Label(PantryCopy.consume, systemImage: "minus.circle")
+                }
+                .tint(Theme.sage)
+                Button {
+                    viewModel.addToPantry(partID, in: modelContext)
+                } label: {
+                    Label(PantryCopy.restock, systemImage: "plus.circle")
+                }
             }
             if row.isManual {
                 Button(role: .destructive) {
-                    viewModel.delete(row.id, in: modelContext)
+                    viewModel.deleteCard(row, in: modelContext)
                 } label: {
                     Label("Sil", systemImage: "trash")
                 }
             }
         }
         .contextMenu {
-            Button(PantryCopy.consume) { viewModel.consumeFromPantry(row.id, in: modelContext) }
-            Button(PantryCopy.restock) { viewModel.addToPantry(row.id, in: modelContext) }
+            if let partID = row.primaryPartID {
+                Button(PantryCopy.consume) { viewModel.consumeFromPantry(partID, in: modelContext) }
+                Button(PantryCopy.restock) { viewModel.addToPantry(partID, in: modelContext) }
+            }
         }
     }
 
@@ -404,7 +412,7 @@ private struct GroceryQuantityControl: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        if viewModel.editingID == row.id {
+        if let partID = row.parts.first?.id, viewModel.editingID == partID {
             VStack(alignment: .leading, spacing: 8) {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 4) {

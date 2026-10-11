@@ -214,7 +214,8 @@ enum HouseholdPlanBridge {
                 isManual: item.isManual,
                 uuid: item.uuid
             )
-            guard let completion = byKey[key], completion.isChecked != item.isChecked else { continue }
+            let completion = byKey[key] ?? byKey.first { HouseholdGroceryKey.samePlanIdentity($0.key, key) }?.value
+            guard let completion, completion.isChecked != item.isChecked else { continue }
             item.isChecked = completion.isChecked
             changed = true
         }

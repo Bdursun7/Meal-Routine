@@ -1020,13 +1020,13 @@ final class PantryDomainTests: XCTestCase {
             applied: []
         )
         let mutation = try XCTUnwrap(on.mutation)
-        XCTAssertEqual(mutation.itemKey, "pantry-auto:tomato|kg")
+        XCTAssertEqual(mutation.itemKey, "pantry-auto:tomato|family:mass")
         XCTAssertEqual(mutation.quantity, 100)
         XCTAssertNotEqual(mutation.itemKey, "tomato|kg")
         let once = PantryAutoGrocery.reduce([], mutation)
         let twice = PantryAutoGrocery.reduce(once, mutation)
         XCTAssertEqual(twice.map(\.quantity), [100])
-        XCTAssertEqual(twice.map(\.itemKey), ["pantry-auto:tomato|kg"])
+        XCTAssertEqual(twice.map(\.itemKey), ["pantry-auto:tomato|family:mass"])
         let again = PantryAutoGrocery.plan(
             itemId: "item-1", ingredientId: "tomato", displayName: "Domates",
             previousQuantity: 500, nextQuantity: 100, unit: "kg", minimum: 200,
@@ -1049,10 +1049,111 @@ final class PantryDomainTests: XCTestCase {
             needs: [need(quantity: 1, unit: "kg")],
             stock: [cookStock(quantity: 400, unit: "g", minimum: 200, autoAdd: true)]
         )
-        XCTAssertEqual(both.groceryMutations.map(\.itemKey).sorted(), ["pantry-auto:tomato|g", "pantry-cook:meal-1:tomato|kg"])
+        XCTAssertEqual(
+            both.groceryMutations.map(\.itemKey).sorted(),
+            ["pantry-auto:tomato|family:mass", "pantry-cook:meal-1:tomato|family:mass"]
+        )
+        XCTAssertNotEqual(
+            both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-auto:") }?.quantity,
+            both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-cook:") }?.quantity,
+            "the cook gap must not replace the threshold quantity"
+        )
         XCTAssertEqual(both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-auto:") }?.quantity, 200)
         XCTAssertEqual(both.groceryMutations.first { $0.itemKey.hasPrefix("pantry-cook:") }?.quantity, 0.6)
         XCTAssertEqual(both.shortages.map(\.offerAddMissing), [false])
+    }
+
+    /// 2026-10-11: one pantry-auto row per canonical id and unit bucket.
+    /// Cook sheet, Bitti and a repeated tap set that row. The cook gap stays on pantry-cook.
+    func testCanonicalShortfallIsIdempotentAndDoesNotReplaceTheThreshold() throws {
+        let legacy = PantryMarketRow(
+            itemKey: "pantry-auto:tomatoes|piece",
+            ingredientId: "tomatoes",
+            displayName: "Domates",
+            quantity: 2,
+            unit: "piece",
+            isChecked: false,
+            revision: 4
+        )
+        let sheet = PantryAutoGrocery.shortfallMutation(
+            ingredientId: "tomatoes",
+            displayName: "Domates",
+            quantity: 1,
+            unit: "adet",
+            rows: [legacy],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(sheet.itemKey, "pantry-auto:tomato|unit:piece")
+        XCTAssertEqual(sheet.lineSource, GroceryLineSource.shortfall.rawValue)
+        XCTAssertNotEqual(sheet.itemKey, "tomato|unit:piece")
+        let once = PantryAutoGrocery.reduce([legacy], sheet)
+        let twice = PantryAutoGrocery.reduce(once, sheet)
+        XCTAssertEqual(twice.map(\.itemKey), ["pantry-auto:tomato|unit:piece"])
+        XCTAssertEqual(twice.map(\.quantity), [1])
+
+        let finished = PantryAutoGrocery.shortfallMutation(
+            ingredientId: "tomato",
+            displayName: "Domates",
+            quantity: 2,
+            unit: "piece",
+            rows: twice,
+            dictionary: dictionary
+        )
+        let afterBitti = PantryAutoGrocery.reduce(twice, finished)
+        XCTAssertEqual(afterBitti.map(\.itemKey), ["pantry-auto:tomato|unit:piece"])
+        XCTAssertEqual(afterBitti.map(\.quantity), [2])
+
+        let cherry = PantryAutoGrocery.itemKey(ingredientId: "cherry-tomato", unit: "piece", dictionary: dictionary)
+        XCTAssertNotEqual(cherry, sheet.itemKey)
+
+        let threshold = PantryAutoGrocery.plan(
+            itemId: "item-1", ingredientId: "tomatoes", displayName: "Domates",
+            previousQuantity: 5, nextQuantity: 1, unit: "piece", minimum: 4,
+            autoAdd: true, version: 2, rows: [], applied: [], dictionary: dictionary
+        )
+        let thresholdMutation = try XCTUnwrap(threshold.mutation)
+        let thresholdRow = PantryAutoGrocery.reduce([], thresholdMutation)
+        XCTAssertEqual(thresholdMutation.lineSource, GroceryLineSource.threshold.rawValue)
+        XCTAssertEqual(thresholdMutation.quantity, 3)
+        let gap = PantryGroceryMutation(
+            itemKey: PantryAutoGrocery.cookGapKey(mealId: "meal-9", ingredientId: "tomatoes", unit: "piece", dictionary: dictionary),
+            ingredientId: "tomato",
+            displayName: "Domates",
+            quantity: 1,
+            unit: "piece",
+            baseRevision: 0,
+            crossingKey: "cook:meal-9:tomato|unit:piece",
+            creates: true,
+            lineSource: GroceryLineSource.shortfall.rawValue
+        )
+        let sideBySide = PantryAutoGrocery.reduce(thresholdRow, gap)
+        XCTAssertEqual(sideBySide.count, 2)
+        XCTAssertEqual(sideBySide.first { $0.itemKey.hasPrefix("pantry-auto:") }?.quantity, 3)
+        XCTAssertEqual(sideBySide.first { $0.itemKey.hasPrefix("pantry-cook:") }?.quantity, 1)
+
+        let checkedLegacy = PantryMarketRow(
+            itemKey: "pantry-auto:tomatoes|piece",
+            ingredientId: "tomatoes",
+            displayName: "Domates",
+            quantity: 2,
+            unit: "piece",
+            isChecked: true,
+            revision: 1
+        )
+        let extra = PantryMarketRow(
+            itemKey: "pantry-auto:tomato|unit:piece",
+            ingredientId: "tomato",
+            displayName: "Domates",
+            quantity: 9,
+            unit: "piece",
+            isChecked: false,
+            revision: 0
+        )
+        let kept = PantryAutoGrocery.reduce([extra, checkedLegacy], sheet)
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(kept[0].itemKey, "pantry-auto:tomatoes|piece")
+        XCTAssertEqual(kept[0].quantity, 2)
+        XCTAssertTrue(kept[0].isChecked)
     }
 
     func testDateRemindersUseTheCalendarDayInEachDeviceZone() {

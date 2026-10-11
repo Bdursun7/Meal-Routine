@@ -9,7 +9,7 @@
 ```text
 Open P0 findings: none
 Open P1 findings: AUD-V5-002 (SwiftData / DatePicker Not verified (Mac); Linux rules Pass)
-Closed on Linux: AUD-V5-001 (Pass). AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006 (Pass on Linux, §10). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
+Closed on Linux: AUD-V5-001 (Pass). AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006 (Pass on Linux, §10). AUD-V5-007 (Pass on Linux, §11, 2026-10-11). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
 Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001 (household timezone, still V7)
 Repository limits: No Xcode, no device. V6 was not started. Remote pantry push stays deferred until after V6.
 ```
@@ -514,4 +514,19 @@ Host: Ubuntu 24.04, x86_64. Node v22.14.0. Swift 6.0.3. PostgreSQL 16.15. `DATAB
 | Non-`tr-TR` / non-TRY | Still Fail. `AUD-GLOB-001` (P2, V7). Device-zone reminder fires do not add a household timezone. |
 
 **Decision:** `FAIL — V6 blocked`. `AUD-V5-002` remains open.
+
+## 11. AUD-V5-007 — Market cards for one canonical ingredient (2026-10-11)
+
+User-approved Option A + C. `V5.0` was not modified. This finding is closed on Linux. It does not change the V6 decision: `AUD-V5-002` is still not Pass.
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-007` |
+| Version / area | V5 Market list, §17 and §21 |
+| Class | Same ingredient and unit appeared as several shopping rows, and every non-plan row was labeled “Elle eklendi” |
+| Expected | One automatic plan row per dictionary canonical id and unit bucket. `tomato` and `tomatoes` merge. Display name alone does not merge, so `cherry-tomato` stays separate. One idempotent `pantry-auto:<canonicalId>\|<bucket>` row for the cook sheet, “Tüm eksikleri”, and Bitti. The Market shows one card with a labeled breakdown and does not sum plan and shortfall. The `pantry-cook:<mealId>:` gap does not overwrite the threshold quantity; it appears in that card. |
+| Actual before | `GroceryMerger` grouped by the raw catalog id, so a week that used both `tomato` and `tomatoes` kept two Domates plan rows. Cook-sheet and threshold rows were manual, so the list called them “Elle eklendi”. Bitti and + inserted a new row on every tap. |
+| Fix | Plan identity and the household plan key use the canonical id. Legacy stored rows reconcile onto that id; a check survives when the amount is unchanged. Shortfall writes set the one `pantry-auto:` key. A checked shortfall row is not overwritten, and a second key for the same bucket is removed. `pantry-cook:` stays a separate stored quantity. The card labels parts Plan, Evdekiler eksiği, Eşik, and Elle eklendi (only `manual:<uuid>`). Aisle lookup uses the canonical id. The server grocery schema is unchanged; a phone that already has `tomatoes\|piece` reuses that item key. |
+| Tests | `testCanonicalShortfallIsIdempotentAndDoesNotReplaceTheThreshold`. `Tools/grocery_merge_checks.swift` (`checkCanonicalIdentity`). `Tools/portion_scale_checks.swift` (old id, kept check, custom quantity). `Tools/household_checks.swift` (`checkPlanKeys`). |
+| Status | Closed on Linux. The Market screen, SwiftData `sourceRaw` migration, `PantryTests`, and a two-simulator legacy key are Not verified (Mac). |
 

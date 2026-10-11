@@ -1551,13 +1551,99 @@ struct PantryGroceryMutation: Equatable, Sendable {
     var baseRevision: Int
     var crossingKey: String
     var creates: Bool
+    /// `GroceryLineSource` raw value. Cook-sheet and Bitti writes are shortfall.
+    /// Threshold crossing is `threshold`. The plan row is never this mutation.
+    var lineSource: String = GroceryLineSource.shortfall.rawValue
 }
 
 enum PantryAutoGrocery {
-    /// One replenishment row per ingredient and canonical unit. Meal-plan rows use a
-    /// different key and are left alone, including when they are checked.
-    static func itemKey(ingredientId: String, unit: String) -> String {
-        "pantry-auto:\(ingredientId)|\(GroceryMerger.normalize(unit))"
+    /// One replenishment row per canonical ingredient and unit bucket.
+    /// Meal-plan rows use `ingredientId|bucket` and are left alone, including when checked.
+    /// `tomatoes` and `tomato` share this key. `cherry-tomato` does not.
+    static func itemKey(
+        ingredientId: String,
+        unit: String,
+        dictionary: IngredientDictionary = .shared
+    ) -> String {
+        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return "pantry-auto:\(id)|\(GroceryMerger.unitBucket(unit))"
+    }
+
+    /// Recipe gap written when auto-add is on. A different key from `itemKey`, so it
+    /// cannot replace the threshold quantity. The Market card shows it in the same
+    /// breakdown. Same meal, canonical id and bucket update this one key.
+    static func cookGapKey(
+        mealId: String,
+        ingredientId: String,
+        unit: String,
+        dictionary: IngredientDictionary = .shared
+    ) -> String {
+        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return "pantry-cook:\(mealId):\(id)|\(GroceryMerger.unitBucket(unit))"
+    }
+
+    /// True when two stored keys are the same pantry-auto row, including a legacy
+    /// `pantry-auto:tomatoes|piece` next to `pantry-auto:tomato|unit:piece`.
+    /// A plan key and a `pantry-cook:` key never match.
+    static func sameStoredRow(
+        _ stored: String,
+        _ incoming: String,
+        dictionary: IngredientDictionary = .shared
+    ) -> Bool {
+        if stored == incoming { return true }
+        let storedKind = rowKind(stored)
+        let incomingKind = rowKind(incoming)
+        guard storedKind == incomingKind, storedKind != .other else { return false }
+        return GroceryMerger.rowIdentity(ingredientId: stored, unit: unitSuffix(stored), dictionary: dictionary)
+            == GroceryMerger.rowIdentity(ingredientId: incoming, unit: unitSuffix(incoming), dictionary: dictionary)
+            && mealId(stored) == mealId(incoming)
+    }
+
+    /// Cook sheet, “Tüm eksikleri”, and Bitti all set this one pantry-auto row.
+    static func shortfallMutation(
+        ingredientId: String,
+        displayName: String,
+        quantity: Double,
+        unit: String,
+        rows: [PantryMarketRow] = [],
+        dictionary: IngredientDictionary = .shared
+    ) -> PantryGroceryMutation {
+        let key = itemKey(ingredientId: ingredientId, unit: unit, dictionary: dictionary)
+        let existing = rows.first { sameStoredRow($0.itemKey, key, dictionary: dictionary) }
+        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return PantryGroceryMutation(
+            itemKey: key,
+            ingredientId: id,
+            displayName: displayName,
+            quantity: quantity,
+            unit: GroceryMerger.normalize(unit),
+            baseRevision: existing?.revision ?? 0,
+            crossingKey: "manual-missing:\(id)|\(GroceryMerger.unitBucket(unit))",
+            creates: existing == nil,
+            lineSource: GroceryLineSource.shortfall.rawValue
+        )
+    }
+
+    private enum RowKind { case auto, cook, other }
+
+    private static func rowKind(_ key: String) -> RowKind {
+        if key.hasPrefix("pantry-auto:") { return .auto }
+        if key.hasPrefix("pantry-cook:") { return .cook }
+        return .other
+    }
+
+    private static func unitSuffix(_ key: String) -> String {
+        guard let bar = key.lastIndex(of: "|") else { return "" }
+        return String(key[key.index(after: bar)...])
+    }
+
+    /// Meal id embedded in a cook-gap key. Empty for pantry-auto, so two meals
+    /// do not collapse onto each other.
+    private static func mealId(_ key: String) -> String {
+        guard key.hasPrefix("pantry-cook:") else { return "" }
+        let rest = String(key.dropFirst("pantry-cook:".count))
+        guard let colon = rest.firstIndex(of: ":") else { return rest }
+        return String(rest[..<colon])
     }
 
     static func crossingKey(itemId: String, version: Int) -> String {
@@ -1565,16 +1651,24 @@ enum PantryAutoGrocery {
     }
 
     /// Applies a set-quantity mutation. The same target twice does not grow the row.
-    /// A checked row with this key is returned unchanged and no second row is added.
+    /// A checked row with this key is left unchanged and no second row is added.
+    /// A legacy key for the same canonical id and bucket (`pantry-auto:tomatoes|piece`)
+    /// collapses onto that one row. The check stays on the survivor.
     static func reduce(_ rows: [PantryMarketRow], _ mutation: PantryGroceryMutation) -> [PantryMarketRow] {
         guard mutation.quantity > 0 else { return rows }
-        if let index = rows.firstIndex(where: { $0.itemKey == mutation.itemKey }) {
+        let matches = rows.indices.filter { sameStoredRow(rows[$0].itemKey, mutation.itemKey) }
+        if let index = matches.first(where: { rows[$0].isChecked }) ?? matches.first {
             var copy = rows
-            if copy[index].isChecked { return copy }
-            copy[index].quantity = PantryUnitPolicy.snap(mutation.quantity)
-            copy[index].unit = GroceryMerger.normalize(mutation.unit)
-            copy[index].displayName = mutation.displayName
-            return copy
+            if !copy[index].isChecked {
+                copy[index].itemKey = mutation.itemKey
+                copy[index].ingredientId = mutation.ingredientId
+                copy[index].quantity = PantryUnitPolicy.snap(mutation.quantity)
+                copy[index].unit = GroceryMerger.normalize(mutation.unit)
+                copy[index].displayName = mutation.displayName
+            }
+            return copy.enumerated().compactMap { offset, row in
+                offset == index || !sameStoredRow(row.itemKey, mutation.itemKey) ? row : nil
+            }
         }
         var copy = rows
         copy.append(PantryMarketRow(
@@ -1603,7 +1697,8 @@ enum PantryAutoGrocery {
         autoAdd: Bool,
         version: Int,
         rows: [PantryMarketRow],
-        applied: Set<String>
+        applied: Set<String>,
+        dictionary: IngredientDictionary = .shared
     ) -> (mutation: PantryGroceryMutation?, applied: Set<String>) {
         let crossing = crossingKey(itemId: itemId, version: version)
         guard autoAdd, PantryThreshold.crossedIntoLow(previous: previousQuantity, next: nextQuantity, minimum: minimum) else {
@@ -1614,21 +1709,22 @@ enum PantryAutoGrocery {
         nextApplied.insert(crossing)
         let missing = PantryThreshold.shortfall(quantity: nextQuantity, minimum: minimum)
         guard missing > 0 else { return (nil, nextApplied) }
-        let key = itemKey(ingredientId: ingredientId, unit: unit)
-        if let existing = rows.first(where: { $0.itemKey == key }), existing.isChecked {
+        let key = itemKey(ingredientId: ingredientId, unit: unit, dictionary: dictionary)
+        if let existing = rows.first(where: { sameStoredRow($0.itemKey, key) }), existing.isChecked {
             return (nil, nextApplied)
         }
         let canonical = GroceryMerger.normalize(unit)
-        let base = rows.first(where: { $0.itemKey == key })?.revision ?? 0
+        let base = rows.first(where: { sameStoredRow($0.itemKey, key) })?.revision ?? 0
         let mutation = PantryGroceryMutation(
             itemKey: key,
-            ingredientId: ingredientId,
+            ingredientId: GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary),
             displayName: displayName,
             quantity: missing,
             unit: canonical,
             baseRevision: base,
             crossingKey: crossing,
-            creates: rows.contains(where: { $0.itemKey == key }) == false
+            creates: rows.contains(where: { sameStoredRow($0.itemKey, key) }) == false,
+            lineSource: GroceryLineSource.threshold.rawValue
         )
         return (mutation, nextApplied)
     }
@@ -2088,7 +2184,7 @@ enum PantryCookConsumption {
                     itemId: row.id, ingredientId: row.ingredientId, displayName: row.displayName,
                     previousQuantity: previous, nextQuantity: remaining, unit: row.unit,
                     minimum: row.minimumQuantity, autoAdd: row.autoAddToGrocery, version: working[index].version,
-                    rows: rowsNow, applied: crossings
+                    rows: rowsNow, applied: crossings, dictionary: dictionary
                 )
                 crossings = replenish.applied
                 if let mutation = replenish.mutation {
@@ -2108,20 +2204,26 @@ enum PantryCookConsumption {
                     offerAddMissing: !row.autoAddToGrocery
                 ))
                 if row.autoAddToGrocery {
-                    let cookKey = "cook:\(mealId):\(row.ingredientId)|\(GroceryMerger.normalize(need.unit))"
+                    let cookKey = "cook:\(mealId):\(GroceryMerger.shoppingIngredientId(row.ingredientId, dictionary: dictionary))|\(GroceryMerger.unitBucket(need.unit))"
                     if !crossings.contains(cookKey) {
                         crossings.insert(cookKey)
-                        let itemKey = "pantry-cook:\(mealId):\(row.ingredientId)|\(GroceryMerger.normalize(need.unit))"
-                        if rowsNow.first(where: { $0.itemKey == itemKey })?.isChecked != true {
+                        let itemKey = PantryAutoGrocery.cookGapKey(
+                            mealId: mealId,
+                            ingredientId: row.ingredientId,
+                            unit: need.unit,
+                            dictionary: dictionary
+                        )
+                        if rowsNow.first(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) })?.isChecked != true {
                             let mutation = PantryGroceryMutation(
                                 itemKey: itemKey,
-                                ingredientId: row.ingredientId,
+                                ingredientId: GroceryMerger.shoppingIngredientId(row.ingredientId, dictionary: dictionary),
                                 displayName: need.displayName,
                                 quantity: gap,
                                 unit: GroceryMerger.normalize(need.unit),
-                                baseRevision: rowsNow.first(where: { $0.itemKey == itemKey })?.revision ?? 0,
+                                baseRevision: rowsNow.first(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) })?.revision ?? 0,
                                 crossingKey: cookKey,
-                                creates: rowsNow.contains(where: { $0.itemKey == itemKey }) == false
+                                creates: rowsNow.contains(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) }) == false,
+                                lineSource: GroceryLineSource.shortfall.rawValue
                             )
                             mutations.append(mutation)
                             rowsNow = PantryAutoGrocery.reduce(rowsNow, mutation)

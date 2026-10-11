@@ -56,7 +56,15 @@ struct IngredientDictionary: Sendable {
         for bundle in [Bundle.main, Bundle(for: IngredientDictionaryBundleToken.self)] {
             let url = bundle.url(forResource: "ingredients.v1", withExtension: "json", subdirectory: "Recipes")
                 ?? bundle.url(forResource: "ingredients.v1", withExtension: "json")
-            if let url, let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data) {
+            if let url, let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data), !dictionary.entries.isEmpty {
+                return dictionary
+            }
+        }
+        // Command-line checks run from the repo and have no app bundle.
+        let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        for relative in ["MealRoutine/Recipes/ingredients.v1.json", "Recipes/ingredients.v1.json"] {
+            let url = cwd.appendingPathComponent(relative)
+            if let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data), !dictionary.entries.isEmpty {
                 return dictionary
             }
         }

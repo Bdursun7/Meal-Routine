@@ -224,17 +224,22 @@ struct PrimaryButtonStyle: ButtonStyle {
 /// Rounded-square check used on recipe ingredients and market rows.
 struct MealCheckBox: View {
     var isChecked: Bool
+    var isMixed: Bool = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(isChecked ? Theme.accent : Color.clear)
+            .fill(isChecked || isMixed ? Theme.accent.opacity(isMixed && !isChecked ? 0.45 : 1) : Color.clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(isChecked ? Theme.accent : Theme.secondaryText.opacity(0.85), lineWidth: 1.5)
+                    .strokeBorder(isChecked || isMixed ? Theme.accent : Theme.secondaryText.opacity(0.85), lineWidth: 1.5)
             }
             .overlay {
                 if isChecked {
                     Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.onAccent)
+                } else if isMixed {
+                    Image(systemName: "minus")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.onAccent)
                 }
