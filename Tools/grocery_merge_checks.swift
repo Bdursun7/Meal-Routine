@@ -515,6 +515,35 @@ private func checkLegacyShortfallCollapse() {
     check(repeated.values.allSatisfy { $0.count == 1 }, "a card never has two parts with the same source label")
 }
 
+/// A completed personal recipe uses the same aggregation as the catalog.
+/// `import:mercimek` is the dictionary name, so the row is `lentils` at the
+/// entered amount. The optional suffix is not that ingredient.
+private func checkPersonalRecipeIdentity() {
+    let url = URL(fileURLWithPath: "MealRoutine/Recipes/ingredients.v1.json")
+    guard let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data) else {
+        check(false, "ingredients.v1.json should load for personal grocery identity")
+        return
+    }
+    let merged = GroceryMerger.merge([
+        line("import:mercimek", 2, "g", nameTR: "mercimek"),
+        line("import:tuz|optional", 1, "tsp", nameTR: "tuz (isteğe bağlı)"),
+        line("import:not-a-dictionary-name", 4, "piece", nameTR: "Özel malzeme"),
+    ], dictionary: dictionary)
+    let lentils = rows("lentils", in: merged)
+    check(lentils.count == 1, "mercimek joins the dictionary id \(merged.map(\.ingredientId))")
+    close(lentils.first?.quantity, 2, "entered mercimek amount is kept")
+    check(lentils.first?.nameTR == "Mercimek", "dictionary name \(lentils.first?.nameTR ?? "")")
+    check(rows("import:mercimek", in: merged).isEmpty, "raw import id is not a second row")
+    let optional = merged.filter { $0.ingredientId.hasSuffix("|optional") }
+    check(optional.count == 1, "optional personal line stays its own row \(merged.map(\.ingredientId))")
+    close(optional.first?.quantity, 1, "optional amount is kept")
+    check(rows("salt", in: merged).isEmpty, "optional tuz is not the salt row")
+    let custom = rows("import:not-a-dictionary-name", in: merged)
+    check(custom.count == 1, "unknown personal name stays on its import id")
+    close(custom.first?.quantity, 4, "unknown personal amount is kept")
+    check(custom.first?.nameTR == "Özel malzeme", "unknown personal name is the typed name")
+}
+
 @main
 struct GroceryMergeChecks {
     static func main() {
@@ -533,6 +562,7 @@ struct GroceryMergeChecks {
         checkEveningLabels()
         checkCanonicalIdentity()
         checkLegacyShortfallCollapse()
+        checkPersonalRecipeIdentity()
 
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)

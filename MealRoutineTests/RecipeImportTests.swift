@@ -332,8 +332,15 @@ final class RecipeImportTests: XCTestCase {
         try context.save()
         try GroceryListService.rebuild(in: context, now: now)
         let items = try context.fetch(FetchDescriptor<GroceryItem>())
-        XCTAssertTrue(items.contains { $0.nameTR == "mercimek" && $0.quantity == 2 })
-        XCTAssertTrue(items.contains { $0.ingredientId.hasSuffix("|optional") })
+        // `import:mercimek` is the dictionary name Mercimek, so the list stores `lentils`.
+        // The entered 2 g is kept. The optional line stays off that row (§25, same aggregation).
+        let lentils = items.first { $0.ingredientId == "lentils" }
+        XCTAssertEqual(lentils?.nameTR, "Mercimek")
+        XCTAssertEqual(lentils?.quantity, 2)
+        XCTAssertEqual(items.filter { $0.ingredientId == "lentils" }.count, 1)
+        let optional = items.first { $0.ingredientId.hasSuffix("|optional") }
+        XCTAssertEqual(optional?.quantity, 1)
+        XCTAssertNotEqual(optional?.ingredientId, "salt")
     }
 
     func testManualRecipeAndMealMemoryStayOnTheExistingPath() throws {
