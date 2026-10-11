@@ -193,7 +193,7 @@ final class PantryDomainTests: XCTestCase {
         return PantryItemBody.create(item, confirmSeparate: false)
     }
 
-    func testRowShowsSafetyForUseByAndQualityForBestBefore() {
+    func testRowShowsNeutralPastDateForUseByAndBestBefore() {
         let safety = PantryRowPresentation.make(
             name: "Süt", ingredientResolved: true, quantity: 1, unit: "l", location: .refrigerator,
             minimumQuantity: nil, dateType: .useBy, dateValue: "2026-10-06", today: "2026-10-07", calendar: utc
@@ -1164,16 +1164,19 @@ final class PantryDomainTests: XCTestCase {
         let zones = ["Europe/Istanbul", "Pacific/Auckland", "America/Los_Angeles"]
         for identifier in zones {
             let zone = TimeZone(identifier: identifier)!
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = zone
+            let now = calendar.date(from: DateComponents(year: 2026, month: 2, day: 1, hour: 8))!
             let best = PantryDateReminders.plan(
                 itemId: "milk", displayName: "Süt", dateType: .bestBefore, dateValue: "2026-03-01",
-                quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone
+                quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone, now: now
             )
             XCTAssertEqual(best.map { "\($0.year)-\($0.month)-\($0.day)" }, ["2026-2-27", "2026-3-1"], identifier)
             XCTAssertEqual(Set(best.map(\.hour)), [9])
             XCTAssertEqual(Set(best.map(\.timeZoneIdentifier)), [identifier])
             let useBy = PantryDateReminders.plan(
                 itemId: "milk", displayName: "Süt", dateType: .useBy, dateValue: "2026-03-01",
-                quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone
+                quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone, now: now
             )
             XCTAssertEqual(useBy.map { "\($0.year)-\($0.month)-\($0.day)" }, ["2026-2-28", "2026-3-1"], identifier)
             for fire in best + useBy {
@@ -1189,11 +1192,116 @@ final class PantryDomainTests: XCTestCase {
         schedule.enabled = false
         XCTAssertEqual(PantryDateReminders.plan(itemId: "milk", displayName: "Süt", dateType: .useBy, dateValue: "2026-03-01", quantity: 1, remindersEnabled: true, schedule: schedule, timeZone: zone), [])
         XCTAssertEqual(PantryDateReminders.plan(itemId: "milk", displayName: "Süt", dateType: .useBy, dateValue: "2026-03-01", quantity: 0, remindersEnabled: true, schedule: .standard, timeZone: zone), [])
-        let moved = PantryDateReminders.plan(itemId: "milk", displayName: "Süt", dateType: .bestBefore, dateValue: "2026-04-01", quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone)
+        var early = Calendar(identifier: .gregorian)
+        early.timeZone = zone
+        let beforeApril = early.date(from: DateComponents(year: 2026, month: 2, day: 1, hour: 8))!
+        let moved = PantryDateReminders.plan(itemId: "milk", displayName: "Süt", dateType: .bestBefore, dateValue: "2026-04-01", quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone, now: beforeApril)
         XCTAssertEqual(moved.map(\.identifier), ["pantry-date.milk.bestBefore.2", "pantry-date.milk.bestBefore.0"])
         XCTAssertEqual(moved.map { "\($0.month)-\($0.day)" }, ["3-30", "4-1"])
         XCTAssertTrue(PantryDateReminders.allIdentifiers(itemId: "milk").contains("pantry-date.milk.bestBefore.2"))
         XCTAssertTrue(PantryDateReminders.allIdentifiers(itemId: "milk").contains("pantry-date.milk.useBy.1"))
+        let duringLead = early.date(from: DateComponents(year: 2026, month: 2, day: 28, hour: 12))!
+        let skippedPast = PantryDateReminders.plan(itemId: "milk", displayName: "Süt", dateType: .bestBefore, dateValue: "2026-03-01", quantity: 1, remindersEnabled: true, schedule: .standard, timeZone: zone, now: duringLead)
+        XCTAssertEqual(skippedPast.map { "\($0.month)-\($0.day)" }, ["3-1"])
+    }
+
+    func testLocationTabsFilterThePantryListAndPreselectAPlace() {
+        let rows = [
+            PantryListedItem(id: "a", name: "Un", location: .pantry),
+            PantryListedItem(id: "b", name: "Süt", location: .refrigerator),
+            PantryListedItem(id: "c", name: "Domates", location: .refrigerator),
+            PantryListedItem(id: "d", name: "Bezelye", location: .freezer),
+        ]
+        XCTAssertEqual(PantryLocationTabs.visible(rows, tab: .all, search: "").map(\.id), ["a", "b", "c", "d"])
+        XCTAssertEqual(PantryLocationTabs.visible(rows, tab: .refrigerator, search: "").map(\.id), ["b", "c"])
+        XCTAssertEqual(PantryLocationTabs.visible(rows, tab: .refrigerator, search: "dom").map(\.id), ["c"])
+        XCTAssertEqual(PantryLocationTabs.visible(rows, tab: .other, search: ""), [])
+        XCTAssertEqual(PantryLocationTabs.counts(rows)[.all], 4)
+        XCTAssertEqual(PantryLocationTabs.counts(rows)[.refrigerator], 2)
+        XCTAssertNil(PantryLocationFilter.all.preselectedLocation)
+        XCTAssertEqual(PantryLocationFilter.freezer.preselectedLocation, .freezer)
+        let empty = PantryLocationTabs.emptyMessage(for: .pantry)
+        XCTAssertEqual(empty, "Kiler konumunda malzeme yok.")
+        for phrase in ["güvenli", "yenmez", "tazelik"] {
+            XCTAssertFalse(empty.localizedCaseInsensitiveContains(phrase), empty)
+        }
+        XCTAssertTrue(PantryLocationTabs.accessibilityLabel(tab: .refrigerator, count: 2, selected: true).contains("Buzdolabı"))
+    }
+
+    func testCookUsesEveryCompatibleRowInDateThenLocationOrder() throws {
+        let pantry = PantryCookStock(
+            id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 300, unit: "g",
+            minimumQuantity: nil, autoAddToGrocery: false, version: 1, dateValue: "2026-04-01", location: .pantry
+        )
+        let fridge = PantryCookStock(
+            id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 200, unit: "g",
+            minimumQuantity: nil, autoAddToGrocery: false, version: 4, dateValue: "2026-04-03", location: .refrigerator
+        )
+        let outcome = cook(event: .markCooked, confirmed: true, needs: [need(quantity: 400, unit: "g")], stock: [fridge, pantry])
+        XCTAssertEqual(outcome.deductions.map(\.itemId), ["pantry", "fridge"])
+        XCTAssertEqual(outcome.deductions.map(\.deducted), [300, 100])
+        XCTAssertEqual(outcome.deductions.map(\.baseVersion), [1, 4])
+        XCTAssertEqual(outcome.shortages, [])
+        let collapsed = PantryCookOutbox.collapse(outcome.deductions)
+        XCTAssertEqual(collapsed.map(\.itemId), ["pantry", "fridge"])
+        XCTAssertEqual(collapsed.map(\.baseVersion), [1, 4])
+
+        let sameDay = [
+            PantryCookStock(id: "z-freezer", ingredientId: "tomato", displayName: "Domates", quantity: 1, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, dateValue: "2026-05-01", location: .freezer),
+            PantryCookStock(id: "a-pantry", ingredientId: "tomato", displayName: "Domates", quantity: 1, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, dateValue: "2026-05-01", location: .pantry),
+        ]
+        XCTAssertEqual(PantryCookSplit.ordered(sameDay).map(\.id), ["a-pantry", "z-freezer"])
+
+        let rows = PantryCookConsumption.classify(
+            needs: [need(quantity: 4, unit: "piece")],
+            stock: [
+                PantryCookStock(id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 2, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .refrigerator),
+                PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 3, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+            ],
+            dictionary: dictionary
+        )
+        let shown = try XCTUnwrap(rows.first)
+        XCTAssertEqual(shown.inventoryLine, "Domates — Kiler: 3 adet, Buzdolabı: 2 adet")
+        XCTAssertEqual(shown.locations.map(\.selected), [3, 1])
+        let overridden = PantryCookConsumption.classify(
+            needs: [need(quantity: 4, unit: "piece")],
+            stock: [
+                PantryCookStock(id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 2, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .refrigerator),
+                PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 3, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+            ],
+            splits: [0: ["pantry": 1, "fridge": 2]],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(overridden.first?.locations.map(\.id), ["pantry", "fridge"])
+        XCTAssertEqual(overridden.first?.locations.map(\.selected), [1, 2])
+        XCTAssertEqual(overridden.first?.shortfallQuantity, 1)
+        let applied = PantryCookConsumption.apply(
+            event: .markCooked, confirmed: true, mealId: "meal-1",
+            needs: [need(quantity: 4, unit: "piece")],
+            stock: [
+                PantryCookStock(id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 2, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 2, location: .refrigerator),
+                PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 3, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 2, location: .pantry),
+            ],
+            rows: [], appliedMeals: [], appliedCrossings: [], armedLow: [], lowStockEnabled: false,
+            splits: [0: ["pantry": 1, "fridge": 2]],
+            dictionary: dictionary
+        )
+        XCTAssertEqual(applied.deductions.map(\.itemId), ["pantry", "fridge"])
+        XCTAssertEqual(applied.deductions.map(\.deducted), [1, 2])
+        XCTAssertEqual(applied.shortages.map(\.missingQuantity), [1])
+        XCTAssertEqual(PantryCookGate.decision(syncsHousehold: false, claim: .pending), .applyNow)
+        XCTAssertEqual(PantryCookGate.decision(syncsHousehold: true, claim: .pending), .hold)
+        XCTAssertEqual(PantryCookGate.decision(syncsHousehold: true, claim: .accepted), .applyNow)
+        XCTAssertEqual(PantryCookGate.decision(syncsHousehold: true, claim: .rejected), .skip)
+        let twice = [
+            PantryCookDeduction(itemId: "item-1", ingredientId: "tomato", newQuantity: 100, unit: "g", baseVersion: 3, deducted: 300),
+            PantryCookDeduction(itemId: "item-1", ingredientId: "tomato", newQuantity: 0, unit: "g", baseVersion: 4, deducted: 100),
+        ]
+        let one = PantryCookOutbox.collapse(twice)
+        XCTAssertEqual(one.count, 1)
+        XCTAssertEqual(one[0].baseVersion, 3)
+        XCTAssertEqual(one[0].newQuantity, 0)
+        XCTAssertEqual(one[0].deducted, 400)
     }
 
     private func need(ingredientId: String = "tomato", quantity: Double, unit: String) -> PantryCookNeed {

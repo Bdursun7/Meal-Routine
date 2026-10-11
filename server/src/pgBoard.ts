@@ -9,6 +9,7 @@ import type {
   ReactionRow,
 } from './boardTypes.js'
 import { defaultPreference } from './boardTypes.js'
+import { legacyGroceryInt } from './boardApply.js'
 
 export function createPgBoard(pool: Pool): BoardStore {
   return {
@@ -66,6 +67,9 @@ function pgBoardTx(client: PoolClient): BoardTx {
       )
     },
     async load(householdId) {
+      // Serializes board writes for one household. The second cook waits, then
+      // sees the new meal revision and conflicts. No extra table.
+      await client.query('SELECT id FROM households WHERE id = $1 FOR UPDATE', [householdId])
       return loadBoard(client, householdId)
     },
     async persist(householdId, document, changes) {
@@ -125,6 +129,18 @@ function pgBoardTx(client: PoolClient): BoardTx {
   }
 }
 
+async function groceryDecimalReady(client: PoolClient): Promise<boolean> {
+  const result = await client.query<{ ready: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'shared_grocery_items'
+          AND column_name = 'quantity_decimal'
+     ) AS ready`,
+  )
+  return result.rows[0]?.ready === true
+}
+
 async function loadBoard(client: PoolClient, householdId: string): Promise<BoardDocument> {
   const preference = await client.query<{
     cooking_days: number[]
@@ -179,16 +195,23 @@ async function loadBoard(client: PoolClient, householdId: string): Promise<Board
       WHERE p.household_id = $1`,
     [householdId],
   )
+  const decimal = await groceryDecimalReady(client)
   const grocery = await client.query<{
     id: string
     item_key: string
     quantity: number
+    quantity_decimal: number | null
+    unit: string | null
+    line_source: string | null
     is_checked: boolean
     updated_by: string | null
     revision: number
   }>(
-    `SELECT id, item_key, quantity, is_checked, updated_by, revision
-       FROM shared_grocery_items WHERE household_id = $1 ORDER BY item_key`,
+    decimal
+      ? `SELECT id, item_key, quantity, quantity_decimal::float8 AS quantity_decimal, unit, line_source, is_checked, updated_by, revision
+           FROM shared_grocery_items WHERE household_id = $1 ORDER BY item_key`
+      : `SELECT id, item_key, quantity, NULL::float8 AS quantity_decimal, NULL::text AS unit, NULL::text AS line_source, is_checked, updated_by, revision
+           FROM shared_grocery_items WHERE household_id = $1 ORDER BY item_key`,
     [householdId],
   )
   const activity = await client.query<{
@@ -266,7 +289,9 @@ async function loadBoard(client: PoolClient, householdId: string): Promise<Board
       id: row.id,
       householdId,
       itemKey: row.item_key,
-      quantity: row.quantity,
+      quantity: row.quantity_decimal == null ? row.quantity : Number(row.quantity_decimal),
+      unit: row.unit,
+      lineSource: row.line_source,
       isChecked: row.is_checked,
       updatedBy: row.updated_by,
       revision: row.revision,
@@ -355,12 +380,33 @@ async function saveBoard(client: PoolClient, householdId: string, document: Boar
     }
   }
   await client.query('DELETE FROM shared_grocery_items WHERE household_id = $1', [householdId])
+  const decimal = await groceryDecimalReady(client)
   for (const item of document.grocery) {
-    await client.query(
-      `INSERT INTO shared_grocery_items (id, household_id, item_key, is_checked, updated_by, revision, quantity, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
-      [item.id, householdId, item.itemKey, item.isChecked, item.updatedBy, item.revision, item.quantity],
-    )
+    if (decimal) {
+      await client.query(
+        `INSERT INTO shared_grocery_items (
+           id, household_id, item_key, is_checked, updated_by, revision, quantity, quantity_decimal, unit, line_source, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())`,
+        [
+          item.id,
+          householdId,
+          item.itemKey,
+          item.isChecked,
+          item.updatedBy,
+          item.revision,
+          legacyGroceryInt(item.quantity),
+          item.quantity,
+          item.unit,
+          item.lineSource,
+        ],
+      )
+    } else {
+      await client.query(
+        `INSERT INTO shared_grocery_items (id, household_id, item_key, is_checked, updated_by, revision, quantity, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
+        [item.id, householdId, item.itemKey, item.isChecked, item.updatedBy, item.revision, legacyGroceryInt(item.quantity)],
+      )
+    }
   }
   await client.query('DELETE FROM household_activity WHERE household_id = $1', [householdId])
   for (const row of document.activity) {

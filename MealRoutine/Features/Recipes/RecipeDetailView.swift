@@ -215,8 +215,8 @@ struct RecipeDetailView: View {
                     PantryCookConfirmSheet(
                         needs: cookNeeds(recipe),
                         stock: cookStock(for: recipe),
-                        onConfirm: { included in
-                            viewModel.confirmCookStock(needs: included, in: modelContext)
+                        onConfirm: { needs, excluded, splits in
+                            viewModel.confirmCookStock(needs: needs, excluded: excluded, splits: splits, in: modelContext)
                         },
                         onDecline: viewModel.declineCookStock,
                         onAddMissing: { shortage in
@@ -1038,15 +1038,16 @@ private struct DiscoverySelectionTracker: ViewModifier {
 private struct PantryCookConfirmSheet: View {
     var needs: [PantryCookNeed]
     var stock: [PantryCookStock]
-    var onConfirm: ([PantryCookNeed]) -> Void
+    var onConfirm: ([PantryCookNeed], Set<Int>, [Int: [String: Double]]) -> Void
     var onDecline: () -> Void
     var onAddMissing: (PantryCookShortage) -> Void
 
     @State private var excluded: Set<Int> = []
     @State private var added: Set<Int> = []
+    @State private var selections: [Int: [String: Double]] = [:]
 
     private var rows: [PantryCookSheetRow] {
-        PantryCookConsumption.classify(needs: needs, stock: stock, excludedNeedIndexes: excluded)
+        PantryCookConsumption.classify(needs: needs, stock: stock, excludedNeedIndexes: excluded, splits: selections)
     }
 
     private var matched: [PantryCookSheetRow] { rows.filter { $0.kind == .matched } }
@@ -1154,6 +1155,7 @@ private struct PantryCookConfirmSheet: View {
                     .foregroundStyle(Theme.textCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 amountLine(row)
+                locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
                     .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
@@ -1174,6 +1176,7 @@ private struct PantryCookConfirmSheet: View {
                     .foregroundStyle(Theme.textCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 amountLine(row)
+                locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textCharcoal)
@@ -1199,11 +1202,53 @@ private struct PantryCookConfirmSheet: View {
         .listRowBackground(Theme.cardSurface)
     }
 
+    @ViewBuilder
     private func amountLine(_ row: PantryCookSheetRow) -> some View {
-        Text("Tarif \(row.recipeAmount) · Evdekiler \(row.stockAmount ?? "")")
-            .font(.subheadline)
-            .foregroundStyle(Theme.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
+        if let inventory = row.inventoryLine {
+            Text(inventory)
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Tarif \(row.recipeAmount)")
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text("Tarif \(row.recipeAmount) · Evdekiler \(row.stockAmount ?? "")")
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func locationControls(_ row: PantryCookSheetRow) -> some View {
+        if row.locations.count > 1 {
+            ForEach(row.locations) { line in
+                Stepper(value: takeBinding(row, line: line), in: 0...max(line.available, 0), step: PantryCookSplit.step(for: line.unit)) {
+                    Text("\(line.locationTitle): \(PantryCookConsumption.formatAmount(line.selected, unit: line.unit))")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textCharcoal)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityLabel("\(row.displayName), \(line.locationTitle), elde \(line.availableText)")
+            }
+            Text(PantryCopy.cookLocationHint)
+                .font(.footnote)
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func takeBinding(_ row: PantryCookSheetRow, line: PantryCookLocationLine) -> Binding<Double> {
+        Binding(
+            get: { line.selected },
+            set: { newValue in
+                var current = selections[row.needIndex] ?? Dictionary(uniqueKeysWithValues: row.locations.map { ($0.id, $0.selected) })
+                current[line.id] = newValue
+                selections[row.needIndex] = current
+            }
+        )
     }
 
     private func amountAccessibility(_ row: PantryCookSheetRow) -> String {
@@ -1242,10 +1287,7 @@ private struct PantryCookConfirmSheet: View {
     }
 
     private func confirm() {
-        let included = needs.enumerated().compactMap { index, need in
-            excluded.contains(index) ? nil : need
-        }
-        onConfirm(included)
+        onConfirm(needs, excluded, selections)
     }
 }
 

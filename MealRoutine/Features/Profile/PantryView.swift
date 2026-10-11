@@ -32,14 +32,20 @@ struct PantryView: View {
     @State private var separatePrompt: PantryFormResult?
     @State private var session = HouseholdSession.shared
     @State private var notificationPreferences = PantryNotificationPreferenceStore.load()
+    @State private var locationTab = PantryLocationTabSession.selected
 
     private var householdID: UUID? { session.snapshot.household?.id }
     private var syncsHousehold: Bool { householdID != nil && PantryOutbox.syncsHousehold }
 
     private var scoped: [PantryItem] { items.filter { $0.householdID == householdID } }
 
+    private var listed: [PantryListedItem] {
+        scoped.map { PantryListedItem(id: $0.uuid.uuidString, name: $0.displayName, location: $0.location) }
+    }
+
     private var visible: [PantryItem] {
-        scoped.filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
+        let allowed = Set(PantryLocationTabs.visible(listed, tab: locationTab, search: search).map(\.id))
+        return scoped.filter { allowed.contains($0.uuid.uuidString) }
             .sorted {
                 if $0.isLowStock != $1.isLowStock { return $0.isLowStock }
                 return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
@@ -76,6 +82,7 @@ struct PantryView: View {
 
     var body: some View {
         List {
+            locationTabs
             statusSections
             content
         }
@@ -93,7 +100,7 @@ struct PantryView: View {
             }
         }
         .sheet(isPresented: $showingAdd) {
-            PantryForm(item: nil, householdID: householdID) { add($0, confirmSeparate: false) }
+            PantryForm(item: nil, householdID: householdID, location: locationTab.preselectedLocation) { add($0, confirmSeparate: false) }
         }
         .sheet(item: $editing) { item in
             PantryForm(item: item, householdID: householdID) { edit(item, with: $0) }
@@ -170,6 +177,39 @@ struct PantryView: View {
     private func rescheduleReminders() {
         for item in scoped {
             PantryStockSideEffects.refreshReminders(for: item, preferences: notificationPreferences)
+        }
+    }
+
+    private var locationTabs: some View {
+        let counts = PantryLocationTabs.counts(listed)
+        return Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PantryLocationFilter.allCases) { tab in
+                        let count = counts[tab] ?? 0
+                        let selected = locationTab == tab
+                        Button {
+                            locationTab = tab
+                            PantryLocationTabSession.selected = tab
+                        } label: {
+                            Text("\(tab.title) \(count)")
+                                .font(.subheadline.weight(selected ? .semibold : .regular))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .foregroundStyle(Theme.textCharcoal)
+                                .background(selected ? Theme.accent.opacity(0.18) : Color.clear, in: Capsule())
+                                .overlay { Capsule().strokeBorder(Theme.secondaryText.opacity(0.35), lineWidth: 1) }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(PantryLocationTabs.accessibilityLabel(tab: tab, count: count, selected: selected))
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityIdentifier("pantry.location.\(tab.rawValue)")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
         }
     }
 
@@ -272,8 +312,16 @@ struct PantryView: View {
             } actions: {
                 Button(PantryCopy.addIngredient) { showingAdd = true }
             }
-        } else if visible.isEmpty {
+        } else if visible.isEmpty && !search.isEmpty {
             ContentUnavailableView.search(text: search)
+        } else if visible.isEmpty {
+            ContentUnavailableView {
+                Label(locationTab.title, systemImage: "shippingbox")
+            } description: {
+                Text(PantryLocationTabs.emptyMessage(for: locationTab))
+            } actions: {
+                Button(PantryCopy.addIngredient) { showingAdd = true }
+            }
         } else {
             ForEach(visible) { item in row(item) }
                 .onDelete(perform: delete)
@@ -812,17 +860,18 @@ private struct PantryForm: View {
     @State private var draft: PantryFormDraft
     var onSave: (PantryFormResult) -> Void
 
-    init(item: PantryItem?, householdID: UUID?, onSave: @escaping (PantryFormResult) -> Void) {
+    init(item: PantryItem?, householdID: UUID?, location: PantryLocation? = nil, onSave: @escaping (PantryFormResult) -> Void) {
         self.item = item
         self.householdID = householdID
         self.onSave = onSave
-        _draft = State(initialValue: Self.draft(for: item))
+        _draft = State(initialValue: Self.draft(for: item, location: location))
     }
 
-    private static func draft(for item: PantryItem?) -> PantryFormDraft {
+    private static func draft(for item: PantryItem?, location: PantryLocation?) -> PantryFormDraft {
         guard let item else {
             var draft = PantryFormDraft.empty
             draft.date = Date()
+            if let location { draft.location = location }
             return draft
         }
         return PantryFormDraft.loaded(

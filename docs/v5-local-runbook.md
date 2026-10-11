@@ -1,6 +1,6 @@
 # V5 yerel çalıştırma
 
-V4.1 adımları `docs/v4.1-local-runbook.md` içindedir. V5 aynı sunucuyu kullanır ve şemaya `0012_pantry.sql` ekler. V5.1 `0013_pantry_auto_add.sql` ile `pantry_items.auto_add_to_grocery` kolonunu ekler (`BOOLEAN NOT NULL DEFAULT false`). `0001`–`0012` dosyaları yeniden yazılmaz. Household saat dilimi kolonu yoktur.
+V4.1 adımları `docs/v4.1-local-runbook.md` içindedir. V5 aynı sunucuyu kullanır ve şemaya `0012_pantry.sql` ekler. V5.1 `0013_pantry_auto_add.sql` ile `pantry_items.auto_add_to_grocery` kolonunu ekler (`BOOLEAN NOT NULL DEFAULT false`). `0014_shared_grocery_quantity.sql` ortak market satırına `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve boş kalabilen `line_source` ekler; tamsayı `quantity` durur. `0001`–`0013` dosyaları yeniden yazılmaz. `0015` yoktur. Household saat dilimi kolonu yoktur.
 
 ## Şema
 
@@ -12,7 +12,7 @@ npm test
 npm run typecheck
 ```
 
-`npm run migrate` `0001`–`0013` uygular. `0012` üç tablo kurar:
+`npm run migrate` `0001`–`0014` uygular. `0012` üç tablo kurar:
 
 - `ingredients`: merkezi sözlük. Seed satırları (`household_id` boş) `server/db/ingredients.v1.json` ile aynıdır. Ev halkının eklediği `custom:<uuid>` satırları o eve bağlıdır.
 - `pantry_items`: household pantry. `ingredient_id` sözlüğe bağlıdır; `date_type` (`bestBefore` | `useBy`) ve `date_value` ya ikisi birden vardır ya hiçbiri. `version` her yazımda artar. `0013` `auto_add_to_grocery` ekler; varsayılan kapalıdır.
@@ -40,7 +40,7 @@ Sonra `npm run migrate`. Yayınlanmış bir ortamda taslak hiç uygulanmadı.
 DATABASE_URL=postgres://kullanici:sifre@localhost:5433/mealroutine npm test
 ```
 
-`pantry.integration.test.ts` boş bir şemaya `0001`–`0011` uygular, V4.1 verisi yazar, `0012` ve `0013`’ü uygular ve hiçbir satırın kaybolmadığını, kısıtların veritabanında da tuttuğunu doğrular.
+`pantry.integration.test.ts` boş bir şemaya `0001`–`0011` uygular, V4.1 verisi yazar, `0012`, `0013` ve `0014`’ü uygular ve hiçbir satırın kaybolmadığını, kısıtların veritabanında da tuttuğunu doğrular. 2026-10-11 Postgres 16.15 koşusu: `npm test` 68/68, atlanan yok; `Tools/run_pantry_domain_tests.sh` 46/46.
 
 ## Ingredient sözlüğü
 
@@ -84,7 +84,8 @@ Yazımlar `Idempotency-Key` (8–200 karakter) ister. Aynı anahtar aynı gövde
 - Tarih isteğe bağlıdır. “Son tüketim tarihi (STT)” geçince “Girilen son tüketim tarihi geçti”, “Tavsiye edilen tüketim tarihi (TETT)” geçince “Girilen tavsiye edilen tüketim tarihi geçti” görünür. Bu satırlar paketteki türü ve tarihin geçmiş olduğunu söyler; gıdanın güvenli olup olmadığına karar vermez.
 - Market’te “Eksik miktarı hesapla”, satırda “Evdekilerden düş” ve “Evdekilere ekle” vardır. Kısmen işaretli bir market satırı “1 adet daha alınacak” der; bu evdeki kalan stok değildir. Plan kurmak, plan satırını açmak veya işaretlemek ve “Pişirdim” tek başına stoğu değiştirmez. Puan kaydedilince “Evdekilerden düş” sayfası açılır. “Vazgeç” stoku bırakır. “Düş” yalnız aynı malzeme kimliği ve çevrilebilir birimde, eldeki miktarı aşmadan düşer. “Düşülecek” satırı kapatılırsa o malzeme düşülmez. Eksik, `autoAddToGrocery` kapalıysa kendiliğinden markete yazılmaz; “Eksiği markete ekle” ayrı durur.
 - Plan satırı sözlük kanonik id + birim kovasıyla birleşir (2026-10-11). `tomato` ve `tomatoes` tek satırdır. Görünen ad birleştirmez; `cherry-tomato` ayrı kalır. Aynı kimlik ve kova markette tek karttır. Döküm parçaları ayrıdır (`Plan`, `Evdekiler eksiği`, `Eşik`, `Pişirme eksiği`, `Elle eklendi`) ve toplanmaz. Aynı etiket iki kez görünmez. Eski kısa satırlar tek `pantry-auto:` satırına iner; iki kısa miktar toplanmaz, büyük olan kalır. “Elle eklendi” yalnız + ile yazılan satırdır. Kartın kutusu bütün parçaları işaretler.
-- Eşik market satırı yalnız `autoAddToGrocery` açıkken ve miktar minimumun üstünden minimuma veya altına ilk inince yazılır. Anahtar `pantry-auto:<kanonikId>|<kova>` (`family:mass`, `family:volume` veya `unit:piece`). Pişirme sayfası, “Tüm eksikleri” ve Bitti aynı anahtarı mutlak yazar; ikinci dokunuş ikinci satır açmaz. `pantry-cook:<mealId>:<kanonikId>|<kova>` eşik miktarını ezmez ve aynı kartın dökümünde durur. Ortak listede gövde `mode: "set"` mutlak miktar yazar; iki telefon aynı eksiği ikinci satır yapmaz. İşaretli satır durur. Miktar `0008` tamsayısıdır (`1`–`999`). Eski `tomatoes|piece` tamamlanması varsa istemci o anahtarı yeniden kullanır.
+- Eşik market satırı yalnız `autoAddToGrocery` açıkken ve miktar minimumun üstünden minimuma veya altına ilk inince yazılır. Anahtar `pantry-auto:<kanonikId>|<kova>` (`family:mass`, `family:volume` veya `unit:piece`). Pişirme sayfası, “Tüm eksikleri” ve Bitti aynı anahtarı mutlak yazar; ikinci dokunuş ikinci satır açmaz. `pantry-cook:<mealId>:<kanonikId>|<kova>` eşik miktarını ezmez ve aynı kartın dökümünde “Pişirme eksiği” olarak durur. Ortak listede gövde `mode: "set"` mutlak miktar yazar; iki telefon aynı eksiği ikinci satır yapmaz. İşaretli satır durur. Plan satırı birim göndermez ve `0008` tamsayısında kalır (`1`–`999`). Kısa satır, pişirme eksiği ve elle eklenen satır `0014` ile ondalık miktar ve birim gönderir. Eski `tomatoes|piece` tamamlanması varsa istemci o anahtarı yeniden kullanır. Bu haftayı açmak elle, eşik ve pişirme satırlarını silmez.
+- Evdekiler üstünde Tümü, Kiler, Buzdolabı, Dondurucu ve Diğer sekmeleri vardır. Market tek listedir. Bir konum sekmesinden eklenen malzeme o konumu seçili açar. Son sekme yalnız o oturumda hatırlanır.
 - Evdekiler’de “Düşük stok bildirimi” ve “Tarih hatırlatması” anahtarları cihazdadır, sunucu şeması değildir. Hatırlatma, girilen `YYYY-MM-DD` gününde cihazın saat dilimiyle 09:00’a konur. `bestBefore` 2 gün önce ve o gün, `useBy` 1 gün önce ve o gündür. İzin yoksa pantry yine çalışır. Uzak push V6 sonrasına bırakıldı. Household saat dilimi V7’dedir.
 - “Bitti” seçenek ister; seçilmeden ya da İptal ile stok değişmez.
 - Household yazımları önce telefona yazılır, sonra kuyruktan gönderilir. Çevrimdışıyken satırda “Eşitlenmeyi bekliyor” görünür. Çakışmada “Bu malzeme başka bir cihazda güncellendi.” ve iki seçenek çıkar.

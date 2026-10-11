@@ -501,6 +501,7 @@ enum PantryTransferApply {
                 let base = match.revision
                 match.quantity = quantity
                 match.unit = unit
+                match.autoAddToGrocery = match.autoAddToGrocery || item.autoAddToGrocery
                 match.updatedAt = .now
                 match.revision += 1
                 PantryOutbox.record(.update, match, baseVersion: base, in: context)
@@ -514,6 +515,7 @@ enum PantryTransferApply {
                     unit: item.unit,
                     location: item.location,
                     minimumQuantity: item.minimumQuantity,
+                    autoAddToGrocery: item.autoAddToGrocery,
                     dateType: item.dateType,
                     dateValue: item.dateValue
                 )
@@ -627,6 +629,81 @@ enum PantryEffectLedger {
     }
 }
 
+struct PantryCookHeld: Codable, Equatable {
+    var needs: [PantryCookNeed]
+    var excluded: [Int]
+    var splits: [String: [String: Double]]
+
+    var decodedSplits: [Int: [String: Double]] {
+        var result: [Int: [String: Double]] = [:]
+        for (key, value) in splits {
+            if let index = Int(key) { result[index] = value }
+        }
+        return result
+    }
+}
+
+enum PantryCookClaimStore {
+    private static let claimsKey = "mealroutine.pantry.cookClaims"
+    private static let heldKey = "mealroutine.pantry.cookHeld"
+
+    static func claim(for mealId: String) -> PantryCookClaim? {
+        let map = UserDefaults.standard.dictionary(forKey: claimsKey) as? [String: String] ?? [:]
+        return map[mealId.lowercased()].flatMap(PantryCookClaim.init(rawValue:))
+    }
+
+    static func mark(_ mealId: String, _ claim: PantryCookClaim) {
+        var map = UserDefaults.standard.dictionary(forKey: claimsKey) as? [String: String] ?? [:]
+        map[mealId.lowercased()] = claim.rawValue
+        UserDefaults.standard.set(map, forKey: claimsKey)
+    }
+
+    static func hold(mealId: String, needs: [PantryCookNeed], excluded: Set<Int>, splits: [Int: [String: Double]]) {
+        var all = loadHeld()
+        var encoded: [String: [String: Double]] = [:]
+        for (index, value) in splits { encoded[String(index)] = value }
+        all[mealId.lowercased()] = PantryCookHeld(needs: needs, excluded: excluded.sorted(), splits: encoded)
+        saveHeld(all)
+    }
+
+    static func held(for mealId: String) -> PantryCookHeld? {
+        loadHeld()[mealId.lowercased()]
+    }
+
+    static func dropHeld(_ mealId: String) {
+        var all = loadHeld()
+        all.removeValue(forKey: mealId.lowercased())
+        saveHeld(all)
+    }
+
+    private static func loadHeld() -> [String: PantryCookHeld] {
+        guard let data = UserDefaults.standard.data(forKey: heldKey) else { return [:] }
+        return (try? JSONDecoder().decode([String: PantryCookHeld].self, from: data)) ?? [:]
+    }
+
+    private static func saveHeld(_ value: [String: PantryCookHeld]) {
+        if let data = try? JSONEncoder().encode(value) {
+            UserDefaults.standard.set(data, forKey: heldKey)
+        }
+    }
+}
+
+/// One remove/add chain per pantry item so a delete cannot lose to an in-flight reschedule.
+actor PantryNotificationSerial {
+    static let shared = PantryNotificationSerial()
+    private var tails: [String: Task<Void, Never>] = [:]
+
+    func enqueue(itemId: String, operation: @escaping @Sendable () async -> Void) async {
+        let previous = tails[itemId]
+        let next = Task {
+            _ = await previous?.value
+            await operation()
+        }
+        tails[itemId] = next
+        await next.value
+    }
+}
+
 /// Local notification adapter. Permission denial does not block pantry writes.
 enum PantryLocalNotifications {
     @MainActor
@@ -646,12 +723,16 @@ enum PantryLocalNotifications {
 
     @MainActor
     static func reschedule(itemId: String, fires: [PantryReminderFire]) {
-        Task { await replace(itemId: itemId, fires: fires) }
+        Task { await PantryNotificationSerial.shared.enqueue(itemId: itemId) { await replace(itemId: itemId, fires: fires) } }
     }
 
     @MainActor
     static func cancel(itemId: String) {
-        Task { await remove(PantryDateReminders.allIdentifiers(itemId: itemId)) }
+        Task {
+            await PantryNotificationSerial.shared.enqueue(itemId: itemId) {
+                await remove(PantryDateReminders.allIdentifiers(itemId: itemId))
+            }
+        }
     }
 
     private static func post(_ notes: [(String, String, String)]) async {
@@ -781,6 +862,8 @@ enum PantryStockSideEffects {
     static func confirmCook(
         mealId: UUID,
         needs: [PantryCookNeed],
+        excludedNeedIndexes: Set<Int> = [],
+        splits: [Int: [String: Double]] = [:],
         in context: ModelContext
     ) -> PantryCookOutcome {
         let preferences = PantryNotificationPreferenceStore.load()
@@ -797,8 +880,29 @@ enum PantryStockSideEffects {
                 autoAddToGrocery: item.autoAddToGrocery,
                 version: item.revision,
                 dateType: item.dateType,
-                dateValue: item.dateValue
+                dateValue: item.dateValue,
+                location: item.location
             )
+        }
+        let mealKey = mealId.uuidString.lowercased()
+        switch PantryCookGate.decision(syncsHousehold: PantryOutbox.syncsHousehold, claim: PantryCookClaimStore.claim(for: mealKey)) {
+        case .hold:
+            PantryCookClaimStore.hold(mealId: mealKey, needs: needs, excluded: excludedNeedIndexes, splits: splits)
+            return PantryCookOutcome(
+                deductions: [], skipped: [], shortages: [], groceryMutations: [],
+                stock: stock, rows: marketRows(in: context), appliedMeals: PantryEffectLedger.cooked(),
+                appliedCrossings: PantryEffectLedger.crossings(), armedLow: PantryEffectLedger.armed(),
+                notices: [], deferred: true
+            )
+        case .skip:
+            return PantryCookOutcome(
+                deductions: [], skipped: [], shortages: [], groceryMutations: [],
+                stock: stock, rows: marketRows(in: context), appliedMeals: PantryEffectLedger.cooked(),
+                appliedCrossings: PantryEffectLedger.crossings(), armedLow: PantryEffectLedger.armed(),
+                notices: [], skippedByPartner: true
+            )
+        case .applyNow:
+            break
         }
         let outcome = PantryCookConsumption.apply(
             event: .markCooked,
@@ -810,13 +914,16 @@ enum PantryStockSideEffects {
             appliedMeals: PantryEffectLedger.cooked(),
             appliedCrossings: PantryEffectLedger.crossings(),
             armedLow: PantryEffectLedger.armed(),
-            lowStockEnabled: preferences.lowStockNotificationsEnabled
+            lowStockEnabled: preferences.lowStockNotificationsEnabled,
+            excludedNeedIndexes: excludedNeedIndexes,
+            splits: splits
         )
         PantryEffectLedger.saveCooked(outcome.appliedMeals)
         PantryEffectLedger.saveCrossings(outcome.appliedCrossings)
         PantryEffectLedger.saveArmed(outcome.armedLow)
+        PantryCookClaimStore.dropHeld(mealKey)
         let byId = Dictionary(uniqueKeysWithValues: items.map { ($0.uuid.uuidString.lowercased(), $0) })
-        for deduction in outcome.deductions {
+        for deduction in PantryCookOutbox.collapse(outcome.deductions) {
             guard let item = byId[deduction.itemId] else { continue }
             item.quantity = deduction.newQuantity
             item.revision += 1
@@ -834,6 +941,18 @@ enum PantryStockSideEffects {
             Task { await PantryOutbox.flush(in: context) }
         }
         return outcome
+    }
+
+    @MainActor
+    static func flushHeldCook(mealId: UUID, in context: ModelContext) {
+        guard let held = PantryCookClaimStore.held(for: mealId.uuidString.lowercased()) else { return }
+        _ = confirmCook(
+            mealId: mealId,
+            needs: held.needs,
+            excludedNeedIndexes: Set(held.excluded),
+            splits: held.decodedSplits,
+            in: context
+        )
     }
 
     @MainActor
@@ -963,6 +1082,8 @@ enum PantryStockSideEffects {
         HouseholdSession.shared.notePantryGrocerySet(
             itemKey: mutation.itemKey,
             quantity: mutation.quantity,
+            unit: mutation.unit,
+            lineSource: mutation.lineSource,
             crossingKey: mutation.crossingKey,
             in: context
         )

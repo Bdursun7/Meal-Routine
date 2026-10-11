@@ -1,18 +1,32 @@
 # MealRoutine — V1–V5 Cross-Version Audit Report
 
-**Latest decision (V5.1 cook, low stock, auto-add, date reminders, 2026-10-10):** `FAIL — V6 blocked`  
-**Code under test:** `V5.1-Cook-Pantry-Notifications`, branched from `V5-Alignment-Audit` `b896938`. `V5.0` was not modified.  
-**Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. The Linux date-only rules passed. The SwiftData upgrade and the DatePicker were not executed. That is **Not verified (Mac)**. `AUD-V5-003` through `AUD-V5-006` are closed on Linux in §10. Their screens, `UNUserNotificationCenter` delivery, and the SwiftData `autoAddToGrocery` column are Not verified (Mac) and are not the Pass.  
-**Accepted exception:** On 2026-10-10 the project owner accepted deleting legacy dated personal rows once, instead of converting them. Spec §2.5 / §4.5, gate §6 “açık istisna”. Recorded in `docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` and §9 below.  
-**STEP 0:** D1 = device time zone for reminder fires (no household timezone column). D2 = migration `0013` `auto_add_to_grocery` only. No other schema change.
+**Latest decision (V5.1 review fixes, 2026-10-11):** `FAIL — V6 blocked`  
+**Code under test:** `cursor/v51-review-fixes-2826`, branched from `V5-Alignment-Audit` `fc10e21`. `V5.0` was not modified.  
+**Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. Linux rules for the findings in §12 passed. The SwiftData store, DatePicker, cook sheet, Evdekiler tabs, notification delivery, and a two-simulator household were not executed. That is **Not verified (Mac)**.  
+**Correction:** The status box in the 2026-10-10 / 2026-10-11 cook and market-card decisions said `Open P0 findings: none`. That was wrong for the phone. Opening Bu Hafta rebuilt the week and deleted manual, `pantry-auto:` and `pantry-cook:` grocery rows (`AUD-V5-008`, P0). §12 closes that P0 and `AUD-V5-009` through `AUD-V5-015` on Linux.  
+**STEP 0 update (2026-10-11):** D1 is unchanged (device time zone, no household timezone column). D2 is no longer “`0013` only”. The owner approved `0014_shared_grocery_quantity` (2026-10-11): `NUMERIC(12,3)` quantity, nullable `unit`, nullable `line_source`. `0001`–`0013` are not rewritten. There is no `0015`.  
+**Linux evidence (2026-10-11):** `npm run typecheck` passed. `npm test` with Postgres 16.15 passed 68/68, no skips. `Tools/run_pantry_domain_tests.sh` passed 46/46. All eight `Tools/run_*.sh` scripts exited 0. `testRowShowsSafetyForUseByAndBestBefore` was renamed to `testRowShowsNeutralPastDateForUseByAndBestBefore`; the assertion was already the neutral sentence.
 
 ```text
-Open P0 findings: none
+Open P0 findings: none after the §12 fix on Linux. The earlier “Open P0: none” (before §12) was wrong for the phone.
 Open P1 findings: AUD-V5-002 (SwiftData / DatePicker Not verified (Mac); Linux rules Pass)
-Closed on Linux: AUD-V5-001 (Pass). AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006 (Pass on Linux, §10). AUD-V5-007 (Pass on Linux, §11, 2026-10-11). AUD-DOC-003 (Pass for the release-gate and runbook sentences).
+Closed on Linux in §12: AUD-V5-008 (P0), AUD-V5-009, AUD-V5-010, AUD-V5-011, AUD-V5-012, AUD-V5-013, AUD-V5-014, AUD-V5-015
+Still closed on Linux from earlier sections: AUD-V5-001, AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006, AUD-V5-007, AUD-DOC-003
 Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001 (household timezone, still V7)
 Repository limits: No Xcode, no device. V6 was not started. Remote pantry push stays deferred until after V6.
 ```
+
+**Earlier decision (V5.1 cook, low stock, auto-add, date reminders, 2026-10-10):** `FAIL — V6 blocked`  
+**Code under test:** `V5.1-Cook-Pantry-Notifications`, branched from `V5-Alignment-Audit` `b896938`. `V5.0` was not modified.  
+**Why V6 stayed blocked then:** `AUD-V5-002` was still not `Pass`. The Linux date-only rules passed. The SwiftData upgrade and the DatePicker were not executed. `AUD-V5-003` through `AUD-V5-006` are closed on Linux in §10. Their screens, `UNUserNotificationCenter` delivery, and the SwiftData `autoAddToGrocery` column are Not verified (Mac) and are not the Pass.  
+**Accepted exception:** On 2026-10-10 the project owner accepted deleting legacy dated personal rows once, instead of converting them. Spec §2.5 / §4.5, gate §6 “açık istisna”. Recorded in `docs/MealRoutine_V5.1_Integration_Readiness_Fixes.md` and §9 below.  
+**STEP 0 at that date:** D1 = device time zone for reminder fires (no household timezone column). D2 = migration `0013` `auto_add_to_grocery` only. No other schema change. Superseded for D2 by the 2026-10-11 `0014` decision above.
+
+```text
+Open P0 findings: none
+```
+
+That box is the claim as written on 2026-10-10 and carried through the market-card pass. §12 is why it does not describe the phone.
 
 **Previous decision (V5.1 re-audit, 2026-10-10):** `FAIL — V6 blocked`  
 **Code under test:** `cursor/v51-integration-readiness-ef13` (commits `7493240` wording, `2bcf807` calendar days). Base is `V5-Alignment-Audit`. `V5.0` was not modified.  
@@ -529,4 +543,115 @@ User-approved Option A + C. `V5.0` was not modified. This finding is closed on L
 | Fix | Plan identity and the household plan key use the canonical id. Legacy stored rows reconcile onto that id; a check survives when the amount is unchanged. Shortfall writes set the one `pantry-auto:` key. A checked shortfall row is not overwritten, and a second key for the same bucket is removed. `pantry-cook:` stays a separate stored quantity. The card labels parts Plan, Evdekiler eksiği, Eşik, and Elle eklendi (only `manual:<uuid>`). Aisle lookup uses the canonical id. The server grocery schema is unchanged; a phone that already has `tomatoes\|piece` reuses that item key. |
 | Tests | `testCanonicalShortfallIsIdempotentAndDoesNotReplaceTheThreshold`. `Tools/grocery_merge_checks.swift` (`checkCanonicalIdentity`). `Tools/portion_scale_checks.swift` (old id, kept check, custom quantity). `Tools/household_checks.swift` (`checkPlanKeys`). |
 | Status | Closed on Linux. The Market screen, SwiftData `sourceRaw` migration, `PantryTests`, and a two-simulator legacy key are Not verified (Mac). Follow-up, 2026-10-11: existing pre-#58 rows (cook-sheet `pantry-auto:<rawId>\|piece` and a Bitti raw id) both rendered as Evdekiler eksiği because rebuild left `isManual` rows in place. Launch and rebuild now collapse that pair into one shortfall set (larger amount, not the sum). `pantry-cook:` is labeled Pişirme eksiği. |
+
+## 12. Review of `fc10e21` (2026-10-11)
+
+A read of `V5-Alignment-Audit` `fc10e21` against `origin/V5.0` `7cfe0b3` found the phone P0 below. The “Open P0 findings: none” line in the earlier header did not see it. `V5.0` was not modified. These rows are closed on Linux by `cursor/v51-review-fixes-2826`. Mac UI is Not verified.
+
+### Commands
+
+Host: Ubuntu 24.04, x86_64. Node from nvm. Swift 6.0.3. PostgreSQL 16.15. `DATABASE_URL=postgres://mealroutine:mealroutine@localhost:5432/mealroutine`.
+
+`cd server && npm run typecheck` passed. `cd server && npm test` passed 68/68, no skips (`board.test.ts` 6, `pantry.integration.test.ts` 2). `Tools/run_pantry_domain_tests.sh` passed 46/46. `run_household_checks.sh`, `run_grocery_checks.sh`, `run_portion_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh`, and `run_recipe_photo_checks.sh` exited 0.
+
+### AUD-V5-008 — week rebuild deletes extra grocery rows
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-008` |
+| Class | P0 data loss |
+| Expected | Opening Bu Hafta rebuilds automatic plan rows and leaves manual, threshold, and cook-gap rows, including their checks. |
+| Actual before | `HouseholdPlanBridge.apply` deleted the week’s groceries. Manual and `pantry-auto:` / `pantry-cook:` rows went with them. |
+| Fix | Surviving rows are copied, the week is rebuilt, then those rows are reattached even if the rebuild throws. Server wires are materialized after that. |
+| Tests | `Tools/household_checks.swift`. `HouseholdGroceryPreserveTests` (SwiftData, Xcode). |
+| Status | Closed on Linux for the preserve rule. The SwiftData test and the screen are Not verified (Mac). |
+
+### AUD-V5-009 — partner phone misses shared shortfall rows
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-009` |
+| Class | P1 two-phone divergence |
+| Expected | Refresh and board pull show the same card parts. A check uses the server item key. |
+| Actual before | `pantry-auto:`, `pantry-cook:`, and `manual:` rows were not inserted on the other phone. A check of a shortfall row could target `manual:<uuid>` instead of the server key. |
+| Fix | `SharedGroceryMaterializer` inserts those wires. `HouseholdGroceryKey.make` keeps a server key. `groceryCheck` sends `itemKey`. The server finds a row by id or `itemKey`. `line_source` on `0014` distinguishes Eşik, Evdekiler eksiği, Pişirme eksiği, and Elle eklendi. Plan keys such as `tomato\|piece` are not materialized. |
+| Tests | `Tools/household_checks.swift` (materializer keeps `0.6 kg`). `board.test.ts` check by `itemKey`. |
+| Status | Closed on Linux. Two simulators are Not verified (Mac). |
+
+### AUD-V5-010 — shared shortfall quantity was an integer
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-010` |
+| Class | P1 rounding |
+| Expected | `0.6 kg` stays `0.6`. `1500 g` is accepted. Plan rows stay integers because the unit is already in the plan key. |
+| Actual before | Shared grocery quantity was `INT` 1…999. `GroceryMerger` rounded shortfalls to a whole number. |
+| Fix | `0014_shared_grocery_quantity.sql`. API quantity is decimal when a unit is sent. Caps: g/ml 100000, kg/l 100, piece and spoon units 9999, otherwise 100000. Snap to thousandths. Quantity must be greater than 0. Legacy integer rows keep a null unit. Plan adds still use `GrocerySyncQuantity.whole`. |
+| Tests | `board.test.ts` “stores a decimal shortfall with a unit and still accepts an integer plan line”. `migrations.test.ts` and `pantry.integration.test.ts` expect `0014`. |
+| Status | Closed on Linux. |
+
+### AUD-V5-011 — cook used one pantry row
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-011` |
+| Class | P1 |
+| Expected | Deduct every compatible row (same canonical ingredient, convertible unit) before a shortfall. Order: earliest calendar day, undated last, then kiler, buzdolabı, dondurucu, diğer, then id. When more than one location holds the ingredient, the sheet shows each amount and the user can change the split. The total never exceeds the need or the stock. |
+| Actual before | The first compatible row was the only deduction. |
+| Fix | `PantryCookSplit`. The sheet steppers write the override. One outbox update per pantry item is `AUD-V5-012`. Market is not split by location. |
+| Tests | `testCookUsesEveryCompatibleRowInDateThenLocationOrder` (default takes and a user override). |
+| Status | Closed on Linux for the rule. The sheet is Not verified (Mac). |
+
+### AUD-V5-012 — one cook wrote several updates; two phones could both deduct
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-012` |
+| Class | P1 |
+| Expected | One pantry update per item per confirm, using the original `baseVersion` and the final quantity. Two phones confirming the same meal produce one deduction. |
+| Actual before | Each pass could enqueue another update. Nothing serialized the second cook. |
+| Fix | `PantryCookOutbox.collapse`. `PantryCookGate` deducts a household meal only after this phone’s meal-cook mutation is accepted; a 409 skips. `pgBoard` takes `SELECT id FROM households WHERE id = $1 FOR UPDATE` before the board load. No new table. `pantry_idempotency` stays per account. Personal pantry and a session with no API still deduct immediately. |
+| Tests | Collapse assertion in `testCookUsesEveryCompatibleRowInDateThenLocationOrder`. `board.test.ts` second cook with a stale meal revision returns 409 `version_conflict`. |
+| Status | Closed on Linux. Two phones tapping Pişirdim are Not verified (Mac). |
+
+### AUD-V5-013 — past reminder fires and cancel races
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-013` |
+| Class | P1 |
+| Expected | A fire date before now is not scheduled. Delete, zero, and turning reminders off cancel that item and do not resurrect it. |
+| Actual before | The planner emitted past lead dates. Remove and add were not serialized per item. |
+| Fix | `PantryDateReminders.plan` drops fires before `now`. `PantryNotificationSerial` queues remove and add per item id. The second switch stays and is labeled “Standart hatırlatma programı”. It is not a lead-day picker. |
+| Tests | `testDateRemindersUseTheCalendarDayInEachDeviceZone` (now `2026-02-01` in the zone loop; a lead inside the window keeps only the future day). |
+| Status | Closed on Linux for the plan. `UNUserNotificationCenter` is Not verified (Mac). |
+
+### AUD-V5-014 — transfer dropped auto-add
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-014` |
+| Class | P1 |
+| Expected | Personal → household transfer and copy keep `autoAddToGrocery`. A merge ORs the flag, matching the server. |
+| Actual before | Copy did not pass the flag. Merge replaced it from the incoming row only. |
+| Fix | Copy initializer passes `autoAddToGrocery`. Merge sets `match.autoAddToGrocery = match.autoAddToGrocery || item.autoAddToGrocery`. |
+| Tests | No separate Linux test. The server OR is in `pantryService.ts`. The phone path is Not verified (Mac). |
+| Status | Closed in code. Mac transfer is Not verified. |
+
+### AUD-V5-015 — labels and the safety-named test
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-015` |
+| Class | P2 |
+| Expected | `pantry-cook:` reads “Pişirme eksiği”. The reminder switch reads “Standart hatırlatma programı”. The past-date test name does not claim a safety verdict. |
+| Actual before | One sentence called the cook gap “Evdekiler eksiği”. The switch said “Hatırlatma günleri”. The test was `testRowShowsSafetyForUseByAndBestBefore`. |
+| Fix | Copy and docs. The test was renamed to `testRowShowsNeutralPastDateForUseByAndBestBefore`. The body still asserts the neutral sentences. |
+| Status | Closed on Linux. |
+
+### Evdekiler location tabs (owner, 2026-10-11)
+
+Not a defect. The owner asked for tabs on Evdekiler: Tümü, Kiler, Buzdolabı, Dondurucu, Diğer. They filter the list, show counts, preselect location when adding from a location tab, remember the last tab for the session only, and speak a VoiceOver label. Empty copy is “Kiler konumunda malzeme yok.” Market stays one list. No schema change. Test: `testLocationTabsFilterThePantryListAndPreselectAPlace`. The chips are Not verified (Mac).
+
+**Decision:** `FAIL — V6 blocked`. `AUD-V5-002` remains open.
 

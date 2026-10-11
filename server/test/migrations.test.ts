@@ -34,7 +34,7 @@ describe('migrations', () => {
   it('lists versioned SQL files in order and creates the phase-0 tables', async () => {
     const dir = migrationsDirectory()
     const files = await listMigrationFiles(dir)
-    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013'])
+    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014'])
     const sql = (
       await Promise.all(files.map((file) => readFile(path.join(dir, file), 'utf8')))
     ).join('\n')
@@ -59,6 +59,11 @@ describe('migrations', () => {
     const autoAdd = await readFile(path.join(dir, '0013_pantry_auto_add.sql'), 'utf8')
     expect(autoAdd).toContain('ADD COLUMN IF NOT EXISTS auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false')
     expect(autoAdd).not.toMatch(/\b(DROP|DELETE FROM|TRUNCATE)\b/i)
+    const decimal = await readFile(path.join(dir, '0014_shared_grocery_quantity.sql'), 'utf8')
+    expect(decimal).toContain('ADD COLUMN IF NOT EXISTS quantity_decimal NUMERIC(12,3)')
+    expect(decimal).toContain('ADD COLUMN IF NOT EXISTS unit TEXT')
+    expect(decimal).toContain('SET quantity_decimal = quantity')
+    expect(decimal).not.toMatch(/\b(DROP|DELETE FROM|TRUNCATE)\b/i)
     expect(sql).toContain("'pending', 'accepted', 'rejected', 'cancelled', 'expired'")
     expect(sql).not.toContain('DROP TABLE')
   })

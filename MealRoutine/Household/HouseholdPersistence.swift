@@ -151,13 +151,20 @@ enum HouseholdWeekPresenter {
 
 enum HouseholdPlanBridge {
     @MainActor
-    static func apply(snapshot: HouseholdSnapshot, in context: ModelContext, now: Date = .now) throws {
+    static func apply(
+        snapshot: HouseholdSnapshot,
+        wires: [SharedGroceryWire] = [],
+        in context: ModelContext,
+        now: Date = .now
+    ) throws {
         guard let plan = snapshot.plan else { return }
         guard WeekCalendar.isSameDay(plan.weekStart, WeekCalendar.weekStart(containing: now)) else { return }
         guard let prefs = try UserPrefsStore.existing(in: context) else { return }
+        var kept: [HouseholdKeptGrocery] = []
         if let existing = try WeekPlanService.currentWeek(in: context, now: now) {
-            let kept = Set(plan.meals.map(\.id))
-            let retired = Set(existing.meals.map(\.uuid)).subtracting(kept)
+            kept = HouseholdGroceryPreserve.kept(existing.groceries.map(keptGrocery))
+            let keptMeals = Set(plan.meals.map(\.id))
+            let retired = Set(existing.meals.map(\.uuid)).subtracting(keptMeals)
             let checks = try context.fetch(FetchDescriptor<IngredientCheck>())
             for check in checks {
                 guard let mealUUID = check.mealUUID, retired.contains(mealUUID) else { continue }
@@ -185,8 +192,96 @@ enum HouseholdPlanBridge {
         }
         try context.save()
         GroceryListService.discardRebuildCache()
-        try GroceryListService.rebuild(in: context, now: now)
+        var rebuildError: Error?
+        do {
+            try GroceryListService.rebuild(in: context, now: now)
+        } catch {
+            rebuildError = error
+        }
+        reattach(kept, to: week, in: context)
+        materialize(wires, onto: week, in: context)
         try applyGrocery(snapshot, in: context, now: now)
+        if let rebuildError { throw rebuildError }
+    }
+
+    @MainActor
+    static func materialize(_ wires: [SharedGroceryWire], in context: ModelContext, now: Date = .now) throws {
+        guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return }
+        materialize(wires, onto: week, in: context)
+        try context.save()
+    }
+
+    @MainActor
+    private static func keptGrocery(_ item: GroceryItem) -> HouseholdKeptGrocery {
+        HouseholdKeptGrocery(
+            uuid: item.uuid,
+            ingredientId: item.ingredientId,
+            nameTR: item.nameTR,
+            nameEN: item.nameEN,
+            quantity: item.quantity,
+            unit: item.unit,
+            hasUnitConflict: item.hasUnitConflict,
+            isChecked: item.isChecked,
+            isManual: item.isManual,
+            sourceRaw: item.sourceRaw,
+            quantityIsCustom: item.quantityIsCustom,
+            uncoveredQuantity: item.uncoveredQuantity
+        )
+    }
+
+    @MainActor
+    private static func reattach(_ kept: [HouseholdKeptGrocery], to week: PlanWeek, in context: ModelContext) {
+        for row in kept {
+            let item = GroceryItem(
+                uuid: row.uuid,
+                ingredientId: row.ingredientId,
+                nameTR: row.nameTR,
+                nameEN: row.nameEN,
+                quantity: row.quantity,
+                unit: row.unit,
+                hasUnitConflict: row.hasUnitConflict,
+                isChecked: row.isChecked,
+                isManual: row.isManual,
+                quantityIsCustom: row.quantityIsCustom,
+                sourceRaw: row.sourceRaw
+            )
+            item.uncoveredQuantity = row.uncoveredQuantity
+            context.insert(item)
+            item.week = week
+        }
+        if !kept.isEmpty { try? context.save() }
+    }
+
+    @MainActor
+    private static func materialize(_ wires: [SharedGroceryWire], onto week: PlanWeek, in context: ModelContext) {
+        let incoming = SharedGroceryMaterializer.rows(from: wires)
+        guard !incoming.isEmpty else { return }
+        let existing = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
+        for row in incoming {
+            if let match = existing.first(where: { $0.ingredientId == row.ingredientId || $0.uuid == row.uuid }) {
+                match.isChecked = row.isChecked
+                match.quantity = row.quantity
+                if !row.unit.isEmpty { match.unit = row.unit }
+                if match.sourceRaw.isEmpty { match.sourceRaw = row.sourceRaw }
+                match.isManual = true
+                continue
+            }
+            let item = GroceryItem(
+                uuid: row.uuid,
+                ingredientId: row.ingredientId,
+                nameTR: row.name,
+                nameEN: row.name,
+                quantity: row.quantity,
+                unit: row.unit,
+                hasUnitConflict: false,
+                isChecked: row.isChecked,
+                isManual: true,
+                sourceRaw: row.sourceRaw
+            )
+            context.insert(item)
+            item.week = week
+        }
+        try? context.save()
     }
 
     /// Partner recipes are not copied into the local collection. The evening still points at the slug.
