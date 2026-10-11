@@ -140,6 +140,17 @@ struct BoardSyncClient: Sendable {
         return try JSONDecoder().decode(BoardChangePage.self, from: data)
     }
 
+    func board(householdId: UUID) async throws -> [SharedGroceryWire] {
+        let (data, http) = try await perform(
+            method: "GET",
+            path: "/v1/households/\(householdId.uuidString)/board",
+            body: nil,
+            headers: [:]
+        )
+        guard (200..<300).contains(http.statusCode) else { throw BoardSyncFailure.retry }
+        return try JSONDecoder().decode(BoardGroceryPage.self, from: data).grocery
+    }
+
     private func perform(
         method: String,
         path: String,
@@ -292,17 +303,6 @@ enum BoardMutationEncoder {
             baseRevision: baseRevision,
             payload: ["isChecked": isChecked, "itemKey": itemKey]
         )
-    }
-
-    func board(householdId: UUID) async throws -> [SharedGroceryWire] {
-        let (data, http) = try await perform(
-            method: "GET",
-            path: "/v1/households/\(householdId.uuidString)/board",
-            body: nil,
-            headers: [:]
-        )
-        guard (200..<300).contains(http.statusCode) else { throw BoardSyncFailure.retry }
-        return try JSONDecoder().decode(BoardGroceryPage.self, from: data).grocery
     }
 
     private static func encode(
