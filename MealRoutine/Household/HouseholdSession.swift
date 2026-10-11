@@ -693,6 +693,55 @@ final class HouseholdSession {
         }
     }
 
+    /// After a legacy shortfall collapse. Sets the one board row for this bucket and
+    /// retires the other pantry-auto keys plus the `manual:<uuid>` checks of deleted rows.
+    func noteShortfallCollapse(
+        canonicalKey: String,
+        quantity: Double,
+        deletedIDs: [UUID],
+        in context: ModelContext
+    ) {
+        guard let account, snapshot.hasHousehold else { return }
+        let sync = GroceryShortfallCollapse.boardSync(
+            canonicalKey: canonicalKey,
+            existingKeys: snapshot.groceryCompletions.map(\.itemKey),
+            deletedIDs: deletedIDs
+        )
+        let previous = snapshot.groceryCompletions.first { $0.itemKey == sync.wireKey }
+        let setID = PantryStableUUID.make("grocery-set:shortfall-reconcile:\(canonicalKey)")
+        let body = BoardMutationEncoder.grocerySet(
+            id: setID,
+            itemKey: sync.wireKey,
+            quantity: GrocerySyncQuantity.whole(quantity),
+            baseRevision: previous?.revision ?? 0
+        )
+        finishSharedEdit(
+            entityType: "grocery",
+            entityId: setID.uuidString,
+            operationType: "add",
+            body: body,
+            workID: setID,
+            in: context
+        )
+        for key in sync.removeKeys {
+            let removeID = PantryStableUUID.make("grocery-remove:\(key)")
+            let removal = BoardMutationEncoder.groceryRemove(id: removeID, itemKey: key)
+            finishSharedEdit(
+                entityType: "grocery",
+                entityId: removeID.uuidString,
+                operationType: "remove",
+                body: removal,
+                workID: removeID,
+                in: context
+            )
+        }
+        if !sync.removeKeys.isEmpty {
+            snapshot.groceryCompletions.removeAll { sync.removeKeys.contains($0.itemKey) }
+            persist(in: context)
+        }
+        _ = account
+    }
+
     /// Sets one replenishment row to an absolute quantity. A second phone that sends
     /// the same amount does not add it again (`mode: set` on the server).
     func notePantryGrocerySet(itemKey: String, quantity: Double, crossingKey: String, in context: ModelContext) {

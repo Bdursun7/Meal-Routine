@@ -9,7 +9,7 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | Komut | Sonuç |
 | --- | --- |
 | `cd server && npm run typecheck` | geçti |
-| `cd server && npm test` | 2026-10-11: 62 geçti, 4 atlandı (Postgres yok; sunucu kodu değişmedi). V5.0 kaydı 61 geçti, 4 atlandıydı. Postgres’li 66 / 66 kaydı 2026-10-10’dadır |
+| `cd server && npm test` | 2026-10-11 kısa-satır düzeltmesi: 63 geçti, 4 atlandı (Postgres yok). `remove` eski `pantry-auto:` anahtarını düşer. Postgres’li 66 / 66 kaydı 2026-10-10’dadır |
 | `cd server && DATABASE_URL=postgres://… npm test` | 66 / 66 geçti, Postgres 16.15, atlanan yok (2026-10-10, V5.1 pişirme ve bildirim). Önceki re-audit 65 / 65, §9 |
 | `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 44 / 44, XCTest, Swift 6.0.3 Linux (2026-10-11, kanonik market kartı). Önceki kayıt 42 / 42 (2026-10-10) |
 | `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh` | 2026-10-11 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır. `run_recipe_photo_checks.sh` bu değişiklikte yeniden koşulmadı |
@@ -42,7 +42,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Onaylı pişirme düşümü | Linux pass / Mac ekran | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez |
 | Düşük stok bildirimi | Linux pass / Mac teslim | Üstten alta bir kez; aynı bölümde tekrar yok; üstüne çıkınca yeniden kurulur. Kapalıyken geçiş spam yapmaz. Uzak push yok |
 | `autoAddToGrocery` | Linux pass | Varsayılan kapalı. Açıkken eksik miktar `pantry-auto:<kanonikId>\|<kova>` anahtarına bir kez yazılır (`family:mass`, `unit:piece`). İşaretli satır durur. İki üye `mode: set` ile tek satır (`board.test.ts`). `pantry-cook:` eşik miktarını ezmez |
-| Market kartı | Linux pass | Plan kimliği kanonik id + birim kovası (2026-10-11). `tomato` ve `tomatoes` tek satır; `cherry-tomato` ayrı. Görünen ad birleştirmez. Kart parçaları toplanmaz. Etiketler Plan, Evdekiler eksiği, Eşik, Elle eklendi. Eski id işareti kaybetmeden tek satıra iner |
+| Market kartı | Linux pass | Plan kimliği kanonik id + birim kovası (2026-10-11). `tomato` ve `tomatoes` tek satır; `cherry-tomato` ayrı. Görünen ad birleştirmez. Kart parçaları toplanmaz. Etiketler Plan, Evdekiler eksiği, Eşik, Pişirme eksiği, Elle eklendi. Eski kısa satırlar tek `pantry-auto:` satırına iner; 1 ve 2 toplanmaz, büyük olan kalır. Aynı etiket iki kez görünmez |
 | Tarih hatırlatması | Linux pass / Mac izin | `YYYY-MM-DD` günü İstanbul, Auckland ve Los Angeles takvimlerinde aynı kalır. Saat 09:00 cihaz dilimindedir. Household timezone yok |
 | iOS XCTest | Mac | `PantryDomainTests` Linux’ta 44 / 44. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook; plan satırı `tomato`) Xcode’da koşulur |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |

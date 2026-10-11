@@ -166,6 +166,44 @@ describe('shared board sync', () => {
     await app.close()
   })
 
+  it('removes a legacy pantry-auto key and leaves the canonical one', async () => {
+    const { app } = session()
+    const ada = await signIn(app, 'ada-remove', 'Ada')
+    const householdId = await createHousehold(app, ada.auth)
+    const legacy = 'pantry-auto:tomatoes|piece'
+    const canonical = 'pantry-auto:tomato|unit:piece'
+    const add = (itemKey: string, entityId: string, idempotency: string) => mutate(app, householdId, ada.auth, idempotency, {
+      entityType: 'grocery',
+      entityId,
+      operationType: 'add',
+      baseRevision: 0,
+      payload: { itemKey, quantity: 1, mode: 'set' },
+    })
+    expect((await add(legacy, '11111111-1111-4111-8111-111111111111', 'legacy-add')).statusCode).toBe(200)
+    expect((await add(canonical, '22222222-2222-4222-8222-222222222222', 'canonical-add')).statusCode).toBe(200)
+    const removed = await mutate(app, householdId, ada.auth, 'legacy-remove', {
+      entityType: 'grocery',
+      entityId: '33333333-3333-4333-8333-333333333333',
+      operationType: 'remove',
+      baseRevision: 0,
+      payload: { itemKey: legacy },
+    })
+    expect(removed.statusCode).toBe(200)
+    expect(removed.json().entity.itemKey).toBe(legacy)
+    const again = await mutate(app, householdId, ada.auth, 'legacy-remove-again', {
+      entityType: 'grocery',
+      entityId: '44444444-4444-4444-8444-444444444444',
+      operationType: 'remove',
+      baseRevision: 0,
+      payload: { itemKey: legacy },
+    })
+    expect(again.statusCode).toBe(200)
+    const board = await app.inject({ method: 'GET', url: `/v1/households/${householdId}/board`, headers: ada.auth })
+    const keys = (board.json().grocery as { itemKey: string }[]).map((row) => row.itemKey)
+    expect(keys).toEqual([canonical])
+    await app.close()
+  })
+
   it('returns a delta since the cursor and keeps meal, reaction, plan, and preference versions', async () => {
     const { app } = session()
     const ada = await signIn(app, 'ada', 'Ada')

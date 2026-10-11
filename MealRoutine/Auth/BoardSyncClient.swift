@@ -264,6 +264,16 @@ enum BoardMutationEncoder {
         )
     }
 
+    static func groceryRemove(id: UUID, itemKey: String) -> Data {
+        encode(
+            entityType: "grocery",
+            entityId: id.uuidString,
+            operationType: "remove",
+            baseRevision: 0,
+            payload: ["itemKey": itemKey]
+        )
+    }
+
     static func groceryCheck(id: UUID, baseRevision: Int, isChecked: Bool) -> Data {
         encode(
             entityType: "grocery",

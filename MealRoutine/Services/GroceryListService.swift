@@ -25,10 +25,60 @@ enum GroceryListService {
         appliedFingerprint = nil
     }
 
+    /// One pass over rows saved before the canonical shortfall key.
+    /// Repeated calls do nothing once each identity is a single `pantry-auto:` row.
+    @MainActor
+    static func reconcileStoredShortfalls(in context: ModelContext) throws {
+        let items = try context.fetch(FetchDescriptor<GroceryItem>())
+        let rows = items.map { item in
+            LegacyGroceryRow(
+                id: item.uuid,
+                ingredientId: item.ingredientId,
+                quantity: item.quantity,
+                unit: item.unit,
+                isChecked: item.isChecked,
+                isManual: item.isManual,
+                sourceRaw: item.sourceRaw
+            )
+        }
+        let result = GroceryShortfallCollapse.plan(rows)
+        guard !result.updates.isEmpty || !result.cookGapIDs.isEmpty else { return }
+        let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.uuid, $0) })
+        for id in result.cookGapIDs {
+            byID[id]?.sourceRaw = GroceryLineSource.cookGap.rawValue
+        }
+        for update in result.updates {
+            guard let keep = byID[update.keepID] else { continue }
+            keep.ingredientId = update.ingredientId
+            keep.quantity = update.quantity
+            keep.unit = update.unit
+            keep.isChecked = update.isChecked
+            keep.isManual = true
+            keep.sourceRaw = update.sourceRaw
+            for id in update.deleteIDs {
+                if let extra = byID[id] {
+                    context.delete(extra)
+                }
+            }
+            HouseholdSession.shared.noteShortfallCollapse(
+                canonicalKey: update.ingredientId,
+                quantity: update.quantity,
+                deletedIDs: update.deleteIDs,
+                in: context
+            )
+            if update.isChecked {
+                HouseholdSession.shared.noteGrocery(id: update.keepID, in: context)
+            }
+        }
+        try context.save()
+        discardRebuildCache()
+    }
+
     @MainActor
     @discardableResult
     static func rebuild(in context: ModelContext, now: Date = .now, applyingPantry: Bool = false) throws -> PantryCoverageStamp {
         guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return .idle }
+        try reconcileStoredShortfalls(in: context)
         guard let prefs = try UserPrefsStore.existing(in: context) else { return .idle }
         let householdSize = prefs.householdSize
         let storedChecks = try context.fetch(FetchDescriptor<IngredientCheck>())
