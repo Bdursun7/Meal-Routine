@@ -38,7 +38,7 @@ export function applyMutation(
 
   if (input.entityType === 'grocery' && input.operationType === 'add') {
     const itemKey = text(input.payload.itemKey, 'itemKey')
-    const quantity = positiveInt(input.payload.quantity ?? 1, 'quantity')
+    const measured = groceryAmount(input.payload)
     const mode = input.payload.mode === undefined ? 'add' : text(input.payload.mode, 'mode')
     if (mode !== 'add' && mode !== 'set') throw new AppError('invalid_request', 400)
     const existing = next.grocery.find((row) => row.itemKey === itemKey)
@@ -48,7 +48,9 @@ export function applyMutation(
         id: uuid(input.entityId),
         householdId: next.preference.householdId,
         itemKey,
-        quantity,
+        quantity: measured.quantity,
+        unit: measured.unit,
+        lineSource: measured.lineSource,
         isChecked: false,
         updatedBy: actor.accountId,
         revision: 1,
@@ -62,9 +64,14 @@ export function applyMutation(
       // observe the same shortfall do not add it twice. A checked row stays.
       entityId = existing.id
       revision = existing.revision
-      if (!existing.isChecked && existing.quantity !== quantity) {
+      const sameAmount = sameQuantity(existing.quantity, measured.quantity)
+        && existing.unit === measured.unit
+        && (measured.lineSource === null || existing.lineSource === measured.lineSource)
+      if (!existing.isChecked && !sameAmount) {
         if (existing.revision !== input.baseRevision) conflict('grocery', existing.id, publicGrocery(existing))
-        existing.quantity = quantity
+        existing.quantity = measured.quantity
+        existing.unit = measured.unit
+        if (measured.lineSource) existing.lineSource = measured.lineSource
         existing.revision += 1
         existing.updatedBy = actor.accountId
         revision = existing.revision
@@ -72,7 +79,16 @@ export function applyMutation(
       entity = publicGrocery(existing)
     } else {
       if (existing.revision !== input.baseRevision) conflict('grocery', existing.id, publicGrocery(existing))
-      existing.quantity += quantity
+      if (measured.unit) {
+        if (existing.unit && existing.unit !== measured.unit) throw new AppError('invalid_request', 400)
+        existing.quantity = snapQuantity(existing.quantity + measured.quantity)
+        existing.unit = measured.unit
+      } else if (existing.unit) {
+        throw new AppError('invalid_request', 400)
+      } else {
+        existing.quantity += measured.quantity
+      }
+      if (measured.lineSource) existing.lineSource = measured.lineSource
       existing.revision += 1
       existing.updatedBy = actor.accountId
       entity = publicGrocery(existing)
@@ -93,7 +109,9 @@ export function applyMutation(
       revision = 0
     }
   } else if (input.entityType === 'grocery' && input.operationType === 'check') {
+    const itemKey = typeof input.payload.itemKey === 'string' ? input.payload.itemKey : ''
     const row = next.grocery.find((item) => item.id === input.entityId)
+      ?? (itemKey ? next.grocery.find((item) => item.itemKey === itemKey) : undefined)
     if (!row) throw new AppError('not_found', 404)
     if (row.revision !== input.baseRevision) conflict('grocery', row.id, publicGrocery(row))
     row.isChecked = bool(input.payload.isChecked, 'isChecked')
@@ -277,6 +295,8 @@ function publicGrocery(row: GroceryRow) {
     id: row.id,
     itemKey: row.itemKey,
     quantity: row.quantity,
+    unit: row.unit,
+    lineSource: row.lineSource,
     isChecked: row.isChecked,
     updatedBy: row.updatedBy,
     revision: row.revision,
@@ -341,6 +361,87 @@ function positiveInt(value: unknown, field: string): number {
     throw new AppError('invalid_request', 400)
   }
   return value
+}
+
+const LINE_SOURCES = new Set(['plan', 'shortfall', 'threshold', 'cookGap', 'typed'])
+
+const UNIT_ALIASES: Record<string, string> = {
+  adet: 'piece',
+  gram: 'g',
+  gr: 'g',
+  kilogram: 'kg',
+  litre: 'l',
+  liter: 'l',
+  mililitre: 'ml',
+  millilitre: 'ml',
+}
+
+/** Plan lines stay integers (0008, 1…999). A unit opts into the 0014 decimal. */
+function groceryAmount(payload: Record<string, unknown>): { quantity: number; unit: string | null; lineSource: string | null } {
+  const rawUnit = payload.unit
+  const unit = rawUnit === undefined || rawUnit === null || rawUnit === '' ? null : normalizeGroceryUnit(text(rawUnit, 'unit'))
+  const lineSource = groceryLineSource(payload.lineSource)
+  if (!unit) {
+    return { quantity: positiveInt(payload.quantity ?? 1, 'quantity'), unit: null, lineSource }
+  }
+  return { quantity: positiveDecimal(payload.quantity, unit), unit, lineSource }
+}
+
+function groceryLineSource(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null
+  const raw = text(value, 'lineSource')
+  if (!LINE_SOURCES.has(raw)) throw new AppError('invalid_request', 400)
+  return raw
+}
+
+function normalizeGroceryUnit(raw: string): string {
+  const trimmed = raw.trim()
+  return UNIT_ALIASES[trimmed.toLowerCase()] ?? trimmed
+}
+
+function unitCap(unit: string): number {
+  switch (unit) {
+    case 'g':
+    case 'ml':
+      return 100_000
+    case 'kg':
+    case 'l':
+      return 100
+    case 'piece':
+    case 'tbsp':
+    case 'tsp':
+    case 'clove':
+    case 'slice':
+    case 'sprig':
+    case 'pinch':
+    case 'cup':
+      return 9_999
+    default:
+      return 100_000
+  }
+}
+
+function positiveDecimal(value: unknown, unit: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) throw new AppError('invalid_request', 400)
+  const snapped = snapQuantity(value)
+  if (snapped <= 0 || snapped > unitCap(unit)) throw new AppError('invalid_request', 400)
+  return snapped
+}
+
+function snapQuantity(value: number): number {
+  return Math.round(value * 1000) / 1000
+}
+
+function sameQuantity(left: number, right: number): boolean {
+  return Math.abs(left - right) < 0.0005
+}
+
+/** Integer column kept for older readers. Not the value a 0014 client displays. */
+export function legacyGroceryInt(quantity: number): number {
+  const rounded = Math.round(quantity)
+  if (rounded < 1) return 1
+  if (rounded > 999) return 999
+  return rounded
 }
 
 function bool(value: unknown, field: string): boolean {

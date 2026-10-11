@@ -658,6 +658,9 @@ final class HouseholdSession {
         do {
             let mealRevision = snapshot.plan?.meals.first { $0.id == mealID }?.revision ?? 0
             try HouseholdReducer.markCooked(snapshot: &snapshot, mealId: mealID, actor: account, now: .now, cooked: true)
+            if usesHouseholdAPI {
+                PantryCookClaimStore.mark(mealID.uuidString, .pending)
+            }
             persist(in: context)
             finishSharedEdit(
                 entityType: "meal",
@@ -698,6 +701,8 @@ final class HouseholdSession {
     func noteShortfallCollapse(
         canonicalKey: String,
         quantity: Double,
+        unit: String,
+        lineSource: String,
         deletedIDs: [UUID],
         in context: ModelContext
     ) {
@@ -712,7 +717,9 @@ final class HouseholdSession {
         let body = BoardMutationEncoder.grocerySet(
             id: setID,
             itemKey: sync.wireKey,
-            quantity: GrocerySyncQuantity.whole(quantity),
+            quantity: quantity,
+            unit: unit,
+            lineSource: lineSource,
             baseRevision: previous?.revision ?? 0
         )
         finishSharedEdit(
@@ -744,9 +751,15 @@ final class HouseholdSession {
 
     /// Sets one replenishment row to an absolute quantity. A second phone that sends
     /// the same amount does not add it again (`mode: set` on the server).
-    func notePantryGrocerySet(itemKey: String, quantity: Double, crossingKey: String, in context: ModelContext) {
+    func notePantryGrocerySet(
+        itemKey: String,
+        quantity: Double,
+        unit: String,
+        lineSource: String,
+        crossingKey: String,
+        in context: ModelContext
+    ) {
         guard let account, snapshot.hasHousehold else { return }
-        let whole = GrocerySyncQuantity.whole(quantity)
         let previous = snapshot.groceryCompletions.first { $0.itemKey == itemKey }
             ?? snapshot.groceryCompletions.first { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) }
         let wireKey = previous?.itemKey ?? itemKey
@@ -754,7 +767,9 @@ final class HouseholdSession {
         let body = BoardMutationEncoder.grocerySet(
             id: id,
             itemKey: wireKey,
-            quantity: whole,
+            quantity: quantity,
+            unit: unit,
+            lineSource: lineSource,
             baseRevision: previous?.revision ?? 0
         )
         finishSharedEdit(
@@ -794,10 +809,21 @@ final class HouseholdSession {
             if let previous {
                 body = BoardMutationEncoder.groceryCheck(
                     id: item.uuid,
+                    itemKey: key,
                     baseRevision: previous.revision,
                     isChecked: item.isChecked
                 )
                 operationType = "check"
+            } else if HouseholdGroceryKey.isServerExtra(key) {
+                body = BoardMutationEncoder.grocerySet(
+                    id: item.uuid,
+                    itemKey: key,
+                    quantity: item.quantity ?? 0,
+                    unit: item.unit,
+                    lineSource: item.sourceRaw,
+                    baseRevision: 0
+                )
+                operationType = "add"
             } else {
                 body = BoardMutationEncoder.groceryAdd(
                     id: item.uuid,
@@ -1246,11 +1272,21 @@ final class HouseholdSession {
                     BoardReactionSync.apply(meal, to: &self.snapshot)
                     self.persist(in: context)
                 }
+                if item.operationType == "cook" {
+                    PantryCookClaimStore.mark(item.entityId, .accepted)
+                    if let mealUUID = UUID(uuidString: item.entityId) {
+                        PantryStockSideEffects.flushHeldCook(mealId: mealUUID, in: context)
+                    }
+                }
                 return .applied
             } catch BoardSyncFailure.conflict(let meal) {
                 if let meal {
                     BoardReactionSync.apply(meal, to: &self.snapshot)
                     self.persist(in: context)
+                }
+                if item.operationType == "cook" {
+                    PantryCookClaimStore.mark(item.entityId, .rejected)
+                    PantryCookClaimStore.dropHeld(item.entityId)
                 }
                 return .conflict
             } catch {
@@ -1312,6 +1348,10 @@ final class HouseholdSession {
         }
         if appliedMeal {
             persist(in: context)
+        }
+        if page.changes.contains(where: { $0.entityType == "grocery" }) {
+            let wires = (try? await api.board(householdId: householdId)) ?? []
+            try? HouseholdPlanBridge.materialize(wires, in: context)
         }
         let overridden = Set(BoardDeltaMerge.overriddenMealIDs(pending: pending, remoteRevisions: revisions))
         guard !overridden.isEmpty else { return false }
@@ -1415,7 +1455,8 @@ final class HouseholdSession {
         do {
             let state = try await work()
             snapshot = HouseholdRemoteMerge.apply(state, to: snapshot, now: .now)
-            try? HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
+            let wires = await groceryWires()
+            try? HouseholdPlanBridge.apply(snapshot: snapshot, wires: wires, in: context)
             persist(in: context)
             statusMessage = success
             syncState = .idle
@@ -1580,7 +1621,8 @@ final class HouseholdSession {
         do {
             let state = try await lifecycleAPI().current()
             snapshot = HouseholdRemoteMerge.apply(state, to: snapshot, now: .now)
-            try? HouseholdPlanBridge.apply(snapshot: snapshot, in: context)
+            let wires = await groceryWires()
+            try? HouseholdPlanBridge.apply(snapshot: snapshot, wires: wires, in: context)
             persist(in: context)
             syncState = .idle
         } catch let error as HouseholdError where error == .notMember {
@@ -1603,6 +1645,11 @@ final class HouseholdSession {
 
     private var signedInRequired: String {
         isTestMode ? "Test modunda önce Test olarak gir." : (HouseholdError.notSignedIn.errorDescription ?? "")
+    }
+
+    private func groceryWires() async -> [SharedGroceryWire] {
+        guard usesHouseholdAPI, let householdId = snapshot.household?.id else { return [] }
+        return (try? await BoardSyncClient(client: lifecycleAPI().client).board(householdId: householdId)) ?? []
     }
 
     private func activeTransport() -> any HouseholdSyncTransport {

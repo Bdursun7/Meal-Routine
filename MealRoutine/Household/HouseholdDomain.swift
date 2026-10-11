@@ -570,9 +570,15 @@ enum HouseholdRecipeAccess {
 }
 
 enum HouseholdGroceryKey {
-    /// Plan rows sync as `canonicalId|unit`. Manual rows stay `manual:<uuid>`.
-    /// A shortfall row is not a plan row; its key is the pantry-auto / pantry-cook id
-    /// already stored on the item, and `isManual` keeps it off this plan key.
+    static func isServerExtra(_ ingredientId: String) -> Bool {
+        ingredientId.hasPrefix("pantry-auto:")
+            || ingredientId.hasPrefix("pantry-cook:")
+            || ingredientId.hasPrefix("manual:")
+    }
+
+    /// Plan rows sync as `canonicalId|unit`. A typed row that is not already a server
+    /// key stays `manual:<uuid>`. Shortfall and cook-gap rows keep the key already
+    /// stored on the item, so a check hits that server row.
     static func make(
         ingredientId: String,
         unit: String,
@@ -580,6 +586,7 @@ enum HouseholdGroceryKey {
         uuid: UUID,
         dictionary: IngredientDictionary = .shared
     ) -> String {
+        if isServerExtra(ingredientId) { return ingredientId }
         if isManual { return "manual:\(uuid.uuidString)" }
         let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
         return "\(id)|\(GroceryMerger.normalize(unit))"
@@ -605,6 +612,89 @@ enum HouseholdGroceryKey {
         let unit = String(key[key.index(after: bar)...])
         guard !id.isEmpty, !unit.isEmpty else { return nil }
         return (id, unit)
+    }
+}
+
+/// Rows a household week rebuild must keep. Automatic plan lines are rebuilt from recipes.
+enum HouseholdGroceryPreserve {
+    static func survivesWeekRebuild(ingredientId: String, isManual: Bool) -> Bool {
+        if HouseholdGroceryKey.isServerExtra(ingredientId) { return true }
+        return isManual
+    }
+
+    static func kept(_ rows: [HouseholdKeptGrocery]) -> [HouseholdKeptGrocery] {
+        rows.filter { survivesWeekRebuild(ingredientId: $0.ingredientId, isManual: $0.isManual) }
+    }
+}
+
+struct HouseholdKeptGrocery: Equatable, Sendable {
+    var uuid: UUID
+    var ingredientId: String
+    var nameTR: String
+    var nameEN: String
+    var quantity: Double?
+    var unit: String
+    var hasUnitConflict: Bool
+    var isChecked: Bool
+    var isManual: Bool
+    var sourceRaw: String
+    var quantityIsCustom: Bool
+    var uncoveredQuantity: Double?
+}
+
+struct SharedGroceryWire: Equatable, Sendable, Codable {
+    var id: String
+    var itemKey: String
+    var quantity: Double
+    var unit: String?
+    var lineSource: String?
+    var isChecked: Bool
+    var revision: Int
+}
+
+struct MaterializedGrocery: Equatable, Sendable {
+    var uuid: UUID
+    var ingredientId: String
+    var name: String
+    var quantity: Double
+    var unit: String
+    var isChecked: Bool
+    var isManual: Bool
+    var sourceRaw: String
+}
+
+/// Turns shared board rows into local Market extras. Plan keys stay on the recipe rebuild.
+enum SharedGroceryMaterializer {
+    static func rows(from wires: [SharedGroceryWire], dictionary: IngredientDictionary = .shared) -> [MaterializedGrocery] {
+        wires.compactMap { wire in
+            guard HouseholdGroceryKey.isServerExtra(wire.itemKey), let uuid = UUID(uuidString: wire.id) else { return nil }
+            let bare = GroceryMerger.shoppingIngredientId(wire.itemKey, dictionary: dictionary)
+            let name = dictionary.entry(bare)?.name ?? bare
+            return MaterializedGrocery(
+                uuid: uuid,
+                ingredientId: wire.itemKey,
+                name: name,
+                quantity: wire.quantity,
+                unit: unit(for: wire),
+                isChecked: wire.isChecked,
+                isManual: true,
+                sourceRaw: source(for: wire)
+            )
+        }
+    }
+
+    private static func unit(for wire: SharedGroceryWire) -> String {
+        if let unit = wire.unit, !unit.isEmpty { return GroceryMerger.normalize(unit) }
+        let suffix = GroceryMerger.keyUnitSuffix(wire.itemKey)
+        if suffix.hasPrefix("unit:") { return String(suffix.dropFirst("unit:".count)) }
+        return ""
+    }
+
+    private static func source(for wire: SharedGroceryWire) -> String {
+        if wire.itemKey.hasPrefix("pantry-cook:") { return GroceryLineSource.cookGap.rawValue }
+        if wire.itemKey.hasPrefix("manual:") { return GroceryLineSource.typed.rawValue }
+        if let source = wire.lineSource, GroceryLineSource(rawValue: source) != nil { return source }
+        return GroceryLineSource.shortfall.rawValue
     }
 }
 

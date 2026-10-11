@@ -63,6 +63,8 @@ enum GroceryListService {
             HouseholdSession.shared.noteShortfallCollapse(
                 canonicalKey: update.ingredientId,
                 quantity: update.quantity,
+                unit: update.unit,
+                lineSource: update.sourceRaw,
                 deletedIDs: update.deleteIDs,
                 in: context
             )

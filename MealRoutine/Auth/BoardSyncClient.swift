@@ -181,13 +181,23 @@ enum BoardMutationEncoder {
         )
     }
 
-    static func grocerySet(id: UUID, itemKey: String, quantity: Int, baseRevision: Int) -> Data {
-        encode(
+    static func grocerySet(
+        id: UUID,
+        itemKey: String,
+        quantity: Double,
+        unit: String? = nil,
+        lineSource: String? = nil,
+        baseRevision: Int
+    ) -> Data {
+        var payload: [String: Any] = ["itemKey": itemKey, "quantity": quantity, "mode": "set"]
+        if let unit, !unit.isEmpty { payload["unit"] = unit }
+        if let lineSource, !lineSource.isEmpty { payload["lineSource"] = lineSource }
+        return encode(
             entityType: "grocery",
             entityId: id.uuidString,
             operationType: "add",
             baseRevision: baseRevision,
-            payload: ["itemKey": itemKey, "quantity": quantity, "mode": "set"]
+            payload: payload
         )
     }
 
@@ -274,14 +284,25 @@ enum BoardMutationEncoder {
         )
     }
 
-    static func groceryCheck(id: UUID, baseRevision: Int, isChecked: Bool) -> Data {
+    static func groceryCheck(id: UUID, itemKey: String, baseRevision: Int, isChecked: Bool) -> Data {
         encode(
             entityType: "grocery",
             entityId: id.uuidString,
             operationType: "check",
             baseRevision: baseRevision,
-            payload: ["isChecked": isChecked]
+            payload: ["isChecked": isChecked, "itemKey": itemKey]
         )
+    }
+
+    func board(householdId: UUID) async throws -> [SharedGroceryWire] {
+        let (data, http) = try await perform(
+            method: "GET",
+            path: "/v1/households/\(householdId.uuidString)/board",
+            body: nil,
+            headers: [:]
+        )
+        guard (200..<300).contains(http.statusCode) else { throw BoardSyncFailure.retry }
+        return try JSONDecoder().decode(BoardGroceryPage.self, from: data).grocery
     }
 
     private static func encode(
@@ -300,6 +321,10 @@ enum BoardMutationEncoder {
         ]
         return (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
     }
+}
+
+private struct BoardGroceryPage: Decodable {
+    var grocery: [SharedGroceryWire]
 }
 
 private struct BoardErrorBody: Decodable {

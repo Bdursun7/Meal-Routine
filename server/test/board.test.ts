@@ -166,6 +166,102 @@ describe('shared board sync', () => {
     await app.close()
   })
 
+  it('stores a decimal shortfall with a unit and still accepts an integer plan line', async () => {
+    const { app } = session()
+    const ada = await signIn(app, 'ada-decimal', 'Ada')
+    const bea = await signIn(app, 'bea-decimal', 'Bea')
+    const householdId = await createHousehold(app, ada.auth)
+    const invite = await app.inject({ method: 'POST', url: `/v1/households/${householdId}/invites`, headers: ada.auth })
+    const code = invite.json().household.invites[0].code as string
+    expect((await app.inject({ method: 'POST', url: `/v1/invites/${code}/accept`, headers: bea.auth })).statusCode).toBe(200)
+
+    const measured = await mutate(app, householdId, ada.auth, 'decimal-set', {
+      entityType: 'grocery',
+      entityId: '12121212-1212-4121-8121-121212121212',
+      operationType: 'add',
+      baseRevision: 0,
+      payload: { itemKey: 'pantry-auto:tomato|family:mass', quantity: 0.6, unit: 'kg', mode: 'set', lineSource: 'shortfall' },
+    })
+    expect(measured.statusCode).toBe(200)
+    expect(measured.json().entity).toMatchObject({ quantity: 0.6, unit: 'kg', lineSource: 'shortfall', revision: 1 })
+    const again = await mutate(app, householdId, bea.auth, 'decimal-set-bea', {
+      entityType: 'grocery',
+      entityId: '13131313-1313-4131-8131-131313131313',
+      operationType: 'add',
+      baseRevision: 0,
+      payload: { itemKey: 'pantry-auto:tomato|family:mass', quantity: 0.6, unit: 'kg', mode: 'set', lineSource: 'shortfall' },
+    })
+    expect(again.statusCode).toBe(200)
+    expect(again.json().entity.revision).toBe(1)
+    const grams = await mutate(app, householdId, ada.auth, 'decimal-grams', {
+      entityType: 'grocery',
+      entityId: '14141414-1414-4141-8141-141414141414',
+      operationType: 'add',
+      baseRevision: 1,
+      payload: { itemKey: 'pantry-auto:tomato|family:mass', quantity: 1500, unit: 'g', mode: 'set', lineSource: 'threshold' },
+    })
+    expect(grams.statusCode).toBe(200)
+    expect(grams.json().entity).toMatchObject({ quantity: 1500, unit: 'g', lineSource: 'threshold' })
+    const tooBig = await mutate(app, householdId, ada.auth, 'decimal-cap', {
+      entityType: 'grocery',
+      entityId: '15151515-1515-4151-8151-151515151515',
+      operationType: 'add',
+      baseRevision: grams.json().entity.revision,
+      payload: { itemKey: 'pantry-auto:tomato|family:mass', quantity: 1000000, unit: 'g', mode: 'set' },
+    })
+    expect(tooBig.statusCode).toBe(400)
+    const planLine = await mutate(app, householdId, ada.auth, 'plan-int', {
+      entityType: 'grocery',
+      entityId: groceryId,
+      operationType: 'add',
+      baseRevision: 0,
+      payload: { itemKey: 'tomato|piece', quantity: 2 },
+    })
+    expect(planLine.statusCode).toBe(200)
+    expect(planLine.json().entity).toMatchObject({ quantity: 2, unit: null })
+    const byKey = await mutate(app, householdId, bea.auth, 'decimal-check', {
+      entityType: 'grocery',
+      entityId: '16161616-1616-4161-8161-161616161616',
+      operationType: 'check',
+      baseRevision: grams.json().entity.revision,
+      payload: { isChecked: true, itemKey: 'pantry-auto:tomato|family:mass' },
+    })
+    expect(byKey.statusCode).toBe(200)
+    expect(byKey.json().entity.isChecked).toBe(true)
+
+    const cooked = await mutate(app, householdId, ada.auth, 'cook-ada', {
+      entityType: 'plan',
+      entityId: planId,
+      operationType: 'upsert',
+      baseRevision: 0,
+      payload: {
+        weekStart: '2030-06-02',
+        status: 'draft',
+        isFinalized: false,
+        meals: [{ id: mealId, dayOffset: 0, recipeSlug: 'menemen', title: 'Menemen' }],
+      },
+    })
+    expect(cooked.statusCode).toBe(200)
+    const firstCook = await mutate(app, householdId, ada.auth, 'cook-first', {
+      entityType: 'meal',
+      entityId: mealId,
+      operationType: 'cook',
+      baseRevision: 1,
+      payload: {},
+    })
+    expect(firstCook.statusCode).toBe(200)
+    const secondCook = await mutate(app, householdId, bea.auth, 'cook-second', {
+      entityType: 'meal',
+      entityId: mealId,
+      operationType: 'cook',
+      baseRevision: 1,
+      payload: {},
+    })
+    expect(secondCook.statusCode).toBe(409)
+    expect(secondCook.json().error).toBe('version_conflict')
+    await app.close()
+  })
+
   it('removes a legacy pantry-auto key and leaves the canonical one', async () => {
     const { app } = session()
     const ada = await signIn(app, 'ada-remove', 'Ada')

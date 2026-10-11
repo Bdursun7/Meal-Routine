@@ -386,7 +386,10 @@ enum GroceryMealAudit {
     }
 }
 
-/// Integer written to `shared_grocery_items.quantity` (migration 0008).
+/// Integer written for plan rows on `shared_grocery_items.quantity` (migration 0008).
+/// The unit already lives in the plan key (`canonicalId|unit`). Checked plan rows and
+/// older clients round-trip that integer, so plan lines stay whole.
+/// Shortfall, cook-gap and typed rows send a decimal quantity plus a unit (0014) instead.
 enum GrocerySyncQuantity {
     static func whole(_ quantity: Double?) -> Int {
         guard let quantity, quantity > 0 else { return 1 }

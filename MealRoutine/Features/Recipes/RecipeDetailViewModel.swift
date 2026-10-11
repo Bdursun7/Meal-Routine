@@ -116,11 +116,28 @@ final class RecipeDetailViewModel {
         cookShortages = []
     }
 
-    func confirmCookStock(needs: [PantryCookNeed], in context: ModelContext) {
+    func confirmCookStock(
+        needs: [PantryCookNeed],
+        excluded: Set<Int> = [],
+        splits: [Int: [String: Double]] = [:],
+        in context: ModelContext
+    ) {
         guard let cookStockMealID else { return }
-        let outcome = PantryStockSideEffects.confirmCook(mealId: cookStockMealID, needs: needs, in: context)
-        let count = Set(outcome.deductions.map(\.ingredientId)).count
-        cookNotice = count > 0 ? PantryCopy.cookConfirmed(count) : PantryCopy.cookUnchanged
+        let outcome = PantryStockSideEffects.confirmCook(
+            mealId: cookStockMealID,
+            needs: needs,
+            excludedNeedIndexes: excluded,
+            splits: splits,
+            in: context
+        )
+        if outcome.deferred {
+            cookNotice = PantryCopy.cookDeferred
+        } else if outcome.skippedByPartner {
+            cookNotice = PantryCopy.cookAlready
+        } else {
+            let count = Set(outcome.deductions.map(\.ingredientId)).count
+            cookNotice = count > 0 ? PantryCopy.cookConfirmed(count) : PantryCopy.cookUnchanged
+        }
         cookShortages = []
         self.cookStockMealID = nil
     }

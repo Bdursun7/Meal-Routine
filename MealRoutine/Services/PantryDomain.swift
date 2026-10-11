@@ -102,11 +102,20 @@ enum PantryCopy {
     static func stillToBuy(_ amount: String) -> String {
         "\(amount) daha alınacak"
     }
+    static let cookLocationHint = "Nereden düşüleceğini değiştirebilirsin. Toplam, tarif ihtiyacını ve eldeki miktarı geçmez."
+    static let cookDeferred = "Ev halkı kaydı sunucuya yazılınca düşülecek."
+    static let cookAlready = "Bu yemek evde zaten düşüldü."
+
+    /// Available stock by place, in deduction order. Example: `Domates — Kiler: 3 adet, Buzdolabı: 2 adet`.
+    static func locationInventory(_ name: String, parts: [(location: String, amount: String)]) -> String {
+        let body = parts.map { "\($0.location): \($0.amount)" }.joined(separator: ", ")
+        return "\(name) — \(body)"
+    }
     static let autoAddToggle = "Minimumun altına inince markete ekle"
     static let autoAddFooter = "Kapalıyken eşik, market listesine ürün eklemez. Açınca eksik miktar bir kez yazılır."
     static let lowStockToggle = "Düşük stok bildirimi"
     static let dateReminderToggle = "Tarih hatırlatması"
-    static let dateReminderScheduleToggle = "Hatırlatma günleri"
+    static let dateReminderScheduleToggle = "Standart hatırlatma programı"
     static let dateReminderFooter = "Tavsiye edilen tarih için 2 gün önce ve o gün. Son tüketim tarihi için 1 gün önce ve o gün. Bu bir hatırlatmadır."
     static let notificationPermissionDenied = "Bildirim izni kapalı. Evdekiler çalışmaya devam eder; hatırlatma gönderilmez."
     static let lowStockNoticeTitle = "Evdekiler"
@@ -143,6 +152,9 @@ enum PantryCopy {
         cookPartial(deducted: "400 g", shortfall: "0,6 kg"),
         cookNotDeducted(shortfall: "2 adet"),
         cookAddNamed("Domates"), cookConfirmed(3), stillToBuy("1 adet"),
+        cookLocationHint, cookDeferred, cookAlready,
+        locationInventory("Domates", parts: [("Buzdolabı", "2 adet"), ("Kiler", "3 adet")]),
+        PantryLocationTabs.emptyMessage(for: .refrigerator),
         addMissingToMarket, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
         dateReminderScheduleToggle, dateReminderFooter, notificationPermissionDenied, lowStockNoticeTitle,
         lowStockNoticeBody(name: "Süt"), reminderBestBefore(name: "Süt", day: "9 Ekim 2026"),
@@ -156,6 +168,83 @@ enum PantryLocation: String, CaseIterable, Codable, Identifiable, Sendable {
     var title: String {
         switch self { case .pantry: "Kiler"; case .refrigerator: "Buzdolabı"; case .freezer: "Dondurucu"; case .other: "Diğer" }
     }
+
+    /// Earlier in cook deduction when two rows share a calendar day.
+    var consumptionRank: Int {
+        switch self {
+        case .pantry: 0
+        case .refrigerator: 1
+        case .freezer: 2
+        case .other: 3
+        }
+    }
+}
+
+/// Evdekiler tabs. `all` is the unfiltered list. The others are `PantryLocation`.
+enum PantryLocationFilter: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case pantry
+    case refrigerator
+    case freezer
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "Tümü"
+        case .pantry, .refrigerator, .freezer, .other:
+            PantryLocation(rawValue: rawValue)?.title ?? rawValue
+        }
+    }
+
+    var location: PantryLocation? {
+        PantryLocation(rawValue: rawValue)
+    }
+
+    /// A location tab preselects that place. Tümü keeps the form default.
+    var preselectedLocation: PantryLocation? { location }
+}
+
+struct PantryListedItem: Equatable, Sendable {
+    var id: String
+    var name: String
+    var location: PantryLocation
+}
+
+/// Filters the pantry list. Market is not filtered by these tabs.
+enum PantryLocationTabs {
+    static func counts(_ items: [PantryListedItem]) -> [PantryLocationFilter: Int] {
+        var result: [PantryLocationFilter: Int] = [.all: items.count]
+        for location in PantryLocation.allCases {
+            guard let tab = PantryLocationFilter(rawValue: location.rawValue) else { continue }
+            result[tab] = items.filter { $0.location == location }.count
+        }
+        return result
+    }
+
+    static func visible(_ items: [PantryListedItem], tab: PantryLocationFilter, search: String) -> [PantryListedItem] {
+        items.filter { item in
+            let inTab = tab.location == nil || item.location == tab.location
+            let matches = search.isEmpty || item.name.localizedCaseInsensitiveContains(search)
+            return inTab && matches
+        }
+    }
+
+    static func emptyMessage(for tab: PantryLocationFilter) -> String {
+        if tab == .all { return PantryCopy.empty }
+        return "\(tab.title) konumunda malzeme yok."
+    }
+
+    static func accessibilityLabel(tab: PantryLocationFilter, count: Int, selected: Bool) -> String {
+        let selection = selected ? "seçili" : "seçili değil"
+        return "\(tab.title), \(count) malzeme, \(selection)"
+    }
+}
+
+/// Last Evdekiler tab for this process. Not written to disk and not a schema field.
+enum PantryLocationTabSession {
+    static var selected: PantryLocationFilter = .all
 }
 
 // MARK: - Dates
@@ -1851,7 +1940,8 @@ enum PantryDateReminders {
         quantity: Double,
         remindersEnabled: Bool,
         schedule: PantryDateReminderSchedule,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        now: Date = .now
     ) -> [PantryReminderFire] {
         guard remindersEnabled, schedule.enabled, quantity > 0, let dateType, let day = PantryDay.canonical(dateValue) else {
             return []
@@ -1864,6 +1954,15 @@ enum PantryDateReminders {
             guard let fire = calendar.date(byAdding: .day, value: -lead, to: anchor) else { return nil }
             let parts = calendar.dateComponents([.year, .month, .day], from: fire)
             guard let year = parts.year, let month = parts.month, let dayNumber = parts.day else { return nil }
+            var clock = DateComponents()
+            clock.calendar = calendar
+            clock.timeZone = timeZone
+            clock.year = year
+            clock.month = month
+            clock.day = dayNumber
+            clock.hour = fireHour
+            clock.minute = fireMinute
+            guard let fireDate = calendar.date(from: clock), fireDate >= now else { return nil }
             let when = lead == 0 ? "bugün" : (lead == 1 ? "yarın" : "\(lead) gün içinde")
             let body = dateType == .useBy
                 ? PantryCopy.reminderUseBy(name: displayName, day: when)
@@ -1880,7 +1979,7 @@ enum PantryDateReminders {
     }
 }
 
-struct PantryCookNeed: Equatable, Sendable {
+struct PantryCookNeed: Equatable, Sendable, Codable {
     var ingredientId: String
     var displayName: String
     var quantity: Double
@@ -1898,8 +1997,155 @@ struct PantryCookStock: Equatable, Sendable, Identifiable {
     var version: Int
     var dateType: PantryDateType? = nil
     var dateValue: String? = nil
+    /// Where this row sits. Missing means `other`, after dated places.
+    var location: PantryLocation = .other
 
     var identifier: String { id }
+}
+
+struct PantryCookLocationLine: Equatable, Sendable, Identifiable {
+    var id: String
+    var locationTitle: String
+    var available: Double
+    var selected: Double
+    var unit: String
+    var availableText: String
+}
+
+/// How one cook confirmation splits a need across pantry rows.
+///
+/// Order: earliest calendar day first; a row with no date is last.
+/// The same day uses location rank (kiler, buzdolabı, dondurucu, diğer), then id.
+/// The default fills that order until the recipe need is met, never past a row's stock.
+/// A user override is clamped the same way: each take stays inside that row, and the
+/// total in the recipe unit never exceeds the need. Shortfall is what the final takes leave.
+enum PantryCookSplit {
+    struct Result: Equatable, Sendable {
+        var takes: [String: Double]
+        var shortfall: Double
+    }
+
+    static func ordered(_ rows: [PantryCookStock]) -> [PantryCookStock] {
+        rows.sorted { lhs, rhs in
+            let leftDay = lhs.dateValue.flatMap(PantryDay.ordinal) ?? Int.max
+            let rightDay = rhs.dateValue.flatMap(PantryDay.ordinal) ?? Int.max
+            if leftDay != rightDay { return leftDay < rightDay }
+            if lhs.location.consumptionRank != rhs.location.consumptionRank {
+                return lhs.location.consumptionRank < rhs.location.consumptionRank
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    static func step(for unit: String) -> Double {
+        switch GroceryMerger.normalize(unit) {
+        case "kg", "l": 0.1
+        default: 1
+        }
+    }
+
+    static func allocate(
+        need: PantryCookNeed,
+        rows: [PantryCookStock],
+        override: [String: Double]? = nil
+    ) -> Result {
+        let ordered = ordered(rows)
+        if let override {
+            return clamp(need: need, rows: ordered, requested: override)
+        }
+        var remaining = PantryUnitPolicy.snap(max(0, need.quantity))
+        var takes: [String: Double] = [:]
+        for row in ordered {
+            if remaining <= 0.0005 {
+                takes[row.id] = 0
+                continue
+            }
+            let needed = PantryUnitPolicy.converted(remaining, from: need.unit, to: row.unit) ?? 0
+            let raw = min(max(0, row.quantity), needed)
+            let snapped = PantryUnitPolicy.snap(raw)
+            takes[row.id] = snapped
+            let covered = PantryUnitPolicy.converted(snapped, from: row.unit, to: need.unit) ?? 0
+            remaining = PantryUnitPolicy.snap(max(0, remaining - covered))
+        }
+        return Result(takes: takes, shortfall: remaining)
+    }
+
+    private static func clamp(need: PantryCookNeed, rows: [PantryCookStock], requested: [String: Double]) -> Result {
+        var takes: [String: Double] = [:]
+        for row in rows {
+            let asked = requested[row.id] ?? 0
+            takes[row.id] = PantryUnitPolicy.snap(min(max(0, row.quantity), max(0, asked)))
+        }
+        var covered = coveredNeed(takes, rows: rows, need: need)
+        if covered > need.quantity + 0.0005 {
+            for row in rows.reversed() {
+                let extra = covered - need.quantity
+                guard extra > 0.0005, let take = takes[row.id], take > 0 else { continue }
+                let extraInStock = PantryUnitPolicy.converted(extra, from: need.unit, to: row.unit) ?? extra
+                takes[row.id] = PantryUnitPolicy.snap(max(0, take - extraInStock))
+                covered = coveredNeed(takes, rows: rows, need: need)
+            }
+        }
+        let shortfall = PantryUnitPolicy.snap(max(0, need.quantity - coveredNeed(takes, rows: rows, need: need)))
+        return Result(takes: takes, shortfall: shortfall)
+    }
+
+    private static func coveredNeed(_ takes: [String: Double], rows: [PantryCookStock], need: PantryCookNeed) -> Double {
+        var covered = 0.0
+        for row in rows {
+            let take = takes[row.id] ?? 0
+            covered += PantryUnitPolicy.converted(take, from: row.unit, to: need.unit) ?? 0
+        }
+        return PantryUnitPolicy.snap(covered)
+    }
+}
+
+/// One pantry write per item. The first `baseVersion` is the server version; the last quantity is what remains.
+enum PantryCookOutbox {
+    static func collapse(_ deductions: [PantryCookDeduction]) -> [PantryCookDeduction] {
+        var order: [String] = []
+        var byId: [String: PantryCookDeduction] = [:]
+        for deduction in deductions {
+            if var existing = byId[deduction.itemId] {
+                existing.newQuantity = deduction.newQuantity
+                existing.deducted = PantryUnitPolicy.snap(existing.deducted + deduction.deducted)
+                existing.unit = deduction.unit
+                byId[deduction.itemId] = existing
+            } else {
+                order.append(deduction.itemId)
+                byId[deduction.itemId] = deduction
+            }
+        }
+        return order.compactMap { byId[$0] }
+    }
+}
+
+enum PantryCookClaim: String, Codable, Equatable, Sendable {
+    case pending
+    case accepted
+    case rejected
+}
+
+enum PantryCookConfirmAction: Equatable, Sendable {
+    case applyNow
+    case hold
+    case skip
+}
+
+/// Household stock moves only after this phone's meal-cook mutation is accepted.
+/// A conflict means the other member already cooked that meal, so this phone does not deduct.
+/// Personal pantry (no household sync) deducts immediately. No extra table: the server
+/// already rejects a second cook when the meal revision moved, and Postgres locks the
+/// household row so the two cooks cannot both commit.
+enum PantryCookGate {
+    static func decision(syncsHousehold: Bool, claim: PantryCookClaim?) -> PantryCookConfirmAction {
+        guard syncsHousehold else { return .applyNow }
+        switch claim {
+        case .accepted: return .applyNow
+        case .rejected: return .skip
+        case .pending, .none: return .hold
+        }
+    }
 }
 
 enum PantryCookRowKind: String, Equatable, Sendable {
@@ -1935,6 +2181,10 @@ struct PantryCookSheetRow: Equatable, Sendable, Identifiable {
     /// Only a full match can be left out. Insufficient rows still deduct the capped amount.
     var canExclude: Bool
     var willDeduct: Bool
+    /// More than one compatible pantry row. Empty when a single row covers the line.
+    var locations: [PantryCookLocationLine] = []
+    /// `Domates — Kiler: 3 adet, Buzdolabı: 2 adet` when several places hold the ingredient.
+    var inventoryLine: String? = nil
 }
 
 struct PantryCookDeduction: Equatable, Sendable {
@@ -1973,6 +2223,10 @@ struct PantryCookOutcome: Equatable, Sendable {
     var appliedCrossings: Set<String>
     var armedLow: Set<String>
     var notices: [LowStockNotice]
+    /// This phone is waiting for its meal-cook mutation before it changes stock.
+    var deferred: Bool = false
+    /// The other member's cook was accepted, so this phone does not deduct again.
+    var skippedByPartner: Bool = false
 }
 
 enum PantryCookConsumption {
@@ -2002,6 +2256,7 @@ enum PantryCookConsumption {
         needs: [PantryCookNeed],
         stock: [PantryCookStock],
         excludedNeedIndexes: Set<Int> = [],
+        splits: [Int: [String: Double]] = [:],
         dictionary: IngredientDictionary = .shared
     ) -> [PantryCookSheetRow] {
         var working = stock
@@ -2009,10 +2264,8 @@ enum PantryCookConsumption {
         for (index, need) in needs.enumerated() where need.quantity > 0 {
             let recipeAmount = formatAmount(need.quantity, unit: need.unit)
             let excluded = excludedNeedIndexes.contains(index)
-            guard let matchIndex = working.firstIndex(where: {
-                sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary)
-                    && PantryUnitPolicy.compatible($0.unit, need.unit)
-            }) else {
+            let compatible = compatibleRows(for: need, in: working, dictionary: dictionary)
+            if compatible.isEmpty {
                 let same = working.contains { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) }
                 if same {
                     rows.append(row(
@@ -2031,45 +2284,113 @@ enum PantryCookConsumption {
                 }
                 continue
             }
-            let stockRow = working[matchIndex]
-            let neededInStock = PantryUnitPolicy.converted(need.quantity, from: need.unit, to: stockRow.unit) ?? 0
-            let taken = min(max(0, stockRow.quantity), neededInStock)
-            let snappedTaken = PantryUnitPolicy.snap(taken)
-            let remaining = PantryUnitPolicy.snap(max(0, stockRow.quantity - taken))
-            let covered = PantryUnitPolicy.converted(taken, from: stockRow.unit, to: need.unit) ?? 0
-            let gap = PantryUnitPolicy.snap(max(0, need.quantity - covered))
-            let stockAmount = formatAmount(stockRow.quantity, unit: stockRow.unit)
-            let consumes = !excluded && snappedTaken > 0
+            let allocation = PantryCookSplit.allocate(need: need, rows: compatible, override: splits[index])
+            let primary = compatible[0]
+            let snappedTaken = allocation.takes[primary.id] ?? 0
+            let remaining = PantryUnitPolicy.snap(max(0, primary.quantity - snappedTaken))
+            let gap = allocation.shortfall
+            let stockAmount = formatAmount(primary.quantity, unit: primary.unit)
+            let anyTake = allocation.takes.values.contains { $0 > 0 }
+            let consumes = !excluded && anyTake
             if consumes {
-                working[matchIndex].quantity = remaining
+                for match in compatible {
+                    let take = allocation.takes[match.id] ?? 0
+                    guard take > 0, let matchIndex = working.firstIndex(where: { $0.id == match.id }) else { continue }
+                    working[matchIndex].quantity = PantryUnitPolicy.snap(max(0, working[matchIndex].quantity - take))
+                }
             }
-            let kind: PantryCookRowKind = gap > 0 || snappedTaken <= 0 ? .insufficient : .matched
-            let summary: String
-            if snappedTaken <= 0 {
-                summary = PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: need.unit))
-            } else if gap > 0 {
-                summary = PantryCopy.cookPartial(
-                    deducted: formatAmount(snappedTaken, unit: stockRow.unit),
-                    shortfall: formatAmount(gap, unit: need.unit)
-                )
-            } else {
-                summary = PantryCopy.cookFull(
-                    deducted: formatAmount(snappedTaken, unit: stockRow.unit),
-                    remaining: formatAmount(remaining, unit: stockRow.unit)
-                )
-            }
+            let kind: PantryCookRowKind = gap > 0 || !anyTake ? .insufficient : .matched
+            let summary = cookSummary(
+                taken: snappedTaken,
+                takenUnit: primary.unit,
+                remaining: remaining,
+                gap: gap,
+                needUnit: need.unit,
+                several: compatible.count > 1,
+                takes: allocation.takes,
+                rows: compatible
+            )
+            let lines = locationLines(compatible, takes: allocation.takes)
             rows.append(row(
                 index: index, need: need, recipeAmount: recipeAmount, kind: kind,
-                stockAmount: stockAmount, summary: summary, reason: nil,
+                stockAmount: compatible.count > 1 ? nil : stockAmount,
+                summary: summary, reason: nil,
                 deducted: consumes ? snappedTaken : 0,
-                remaining: remaining,
+                remaining: compatible.count > 1 ? nil : remaining,
                 shortfall: gap,
-                offerAddMissing: gap > 0 && !stockRow.autoAddToGrocery,
+                offerAddMissing: gap > 0 && !compatible.contains(where: \.autoAddToGrocery),
                 canExclude: kind == .matched,
-                willDeduct: consumes
+                willDeduct: consumes,
+                locations: compatible.count > 1 ? lines : [],
+                inventoryLine: compatible.count > 1
+                    ? PantryCopy.locationInventory(need.displayName, parts: lines.map { ($0.locationTitle, $0.availableText) })
+                    : nil
             ))
         }
         return rows
+    }
+
+    private static func cookSummary(
+        taken: Double,
+        takenUnit: String,
+        remaining: Double,
+        gap: Double,
+        needUnit: String,
+        several: Bool,
+        takes: [String: Double],
+        rows: [PantryCookStock]
+    ) -> String {
+        if several {
+            let pieces = rows.compactMap { row -> String? in
+                let take = takes[row.id] ?? 0
+                guard take > 0 else { return nil }
+                return "\(row.location.title) \(formatAmount(take, unit: row.unit))"
+            }
+            let body = pieces.joined(separator: ", ")
+            if gap > 0 {
+                return body.isEmpty
+                    ? PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit))
+                    : "\(body). \(PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit)))"
+            }
+            return body
+        }
+        if taken <= 0 {
+            return PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit))
+        }
+        if gap > 0 {
+            return PantryCopy.cookPartial(
+                deducted: formatAmount(taken, unit: takenUnit),
+                shortfall: formatAmount(gap, unit: needUnit)
+            )
+        }
+        return PantryCopy.cookFull(
+            deducted: formatAmount(taken, unit: takenUnit),
+            remaining: formatAmount(remaining, unit: takenUnit)
+        )
+    }
+
+    private static func locationLines(_ rows: [PantryCookStock], takes: [String: Double]) -> [PantryCookLocationLine] {
+        rows.map { row in
+            PantryCookLocationLine(
+                id: row.id,
+                locationTitle: row.location.title,
+                available: row.quantity,
+                selected: takes[row.id] ?? 0,
+                unit: row.unit,
+                availableText: formatAmount(row.quantity, unit: row.unit)
+            )
+        }
+    }
+
+    private static func compatibleRows(
+        for need: PantryCookNeed,
+        in stock: [PantryCookStock],
+        dictionary: IngredientDictionary
+    ) -> [PantryCookStock] {
+        PantryCookSplit.ordered(stock.filter {
+            sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary)
+                && PantryUnitPolicy.compatible($0.unit, need.unit)
+        })
     }
 
     private static func row(
@@ -2085,7 +2406,9 @@ enum PantryCookConsumption {
         shortfall: Double,
         offerAddMissing: Bool,
         canExclude: Bool,
-        willDeduct: Bool
+        willDeduct: Bool,
+        locations: [PantryCookLocationLine] = [],
+        inventoryLine: String? = nil
     ) -> PantryCookSheetRow {
         PantryCookSheetRow(
             id: "\(index)|\(need.ingredientId)|\(need.unit)",
@@ -2103,7 +2426,9 @@ enum PantryCookConsumption {
             shortfallUnit: GroceryMerger.normalize(need.unit),
             offerAddMissing: offerAddMissing,
             canExclude: canExclude,
-            willDeduct: willDeduct
+            willDeduct: willDeduct,
+            locations: locations,
+            inventoryLine: inventoryLine
         )
     }
 
@@ -2118,6 +2443,8 @@ enum PantryCookConsumption {
         appliedCrossings: Set<String>,
         armedLow: Set<String>,
         lowStockEnabled: Bool,
+        excludedNeedIndexes: Set<Int> = [],
+        splits: [Int: [String: Double]] = [:],
         dictionary: IngredientDictionary = .shared
     ) -> PantryCookOutcome {
         guard PantryStockEvent.deducts(event, confirmed: confirmed), !appliedMeals.contains(mealId) else {
@@ -2139,8 +2466,9 @@ enum PantryCookConsumption {
         var meals = appliedMeals
         meals.insert(mealId)
 
-        for need in needs where need.quantity > 0 {
-            guard let index = working.firstIndex(where: { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) && PantryUnitPolicy.compatible($0.unit, need.unit) }) else {
+        for (needIndex, need) in needs.enumerated() where need.quantity > 0 && !excludedNeedIndexes.contains(needIndex) {
+            let compatible = compatibleRows(for: need, in: working, dictionary: dictionary)
+            if compatible.isEmpty {
                 let same = working.contains { sameIngredient($0.ingredientId, need.ingredientId, dictionary: dictionary) }
                 skipped.append(PantryCookSkip(
                     ingredientId: need.ingredientId,
@@ -2157,22 +2485,25 @@ enum PantryCookConsumption {
                 ))
                 continue
             }
-            let row = working[index]
-            let neededInStock = PantryUnitPolicy.converted(need.quantity, from: need.unit, to: row.unit) ?? 0
-            let taken = min(max(0, row.quantity), neededInStock)
-            let remaining = PantryUnitPolicy.snap(max(0, row.quantity - taken))
-            if taken > 0 {
+            let allocation = PantryCookSplit.allocate(need: need, rows: compatible, override: splits[needIndex])
+            var touched = compatible[0]
+            for match in compatible {
+                let take = allocation.takes[match.id] ?? 0
+                guard take > 0, let index = working.firstIndex(where: { $0.id == match.id }) else { continue }
+                let row = working[index]
+                let remaining = PantryUnitPolicy.snap(max(0, row.quantity - take))
                 deductions.append(PantryCookDeduction(
                     itemId: row.id,
                     ingredientId: row.ingredientId,
                     newQuantity: remaining,
                     unit: row.unit,
                     baseVersion: row.version,
-                    deducted: PantryUnitPolicy.snap(taken)
+                    deducted: take
                 ))
                 let previous = row.quantity
                 working[index].quantity = remaining
                 working[index].version = row.version + 1
+                touched = working[index]
                 let low = PantryLowStockNotifications.step(
                     itemId: row.id, name: row.displayName, previousQuantity: previous, nextQuantity: remaining,
                     minimum: row.minimumQuantity, enabled: lowStockEnabled, armed: armed
@@ -2191,31 +2522,31 @@ enum PantryCookConsumption {
                     rowsNow = PantryAutoGrocery.reduce(rowsNow, mutation)
                 }
             }
-            let covered = PantryUnitPolicy.converted(taken, from: row.unit, to: need.unit) ?? 0
-            let gap = PantryUnitPolicy.snap(max(0, need.quantity - covered))
+            let gap = allocation.shortfall
             if gap > 0 {
+                let auto = compatible.contains(where: \.autoAddToGrocery)
                 shortages.append(PantryCookShortage(
                     ingredientId: need.ingredientId,
                     displayName: need.displayName,
                     missingQuantity: gap,
                     unit: GroceryMerger.normalize(need.unit),
-                    autoAddToGrocery: row.autoAddToGrocery,
-                    offerAddMissing: !row.autoAddToGrocery
+                    autoAddToGrocery: auto,
+                    offerAddMissing: !auto
                 ))
-                if row.autoAddToGrocery {
-                    let cookKey = "cook:\(mealId):\(GroceryMerger.shoppingIngredientId(row.ingredientId, dictionary: dictionary))|\(GroceryMerger.unitBucket(need.unit))"
+                if auto {
+                    let cookKey = "cook:\(mealId):\(GroceryMerger.shoppingIngredientId(touched.ingredientId, dictionary: dictionary))|\(GroceryMerger.unitBucket(need.unit))"
                     if !crossings.contains(cookKey) {
                         crossings.insert(cookKey)
                         let itemKey = PantryAutoGrocery.cookGapKey(
                             mealId: mealId,
-                            ingredientId: row.ingredientId,
+                            ingredientId: touched.ingredientId,
                             unit: need.unit,
                             dictionary: dictionary
                         )
                         if rowsNow.first(where: { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) })?.isChecked != true {
                             let mutation = PantryGroceryMutation(
                                 itemKey: itemKey,
-                                ingredientId: GroceryMerger.shoppingIngredientId(row.ingredientId, dictionary: dictionary),
+                                ingredientId: GroceryMerger.shoppingIngredientId(touched.ingredientId, dictionary: dictionary),
                                 displayName: need.displayName,
                                 quantity: gap,
                                 unit: GroceryMerger.normalize(need.unit),

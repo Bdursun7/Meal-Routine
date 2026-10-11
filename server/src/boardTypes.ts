@@ -42,7 +42,12 @@ export interface GroceryRow {
   id: string
   householdId: string
   itemKey: string
+  /** Authoritative amount. Integer for a plan line, decimal when `unit` is set (0014). */
   quantity: number
+  /** Null on rows written before 0014 and on integer plan lines. */
+  unit: string | null
+  /** Market card part. Null when the writer did not send one. */
+  lineSource: string | null
   isChecked: boolean
   updatedBy: string | null
   revision: number
@@ -144,6 +149,8 @@ export function publicBoard(document: BoardDocument) {
       id: item.id,
       itemKey: item.itemKey,
       quantity: item.quantity,
+      unit: item.unit,
+      lineSource: item.lineSource,
       isChecked: item.isChecked,
       updatedBy: item.updatedBy,
       revision: item.revision,

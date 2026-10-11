@@ -2,17 +2,17 @@
 
 Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `docs/v5-local-runbook.md`.
 
-`MARKETING_VERSION` `5.0.0`. `CURRENT_PROJECT_VERSION` `5`. Migration `0012_pantry` ve `0013_pantry_auto_add`. `0001`–`0012` dosyaları bu değişiklikte yeniden yazılmadı; `server/test/migrations.test.ts` `0001`–`0011` içinde pantry izi olmadığını ve `0013` kolonunun `ADD COLUMN` olduğunu doğrular.
+`MARKETING_VERSION` `5.0.0`. `CURRENT_PROJECT_VERSION` `5`. Migration `0012_pantry`, `0013_pantry_auto_add` ve `0014_shared_grocery_quantity`. `0001`–`0013` dosyaları bu değişiklikte yeniden yazılmadı. `server/test/migrations.test.ts` `0001`–`0011` içinde pantry izi olmadığını, `0013` kolonunun `ADD COLUMN` olduğunu ve `0014` dosyasının `DROP` / `DELETE` / `TRUNCATE` içermediğini doğrular. `0015` yoktur.
 
 ## Bu ortamda koşan kontroller
 
 | Komut | Sonuç |
 | --- | --- |
 | `cd server && npm run typecheck` | geçti |
-| `cd server && npm test` | 2026-10-11 kısa-satır düzeltmesi: 63 geçti, 4 atlandı (Postgres yok). `remove` eski `pantry-auto:` anahtarını düşer. Postgres’li 66 / 66 kaydı 2026-10-10’dadır |
-| `cd server && DATABASE_URL=postgres://… npm test` | 66 / 66 geçti, Postgres 16.15, atlanan yok (2026-10-10, V5.1 pişirme ve bildirim). Önceki re-audit 65 / 65, §9 |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 44 / 44, XCTest, Swift 6.0.3 Linux (2026-10-11, kanonik market kartı). Önceki kayıt 42 / 42 (2026-10-10) |
-| `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh` | 2026-10-11 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır. `run_recipe_photo_checks.sh` bu değişiklikte yeniden koşulmadı |
+| `cd server && npm test` | Postgres yokken önceki kayıt (2026-10-11 kısa-satır düzeltmesi): 63 geçti, 4 atlandı. Bu turda yeniden ölçülmedi |
+| `cd server && DATABASE_URL=postgres://… npm test` | 68 / 68 geçti, Postgres 16.15, atlanan yok (2026-10-11, gözden geçirme düzeltmeleri). Önceki kayıt 66 / 66 (2026-10-10) |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 46 / 46, XCTest, Swift 6.0.3 Linux (2026-10-11). Önceki kayıt 44 / 44 (kanonik kart) ve 42 / 42 (2026-10-10) |
+| `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh`, `run_recipe_photo_checks.sh` | 2026-10-11 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır |
 
 Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRules`, `GroceryView`, `GroceryViewModel`, `HouseholdSession`, `APIClient`) ve `MealRoutineTests/PantryTests.swift` Linux’ta derlenemez. Bunlar Mac’te Xcode ile derlenip koşulur.
 
@@ -34,17 +34,20 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Offline queue | pass | Her household yazımı önce cache’e, sonra sabit `Idempotency-Key` ve `baseVersion` ile kuyruğa girer. Çevrimdışıyken gönderilmez, dönüşte bir kez gönderilir; sunucu replay’i ikinci kez uygulamaz |
 | Conflict | pass | Eski `baseVersion` 409 ve `current` döner. Kuyruk `requiresResolution`, satır sunucu halini gösterir, “Bu malzeme başka bir cihazda güncellendi.” görünür. “Sunucudaki hali kullan” veya “Değişikliğimi yeniden uygula”; ikisinde de sessiz kayıp yok |
 | Reddedilen istek | pass | 400/422 sonsuz retry olmaz, `failed` olur; kullanıcı yeniden dener veya atar |
-| Migration | pass | `0012` ve `0013` V4.1 verisi olan Postgres’te household, board ve hesap satırlarını silmeden uygulanır (`pantry.integration.test.ts`). `0013` yalnız `auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false` ekler. `DROP TABLE` yok |
+| Migration | pass | `0012`, `0013` ve `0014` V4.1 verisi olan Postgres’te household, board ve hesap satırlarını silmeden uygulanır (`pantry.integration.test.ts`). `0013` yalnız `auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false` ekler. `0014` `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve `line_source` ekler; tamsayı `quantity` durur. `DROP TABLE` yok. `0015` yok |
 | Account deletion | pass | Tek üyeli ev silinince pantry gider; partner kalırsa kalır. Silinen hesabın idempotency satırı silinir; telefon kişisel pantry’yi ve ev kopyasını temizler. Evden çıkınca o evin cache’i telefonda kalmaz |
 | V1–V4.1 regresyon | pass (Linux) / Mac | Sunucu paketi yeşil. Linux check betikleri yeşil. Boş pantry V4.1 planını ve açıklamasını değiştirmez. Tam XCTest paketi Mac’te |
 | Türkçe metinler | pass | Yükleniyor, boş, hata + yeniden dene, çevrimdışı, conflict, failed metinleri `PantryCopy` içinde; boş metin yönergedeki cümle |
 | VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Varsayılan yazı boyutunda satır içeriğe göre sıkıdır; kontroller yalnız erişilebilirlik boyutlarında alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
-| Onaylı pişirme düşümü | Linux pass / Mac ekran | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez |
+| Onaylı pişirme düşümü | Linux pass / Mac ekran | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez. Aynı malzeme birden fazla satırdaysa sıra en erken gün, sonra kiler / buzdolabı / dondurucu / diğer, sonra kimliktir. Kullanıcı bölüşümü değiştirebilir; toplam ihtiyacı ve stoku geçmez (`testCookUsesEveryCompatibleRowInDateThenLocationOrder`) |
 | Düşük stok bildirimi | Linux pass / Mac teslim | Üstten alta bir kez; aynı bölümde tekrar yok; üstüne çıkınca yeniden kurulur. Kapalıyken geçiş spam yapmaz. Uzak push yok |
 | `autoAddToGrocery` | Linux pass | Varsayılan kapalı. Açıkken eksik miktar `pantry-auto:<kanonikId>\|<kova>` anahtarına bir kez yazılır (`family:mass`, `unit:piece`). İşaretli satır durur. İki üye `mode: set` ile tek satır (`board.test.ts`). `pantry-cook:` eşik miktarını ezmez |
 | Market kartı | Linux pass | Plan kimliği kanonik id + birim kovası (2026-10-11). `tomato` ve `tomatoes` tek satır; `cherry-tomato` ayrı. Görünen ad birleştirmez. Kart parçaları toplanmaz. Etiketler Plan, Evdekiler eksiği, Eşik, Pişirme eksiği, Elle eklendi. Eski kısa satırlar tek `pantry-auto:` satırına iner; 1 ve 2 toplanmaz, büyük olan kalır. Aynı etiket iki kez görünmez |
-| Tarih hatırlatması | Linux pass / Mac izin | `YYYY-MM-DD` günü İstanbul, Auckland ve Los Angeles takvimlerinde aynı kalır. Saat 09:00 cihaz dilimindedir. Household timezone yok |
-| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 44 / 44. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook; plan satırı `tomato`) Xcode’da koşulur |
+| Tarih hatırlatması | Linux pass / Mac izin | `YYYY-MM-DD` günü İstanbul, Auckland ve Los Angeles takvimlerinde aynı kalır. Saat 09:00 cihaz dilimindedir. Lead penceresinde geçmiş ateş atlanır. Household timezone yok. İkinci anahtarın etiketi “Standart hatırlatma programı”dır; gün seçici değildir |
+| Hafta yenileme | Linux pass / Mac SwiftData | `HouseholdPlanBridge.apply` elle, `pantry-auto:` ve `pantry-cook:` satırlarını silmez. Plan satırları yeniden kurulur. `Tools/household_checks.swift` ve `HouseholdGroceryPreserveTests` (Xcode) |
+| Ortak kısa miktar | Linux pass | `0,6 kg` 1 olmaz. `1500 g` kabul edilir. `1000000 g` 400 döner. Plan satırı birim göndermez ve `1`…`999` tamsayı kalır (`board.test.ts`) |
+| Evdekiler sekmeleri | Linux kural / Mac ekran | Tümü, Kiler, Buzdolabı, Dondurucu, Diğer. Sekme listeyi süzer; konumdan ekleme o yeri seçer. Market bölünmez (`testLocationTabsFilterThePantryListAndPreselectAPlace`) |
+| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 46 / 46. `PantryTests` ve `HouseholdGroceryPreserveTests` Xcode’da koşulur |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |
 
 Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi çıkarımı, fiyat / bütçe (V6), harici son kullanma API’si, otomatik tarih tahmini, üye sınırı artışı, Apple Sign in / APNs / TestFlight.
@@ -59,4 +62,21 @@ Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi ç
 6. `autoAddToGrocery` kapalıyken eşiğin market satırı açmadığını, açıkken `pantry-auto:<kanonikId>\|<kova>` satırının bir kez yazıldığını ve işaretli satırın durduğunu kontrol et. İki simülatör aynı eşiği görünce ikinci market satırı açılmamalı. Pişirme eksiği aynı kartta ayrı parça olarak durur ve eşik miktarını değiştirmez.
 7. Market’te “Domates” ara. `tomato` ve `tomatoes` tek karttır. Plan, evdekiler eksiği ve elle eklenen miktar ayrı ayrı görünür, toplanmaz. Kartın kutusu bütün parçaları işaretler; kısmi durumda eksi görünür. Koridor “Sebze ve meyve”dir. “X daha alınacak” plan kalanıdır. Bitti ikinci bir eksik satırı açmaz. Hafta yokken Bitti “Önce bu haftanın planını kur…” der.
 8. Tarih hatırlatmasını aç. İzin verilmezse “Bildirim izni kapalı…” cümlesi görünür ve Evdekiler kaydı yine çalışır. Tarih değişince eski gün, silinince bekleyen hatırlatma kalkar.
-9. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez.
+9. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez. Evdekiler sekmeleri kaydırılabilir çiplerdir; VoiceOver “Buzdolabı, 2 malzeme, seçili” gibi okur.
+10. İki simülatör, aynı ev. Adımlar aşağıdaki listededir.
+
+## İki simülatör
+
+Aynı `Debug-Local` sunucusu, aynı ev, iki iOS 18 simülatörü. `0014` migrate edilmiş olmalı.
+
+1. V5.0 mağazasıyla aç. `calendarDay`, `autoAddToGrocery` ve `sourceRaw` hafif göçle gelir. `bestBefore` `Date` kalır.
+2. Eski kişisel tarihli satırlar bir kez silinir. İkinci açılış bir şey silmez. Ortak satırlar silinmez. Tarih seçici `YYYY-MM-DD` olarak gidiş-dönüş yapar; saat dilimi günü kaydırmaz.
+3. Telefon A eşik veya pişirme eksiği ekler. Telefon B yenileyince aynı market kartının parçalarını görür: Plan, Evdekiler eksiği, Eşik, Pişirme eksiği, Elle eklendi. A işaretleyince B aynı sunucu anahtarını işaretli görür. Bu haftayı açmak elle ve kısa satırları silmez.
+4. `0,6 kg` veya `1500 g` kısa satır 1 olmaz ve 999 tavanına takılmaz.
+5. Aynı malzeme iki konumda (örneğin g ve g, farklı gün veya kiler / buzdolabı). Düşüm belgedeki sırayla stoku gezer, sonra eksik kalır. Kullanıcı adımlarla bölüşümü değiştirir. Toplam ihtiyacı ve stoku geçmez.
+6. Aynı malzemeden iki satır tek pantry `PATCH` olur: ilk `baseVersion`, son miktar.
+7. İki telefon aynı yemeğe Pişirdim / Düş der. Yalnız bir düşüm kalır.
+8. Tarih lead penceresinin içindeyse geçmiş lead hemen ateşlenmez. Silmek, sıfırlamak veya kapatmak hatırlatmayı iptal eder; geri gelmez.
+9. Kişisel `autoAddToGrocery` Aktar ve Kopyala’da durur. Birleştirmede OR uygulanır.
+10. Evdekiler sekmeleri süzer, sayıları gösterir, konumdan eklemede o yeri seçer, oturumda son sekmeyi hatırlar, boş konum nötr Türkçe yazar, VoiceOver etiketi okur. Market tek listedir.
+11. Bildirim izni reddedilince şerit görünür. VoiceOver, Dynamic Type ve Dark Mode; kahraman çerçevesi; cihazda Apple imzası ve paylaşım uzantısı.
