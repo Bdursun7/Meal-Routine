@@ -220,6 +220,91 @@ private func checkPhotoSlot() {
         ),
         "tall backdrop does not use the hero's wide-frame rule"
     )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 960,
+            height: 720,
+            minimumWidth: RecipePhoto.heroPointHeight,
+            minimumHeight: RecipePhoto.heroPointHeight,
+            widerThanTall: true
+        ),
+        "960 px rendition box is the clipped hero"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 320,
+            height: 240,
+            minimumWidth: RecipePhoto.heroPointHeight,
+            minimumHeight: RecipePhoto.heroPointHeight,
+            widerThanTall: true
+        ),
+        "list thumbnail box is not the hero plate"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 2560,
+            height: 1920,
+            minimumWidth: RecipePhoto.heroPointHeight,
+            minimumHeight: RecipePhoto.heroPointHeight,
+            widerThanTall: true
+        ),
+        "original upload box is not the hero plate"
+    )
+    check(
+        !RecipePhoto.isReadyPhotoSlot(
+            width: 300,
+            height: 220,
+            minimumWidth: RecipePhoto.heroPointHeight,
+            minimumHeight: RecipePhoto.heroPointHeight,
+            widerThanTall: true
+        ),
+        "narrow hero measurement is still cut off"
+    )
+    check(
+        RecipePhoto.isReadyPhotoSlot(
+            width: 375,
+            height: 220,
+            minimumWidth: RecipePhoto.heroPointHeight,
+            minimumHeight: RecipePhoto.heroPointHeight,
+            widerThanTall: true
+        ),
+        "narrowest phone plate can draw"
+    )
+}
+
+private func checkDetailVariant() {
+    let hamsi = URL(string: "https://upload.wikimedia.org/wikipedia/commons/b/b3/Hamsi_tava.jpg")!
+    let tariflerDetail = RecipePhoto.renditionURL(for: hamsi, role: .detailHero)
+    let weekDetail = RecipePhoto.renditionURL(for: hamsi, role: .detailHero)
+    let listRow = RecipePhoto.renditionURL(for: hamsi, role: .listThumbnail)
+    check(tariflerDetail == weekDetail, "Tarifler and Bu Hafta detail share the hero rendition")
+    check(
+        tariflerDetail.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/960px-Hamsi_tava.jpg",
+        "detail hero is 960, got \(tariflerDetail.absoluteString)"
+    )
+    check(
+        listRow.absoluteString == "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Hamsi_tava.jpg/320px-Hamsi_tava.jpg",
+        "list row stays at 320, got \(listRow.absoluteString)"
+    )
+    check(tariflerDetail != listRow, "detail does not reuse the list rendition")
+    check(
+        RecipePhoto.cacheFileName(for: tariflerDetail) != RecipePhoto.cacheFileName(for: listRow),
+        "hero and list thumbnail use different cache keys"
+    )
+    check(
+        RecipePhoto.cacheFileName(for: tariflerDetail) != RecipePhoto.cacheFileName(for: hamsi),
+        "hero cache key is not the original upload"
+    )
+    check(RecipePhoto.Role.detailHero.maxPixel == RecipePhoto.heroMaxPixel, "detail role asks for 960")
+    check(RecipePhoto.Role.listThumbnail.maxPixel == RecipePhoto.thumbnailMaxPixel, "list role asks for 320")
+
+    let fill = RecipePhoto.aspectFillRect(imageWidth: 960, imageHeight: 720, slotWidth: 390, slotHeight: 220)
+    check(fill != nil, "hero crop rect exists")
+    if let fill {
+        check(abs(fill.x) < 0.01 && abs(fill.width - 390) < 0.01, "4:3 hero fills the plate width, got \(fill)")
+        check(fill.height > 220 && fill.y < 0, "4:3 hero crops top and bottom instead of a raw slice, got \(fill)")
+        check(abs(fill.width - 960) > 1 && abs(fill.height - 720) > 1, "crop is not the unscaled bitmap")
+    }
 }
 
 private func checkImageSniff() {
@@ -532,6 +617,7 @@ struct RecipePhotoCheckMain {
         checkCreditPolicy()
         checkURLPolicy()
         checkPhotoSlot()
+        checkDetailVariant()
         checkImageSniff()
         checkDiskCache()
         await checkLoader()

@@ -35,6 +35,15 @@ struct RecipePhotoView: View {
 
     @State private var image: UIImage?
     @State private var phase: Phase
+    /// Pixel budget the current bitmap was decoded for. A list thumbnail must not
+    /// be scaled up into the hero while the 960 px file is still loading.
+    @State private var decodedForMaxPixel = 0
+    @State private var imageToken = 0
+    @State private var plateSize: CGSize = .zero
+    @State private var painted: UIImage?
+    @State private var paintedSlot: CGSize = .zero
+    @State private var paintedToken = 0
+    @Environment(\.displayScale) private var displayScale
 
     init(
         urlString: String,
@@ -58,35 +67,78 @@ struct RecipePhotoView: View {
     }
 
     var body: some View {
-        photoPlate
+        measuredPlate
             .overlay {
-                // The bitmap stays out of the plate's layout. Inside the stack, its
-                // pixel size (960 by 720, or the full upload after a rejected rendition)
-                // is what List measures. The 220 pt frame then clips an unscaled
-                // slice, and the credit's remeasure is what finally scales it.
-                GeometryReader { geo in
-                    if let image, phase == .shown, canDrawBitmap(image), slotIsReady(geo.size) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
-                    }
-                }
-                .allowsHitTesting(false)
+                bitmapOverlay
+                    .allowsHitTesting(false)
             }
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
-            .accessibilityAddTraits(phase == .shown ? .isImage : [])
+            .accessibilityAddTraits(bitmapIsVisible ? .isImage : [])
             .transaction { transaction in
                 transaction.animation = nil
             }
-            .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)" : "") {
+            .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)|\(fetchMaxPixel)" : "") {
                 guard loadsPhoto else { return }
+                // Drop whatever the row had decoded. A 320 px thumbnail must not
+                // sit in the hero until the shared detail rendition arrives.
+                image = nil
+                painted = nil
+                paintedSlot = .zero
+                paintedToken = 0
+                imageToken = 0
+                decodedForMaxPixel = 0
+                isPhotoShown = false
+                let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
+                let hasLocalPhoto = !localImagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                phase = (hasRemotePhoto || hasLocalPhoto) ? .loading : .missing
                 await load()
             }
+    }
+
+    /// Hero measures the plate, not the bitmap. The image stays in the overlay.
+    @ViewBuilder
+    private var measuredPlate: some View {
+        if layout == .hero {
+            photoPlate
+                .background {
+                    GeometryReader { geo in
+                        Color.clear.preference(key: HeroPlateSizeKey.self, value: geo.size)
+                    }
+                }
+                .onPreferenceChange(HeroPlateSizeKey.self) { newSize in
+                    guard !sameSlot(newSize, plateSize) else { return }
+                    plateSize = newSize
+                    paint(in: newSize)
+                }
+        } else {
+            photoPlate
+        }
+    }
+
+    @ViewBuilder
+    private var bitmapOverlay: some View {
+        if layout == .hero {
+            // Already cropped to the plate. Its point size is the slot, so the
+            // first draw cannot be an unscaled slice of the 960 px rendition
+            // or of the list thumbnail.
+            if let painted {
+                Image(uiImage: painted)
+                    .frame(width: plateSize.width, height: plateSize.height)
+            }
+        } else {
+            GeometryReader { geo in
+                if let image, phase == .shown, canDrawBitmap(image), slotIsReady(geo.size) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                }
+            }
+        }
     }
 
     /// Fixed plate. The placeholder stays until the overlay has a settled slot,
@@ -103,7 +155,7 @@ struct RecipePhotoView: View {
                 Theme.accent.opacity(0.16)
             }
             placeholderMark
-            if phase == .loading, layout == .hero || layout == .backdrop {
+            if showsProgress {
                 ProgressView()
                     .tint(Theme.onAccent)
                     .padding(12)
@@ -123,6 +175,27 @@ struct RecipePhotoView: View {
             minimumHeight: Double(fixedHeight),
             widerThanTall: layout == .hero
         )
+    }
+
+    private func sameSlot(_ lhs: CGSize, _ rhs: CGSize) -> Bool {
+        abs(lhs.width - rhs.width) < 0.5 && abs(lhs.height - rhs.height) < 0.5
+    }
+
+    /// Composite the hero into the settled plate. Until this runs, the placeholder stays.
+    private func paint(in slot: CGSize) {
+        guard layout == .hero else { return }
+        guard let image,
+              phase == .shown,
+              decodedForMaxPixel == fetchMaxPixel,
+              canDrawBitmap(image),
+              slotIsReady(slot),
+              let composited = RecipePhotoCompositor.image(image, filling: slot, scale: displayScale)
+        else { return }
+        if painted != nil, paintedToken == imageToken, sameSlot(paintedSlot, slot) { return }
+        painted = composited
+        paintedSlot = slot
+        paintedToken = imageToken
+        isPhotoShown = true
     }
 
     /// A list cell can be measured at the full row width and height 0.
@@ -154,20 +227,25 @@ struct RecipePhotoView: View {
     /// Positive on every layout. Backdrop may grow taller; it never collapses to 0.
     private var fixedHeight: CGFloat {
         switch layout {
-        case .hero: 220
+        case .hero: CGFloat(RecipePhoto.heroPointHeight)
         case .thumbnail: 64
         case .plate: 72
         case .backdrop: 180
         }
     }
 
-    /// Commons width to download. Decode still clamps to the on-screen size.
-    private var fetchMaxPixel: Int {
+    /// Commons width to download. List rows stay at 320 so Tarifler can scroll.
+    /// Detail from Tarifler and from Bu Hafta both use the hero rendition.
+    private var displayRole: RecipePhoto.Role {
         switch layout {
-        case .hero: RecipePhoto.heroMaxPixel
-        case .backdrop: RecipePhoto.backdropMaxPixel
-        case .thumbnail, .plate: RecipePhoto.thumbnailMaxPixel
+        case .hero: .detailHero
+        case .backdrop: .cardBackdrop
+        case .thumbnail, .plate: .listThumbnail
         }
+    }
+
+    private var fetchMaxPixel: Int {
+        displayRole.maxPixel
     }
 
     /// Stacked plate mark used when the catalog photo is missing or still loading.
@@ -195,6 +273,17 @@ struct RecipePhotoView: View {
         .accessibilityHidden(true)
     }
 
+    private var showsProgress: Bool {
+        guard layout == .hero || layout == .backdrop else { return false }
+        if phase == .loading { return true }
+        return layout == .hero && phase == .shown && painted == nil
+    }
+
+    private var bitmapIsVisible: Bool {
+        if layout == .hero { return painted != nil }
+        return phase == .shown
+    }
+
     private var accessibilityText: String {
         switch phase {
         case .loading:
@@ -204,19 +293,23 @@ struct RecipePhotoView: View {
         case .failed:
             "Fotoğraf yüklenemedi"
         case .shown:
-            "Tarif fotoğrafı"
+            if layout == .hero, painted == nil {
+                "Fotoğraf yükleniyor"
+            } else {
+                "Tarif fotoğrafı"
+            }
         }
     }
 
     private func load() async {
+        let pixelBudget = fetchMaxPixel
         if RecipePhoto.remoteURL(from: urlString) == nil, let local = localBitmap() {
-            image = local
-            phase = .shown
-            isPhotoShown = true
+            adopt(local, pixelBudget: pixelBudget)
             return
         }
         guard let remoteURL = RecipePhoto.remoteURL(from: urlString) else {
             image = nil
+            painted = nil
             isPhotoShown = false
             phase = .missing
             return
@@ -224,26 +317,36 @@ struct RecipePhotoView: View {
         if image == nil {
             phase = .loading
         }
-        let data = await RecipePhotoLoader.load(remoteURL: remoteURL, maxPixel: fetchMaxPixel)
+        let data = await RecipePhotoLoader.load(remoteURL: remoteURL, maxPixel: pixelBudget)
         guard !Task.isCancelled else { return }
         guard let data else {
             phase = .failed
             return
         }
-        let maxPixel = CGFloat(fetchMaxPixel)
-        let decoded = await RecipePhotoDecodeGate.shared.image(from: data, maxPixel: maxPixel)
+        let decoded = await RecipePhotoDecodeGate.shared.image(from: data, maxPixel: CGFloat(pixelBudget))
         guard !Task.isCancelled else { return }
+        guard pixelBudget == fetchMaxPixel else { return }
         guard let decoded, decoded.size.width > 0, decoded.size.height > 0 else {
             RecipePhotoDiskCache.remove(
-                remoteURL: remoteURL,
+                remoteURL: RecipePhoto.renditionURL(for: remoteURL, role: displayRole),
                 directory: RecipePhotoDiskCache.defaultDirectory()
             )
             phase = .failed
             return
         }
-        image = decoded
+        adopt(decoded, pixelBudget: pixelBudget)
+    }
+
+    private func adopt(_ bitmap: UIImage, pixelBudget: Int) {
+        imageToken += 1
+        image = bitmap
+        decodedForMaxPixel = pixelBudget
         phase = .shown
-        isPhotoShown = true
+        if layout == .hero {
+            paint(in: plateSize)
+        } else {
+            isPhotoShown = true
+        }
     }
 
     private func localBitmap() -> UIImage? {
@@ -374,5 +477,32 @@ private enum RecipePhotoDecoder {
             return UIImage(cgImage: cgImage)
         }
         return UIImage(data: data)
+    }
+}
+
+private struct HeroPlateSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+/// Draws the final hero crop into a bitmap the size of the plate.
+/// SwiftUI's first pass otherwise shows the source image at its pixel size.
+private enum RecipePhotoCompositor {
+    static func image(_ image: UIImage, filling slot: CGSize, scale: CGFloat) -> UIImage? {
+        guard let rect = RecipePhoto.aspectFillRect(
+            imageWidth: Double(image.size.width),
+            imageHeight: Double(image.size.height),
+            slotWidth: Double(slot.width),
+            slotHeight: Double(slot.height)
+        ) else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale > 0 ? scale : 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: slot, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height))
+        }
     }
 }
