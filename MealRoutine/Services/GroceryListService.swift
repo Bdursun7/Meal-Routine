@@ -172,13 +172,16 @@ enum GroceryListService {
                 contributions: contributions,
                 checks: checks
             )
-            if match.nameTR != line.nameTR
+            if match.ingredientId != line.ingredientId
+                || match.nameTR != line.nameTR
                 || match.nameEN != line.nameEN
                 || match.quantity != nextQuantity
                 || match.unit != nextUnit
                 || match.hasUnitConflict != nextConflict
                 || match.isChecked != resolution.isChecked
-                || match.uncoveredQuantity != resolution.uncoveredQuantity {
+                || match.uncoveredQuantity != resolution.uncoveredQuantity
+                || match.sourceRaw != GroceryLineSource.plan.rawValue {
+                match.ingredientId = line.ingredientId
                 match.nameTR = line.nameTR
                 match.nameEN = line.nameEN
                 match.quantity = nextQuantity
@@ -186,6 +189,7 @@ enum GroceryListService {
                 match.hasUnitConflict = nextConflict
                 match.isChecked = resolution.isChecked
                 match.uncoveredQuantity = resolution.uncoveredQuantity
+                match.sourceRaw = GroceryLineSource.plan.rawValue
                 didChange = true
             }
         }
@@ -210,7 +214,8 @@ enum GroceryListService {
                 unit: unit,
                 hasUnitConflict: line.hasUnitConflict,
                 isChecked: resolution.isChecked,
-                isManual: false
+                isManual: false,
+                sourceRaw: GroceryLineSource.plan.rawValue
             )
             item.uncoveredQuantity = resolution.uncoveredQuantity
             context.insert(item)
@@ -373,7 +378,8 @@ enum GroceryListService {
             unit: GroceryMerger.normalize(unit),
             hasUnitConflict: false,
             isChecked: false,
-            isManual: true
+            isManual: true,
+            sourceRaw: GroceryLineSource.typed.rawValue
         )
         context.insert(item)
         item.week = week

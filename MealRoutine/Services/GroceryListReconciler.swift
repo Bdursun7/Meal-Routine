@@ -48,9 +48,10 @@ struct GroceryReconcilePlan: Equatable, Sendable {
 /// Pairs a rebuilt shopping list with the automatic rows already on the week.
 ///
 /// Matching uses `GroceryMerger.rowIdentity`, so gram and kilogram (millilitre
-/// and litre) reuse one row. Each stored row is used at most once. When several
-/// rows share an identity, a checked one is kept. That check is cleared when
-/// the amount on the row changes.
+/// and litre) reuse one row, and `tomatoes` reuses a stored `tomato` row.
+/// Each stored row is used at most once. A check whose amount still matches
+/// is kept. Otherwise a hand-edited quantity is kept. A changed amount clears
+/// the check. Extra rows for the same canonical id are deleted, not duplicated.
 enum GroceryListReconciler {
     static func plan(
         existingAuto: [AutoGroceryRow],
@@ -66,7 +67,7 @@ enum GroceryListReconciler {
                 !used.contains(row.id)
                     && GroceryMerger.rowIdentity(ingredientId: row.ingredientId, unit: row.unit) == identity
             }
-            if let match = candidates.first(where: \.isChecked) ?? candidates.first {
+            if let match = pick(candidates, plannedQuantity: line.quantity, plannedUnit: line.unit) {
                 used.insert(match.id)
                 updates.append(
                     GroceryReconcilePlan.Update(
@@ -89,6 +90,31 @@ enum GroceryListReconciler {
 
         let deletes = existingAuto.map(\.id).filter { !used.contains($0) }
         return GroceryReconcilePlan(updates: updates, inserts: inserts, deletes: deletes)
+    }
+
+    /// One stored row for this canonical identity.
+    /// A check that still describes the amount on screen wins, so renaming
+    /// `tomatoes` to `tomato` does not drop it. A hand edit wins over a check
+    /// whose amount no longer matches. Anything left over is deleted by the caller.
+    private static func pick(
+        _ candidates: [AutoGroceryRow],
+        plannedQuantity: Double?,
+        plannedUnit: String
+    ) -> AutoGroceryRow? {
+        func survives(_ row: AutoGroceryRow) -> Bool {
+            GroceryCheckState.keepsCheckAfterRebuild(
+                wasChecked: row.isChecked,
+                storedQuantity: row.quantity,
+                storedUnit: row.unit,
+                plannedQuantity: plannedQuantity,
+                plannedUnit: plannedUnit,
+                quantityIsCustom: row.quantityIsCustom
+            )
+        }
+        if let stable = candidates.first(where: { $0.isChecked && survives($0) }) { return stable }
+        if let custom = candidates.first(where: \.quantityIsCustom) { return custom }
+        if let checked = candidates.first(where: \.isChecked) { return checked }
+        return candidates.first
     }
 }
 

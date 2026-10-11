@@ -9,11 +9,10 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | Komut | Sonuç |
 | --- | --- |
 | `cd server && npm run typecheck` | geçti |
-| `cd server && npm test` | V5.0 kaydı: 61 geçti, 4 atlandı (Postgres yok). V5.1 re-audit bu satırı kullanmaz |
+| `cd server && npm test` | 2026-10-11: 62 geçti, 4 atlandı (Postgres yok; sunucu kodu değişmedi). V5.0 kaydı 61 geçti, 4 atlandıydı. Postgres’li 66 / 66 kaydı 2026-10-10’dadır |
 | `cd server && DATABASE_URL=postgres://… npm test` | 66 / 66 geçti, Postgres 16.15, atlanan yok (2026-10-10, V5.1 pişirme ve bildirim). Önceki re-audit 65 / 65, §9 |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 42 / 42, XCTest, Swift 6.0.3 Linux (2026-10-10). Önceki re-audit 35 / 35, §9 |
-| `Tools/run_recommender_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_product_gap_checks.sh`, `run_grocery_checks.sh`, `run_recipe_photo_checks.sh` | §9 re-audit’te geçti. Bu V5.1 dalında yeniden koşulmadı |
-| `Tools/run_portion_checks.sh` | §9 re-audit’te geçti. 125 g + 1 kg `1,125 kg` kalır. Bu dalda yeniden koşulmadı |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 44 / 44, XCTest, Swift 6.0.3 Linux (2026-10-11, kanonik market kartı). Önceki kayıt 42 / 42 (2026-10-10) |
+| `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh` | 2026-10-11 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır. `run_recipe_photo_checks.sh` bu değişiklikte yeniden koşulmadı |
 
 Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRules`, `GroceryView`, `GroceryViewModel`, `HouseholdSession`, `APIClient`) ve `MealRoutineTests/PantryTests.swift` Linux’ta derlenemez. Bunlar Mac’te Xcode ile derlenip koşulur.
 
@@ -42,9 +41,10 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Varsayılan yazı boyutunda satır içeriğe göre sıkıdır; kontroller yalnız erişilebilirlik boyutlarında alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
 | Onaylı pişirme düşümü | Linux pass / Mac ekran | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez |
 | Düşük stok bildirimi | Linux pass / Mac teslim | Üstten alta bir kez; aynı bölümde tekrar yok; üstüne çıkınca yeniden kurulur. Kapalıyken geçiş spam yapmaz. Uzak push yok |
-| `autoAddToGrocery` | Linux pass | Varsayılan kapalı. Açıkken eksik miktar `pantry-auto:` anahtarına bir kez yazılır. İşaretli satır durur. İki üye `mode: set` ile tek satır (`board.test.ts`) |
+| `autoAddToGrocery` | Linux pass | Varsayılan kapalı. Açıkken eksik miktar `pantry-auto:<kanonikId>\|<kova>` anahtarına bir kez yazılır (`family:mass`, `unit:piece`). İşaretli satır durur. İki üye `mode: set` ile tek satır (`board.test.ts`). `pantry-cook:` eşik miktarını ezmez |
+| Market kartı | Linux pass | Plan kimliği kanonik id + birim kovası (2026-10-11). `tomato` ve `tomatoes` tek satır; `cherry-tomato` ayrı. Görünen ad birleştirmez. Kart parçaları toplanmaz. Etiketler Plan, Evdekiler eksiği, Eşik, Elle eklendi. Eski id işareti kaybetmeden tek satıra iner |
 | Tarih hatırlatması | Linux pass / Mac izin | `YYYY-MM-DD` günü İstanbul, Auckland ve Los Angeles takvimlerinde aynı kalır. Saat 09:00 cihaz dilimindedir. Household timezone yok |
-| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 42 / 42. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook) Xcode’da koşulur |
+| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 44 / 44. `PantryTests` (SwiftData cache, outbox, conflict, transfer, plan/cook; plan satırı `tomato`) Xcode’da koşulur |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |
 
 Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi çıkarımı, fiyat / bütçe (V6), harici son kullanma API’si, otomatik tarih tahmini, üye sınırı artışı, Apple Sign in / APNs / TestFlight.
@@ -56,6 +56,7 @@ Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi ç
 3. Pantry ekranında VoiceOver, en büyük Dynamic Type ve Dark Mode ile liste, form, conflict ve hata durumlarını gez.
 4. `Debug-Local` ile yerel sunucuya bağlanıp iki simülatörde aynı satırı düzenleyerek conflict akışını dene.
 5. Planlı bir yemeği pişir, puanı kaydet. “Evdekilerden düş” sayfası sekmenin üstünde açılır. “Vazgeç” stoku bırakır. “Düş” yalnız çevrilebilir birimi ve eldeki miktarı düşer; sayfa kapanır ve kısa bir onay görünür. Uyumsuz birim düşülmez. Stok 0 “Stok kadar düşülür” demez.
-6. `autoAddToGrocery` kapalıyken eşiğin market satırı açmadığını, açıkken `pantry-auto:` satırının bir kez yazıldığını ve işaretli satırın durduğunu kontrol et. İki simülatör aynı eşiği görünce ikinci market satırı açılmamalı.
-7. Tarih hatırlatmasını aç. İzin verilmezse “Bildirim izni kapalı…” cümlesi görünür ve Evdekiler kaydı yine çalışır. Tarih değişince eski gün, silinince bekleyen hatırlatma kalkar.
-8. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez.
+6. `autoAddToGrocery` kapalıyken eşiğin market satırı açmadığını, açıkken `pantry-auto:<kanonikId>\|<kova>` satırının bir kez yazıldığını ve işaretli satırın durduğunu kontrol et. İki simülatör aynı eşiği görünce ikinci market satırı açılmamalı. Pişirme eksiği aynı kartta ayrı parça olarak durur ve eşik miktarını değiştirmez.
+7. Market’te “Domates” ara. `tomato` ve `tomatoes` tek karttır. Plan, evdekiler eksiği ve elle eklenen miktar ayrı ayrı görünür, toplanmaz. Kartın kutusu bütün parçaları işaretler; kısmi durumda eksi görünür. Koridor “Sebze ve meyve”dir. “X daha alınacak” plan kalanıdır. Bitti ikinci bir eksik satırı açmaz. Hafta yokken Bitti “Önce bu haftanın planını kur…” der.
+8. Tarih hatırlatmasını aç. İzin verilmezse “Bildirim izni kapalı…” cümlesi görünür ve Evdekiler kaydı yine çalışır. Tarih değişince eski gün, silinince bekleyen hatırlatma kalkar.
+9. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez.

@@ -330,6 +330,63 @@ private func tomatoContribution(meal: UUID, slug: String, sort: Int, quantity: D
     )
 }
 
+/// Stored `tomatoes` and `tomato` rows collapse to one. An unchanged amount keeps its check.
+private func checkCanonicalReconcile() {
+    let url = URL(fileURLWithPath: "MealRoutine/Recipes/ingredients.v1.json")
+    guard let data = try? Data(contentsOf: url), let dictionary = try? IngredientDictionary(data: data) else {
+        check(false, "ingredients.v1.json should load for reconcile")
+        return
+    }
+    let merged = GroceryMerger.merge([
+        GrocerySourceLine(ingredientId: "tomato", nameTR: "Domates", nameEN: "Tomato", quantity: 6, unit: "piece"),
+        GrocerySourceLine(ingredientId: "tomatoes", nameTR: "Domates", nameEN: "Tomatoes", quantity: 2, unit: "piece"),
+    ], dictionary: dictionary)
+    check(merged.count == 1 && merged.first?.ingredientId == "tomato", "merged id is canonical \(merged)")
+    close(merged.first?.quantity, 8, "canonical sum")
+
+    let alias = UUID()
+    let catalog = UUID()
+    let combined = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: alias, ingredientId: "tomatoes", unit: "piece", quantity: 2, isChecked: true),
+            AutoGroceryRow(id: catalog, ingredientId: "tomato", unit: "piece", quantity: 6, isChecked: false),
+        ],
+        merged: merged
+    )
+    check(combined.updates.count == 1 && combined.inserts.isEmpty && combined.deletes.count == 1, "one row kept, duplicate deleted \(combined)")
+    check(combined.updates.first?.isChecked == false, "a changed total clears the check")
+
+    let stableID = UUID()
+    let stableMerged = GroceryMerger.merge([
+        GrocerySourceLine(ingredientId: "tomatoes", nameTR: "Domates", nameEN: "Tomatoes", quantity: 2, unit: "adet"),
+    ], dictionary: dictionary)
+    let stable = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: stableID, ingredientId: "tomatoes", unit: "piece", quantity: 2, isChecked: true),
+        ],
+        merged: stableMerged
+    )
+    check(
+        stable.updates.count == 1
+            && stable.updates.first?.existingID == stableID
+            && stable.updates.first?.isChecked == true
+            && stable.deletes.isEmpty
+            && stable.inserts.isEmpty,
+        "renaming tomatoes → tomato keeps the check when the amount is unchanged \(stable)"
+    )
+
+    let customID = UUID()
+    let generatedID = UUID()
+    let custom = GroceryListReconciler.plan(
+        existingAuto: [
+            AutoGroceryRow(id: customID, ingredientId: "tomatoes", unit: "piece", quantity: 9, isChecked: false, quantityIsCustom: true),
+            AutoGroceryRow(id: generatedID, ingredientId: "tomato", unit: "piece", quantity: 6, isChecked: true),
+        ],
+        merged: merged
+    )
+    check(custom.updates.first?.existingID == customID && custom.deletes == [generatedID], "hand-edited quantity survives the alias merge \(custom)")
+}
+
 private func checkIngredientCoverage() {
     let mealA = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
     let mealB = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
@@ -442,6 +499,7 @@ struct PortionScaleChecks {
         checkPerMealGrocerySum()
         checkReconcileKeepsChecks()
         checkQuantityChangeClearsCheck()
+        checkCanonicalReconcile()
         checkIngredientCoverage()
         if failures > 0 {
             fputs("\(failures) check(s) failed\n", stderr)

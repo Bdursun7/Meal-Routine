@@ -301,17 +301,17 @@ final class PantryTests: XCTestCase {
 
         GroceryListService.discardRebuildCache()
         try GroceryListService.rebuild(in: context, now: now, applyingPantry: true)
-        let first = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomatoes" }
+        let first = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomato" }
         XCTAssertEqual(first?.quantity, 100)
         GroceryListService.discardRebuildCache()
         try GroceryListService.rebuild(in: context, now: now, applyingPantry: true)
-        let second = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomatoes" }
+        let second = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomato" }
         XCTAssertEqual(second?.quantity, 100, "a second compute does not subtract again")
         XCTAssertEqual(stock.quantity, 400, "computing the missing amount never writes stock")
 
         GroceryListService.discardRebuildCache()
         try GroceryListService.rebuild(in: context, now: now, applyingPantry: false)
-        let full = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomatoes" }
+        let full = try context.fetch(FetchDescriptor<GroceryItem>()).first { $0.ingredientId == "tomato" }
         XCTAssertEqual(full?.quantity, 500)
     }
 

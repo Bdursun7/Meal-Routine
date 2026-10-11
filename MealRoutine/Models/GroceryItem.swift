@@ -13,6 +13,8 @@ final class GroceryItem {
     var hasUnitConflict: Bool
     var isChecked: Bool
     var isManual: Bool
+    /// `GroceryLineSource` raw value. Empty on rows saved before the column existed.
+    var sourceRaw: String = ""
     /// Set when the household edits the amount. Rebuild keeps this quantity and its unit.
     var quantityIsCustom: Bool = false
     /// Remaining need when only some of the merged amount is covered by recipe checks.
@@ -30,7 +32,8 @@ final class GroceryItem {
         hasUnitConflict: Bool,
         isChecked: Bool = false,
         isManual: Bool = false,
-        quantityIsCustom: Bool = false
+        quantityIsCustom: Bool = false,
+        sourceRaw: String = ""
     ) {
         self.uuid = uuid
         self.ingredientId = ingredientId
@@ -42,6 +45,7 @@ final class GroceryItem {
         self.isChecked = isChecked
         self.isManual = isManual
         self.quantityIsCustom = quantityIsCustom
+        self.sourceRaw = sourceRaw
     }
 
     var displayName: String {

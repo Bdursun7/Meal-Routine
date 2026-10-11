@@ -3,19 +3,26 @@ import Observation
 import SwiftData
 
 struct GroceryRowPresentation: Identifiable, Equatable {
-    var id: UUID
+    var id: String
+    var partIDs: [UUID]
     var name: String
+    /// One part: its amount. Several parts: the labeled breakdown, not a sum.
     var detail: String
     var quantity: Double?
     var unitLabel: String
     var category: GroceryCategory
     var hasUnitConflict: Bool
     var isChecked: Bool
+    var isMixed: Bool
     var isManual: Bool
-    /// Spoken and shown when only part of the merged amount is still needed.
+    /// Spoken and shown when only part of the merged plan amount is still needed.
     var remainingDetail: String?
+    var parts: [GroceryCardPart]
+    var primaryPartID: UUID?
+    /// Single-part cards keep the source under the amount. A breakdown already names each source.
+    var sourceCaption: String?
 
-    var canEditQuantity: Bool { quantity != nil }
+    var canEditQuantity: Bool { parts.count == 1 && quantity != nil }
 }
 
 struct GrocerySectionPresentation: Identifiable, Equatable {
@@ -108,6 +115,7 @@ final class GroceryViewModel {
 
     private func matchesSearch(_ row: GroceryRowPresentation, _ query: String) -> Bool {
         row.name.localizedCaseInsensitiveContains(query)
+            || row.detail.localizedCaseInsensitiveContains(query)
             || row.category.title.localizedCaseInsensitiveContains(query)
     }
 
@@ -116,29 +124,48 @@ final class GroceryViewModel {
         guard let week = weeks.first(where: { WeekCalendar.isSameDay($0.weekStart, start) }) else {
             return []
         }
-        return week.groceries
-            .map { item in
-                GroceryRowPresentation(
-                    id: item.uuid,
-                    name: item.displayName,
-                    detail: QuantityFormat.quantityAndUnit(quantity: item.quantity, unit: item.unit),
-                    quantity: item.quantity,
-                    unitLabel: UnitLabels.turkish(item.unit),
-                    category: GroceryCategory.classify(ingredientId: item.ingredientId, name: item.displayName),
-                    hasUnitConflict: item.hasUnitConflict,
-                    isChecked: item.isChecked,
-                    isManual: item.isManual,
-                    remainingDetail: item.uncoveredQuantity.map { remaining in
-                        PantryCopy.stillToBuy(QuantityFormat.quantityAndUnit(quantity: remaining, unit: item.unit))
-                    } ?? (usesPantryCoverage && !item.isManual && !item.isChecked && item.quantity == 0 ? PantryCopy.covered : nil)
-                )
-            }
-            .sorted { lhs, rhs in
-                if lhs.hasUnitConflict != rhs.hasUnitConflict { return lhs.hasUnitConflict }
-                let order = lhs.name.localizedStandardCompare(rhs.name)
-                if order != .orderedSame { return order == .orderedAscending }
-                return lhs.detail < rhs.detail
-            }
+        let inputs = week.groceries.map { item in
+            GroceryCardInput(
+                id: item.uuid,
+                ingredientId: item.ingredientId,
+                name: item.displayName,
+                quantity: item.quantity,
+                unit: item.unit,
+                hasUnitConflict: item.hasUnitConflict,
+                isChecked: item.isChecked,
+                isManual: item.isManual,
+                sourceRaw: item.sourceRaw,
+                remainingDetail: item.uncoveredQuantity.map { remaining in
+                    PantryCopy.stillToBuy(QuantityFormat.quantityAndUnit(quantity: remaining, unit: item.unit))
+                } ?? (usesPantryCoverage && !item.isManual && !item.isChecked && item.quantity == 0 ? PantryCopy.covered : nil)
+            )
+        }
+        return GroceryCardGrouper.group(inputs).map { card in
+            let single = card.singlePart
+            return GroceryRowPresentation(
+                id: card.id,
+                partIDs: card.parts.map(\.id),
+                name: card.name,
+                detail: single?.amountText ?? card.breakdown,
+                quantity: single?.quantity,
+                unitLabel: UnitLabels.turkish(single?.unit ?? card.parts.first?.unit ?? ""),
+                category: card.category,
+                hasUnitConflict: card.hasUnitConflict,
+                isChecked: card.isFullyChecked,
+                isMixed: card.isMixed,
+                isManual: card.canDelete,
+                remainingDetail: card.coverageNote,
+                parts: card.parts,
+                primaryPartID: card.primaryPartID,
+                sourceCaption: single?.source.title
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.hasUnitConflict != rhs.hasUnitConflict { return lhs.hasUnitConflict }
+            let order = lhs.name.localizedStandardCompare(rhs.name)
+            if order != .orderedSame { return order == .orderedAscending }
+            return lhs.detail < rhs.detail
+        }
     }
 
     func rebuild(in context: ModelContext) {
@@ -256,8 +283,8 @@ final class GroceryViewModel {
     }
 
     func beginQuantityEdit(_ row: GroceryRowPresentation) {
-        guard row.canEditQuantity else { return }
-        editingID = row.id
+        guard row.canEditQuantity, let partID = row.parts.first?.id else { return }
+        editingID = partID
         editingQuantity = QuantityFormat.string(row.quantity)
     }
 
@@ -289,11 +316,29 @@ final class GroceryViewModel {
         }
     }
 
+    /// Checks every part, or clears them when the card is already fully checked.
+    /// A mixed card completes the remaining parts. Each part keeps its own sync key.
+    func toggleCard(_ row: GroceryRowPresentation, in context: ModelContext) {
+        let turnOn = !row.isChecked
+        let items = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
+        for id in row.partIDs {
+            guard let item = items.first(where: { $0.uuid == id }), item.isChecked != turnOn else { continue }
+            toggle(id, in: context)
+        }
+    }
+
     func delete(_ id: UUID, in context: ModelContext) {
         do {
             try GroceryListService.deleteManual(id, in: context)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteCard(_ row: GroceryRowPresentation, in context: ModelContext) {
+        guard row.isManual else { return }
+        for id in row.partIDs {
+            delete(id, in: context)
         }
     }
 

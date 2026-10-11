@@ -8,6 +8,7 @@ OUT="${TMPDIR:-/tmp}/meal-grocery-checks"
   "$ROOT/MealRoutine/Services/Catalog/RecipeCatalogDTO.swift" \
   "$ROOT/MealRoutine/Services/PortionScaler.swift" \
   "$ROOT/MealRoutine/Services/UnitNormalization.swift" \
+  "$ROOT/MealRoutine/Services/IngredientDictionary.swift" \
   "$ROOT/MealRoutine/Services/GroceryMerger.swift" \
   "$ROOT/MealRoutine/Support/Formatters.swift" \
   "$ROOT/MealRoutine/Support/GroceryCategory.swift" \

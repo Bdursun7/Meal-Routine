@@ -498,16 +498,28 @@ Planlı yemek pişmiş işaretlendikten sonra tek sayfa açılır: başlık “E
 - Aynı yemek kimliği ikinci kez uygulanırsa düşüm tekrarlanmaz.
 - Ortak satır mevcut outbox’a gider: `Idempotency-Key` `PantryStableUUID.make("cook:<mealId>:<itemId>")`, `baseVersion` düşüm öncesi `version`. 409 `requiresResolution` yolu değişmez.
 
-Eksik miktar, `autoAddToGrocery` kapalıysa markete yazılmaz. Yetersiz stok satırı “Eksiği markete ekle” gösterir. Açıksa tarif eksiği `pantry-cook:<mealId>:<ingredientId>|<unit>` anahtarıyla bir kez yazılır.
+Eksik miktar, `autoAddToGrocery` kapalıysa kendiliğinden yazılmaz. Yetersiz stok satırı “Eksiği markete ekle” gösterir. O düğme, “Tüm eksikleri” ve Bitti → markete ekle / minimuma göre eksik aynı anahtarı mutlak yazar: `pantry-auto:<kanonikId>|<birim kovası>`. İkinci dokunuş ve sayfayı yeniden açmak ikinci satır açmaz. Açıksa tarif eksiği `pantry-cook:<mealId>:<kanonikId>|<kova>` anahtarıyla bir kez yazılır ve eşik satırının miktarını değiştirmez.
 
 ### Eşik ve market
 
 `autoAddToGrocery` varsayılan kapalıdır. Açıkken satır minimumun üstünden minimuma veya altına ilk inince eksik miktar (`minimum - quantity`, sıfırdan küçük değil) bir kez yazılır. Eşitlikte eksik 0’dır; satır açılmaz.
 
-Market anahtarı `pantry-auto:<ingredientId>|<canonicalUnit>` şeklindedir. Planın `ingredientId|unit` satırına eklenmez ve o satırın miktarı değiştirilmez: plan miktarını artırmak veya mutlak yazmak ya ikiye katlar ya da planı ezer, ayrı bir crossing kolonu da ikinci bir şema değişikliği olurdu. Defter, bu sabit anahtar ve mutlak miktardır.
+Market anahtarı `pantry-auto:<kanonikId>|<birim kovası>` şeklindedir (`family:mass`, `family:volume` veya `unit:<kod>`, örneğin `unit:piece`). `tomatoes` ile `tomato` aynı anahtardır. `cherry-tomato` değildir. Planın satırına eklenmez ve o satırın miktarı değiştirilmez: plan miktarını artırmak veya mutlak yazmak ya ikiye katlar ya da planı ezer, ayrı bir crossing kolonu da ikinci bir şema değişikliği olurdu. Defter, bu sabit anahtar ve mutlak miktardır. Eşik bu anahtara `Eşik` kaynağıyla yazar. Pişirme sayfası ve Bitti aynı anahtara `Evdekiler eksiği` kaynağıyla yazar; ikisi de varsa son yazan miktarı belirler. Otomatik pişirme eksiği bu anahtarı kullanmaz.
 
 Sunucu grocery `add` gövdesi `mode` almazsa eskisi gibi artırır. `mode: "set"` miktarı mutlak yazar. İki üye aynı miktarı `baseRevision: 0` ile gönderirse tek satır kalır (`board.test.ts`). Miktar zaten hedefse eski `baseRevision` bile ikinci kez artırmaz. İşaretli satır değişmez ve ikinci satır açılmaz. Ortak miktar `0008` tamsayısıdır (`1`…`999`, `GrocerySyncQuantity.whole`). Daha büyük bir eksik bu kolona sığmaz; kolon genişletilmedi.
 
 Yerel defterler `UserDefaults` anahtarlarıdır: `mealroutine.pantry.autoCrossings`, `mealroutine.pantry.lowStockArmed`, `mealroutine.pantry.cookApplied`. Bunlar şema değildir.
 
-Linux kanıtı: `PantryDomainTests` içindeki decline, tavan, birim uyuşmazlığı, retry, bildirim, autoAdd ve saat dilimi testleri; `pantry.test.ts` bayrağın create/patch/list yolu; `board.test.ts` iki üyeli `mode: set`. Ekran, bildirim izni ve SwiftData Mac kontrol listesindedir.
+### Market kartı (2026-10-11)
+
+Kullanıcı onayı: plan satırının kimliği sözlük kanonik id + birim kovasıdır. Görünen adla birleştirme yoktur (§17). `tomatoes` ve `tomato` tek otomatik satırdır. `cherry-tomato` ayrı kalır. Eski saklı satırlar bu kimliğe çekilir. İşaret, miktar değişmediyse durur. Miktar değişince mevcut kural işareti kaldırır. El ile değiştirilmiş miktar, işaretli ve hâlâ uyan bir satır yoksa korunur. İkinci otomatik satır silinir; işaret kaybolmaz.
+
+Aynı kanonik id ve kova, markette tek karttır. Parçalar ayrı miktar olarak durur: `Plan: 6 adet · Evdekiler eksiği: 1 adet · Elle eklendi: 2 adet`. Plan ile eksik tek sayıya toplanmaz. Toplam yalnız “toplam” diye etiketlenirse gösterilebilir; bu sürüm toplam satırı çizmez. Kartın kutusu bütün parçaları işaretler. Kısmi durumda eksi işareti görünür. Kart “Alındı”ya yalnız her parça işaretliyken iner.
+
+Kaynak etiketleri: Plan, Evdekiler eksiği, Eşik, Elle eklendi. “Elle eklendi” yalnız + ile yazılan `manual:<uuid>` satırıdır. `pantry-cook:` satırı ayrı saklanır, eşik miktarını ezmez ve aynı kartın dökümünde “Evdekiler eksiği” olarak görünür. Bu, tek kart ile “eşik satırını ezme” kuralını bir arada tutar.
+
+Koridor, kanonik id ile seçilir; `pantry-auto:` anahtarı koridor aramaz. Sayaç kart sayar. “X daha alınacak” plan parçasının kalanıdır. Ortak tahta semantiği değişmez. Plansız satırın anahtarı `kanonikId|normalize(birim)` olur. Telefonda eski `tomatoes|piece` tamamlanması varsa istemci o anahtarı yeniden kullanır ve ikinci ekleme göndermez. `manual:` durur. `pantry-auto:` ve `pantry-cook:` plan anahtarı değildir. Sunucu satır yeniden adlandırmaz.
+
+Hafta yoksa Bitti yeni satır açmaz, ortak listeye yazmaz ve “Önce bu haftanın planını kur. Market listesi o zaman açılır.” der.
+
+Linux kanıtı: `PantryDomainTests` içindeki decline, tavan, birim uyuşmazlığı, retry, bildirim, autoAdd, kanonik eksik satırı ve saat dilimi testleri; `Tools/grocery_merge_checks.swift` kanonik plan kimliği ve kart dökümü; `Tools/portion_scale_checks.swift` eski id’nin işaret kaybetmeden tek satıra inmesi; `pantry.test.ts` bayrağın create/patch/list yolu; `board.test.ts` iki üyeli `mode: set`. Ekran, bildirim izni ve SwiftData Mac kontrol listesindedir.

@@ -570,9 +570,41 @@ enum HouseholdRecipeAccess {
 }
 
 enum HouseholdGroceryKey {
-    static func make(ingredientId: String, unit: String, isManual: Bool, uuid: UUID) -> String {
+    /// Plan rows sync as `canonicalId|unit`. Manual rows stay `manual:<uuid>`.
+    /// A shortfall row is not a plan row; its key is the pantry-auto / pantry-cook id
+    /// already stored on the item, and `isManual` keeps it off this plan key.
+    static func make(
+        ingredientId: String,
+        unit: String,
+        isManual: Bool,
+        uuid: UUID,
+        dictionary: IngredientDictionary = .shared
+    ) -> String {
         if isManual { return "manual:\(uuid.uuidString)" }
-        return "\(ingredientId)|\(unit)"
+        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return "\(id)|\(GroceryMerger.normalize(unit))"
+    }
+
+    /// `tomatoes|piece` and `tomato|piece` are one plan row. Pantry keys are not.
+    static func samePlanIdentity(
+        _ lhs: String,
+        _ rhs: String,
+        dictionary: IngredientDictionary = .shared
+    ) -> Bool {
+        if lhs == rhs { return true }
+        if lhs.hasPrefix("manual:") || rhs.hasPrefix("manual:") { return false }
+        if lhs.hasPrefix("pantry-") || rhs.hasPrefix("pantry-") { return false }
+        guard let left = parts(lhs), let right = parts(rhs) else { return false }
+        return GroceryMerger.rowIdentity(ingredientId: left.id, unit: left.unit, dictionary: dictionary)
+            == GroceryMerger.rowIdentity(ingredientId: right.id, unit: right.unit, dictionary: dictionary)
+    }
+
+    private static func parts(_ key: String) -> (id: String, unit: String)? {
+        guard let bar = key.lastIndex(of: "|") else { return nil }
+        let id = String(key[..<bar])
+        let unit = String(key[key.index(after: bar)...])
+        guard !id.isEmpty, !unit.isEmpty else { return nil }
+        return (id, unit)
     }
 }
 

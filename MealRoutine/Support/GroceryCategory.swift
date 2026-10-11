@@ -40,12 +40,15 @@ enum GroceryCategory: String, CaseIterable, Identifiable, Sendable {
         .produce, .protein, .dairyAndEggs, .pantry, .spicesAndSauces, .other
     ]
 
-    /// Known catalog ids win. Manual rows and unknown ids use the display name.
+    /// Known catalog ids win. The id is the dictionary canonical id, never a
+    /// `pantry-auto:` key and never the display name. Typed `manual:` rows and
+    /// unknown ids use the display name only as an aisle hint.
     static func classify(ingredientId: String, name: String) -> GroceryCategory {
-        if ingredientId.lowercased().hasPrefix("manual:") {
+        let bare = GroceryMerger.shoppingIngredientId(ingredientId)
+        if bare.lowercased().hasPrefix("manual:") {
             return inferred(from: name)
         }
-        if let known = byID[normalize(ingredientId)] {
+        if let known = byID[normalize(bare)] {
             return known
         }
         return inferred(from: name)
@@ -190,6 +193,143 @@ struct GroceryGroupInput: Equatable, Sendable {
     var name: String
     var category: GroceryCategory
     var isChecked: Bool
+}
+
+/// One stored shopping line handed to the Market card grouper.
+struct GroceryCardInput: Equatable, Sendable {
+    var id: UUID
+    var ingredientId: String
+    var name: String
+    var quantity: Double?
+    var unit: String
+    var hasUnitConflict: Bool
+    var isChecked: Bool
+    var isManual: Bool
+    var sourceRaw: String
+    var remainingDetail: String?
+}
+
+struct GroceryCardPart: Equatable, Sendable, Identifiable {
+    var id: UUID
+    var quantity: Double?
+    var unit: String
+    var source: GroceryLineSource
+    var isChecked: Bool
+    var isManual: Bool
+    var hasUnitConflict: Bool
+    var remainingDetail: String?
+
+    var amountText: String {
+        QuantityFormat.quantityAndUnit(quantity: quantity, unit: unit)
+    }
+
+    var label: String { "\(source.title): \(amountText)" }
+}
+
+struct GroceryCardModel: Equatable, Sendable, Identifiable {
+    var id: String
+    var name: String
+    var category: GroceryCategory
+    var parts: [GroceryCardPart]
+
+    var isFullyChecked: Bool { !parts.isEmpty && parts.allSatisfy(\.isChecked) }
+    var isMixed: Bool { parts.contains(where: \.isChecked) && !isFullyChecked }
+    var hasUnitConflict: Bool { parts.contains(where: \.hasUnitConflict) }
+    /// Parts stay separate. This is not a sum of plan and shortfall.
+    var breakdown: String { parts.map(\.label).joined(separator: " · ") }
+    var coverageNote: String? {
+        parts.first { $0.source == .plan }?.remainingDetail ?? parts.compactMap(\.remainingDetail).first
+    }
+    var singlePart: GroceryCardPart? { parts.count == 1 ? parts.first : nil }
+    var canDelete: Bool { parts.allSatisfy(\.isManual) }
+    var primaryPartID: UUID? {
+        parts.first { $0.source == .plan }?.id ?? parts.first?.id
+    }
+}
+
+/// One Market card per canonical ingredient and unit bucket.
+///
+/// Plan, threshold, cook gap and a typed row share the card. Their quantities
+/// stay on separate parts. A typed row joins only when its name is an unambiguous
+/// dictionary name (`Domates` → tomato). A similar name does not (`Cherry domates`).
+enum GroceryCardGrouper {
+    static func group(
+        _ inputs: [GroceryCardInput],
+        dictionary: IngredientDictionary = .shared
+    ) -> [GroceryCardModel] {
+        var buckets: [String: [GroceryCardInput]] = [:]
+        var order: [String] = []
+        for input in inputs {
+            let key = groupKey(input, dictionary: dictionary)
+            if buckets[key] == nil { order.append(key) }
+            buckets[key, default: []].append(input)
+        }
+        return order.compactMap { key in
+            guard let rows = buckets[key], !rows.isEmpty else { return nil }
+            let ingredientId = groupIngredientId(rows, dictionary: dictionary)
+            let name = cardName(rows, ingredientId: ingredientId, dictionary: dictionary)
+            let parts = rows.map { row in
+                GroceryCardPart(
+                    id: row.id,
+                    quantity: row.quantity,
+                    unit: row.unit,
+                    source: GroceryLineSource.resolve(
+                        ingredientId: row.ingredientId,
+                        isManual: row.isManual,
+                        stored: row.sourceRaw
+                    ),
+                    isChecked: row.isChecked,
+                    isManual: row.isManual,
+                    hasUnitConflict: row.hasUnitConflict,
+                    remainingDetail: row.remainingDetail
+                )
+            }.sorted { lhs, rhs in
+                if lhs.source.sort != rhs.source.sort { return lhs.source.sort < rhs.source.sort }
+                if lhs.amountText != rhs.amountText { return lhs.amountText < rhs.amountText }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return GroceryCardModel(
+                id: key,
+                name: name,
+                category: GroceryCategory.classify(ingredientId: ingredientId, name: name),
+                parts: parts
+            )
+        }
+    }
+
+    private static func groupKey(_ input: GroceryCardInput, dictionary: IngredientDictionary) -> String {
+        let bucket = GroceryMerger.unitBucket(input.unit)
+        if input.ingredientId.hasPrefix("manual:") {
+            if let entry = dictionary.exactMatch(for: input.name) {
+                return "\(entry.id)|\(bucket)"
+            }
+            return "\(input.ingredientId)|\(bucket)"
+        }
+        let id = GroceryMerger.shoppingIngredientId(input.ingredientId, dictionary: dictionary)
+        return "\(id)|\(bucket)"
+    }
+
+    private static func groupIngredientId(_ rows: [GroceryCardInput], dictionary: IngredientDictionary) -> String {
+        if let linked = rows.compactMap({ row -> String? in
+            if row.ingredientId.hasPrefix("manual:") {
+                return dictionary.exactMatch(for: row.name)?.id
+            }
+            let id = GroceryMerger.shoppingIngredientId(row.ingredientId, dictionary: dictionary)
+            return id.hasPrefix("manual:") ? nil : id
+        }).first {
+            return linked
+        }
+        return rows[0].ingredientId
+    }
+
+    private static func cardName(
+        _ rows: [GroceryCardInput],
+        ingredientId: String,
+        dictionary: IngredientDictionary
+    ) -> String {
+        if let entry = dictionary.entry(ingredientId), !entry.name.isEmpty { return entry.name }
+        return rows.first { !$0.name.isEmpty }?.name ?? ingredientId
+    }
 }
 
 enum GroceryListGrouping {

@@ -838,17 +838,37 @@ enum PantryStockSideEffects {
 
     @MainActor
     static func addMissing(_ shortage: PantryCookShortage, in context: ModelContext) {
-        let mutation = PantryGroceryMutation(
-            itemKey: PantryAutoGrocery.itemKey(ingredientId: shortage.ingredientId, unit: shortage.unit),
+        let rows = marketRows(in: context)
+        let mutation = PantryAutoGrocery.shortfallMutation(
             ingredientId: shortage.ingredientId,
             displayName: shortage.displayName,
             quantity: shortage.missingQuantity,
             unit: shortage.unit,
-            baseRevision: 0,
-            crossingKey: "manual-missing:\(shortage.ingredientId)",
-            creates: true
+            rows: rows
         )
         apply(mutation, in: context)
+    }
+
+    /// Bitti → markete ekle, and Bitti → minimuma göre eksik. Same pantry-auto key as the cook sheet.
+    /// False only when there is no current week to attach a new row to. A checked row is left as it is.
+    @MainActor
+    @discardableResult
+    static func addFinishedToMarket(
+        name: String,
+        ingredientId: String,
+        quantity: Double,
+        unit: String,
+        in context: ModelContext
+    ) -> Bool {
+        let rows = marketRows(in: context)
+        let mutation = PantryAutoGrocery.shortfallMutation(
+            ingredientId: ingredientId,
+            displayName: name,
+            quantity: quantity,
+            unit: unit,
+            rows: rows
+        )
+        return apply(mutation, in: context) != .needsWeek
     }
 
     @MainActor
@@ -870,30 +890,76 @@ enum PantryStockSideEffects {
         }
     }
 
+    /// An older Bitti row stored the catalog id itself. A second one is the duplicate
+    /// this write replaces. Plan rows, typed `manual:` rows and cook-gap rows stay.
+    private static func legacyBittiDuplicate(_ item: GroceryItem, identity: String) -> Bool {
+        guard item.isManual else { return false }
+        if item.ingredientId.hasPrefix("manual:") || item.ingredientId.hasPrefix("pantry-cook:") { return false }
+        if item.ingredientId.hasPrefix("pantry-auto:") { return false }
+        return GroceryMerger.rowIdentity(ingredientId: item.ingredientId, unit: item.unit) == identity
+    }
+
+    private enum GroceryApplyResult {
+        case stored
+        case unchanged
+        case needsWeek
+    }
+
     @MainActor
-    private static func apply(_ mutation: PantryGroceryMutation, in context: ModelContext) {
-        guard mutation.quantity > 0 else { return }
+    @discardableResult
+    private static func apply(_ mutation: PantryGroceryMutation, in context: ModelContext) -> GroceryApplyResult {
+        guard mutation.quantity > 0 else { return .unchanged }
         let items = (try? context.fetch(FetchDescriptor<GroceryItem>())) ?? []
-        if let match = items.first(where: { $0.ingredientId == mutation.itemKey }) {
-            if match.isChecked { return }
-            match.quantity = mutation.quantity
-            match.unit = mutation.unit
-            try? context.save()
-        } else if let week = try? WeekPlanService.currentWeek(in: context) {
-            let item = GroceryItem(
-                ingredientId: mutation.itemKey,
-                nameTR: mutation.displayName,
-                nameEN: mutation.displayName,
-                quantity: mutation.quantity,
-                unit: mutation.unit,
-                hasUnitConflict: false,
-                isChecked: false,
-                isManual: true
-            )
-            context.insert(item)
-            item.week = week
-            try? context.save()
+        let identity = GroceryMerger.rowIdentity(ingredientId: mutation.itemKey, unit: mutation.unit)
+        let candidates = items.filter { item in
+            PantryAutoGrocery.sameStoredRow(item.ingredientId, mutation.itemKey)
+                || legacyBittiDuplicate(item, identity: identity)
         }
+        if let match = candidates.first(where: \.isChecked) ?? candidates.first {
+            if !match.isChecked {
+                match.ingredientId = mutation.itemKey
+                match.quantity = mutation.quantity
+                match.unit = mutation.unit
+                match.nameTR = mutation.displayName
+                match.nameEN = mutation.displayName
+                match.sourceRaw = mutation.lineSource
+                match.isManual = true
+            }
+            var removed = false
+            for extra in candidates where extra.uuid != match.uuid {
+                context.delete(extra)
+                removed = true
+            }
+            if !match.isChecked || removed {
+                try? context.save()
+            }
+            if match.isChecked { return .unchanged }
+            noteSet(mutation, in: context)
+            return .stored
+        }
+        guard let week = try? WeekPlanService.currentWeek(in: context) else {
+            return .needsWeek
+        }
+        let item = GroceryItem(
+            ingredientId: mutation.itemKey,
+            nameTR: mutation.displayName,
+            nameEN: mutation.displayName,
+            quantity: mutation.quantity,
+            unit: mutation.unit,
+            hasUnitConflict: false,
+            isChecked: false,
+            isManual: true,
+            sourceRaw: mutation.lineSource
+        )
+        context.insert(item)
+        item.week = week
+        try? context.save()
+        noteSet(mutation, in: context)
+        return .stored
+    }
+
+    @MainActor
+    private static func noteSet(_ mutation: PantryGroceryMutation, in context: ModelContext) {
         HouseholdSession.shared.notePantryGrocerySet(
             itemKey: mutation.itemKey,
             quantity: mutation.quantity,

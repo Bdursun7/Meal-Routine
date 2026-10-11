@@ -699,10 +699,12 @@ final class HouseholdSession {
         guard let account, snapshot.hasHousehold else { return }
         let whole = GrocerySyncQuantity.whole(quantity)
         let previous = snapshot.groceryCompletions.first { $0.itemKey == itemKey }
+            ?? snapshot.groceryCompletions.first { PantryAutoGrocery.sameStoredRow($0.itemKey, itemKey) }
+        let wireKey = previous?.itemKey ?? itemKey
         let id = PantryStableUUID.make("grocery-set:\(crossingKey)")
         let body = BoardMutationEncoder.grocerySet(
             id: id,
-            itemKey: itemKey,
+            itemKey: wireKey,
             quantity: whole,
             baseRevision: previous?.revision ?? 0
         )
@@ -720,13 +722,15 @@ final class HouseholdSession {
     func noteGrocery(id: UUID, in context: ModelContext) {
         guard let account, snapshot.hasHousehold else { return }
         guard let item = try? context.fetch(FetchDescriptor<GroceryItem>()).first(where: { $0.uuid == id }) else { return }
-        let key = HouseholdGroceryKey.make(
+        let canonical = HouseholdGroceryKey.make(
             ingredientId: item.ingredientId,
             unit: item.unit,
             isManual: item.isManual,
             uuid: item.uuid
         )
-        let previous = snapshot.groceryCompletions.first { $0.itemKey == key }
+        let previous = snapshot.groceryCompletions.first { $0.itemKey == canonical }
+            ?? snapshot.groceryCompletions.first { HouseholdGroceryKey.samePlanIdentity($0.itemKey, canonical) }
+        let key = previous?.itemKey ?? canonical
         do {
             try HouseholdReducer.setGrocery(
                 snapshot: &snapshot,
