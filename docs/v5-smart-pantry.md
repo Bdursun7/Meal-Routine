@@ -4,8 +4,8 @@
 
 **Durum:** Dört durum birbirinin yerine geçmez.
 
-- **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. V5.1 buna ekler: onaylı pişirme düşümü, isteğe bağlı düşük stok bildirimi, `autoAddToGrocery` (varsayılan kapalı), cihaz saat diliminde takvim günü hatırlatması, hafta yenilenince elle ve pantry market satırlarının durması, ortak kısa satırın ondalık miktarı (`0014`) ve Evdekiler konum sekmeleri. Kaynak: `server/db/migrations/0012_pantry.sql`, `server/db/migrations/0013_pantry_auto_add.sql`, `server/db/migrations/0014_shared_grocery_quantity.sql`, `server/src/pantryService.ts`, `server/src/boardApply.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/PantryRules.swift`.
-- **Otomatik testle doğrulanmış (2026-10-11, Linux, V5.1 gözden geçirme düzeltmeleri):** `cd server && npm test` Postgres 16.15 ile 68/68 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 46/46 geçti (Swift 6.0.3). Sekiz `Tools/run_*.sh` betiği de geçti. Önceki kayıt 66/66 ve 42/42 idi (2026-10-10); kanonik market kartı 44/44 idi (2026-10-11). Bu satır SwiftData mağazasını, tarih seçiciyi, `UNUserNotificationCenter` teslimini, iki simülatörü ve Evdekiler / pişirme ekranlarını geçmiş saymaz.
+- **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. V5.1 buna ekler: onaylı pişirme düşümü, isteğe bağlı düşük stok bildirimi, `autoAddToGrocery` (varsayılan kapalı), cihaz saat diliminde takvim günü hatırlatması, hafta yenilenince elle ve pantry market satırlarının durması, ortak kısa satırın ondalık miktarı (`0014`), Evdekiler konum sekmeleri ve aynı malzemenin birden fazla konumda ayrı satır olması (`0015`, karar 2026-10-11, seçenek A). Kaynak: `server/db/migrations/0012_pantry.sql`, `server/db/migrations/0013_pantry_auto_add.sql`, `server/db/migrations/0014_shared_grocery_quantity.sql`, `server/db/migrations/0015_pantry_location.sql`, `server/src/pantryService.ts`, `server/src/boardApply.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/PantryRules.swift`.
+- **Otomatik testle doğrulanmış (2026-10-11, Linux, konum satırları):** `cd server && npm test` Postgres 16.15 ile 73/73 geçti, atlanan yok. `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 50/50 geçti (Swift 6.0.3). Sekiz `Tools/run_*.sh` betiği de geçti. Önceki kayıt 68/68 ve 46/46 idi (aynı gün, gözden geçirme düzeltmeleri); ondan önce 66/66 ve 42/42 (2026-10-10); kanonik market kartı 44/44 idi. Bu satır SwiftData mağazasını, tarih seçiciyi, `UNUserNotificationCenter` teslimini, iki simülatörü ve Evdekiler / pişirme ekranlarını geçmiş saymaz.
 - **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
 - **Ürün kabul kapısı kapandı:** Hayır. Nötr metin Linux testinde geçti. SwiftData yükseltmesi, tarih seçici ve iOS ekran kontrolleri Not verified (Mac). Not verified, Pass değildir. V6 başlamaz.
 
@@ -109,7 +109,7 @@ PantryItem
 - Yazılan ad, büyük/küçük harf ve diakritik farkı yok sayılarak tek bir maddenin adı veya eş anlamlısıyla birebir örtüşürse o `ingredientId` bağlanır. Örtüşme yoksa veya birden fazla madde aynı ada sahipse `custom:<uuid>` oluşturulur. Ortak evde `POST /v1/households/:id/ingredients` ile kaydedilir. Kişisel pantry’de yalnız cihazda durur. “Domates” ile “Cherry domates” kendiliğinden birleşmez. Eşleşme LLM ile yapılmaz.
 - `quantity` negatif olamaz. Sunucu binde birliğe yuvarlar (`roundPantryQuantity`).
 - `unit` bilinmeyen veya geçersizse kayıt reddedilir. Kullanıcı uyumsuz birimi `confirmSeparate: true` ile ayrı satır yapabilir; bilinmeyen birim o bayrakla da reddedilir.
-- `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik tek başına market satırı açmaz. `autoAddToGrocery` kapalıyken (varsayılan) eşik altına inmek market satırı yazmaz. Açıkken kural bölüm 21’dedir.
+- `minimumQuantity` boş olabilir. Doluysa negatif olamaz. Ayrı bir birimi yoktur; satırın `unit` değeriyle yorumlanır. Eşik, “Azaldı”, kısa miktar ve Bitti’deki “minimuma göre eksik” aynı kanonik malzeme ve birim kovasının bütün konumlarındaki toplama bakar. Yeni kolon yoktur. Bir satırda bu alanlar değişince kardeş satırlar aynı değeri alır. Eski kardeşler farklıysa okuma en yüksek minimumu (hedef birime çevrilmiş) ve bayrakların OR’unu kullanır; satırı kendiliğinden yazmaz. Ekleme bu tavanı düşürmez ve açık bayrağı kapatmaz. Düzenleme kaydedilen değeri bütün kardeşlere yazar; yalnız gerçekten değişen alan gider. Eşik tek başına market satırı açmaz. `autoAddToGrocery` kapalıyken (varsayılan) eşik altına inmek market satırı yazmaz. Açıkken kural bölüm 21’dedir.
 - `autoAddToGrocery` `BOOLEAN NOT NULL DEFAULT false` (`0013_pantry_auto_add.sql`). Create, list ve patch gövdesindedir. Gövdede yoksa mevcut değer kalır. Kişisel pantry aynı alanı SwiftData’da tutar; sunucuya gitmez.
 - `dateType` yalnız `bestBefore` veya `useBy` olabilir. İkisi aynı anlama gelmez.
 - `dateValue` takvim günüdür (`YYYY-MM-DD`, SQL `DATE`). Saat dilimi anına çevrilip bir gün kaydırılmaz. iOS kanonik alan `calendarDay` aynı stringi tutar. Ayrıntı ve kabul edilmiş eski kişisel satır istisnası bölüm 13’tedir.
@@ -137,7 +137,7 @@ Kanonik pantry birimleri (`0012_pantry.sql` `unit` kontrolü): `g`, `kg`, `ml`, 
 - Gram ve kilogram `mass` ailesindedir (`unit_bucket`).
 - Mililitre ve litre `volume` ailesindedir.
 - Adet, kaşık, diş, tutam, dilim, dal ve “damak tadına” otomatik olarak grama veya litreye çevrilmez. Her biri kendi `unit_bucket` değeridir.
-- Uyuşmayan birimler tek satırda birleştirilmez. Aynı household + `ingredientId` + `unit_bucket` tek satırdır.
+- Uyuşmayan birimler tek satırda birleştirilmez. Aynı household + `ingredientId` + `unit_bucket` + `location` tek satırdır (`0015_pantry_location`, `pantry_items_one_row_per_place`). Aynı malzeme ve kova başka bir konumda ayrı satırdır. `0012`’deki `pantry_items_one_row_per_bucket` kalkar; satırlar silinmez ve yeniden yazılmaz.
 - Kullanıcıya dönüşüm yapılamadığında açık bir seçim gösterilir (`pantry_unit_choice`, `confirmSeparate`).
 - Yuvarlama, market birleştirmedeki binde birlik snap ile aynıdır.
 
@@ -165,7 +165,7 @@ Liste satırı şunları gösterir:
 
 - Malzeme adı (`displayName`)
 - Mevcut miktar ve birim (sayı ve birim kodundan; gösterim metninden parse edilmez)
-- Konum
+- Konum. Tümü sekmesi her konumu kendi satırında gösterir; satır `miktar · konum` yazar. Gruplanmış alt satır yoktur. Kiler, Buzdolabı, Dondurucu ve Diğer yalnız o konumu süzer. Bir konum sekmesinden eklenen satır yalnız o konumda oluşur veya oradaki satıra eklenir. Tümü, formun varsayılan konumunu bırakır.
 - Minimum miktar varsa eşik bilgisi
 - Tarih varsa türün adı ve takvim günü
 - Tarih geçmişse nötr durum: girilen tarihin geçmiş olduğu. Tür (`bestBefore` veya `useBy`) ayrıca görünür. Metin gıdanın güvenli veya güvensiz olduğuna karar vermez.
@@ -363,8 +363,8 @@ iOS farkları (davranış değişikliği değildir; kayıtlı eşlemedir):
 
 Migration:
 
-- `0001`–`0011` değiştirilmez. `0012_pantry` ingredients, pantry_items ve pantry_idempotency ekler. `0013_pantry_auto_add` yalnız `auto_add_to_grocery` kolonunu ekler. `0014_shared_grocery_quantity` ortak market miktarını ondalık yapar, birim ve kart kaynağı ekler, tamsayı kolonu bırakır. Household saat dilimi kolonu yoktur.
-- `0012` öncesi pantry tablosu yoktur. Korunacak eski pantry satırı yoktur. V4.1 household, board ve hesap satırları `0012`, `0013` ve `0014` uygulanırken silinmemelidir. Bunu `server/test/pantry.integration.test.ts` dener. `0013` `DEFAULT false` olduğu için kolonu yazmayan eski `INSERT` durur. `0014` tamsayı `quantity` kolonunu bırakır; `quantity_decimal` boşsa o tamsayıdan doldurulur.
+- `0001`–`0011` değiştirilmez. `0012_pantry` ingredients, pantry_items ve pantry_idempotency ekler. `0013_pantry_auto_add` yalnız `auto_add_to_grocery` kolonunu ekler. `0014_shared_grocery_quantity` ortak market miktarını ondalık yapar, birim ve kart kaynağı ekler, tamsayı kolonu bırakır. `0015_pantry_location` `pantry_items_one_row_per_bucket` kısıtını kaldırır ve `UNIQUE (household_id, ingredient_id, unit_bucket, location)` koyar (`pantry_items_one_row_per_place`). Household saat dilimi kolonu yoktur.
+- `0012` öncesi pantry tablosu yoktur. Korunacak eski pantry satırı yoktur. V4.1 household, board ve hesap satırları `0012`, `0013`, `0014` ve `0015` uygulanırken silinmemelidir. Bunu `server/test/pantry.integration.test.ts` dener. `0013` `DEFAULT false` olduğu için kolonu yazmayan eski `INSERT` durur. `0014` tamsayı `quantity` kolonunu bırakır; `quantity_decimal` boşsa o tamsayıdan doldurulur. `0015` mevcut satırı silmez ve yeniden yazmaz: her satırın zaten bir konumu vardır, ikinci konum yeni satırdır.
 - Tekrar çalıştırma: `schema_migrations` kaydı varken `migrate` `0012`’yi yeniden uygulamaz. Seed `ON CONFLICT (id) DO NOTHING` kullanır.
 - Geri alma: migration dosyasında `DROP TABLE` yoktur. Onarım, yayınlanmamış geliştirme veritabanı için `docs/v5-local-runbook.md` içindeki taslak düşürme notudur. Yayınlanmış şema için otomatik down migration yoktur.
 - Hesap silinince pantry ve idempotency satırları hesap/household silme kurallarıyla gider (`ON DELETE CASCADE`).
@@ -397,7 +397,7 @@ Bu liste tek yerdir. V5.0 uygulanırken yeniden açılmaz.
 10. Paylaşılan pantry’nin sunucu sahibi household’dır. Kişisel pantry yalnız cihazdadır; ayrı bir kişisel pantry backend’i yoktur.
 11. V5 otomatik malzeme tanıma veya LLM eşlemesi yapmaz.
 12. Plan oluşturmak pantry kullanmaya bağlı değildir.
-13. Pantry migration listesi `0012_pantry`, `0013_pantry_auto_add` ve `0014_shared_grocery_quantity` dosyalarıdır. `0001`–`0013` yeniden yazılmaz. `0014` kullanıcı kararıdır (2026-10-11) ve “yalnız 0013” kaydının yerine geçer.
+13. Pantry migration listesi `0012_pantry`, `0013_pantry_auto_add`, `0014_shared_grocery_quantity` ve `0015_pantry_location` dosyalarıdır. `0001`–`0014` yeniden yazılmaz. `0014` kullanıcı kararıdır (2026-10-11) ve “yalnız 0013” kaydının yerine geçer. `0015` aynı günün ikinci kararıdır (seçenek A): aynı malzeme birkaç konumda ayrı satırdır.
 
 ## 16. Uygulama fazları
 
@@ -449,7 +449,7 @@ V5 tamamlanmış sayılmadan önce aşağıdakilerin hepsi sağlanır. Kutular b
 - Plan stoku değiştirmez. “Pişirdim” tek başına stoku değiştirmez. Onaylı düşüm stoktan fazla düşmez.
 - Offline queue bağlantı dönüşünde işlemleri çoğaltmadan gönderir.
 - Conflict sunucu haliyle deterministik çözülür.
-- `0012`, `0013` ve `0014` mevcut V1–V4.1 verisini silmez.
+- `0012`, `0013`, `0014` ve `0015` mevcut V1–V4.1 verisini silmez.
 - Account deletion pantry ownership kurallarına uyar.
 - V1–V4.1 regresyon testleri korunur.
 - Loading, empty, error, offline ve conflict metinleri Türkçedir.
@@ -466,7 +466,7 @@ Tarih hatırlatması yalnız kullanıcı tarih girdiyse ve hatırlatma açıksa 
 
 Metin hatırlatmadır. “Güvenli”, “yenmez” veya tazelik hükmü yoktur. İşletim sistemi bildirimi erteleyebilir. İzin reddedilirse `mealroutine.pantry.notificationPermissionDenied` yazılır ve Evdekiler çalışmaya devam eder.
 
-Düşük stok bildirimi, miktar minimumun üstünden minimuma veya altına ilk inince bir kez gider. “Azaldı” rozetiyle aynı çizgi kullanılır: `quantity <= minimumQuantity`. Eşitlikte bildirim bir kez gider; eksik miktar 0 olduğu için market satırı açılmaz. Aynı düşük bölümde tekrar gitmez. Miktar yeniden üstüne çıkınca kuruluş kalkar; tekrar inince yeni bildirim olabilir. Bildirim kapalıyken geçiş olursa kayıt yine tutulur, böylece kullanıcı bölüm ortasında açarsa spam olmaz.
+Düşük stok bildirimi, grubun toplamı minimumun üstünden minimuma veya altına ilk inince bir kez gider. Anahtar satır kimliği değil, `kanonikId|birim kovası`dır (`PantryGroupStock.alertKey`, örneğin `tomato|family:mass`). Eski satır anahtarları bu anahtarla eşleşmez; yükseltmeden sonra bir fazla bildirim gidebilir. “Azaldı” rozeti aynı toplama bakar: satırın kendi miktarı 0’dan büyükken grup toplamı etkin minimumun altındaysa görünür. Miktarı 0 olan satır “Tükendi” yazar, “Azaldı” yazmaz. Eşitlikte bildirim bir kez gider; eksik miktar 0 olduğu için market satırı açılmaz. Aynı düşük bölümde tekrar gitmez. Toplam yeniden üstüne çıkınca kuruluş kalkar; tekrar inince yeni bildirim olabilir. Bildirim kapalıyken geçiş olursa kayıt yine tutulur, böylece kullanıcı bölüm ortasında açarsa spam olmaz. Tarih hatırlatması satırdadır: her konumun kendi günü vardır.
 
 ## 19. Global-readiness kuralları
 
@@ -485,7 +485,7 @@ V5, stok farkındalığı katar. Fiyat ve bütçe V5’te yoktur. V6 Balanced Nu
 
 ## 21. V5.1 pişirme düşümü ve eşik
 
-Kararlar (2026-10-10): hatırlatma cihazın geçerli saat dilimindedir (D1=a). `0013` `auto_add_to_grocery` kolonudur (D2=b). Kullanıcı 2026-10-11’de bunu genişletti: `0014_shared_grocery_quantity` ortak market satırına `NUMERIC(12,3)` miktar, boş kalabilen `unit` ve boş kalabilen `line_source` ekler. `0001`–`0013` yeniden yazılmaz. Tamsayı `quantity` kolonu plan satırları ve eski istemciler için durur.
+Kararlar (2026-10-10): hatırlatma cihazın geçerli saat dilimindedir (D1=a). `0013` `auto_add_to_grocery` kolonudur (D2=b). Kullanıcı 2026-10-11’de bunu genişletti: `0014_shared_grocery_quantity` ortak market satırına `NUMERIC(12,3)` miktar, boş kalabilen `unit` ve boş kalabilen `line_source` ekler. Aynı gün, seçenek A: aynı malzeme birkaç konumda ayrı satırdır (`0015_pantry_location`). `0001`–`0014` yeniden yazılmaz. Tamsayı `quantity` kolonu plan satırları ve eski istemciler için durur.
 
 ### Onaylı düşüm
 
@@ -502,7 +502,7 @@ Eksik miktar, `autoAddToGrocery` kapalıysa kendiliğinden yazılmaz. Yetersiz s
 
 ### Eşik ve market
 
-`autoAddToGrocery` varsayılan kapalıdır. Açıkken satır minimumun üstünden minimuma veya altına ilk inince eksik miktar (`minimum - quantity`, sıfırdan küçük değil) bir kez yazılır. Eşitlikte eksik 0’dır; satır açılmaz.
+`autoAddToGrocery` varsayılan kapalıdır. Açıkken grubun toplamı minimumun üstünden minimuma veya altına ilk inince eksik miktar (`etkin minimum - bütün konumların toplamı`, sıfırdan küçük değil) bir kez yazılır. Eşitlikte eksik 0’dır; satır açılmaz. Bitti bir konum satırını sıfırlar. “Markete ekle” o satırın biten miktarını yazar. “Minimuma göre eksik”, o satır sıfırlandıktan sonra kalan toplam ile etkin minimumun farkıdır.
 
 Market anahtarı `pantry-auto:<kanonikId>|<birim kovası>` şeklindedir (`family:mass`, `family:volume` veya `unit:<kod>`, örneğin `unit:piece`). `tomatoes` ile `tomato` aynı anahtardır. `cherry-tomato` değildir. Planın satırına eklenmez ve o satırın miktarı değiştirilmez: plan miktarını artırmak veya mutlak yazmak ya ikiye katlar ya da planı ezer, ayrı bir crossing kolonu da ikinci bir şema değişikliği olurdu. Defter, bu sabit anahtar ve mutlak miktardır. Eşik bu anahtara `Eşik` kaynağıyla yazar. Pişirme sayfası ve Bitti aynı anahtara `Evdekiler eksiği` kaynağıyla yazar; ikisi de varsa son yazan miktarı belirler. Otomatik pişirme eksiği bu anahtarı kullanmaz.
 
@@ -520,9 +520,11 @@ Aynı kanonik id ve kova, markette tek karttır. Parçalar ayrı miktar olarak d
 
 Kaynak etiketleri: Plan, Evdekiler eksiği, Eşik, Pişirme eksiği, Elle eklendi. “Elle eklendi” yalnız + ile yazılan `manual:<uuid>` satırıdır. `pantry-cook:` satırı ayrı saklanır, eşik miktarını ezmez ve aynı kartın dökümünde “Pişirme eksiği” olarak görünür.
 
-Pişirme düşümü birden fazla uyumlu satırı gezer. Sıra: en erken takvim günü önce, tarihsiz satır sonda; aynı günde kiler, buzdolabı, dondurucu, diğer; sonra satır kimliği. Varsayılan bölüşüm bu sırayla ihtiyacı doldurur, her satır kendi stokunu geçmez. Kullanıcı sayfadaki adımlarla bölüşümü değiştirir; toplam ihtiyacı ve stoku geçmez. Eksik, bu son seçimden hesaplanır. Aynı malzemeden iki satır tek outbox güncellemesine iner: ilk `baseVersion`, son miktar, `revision` bir kez. İkinci üyenin aynı yemeği pişirmesi sunucuda `version_conflict` olur (household satırı `FOR UPDATE` ile kilitlenir; yeni tablo yok) ve o telefon stok düşmez.
+Pişirme düşümü birden fazla uyumlu satırı gezer. `0015` ile bu satırlar gerçekten ayrı konumlardır; aynı kovadaki ikinci konum artık ilk satırı taşımaz. Sıra: en erken takvim günü önce, tarihsiz satır sonda; aynı günde kiler, buzdolabı, dondurucu, diğer; sonra satır kimliği. Varsayılan bölüşüm bu sırayla ihtiyacı doldurur, her satır kendi stokunu geçmez. Kullanıcı sayfadaki adımlarla bölüşümü değiştirir; toplam ihtiyacı ve stoku geçmez. Eksik, bu son seçimden hesaplanır. Aynı pantry satırına bu onayda iki kez yazılmaz: ilk `baseVersion`, son miktar, `revision` bir kez. Ayrı konum satırlarının her biri kendi güncellemesidir. İkinci üyenin aynı yemeği pişirmesi sunucuda `version_conflict` olur (household satırı `FOR UPDATE` ile kilitlenir; yeni tablo yok) ve o telefon stok düşmez. “Eksik miktarı hesapla” bütün uyumlu konumları toplar, sonra aynı sırayla düşer; stok yazılmaz. Market sekmelere bölünmez.
 
-Evdekiler listesinin üstünde Tümü, Kiler, Buzdolabı, Dondurucu ve Diğer sekmeleri vardır. Market bölünmez. Sekme yalnız listeyi süzer. Bir konum sekmesinden eklenen satır o konumu seçili açar. Son sekme yalnız oturumda hatırlanır.
+Konum birleştirme tarihi: hedef, o yeri zaten tutan satırdır (eklemede aynı konumdaki satır). İkisi de tarihsizse tarihsiz kalır. Biri tarihliyse o çift kalır. Aynı tarih türünde daha erken `YYYY-MM-DD` kalır. `bestBefore` ile `useBy` birbirine çevrilmez: hedefin türü ve günü kalır, diğer tür düşer, miktar yine birleşir. Bir satırı dolu bir konuma taşımak miktarları birleştirir, kaynağı siler ve sağ kalan hedef satırdır. `baseVersion` kaynağın sürümüdür; eski sürüm 409 `conflict` döner. Aynı `Idempotency-Key` ve aynı gövde, kaynak silindikten sonra da ilk cevabı döner.
+
+Evdekiler listesinin üstünde Tümü, Kiler, Buzdolabı, Dondurucu ve Diğer sekmeleri vardır. Market bölünmez. Sekme yalnız listeyi süzer. Tümü her konum satırını konum etiketiyle gösterir. Bir konum sekmesinden eklenen satır o konumu seçili açar ve yalnız orada birleşir. Son sekme yalnız oturumda hatırlanır. Minimum alanının alt yazısı, eşiğin bütün konumların toplamına baktığını söyler (`PantryCopy.minimumFooter`).
 
 Koridor, kanonik id ile seçilir; `pantry-auto:` anahtarı koridor aramaz. Sayaç kart sayar. “X daha alınacak” plan parçasının kalanıdır. Ortak tahta semantiği değişmez. Plansız satırın anahtarı `kanonikId|normalize(birim)` olur. Telefonda eski `tomatoes|piece` tamamlanması varsa istemci o anahtarı yeniden kullanır ve ikinci ekleme göndermez. `manual:` durur. `pantry-auto:` ve `pantry-cook:` plan anahtarı değildir. Sunucu satır yeniden adlandırmaz.
 

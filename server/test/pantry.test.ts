@@ -372,6 +372,105 @@ describe('pantry', () => {
     expect((await list(app, auth, householdId))[0]).toMatchObject({ quantity: 500, version: 3 })
   })
 
+  it('keeps the same ingredient in two locations and merges only inside one place', async () => {
+    const { app, auth, householdId } = await setup()
+    const fridge = await create(app, auth, householdId, 'pantry-place-fridge', { ...tomato, quantity: 400, minimumQuantity: 1000, autoAddToGrocery: true, dateType: 'useBy', dateValue: '2030-06-01' })
+    const pantry = await create(app, auth, householdId, 'pantry-place-pantry', { ...tomato, quantity: 300, unit: 'g', location: 'pantry', minimumQuantity: 100, autoAddToGrocery: false, dateType: 'bestBefore', dateValue: '2030-01-01' })
+    expect(pantry.statusCode).toBe(200)
+    expect(pantry.json().id).not.toBe(fridge.json().id)
+    expect(pantry.json()).toMatchObject({ location: 'pantry', quantity: 300, minimumQuantity: 1000, autoAddToGrocery: true, dateType: 'bestBefore', dateValue: '2030-01-01' })
+    expect(fridge.json()).toMatchObject({ location: 'refrigerator', quantity: 400 })
+    const listed = await list(app, auth, householdId)
+    expect(listed).toHaveLength(2)
+    expect(listed.every((row) => row.minimumQuantity === 1000 && row.autoAddToGrocery === true)).toBe(true)
+    const total = listed.reduce((sum, row) => sum + Number(row.quantity), 0)
+    expect(total).toBe(700)
+    expect(1000 - total).toBe(300)
+
+    const again = await create(app, auth, householdId, 'pantry-place-pantry-again', { ...tomato, quantity: 50, location: 'pantry', dateType: 'bestBefore', dateValue: '2030-03-01' })
+    expect(again.json()).toMatchObject({ id: pantry.json().id, location: 'pantry', quantity: 350, dateType: 'bestBefore', dateValue: '2030-01-01' })
+    expect((await list(app, auth, householdId)).find((row) => row.id === fridge.json().id)).toMatchObject({ location: 'refrigerator', quantity: 400 })
+
+    const covered = await reconcile(app, auth, householdId, 'pantry-place-missing', {
+      operation: 'compute-missing',
+      lines: [{ ingredientId: 'tomato', quantity: 1000, unit: 'g' }],
+    })
+    expect(covered.json().lines[0]).toMatchObject({ quantity: 250, applied: true })
+    expect((await list(app, auth, householdId)).reduce((sum, row) => sum + Number(row.quantity), 0)).toBe(750)
+  })
+
+  it('merges a moved row into the destination and keeps the date rule', async () => {
+    const { app, auth, householdId } = await setup()
+    const fridge = await create(app, auth, householdId, 'pantry-move-fridge', { ...tomato, quantity: 400, dateType: 'useBy', dateValue: '2030-02-01', minimumQuantity: 100 })
+    const pantry = await create(app, auth, householdId, 'pantry-move-pantry', { ...tomato, quantity: 300, location: 'pantry', dateType: 'bestBefore', dateValue: '2030-05-01', minimumQuantity: 250 })
+    const fridgeNow = (await list(app, auth, householdId)).find((row) => row.id === fridge.json().id)
+    expect(fridgeNow).toMatchObject({ minimumQuantity: 250, version: 2 })
+    const stale = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${fridge.json().id}?baseVersion=1`,
+      headers: { ...auth, 'idempotency-key': 'pantry-move-stale' },
+      payload: { location: 'pantry', quantity: 400 },
+    })
+    expect(stale.statusCode).toBe(409)
+    expect(stale.json()).toMatchObject({ error: 'conflict', current: { id: fridge.json().id, quantity: 400, version: 2 } })
+
+    const moved = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${fridge.json().id}?baseVersion=${fridgeNow?.version}`,
+      headers: { ...auth, 'idempotency-key': 'pantry-move-ok' },
+      payload: { location: 'pantry', quantity: 400, unit: 'g', minimumQuantity: 80, autoAddToGrocery: false, dateType: 'useBy', dateValue: '2030-02-01' },
+    })
+    expect(moved.statusCode).toBe(200)
+    expect(moved.json()).toMatchObject({
+      id: pantry.json().id, location: 'pantry', quantity: 700, dateType: 'bestBefore', dateValue: '2030-05-01', minimumQuantity: 80, autoAddToGrocery: false,
+    })
+    const replay = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${fridge.json().id}?baseVersion=${fridgeNow?.version}`,
+      headers: { ...auth, 'idempotency-key': 'pantry-move-ok' },
+      payload: { location: 'pantry', quantity: 400, unit: 'g', minimumQuantity: 80, autoAddToGrocery: false, dateType: 'useBy', dateValue: '2030-02-01' },
+    })
+    expect(replay.json()).toEqual(moved.json())
+    const rows = await list(app, auth, householdId)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ id: pantry.json().id, quantity: 700 })
+
+    const earlier = await create(app, auth, householdId, 'pantry-move-earlier', { ...tomato, quantity: 10, location: 'freezer', dateType: 'bestBefore', dateValue: '2030-04-01', minimumQuantity: 80 })
+    const pulled = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${earlier.json().id}?baseVersion=1`,
+      headers: { ...auth, 'idempotency-key': 'pantry-move-pull' },
+      payload: { location: 'pantry', quantity: 10, unit: 'g', dateType: 'bestBefore', dateValue: '2030-04-01', minimumQuantity: 80, autoAddToGrocery: false },
+    })
+    expect(pulled.json()).toMatchObject({ id: pantry.json().id, quantity: 710, dateType: 'bestBefore', dateValue: '2030-04-01' })
+  })
+
+  it('does not let a same-place create lower a higher sibling minimum', async () => {
+    const { app, repo, auth, householdId } = await setup()
+    const fridge = await create(app, auth, householdId, 'pantry-raise-fridge', { ...tomato, quantity: 400, minimumQuantity: 1000, autoAddToGrocery: true })
+    const pantry = await create(app, auth, householdId, 'pantry-raise-pantry', { ...tomato, quantity: 300, location: 'pantry', minimumQuantity: 100, autoAddToGrocery: false })
+    expect(pantry.json()).toMatchObject({ minimumQuantity: 1000, autoAddToGrocery: true })
+    const drifted = (await list(app, auth, householdId)).find((row) => row.id === pantry.json().id)
+    await repo.updatePantryItem(householdId, pantry.json().id, { minimumQuantity: 100, autoAddToGrocery: false }, Number(drifted?.version), new Date())
+    const again = await create(app, auth, householdId, 'pantry-raise-again', { ...tomato, quantity: 20, location: 'pantry' })
+    expect(again.statusCode).toBe(200)
+    expect(again.json()).toMatchObject({ id: pantry.json().id, quantity: 320, minimumQuantity: 1000, autoAddToGrocery: true })
+    const rows = await list(app, auth, householdId)
+    expect(rows).toHaveLength(2)
+    expect(rows.every((row) => row.minimumQuantity === 1000 && row.autoAddToGrocery === true)).toBe(true)
+    expect(rows.find((row) => row.id === fridge.json().id)).toMatchObject({ location: 'refrigerator', quantity: 400 })
+  })
+
+  it('sums every location when stock is consumed', async () => {
+    const { app, auth, householdId } = await setup()
+    await create(app, auth, householdId, 'pantry-sum-fridge', { ...tomato, quantity: 200, dateType: 'useBy', dateValue: '2030-08-02' })
+    await create(app, auth, householdId, 'pantry-sum-pantry', { ...tomato, quantity: 300, location: 'pantry', dateType: 'useBy', dateValue: '2030-08-01' })
+    const consumed = await reconcile(app, auth, householdId, 'pantry-sum-consume', {
+      operation: 'consume',
+      lines: [{ ingredientId: 'tomato', quantity: 400, unit: 'g' }],
+    })
+    expect(consumed.statusCode).toBe(200)
+    const rows = await list(app, auth, householdId)
+    expect(rows.find((row) => row.location === 'pantry')).toMatchObject({ quantity: 0 })
+    expect(rows.find((row) => row.location === 'refrigerator')).toMatchObject({ quantity: 100 })
+  })
+
   it('classifies pantry errors for recovery and keeps the V4.1 error body elsewhere', async () => {
     const { app, auth, householdId } = await setup()
     const missingKey = await app.inject({ method: 'POST', url: `/v1/households/${householdId}/pantry/items`, headers: auth, payload: tomato })

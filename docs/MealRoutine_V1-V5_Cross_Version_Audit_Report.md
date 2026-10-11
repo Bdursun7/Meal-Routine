@@ -1,10 +1,25 @@
 # MealRoutine — V1–V5 Cross-Version Audit Report
 
-**Latest decision (V5.1 review fixes, 2026-10-11):** `FAIL — V6 blocked`  
+**Latest decision (pantry locations, 2026-10-11, option A):** `FAIL — V6 blocked`  
+**Code under test:** `cursor/pantry-location-rows-2826`, branched from `V5-Alignment-Audit` `fb94588`. `V5.0` was not modified.  
+**Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. Linux rules for `AUD-V5-016` passed. The SwiftData store, DatePicker, cook sheet with real location rows, Evdekiler tabs, notification delivery, and a two-simulator household were not executed. That is **Not verified (Mac)**.  
+**Location rule:** The same canonical ingredient and unit bucket may sit in more than one location. `0015_pantry_location` drops `pantry_items_one_row_per_bucket` and adds `UNIQUE (household_id, ingredient_id, unit_bucket, location)`. Existing rows are not deleted or rewritten. Create merges only into the same place. Moving a row onto an occupied place adds the quantity and deletes the source. Dates: the row already in that place is the target. Both undated stays undated. One dated side keeps that pair. The same type keeps the earlier `YYYY-MM-DD`. `bestBefore` and `useBy` are not converted; the target’s type and day stay. Settings are ingredient-level with no new column: reads use the max minimum (converted) and the OR of auto-add. A create never lowers that minimum and never turns auto-add off. An edit writes the saved values onto every sibling, and only the fields that changed. Threshold, “Azaldı”, Bitti’s shortfall, and “Eksik miktarı hesapla” use the total. Date reminders stay on the row. The low-stock key is `canonicalId|unit bucket`. Old per-row keys do not match, so one extra notice can fire after the upgrade. `AUD-V5-009` already names the partner shortfall gap, so this finding is `AUD-V5-016`.  
+**Linux evidence (2026-10-11, location rows):** `npm run typecheck` passed. `npm test` with Postgres 16.15 passed 73/73, no skips. `Tools/run_pantry_domain_tests.sh` passed 50/50. All eight `Tools/run_*.sh` scripts exited 0. The 68/68 and 46/46 lines below stay as that earlier run’s record.
+
+```text
+Open P0 findings: none after the §12 fix on Linux. The earlier “Open P0: none” (before §12) was wrong for the phone.
+Open P1 findings: AUD-V5-002 (SwiftData / DatePicker Not verified (Mac); Linux rules Pass)
+Closed on Linux in §12: AUD-V5-008 (P0), AUD-V5-009 through AUD-V5-016
+Still closed on Linux from earlier sections: AUD-V5-001, AUD-V5-003, AUD-V5-004, AUD-V5-005, AUD-V5-006, AUD-V5-007, AUD-DOC-003
+Deferred P2 findings: AUD-DOC-001, AUD-DOC-002, AUD-GLOB-001 (household timezone, still V7)
+Repository limits: No Xcode, no device. V6 was not started. Remote pantry push stays deferred until after V6.
+```
+
+**Earlier decision (V5.1 review fixes, 2026-10-11):** `FAIL — V6 blocked`  
 **Code under test:** `cursor/v51-review-fixes-2826`, branched from `V5-Alignment-Audit` `fc10e21`. `V5.0` was not modified.  
 **Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. Linux rules for the findings in §12 passed. The SwiftData store, DatePicker, cook sheet, Evdekiler tabs, notification delivery, and a two-simulator household were not executed. That is **Not verified (Mac)**.  
 **Correction:** The status box in the 2026-10-10 / 2026-10-11 cook and market-card decisions said `Open P0 findings: none`. That was wrong for the phone. Opening Bu Hafta rebuilt the week and deleted manual, `pantry-auto:` and `pantry-cook:` grocery rows (`AUD-V5-008`, P0). §12 closes that P0 and `AUD-V5-009` through `AUD-V5-015` on Linux.  
-**STEP 0 update (2026-10-11):** D1 is unchanged (device time zone, no household timezone column). D2 is no longer “`0013` only”. The owner approved `0014_shared_grocery_quantity` (2026-10-11): `NUMERIC(12,3)` quantity, nullable `unit`, nullable `line_source`. `0001`–`0013` are not rewritten. There is no `0015`.  
+**STEP 0 update (2026-10-11):** D1 is unchanged (device time zone, no household timezone column). D2 is no longer “`0013` only”. The owner approved `0014_shared_grocery_quantity` (2026-10-11): `NUMERIC(12,3)` quantity, nullable `unit`, nullable `line_source`. `0001`–`0013` are not rewritten. There is no `0015`. A later decision the same day (option A, at the top of this report) adds `0015_pantry_location`. This sentence is kept so that earlier “no 0015” record is not rewritten.  
 **Linux evidence (2026-10-11):** `npm run typecheck` passed. `npm test` with Postgres 16.15 passed 68/68, no skips. `Tools/run_pantry_domain_tests.sh` passed 46/46. All eight `Tools/run_*.sh` scripts exited 0. `testRowShowsSafetyForUseByAndBestBefore` was renamed to `testRowShowsNeutralPastDateForUseByAndBestBefore`; the assertion was already the neutral sentence.
 
 ```text
@@ -648,6 +663,18 @@ Host: Ubuntu 24.04, x86_64. Node from nvm. Swift 6.0.3. PostgreSQL 16.15. `DATAB
 | Actual before | One sentence called the cook gap “Evdekiler eksiği”. The switch said “Hatırlatma günleri”. The test was `testRowShowsSafetyForUseByAndBestBefore`. |
 | Fix | Copy and docs. The test was renamed to `testRowShowsNeutralPastDateForUseByAndBestBefore`. The body still asserts the neutral sentences. |
 | Status | Closed on Linux. |
+
+### AUD-V5-016 — one row per bucket blocked a second location
+
+| Field | Value |
+| --- | --- |
+| ID | `AUD-V5-016` |
+| Class | P1 |
+| Expected | The same ingredient and unit bucket can live in more than one pantry location. Cook’s per-location split, and adding Domates to a second place, keep both rows. |
+| Actual before | `0012` `UNIQUE (household_id, ingredient_id, unit_bucket)` and the phone merge (`match.location = result.location`) folded the second place into the first row and moved it. The cook split had no real second row to walk. |
+| Fix | `0015_pantry_location` replaces that constraint with `UNIQUE (household_id, ingredient_id, unit_bucket, location)`. No row is deleted or rewritten. Server create merges only the same ingredient, bucket, and location. A move onto an occupied place merges quantity in one transaction and returns the survivor. `bestBefore` and `useBy` stay apart: the destination’s type and day win. `minimumQuantity`, `autoAddToGrocery`, and the low-stock notice use the total across locations. Editing them copies the saved value to siblings. `AUD-V5-009` was already the partner shortfall finding, so this id is 016. |
+| Tests | Postgres: `0015` on an existing tomato row, two locations, move-merge, replay, and `compute-missing` / consume of the total (`pantry.integration.test.ts`, `pantry.test.ts`). Domain: group total, max/OR then replace, date rule, coverage across rows, cook order (`PantryDomainTests`). |
+| Status | Closed on Linux. Evdekiler, the cook sheet, and VoiceOver are Not verified (Mac). |
 
 ### Evdekiler location tabs (owner, 2026-10-11)
 

@@ -34,7 +34,7 @@ describe('migrations', () => {
   it('lists versioned SQL files in order and creates the phase-0 tables', async () => {
     const dir = migrationsDirectory()
     const files = await listMigrationFiles(dir)
-    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014'])
+    expect(files.map((file) => file.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009', '0010', '0011', '0012', '0013', '0014', '0015'])
     const sql = (
       await Promise.all(files.map((file) => readFile(path.join(dir, file), 'utf8')))
     ).join('\n')
@@ -52,10 +52,15 @@ describe('migrations', () => {
     expect(sql).toContain('client_diagnostics')
     expect(sql).toContain('pantry_items')
     expect(sql).toContain('pantry_idempotency')
-    for (const file of files.filter((name) => !name.startsWith('0012') && !name.startsWith('0013'))) {
+    for (const file of files.filter((name) => name.slice(0, 4) < '0012')) {
       const earlier = await readFile(path.join(dir, file), 'utf8')
       expect(earlier).not.toContain('pantry_items')
     }
+    const places = await readFile(path.join(dir, '0015_pantry_location.sql'), 'utf8')
+    expect(places).toContain('DROP CONSTRAINT IF EXISTS pantry_items_one_row_per_bucket')
+    expect(places).toContain('pantry_items_one_row_per_place')
+    expect(places).toContain('UNIQUE (household_id, ingredient_id, unit_bucket, location)')
+    expect(places).not.toMatch(/\b(DROP TABLE|DELETE FROM|TRUNCATE)\b/i)
     const autoAdd = await readFile(path.join(dir, '0013_pantry_auto_add.sql'), 'utf8')
     expect(autoAdd).toContain('ADD COLUMN IF NOT EXISTS auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false')
     expect(autoAdd).not.toMatch(/\b(DROP|DELETE FROM|TRUNCATE)\b/i)
@@ -71,7 +76,7 @@ describe('migrations', () => {
   it('keeps 0001-0011 untouched by V5 and seeds the same dictionary the app bundles', async () => {
     const dir = migrationsDirectory()
     const files = await listMigrationFiles(dir)
-    for (const file of files.filter((name) => !name.startsWith('0012') && !name.startsWith('0013'))) {
+    for (const file of files.filter((name) => name.slice(0, 4) < '0012')) {
       const earlier = await readFile(path.join(dir, file), 'utf8')
       for (const marker of ['TABLE IF NOT EXISTS ingredients', 'date_type', 'pantry_']) expect(earlier, file).not.toContain(marker)
     }

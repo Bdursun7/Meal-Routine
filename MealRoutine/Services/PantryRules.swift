@@ -472,6 +472,56 @@ enum PantryIngredientStore {
     }
 }
 
+/// Copies ingredient-level settings onto every sibling row.
+/// Personal rows bump `revision`. Household rows do not: the server fans the same
+/// values out, and a second outbox update would bump `version` twice.
+@MainActor
+enum PantrySiblingSync {
+    static func mirror(
+        anchor: PantryItem,
+        minimum: Double?,
+        autoAdd: Bool,
+        unit: String,
+        mode: PantrySiblingMode,
+        in context: ModelContext
+    ) {
+        let items = ((try? context.fetch(FetchDescriptor<PantryItem>())) ?? []).filter { $0.householdID == anchor.householdID }
+        let rows = items.map { item in
+            PantryGroupRow(
+                id: item.uuid.uuidString.lowercased(),
+                ingredientId: item.ingredientID,
+                quantity: item.quantity,
+                unit: item.unit,
+                location: item.location,
+                minimumQuantity: item.minimumQuantity,
+                autoAddToGrocery: item.autoAddToGrocery,
+                dateType: item.dateType,
+                dateValue: item.dateValue
+            )
+        }
+        let planned = PantryGroupStock.updates(
+            rows: rows,
+            ingredientId: anchor.ingredientID,
+            unit: unit,
+            minimum: minimum,
+            autoAdd: autoAdd,
+            mode: mode
+        )
+        for update in planned {
+            guard let row = items.first(where: { $0.uuid.uuidString.lowercased() == update.id }) else { continue }
+            let changed = row.minimumQuantity != update.minimumQuantity || row.autoAddToGrocery != update.autoAddToGrocery
+            guard changed else { continue }
+            row.minimumQuantity = update.minimumQuantity
+            row.autoAddToGrocery = update.autoAddToGrocery
+            if row.householdID == nil, row.uuid != anchor.uuid {
+                row.revision += 1
+                row.updatedAt = .now
+            }
+        }
+        try? context.save()
+    }
+}
+
 enum PantryTransferApply {
     /// Moves or copies personal rows onto the household. Personal rows stay put on copy and on keep.
     /// Rows meet only on the same dictionary id; compatible units merge, incompatible ones stay apart.
@@ -488,7 +538,11 @@ enum PantryTransferApply {
         for item in personal {
             let key = dictionary.canonicalId(item.ingredientID)
             let index = key.flatMap { key in
-                household.firstIndex { dictionary.canonicalId($0.ingredientID) == key && PantryUnitPolicy.compatible($0.unit, item.unit) }
+                household.firstIndex {
+                    dictionary.canonicalId($0.ingredientID) == key
+                        && PantryUnitPolicy.compatible($0.unit, item.unit)
+                        && $0.location == item.location
+                }
             }
             if let index, case .merge(let quantity, let unit) = PantryUnitPolicy.decision(
                 existingUnit: household[index].unit,
@@ -499,12 +553,30 @@ enum PantryTransferApply {
             ) {
                 let match = household[index]
                 let base = match.revision
+                let incomingMinimum = item.minimumQuantity.flatMap { PantryUnitPolicy.converted($0, from: item.unit, to: unit) }
+                let group = household.filter {
+                    dictionary.canonicalId($0.ingredientID) == key && PantryUnitPolicy.compatible($0.unit, unit)
+                }.map { sibling in
+                    PantryGroupRow(
+                        id: sibling.uuid.uuidString.lowercased(),
+                        ingredientId: sibling.ingredientID,
+                        quantity: sibling.quantity,
+                        unit: sibling.unit,
+                        location: sibling.location,
+                        minimumQuantity: sibling.minimumQuantity,
+                        autoAddToGrocery: sibling.autoAddToGrocery,
+                        dateType: sibling.dateType,
+                        dateValue: sibling.dateValue
+                    )
+                }
                 match.quantity = quantity
                 match.unit = unit
-                match.autoAddToGrocery = match.autoAddToGrocery || item.autoAddToGrocery
+                match.minimumQuantity = PantryGroupStock.raisedMinimum(current: PantryGroupStock.effectiveMinimum(group, unit: unit), incoming: incomingMinimum)
+                match.autoAddToGrocery = PantryGroupStock.effectiveAutoAdd(group) || item.autoAddToGrocery
                 match.updatedAt = .now
                 match.revision += 1
                 PantryOutbox.record(.update, match, baseVersion: base, in: context)
+                PantrySiblingSync.mirror(anchor: match, minimum: match.minimumQuantity, autoAdd: match.autoAddToGrocery, unit: unit, mode: .replace, in: context)
                 touched.append(match)
             } else {
                 let copy = PantryItem(
@@ -519,11 +591,36 @@ enum PantryTransferApply {
                     dateType: item.dateType,
                     dateValue: item.dateValue
                 )
+                let siblings = household.filter {
+                    guard let key else { return false }
+                    return dictionary.canonicalId($0.ingredientID) == key && PantryUnitPolicy.compatible($0.unit, item.unit)
+                }
+                let siblingRows = siblings.map { sibling in
+                    PantryGroupRow(
+                        id: sibling.uuid.uuidString.lowercased(),
+                        ingredientId: sibling.ingredientID,
+                        quantity: sibling.quantity,
+                        unit: sibling.unit,
+                        location: sibling.location,
+                        minimumQuantity: sibling.minimumQuantity,
+                        autoAddToGrocery: sibling.autoAddToGrocery,
+                        dateType: sibling.dateType,
+                        dateValue: sibling.dateValue
+                    )
+                }
+                let minimum = PantryGroupStock.raisedMinimum(
+                    current: PantryGroupStock.effectiveMinimum(siblingRows, unit: item.unit),
+                    incoming: item.minimumQuantity
+                )
+                let autoAdd = PantryGroupStock.effectiveAutoAdd(siblingRows) || item.autoAddToGrocery
+                copy.minimumQuantity = minimum
+                copy.autoAddToGrocery = autoAdd
                 context.insert(copy)
                 household.append(copy)
                 // Unresolved legacy ids cannot be stored on the server; the row stays local until the user picks the ingredient.
                 if key != nil {
                     PantryOutbox.record(.create, copy, baseVersion: nil, confirmSeparate: true, in: context)
+                    PantrySiblingSync.mirror(anchor: copy, minimum: minimum, autoAdd: autoAdd, unit: copy.unit, mode: .replace, in: context)
                 }
                 touched.append(copy)
             }
@@ -791,16 +888,39 @@ enum PantryStockSideEffects {
     static func afterQuantityChange(
         item: PantryItem,
         previousQuantity: Double,
+        previousGroupQuantity: Double? = nil,
+        nextGroupQuantity: Double? = nil,
         in context: ModelContext
     ) {
         let preferences = PantryNotificationPreferenceStore.load()
+        let stored = ((try? context.fetch(FetchDescriptor<PantryItem>())) ?? []).filter { $0.householdID == item.householdID }
+        let group = stored.filter {
+            PantryGroupStock.sameIngredient($0.ingredientID, item.ingredientID) && PantryUnitPolicy.compatible($0.unit, item.unit)
+        }.map { row in
+            PantryGroupRow(
+                id: row.uuid.uuidString.lowercased(),
+                ingredientId: row.ingredientID,
+                quantity: row.quantity,
+                unit: row.unit,
+                location: row.location,
+                minimumQuantity: row.minimumQuantity,
+                autoAddToGrocery: row.autoAddToGrocery,
+                dateType: row.dateType,
+                dateValue: row.dateValue
+            )
+        }
+        let next = nextGroupQuantity ?? PantryGroupStock.total(group, unit: item.unit)
+        let previous = previousGroupQuantity ?? PantryUnitPolicy.snap(next - item.quantity + previousQuantity)
+        let minimum = PantryGroupStock.effectiveMinimum(group, unit: item.unit)
+        let autoAdd = group.isEmpty ? item.autoAddToGrocery : PantryGroupStock.effectiveAutoAdd(group)
+        let key = PantryGroupStock.alertKey(ingredientId: item.ingredientID, unit: item.unit)
         var armed = PantryEffectLedger.armed()
         let low = PantryLowStockNotifications.step(
-            itemId: item.uuid.uuidString.lowercased(),
+            itemId: key,
             name: item.displayName,
-            previousQuantity: previousQuantity,
-            nextQuantity: item.quantity,
-            minimum: item.minimumQuantity,
+            previousQuantity: previous,
+            nextQuantity: next,
+            minimum: minimum,
             enabled: preferences.lowStockNotificationsEnabled,
             armed: armed
         )
@@ -810,14 +930,14 @@ enum PantryStockSideEffects {
         var crossings = PantryEffectLedger.crossings()
         let rows = marketRows(in: context)
         let plan = PantryAutoGrocery.plan(
-            itemId: item.uuid.uuidString.lowercased(),
+            itemId: key,
             ingredientId: item.ingredientID,
             displayName: item.displayName,
-            previousQuantity: previousQuantity,
-            nextQuantity: item.quantity,
+            previousQuantity: previous,
+            nextQuantity: next,
             unit: item.unit,
-            minimum: item.minimumQuantity,
-            autoAdd: item.autoAddToGrocery,
+            minimum: minimum,
+            autoAdd: autoAdd,
             version: item.revision,
             rows: rows,
             applied: crossings

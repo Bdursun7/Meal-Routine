@@ -1304,6 +1304,74 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(one[0].deducted, 400)
     }
 
+    func testTwoLocationsStaySeparateAndTheTotalDrivesLowStock() {
+        let fridge = PantryGroupRow(id: "fridge", ingredientId: "tomato", quantity: 400, unit: "g", location: .refrigerator, minimumQuantity: 200, autoAddToGrocery: false, dateType: .useBy, dateValue: "2030-02-01")
+        let pantry = PantryGroupRow(id: "pantry", ingredientId: "tomatoes", quantity: 1, unit: "kg", location: .pantry, minimumQuantity: 0.1, autoAddToGrocery: true, dateType: .bestBefore, dateValue: "2030-05-01")
+        let rows = [fridge, pantry]
+        XCTAssertEqual(PantryGroupStock.total(rows, unit: "g"), 1400)
+        XCTAssertEqual(PantryGroupStock.effectiveMinimum(rows, unit: "g"), 200)
+        XCTAssertTrue(PantryGroupStock.effectiveAutoAdd(rows))
+        XCTAssertEqual(PantryGroupStock.alertKey(ingredientId: "tomatoes", unit: "kg", dictionary: dictionary), "tomato|family:mass")
+        let low = PantryRowPresentation.make(
+            name: "Domates", ingredientResolved: true, quantity: 400, unit: "g", location: .refrigerator,
+            minimumQuantity: 1500, dateType: nil, dateValue: nil, today: "2026-10-11",
+            lowStockQuantity: 1400, calendar: utc
+        )
+        XCTAssertEqual(low.badges.map(\.text), [PantryCopy.lowStock])
+        let empty = PantryRowPresentation.make(
+            name: "Domates", ingredientResolved: true, quantity: 0, unit: "g", location: .pantry,
+            minimumQuantity: 1500, dateType: nil, dateValue: nil, today: "2026-10-11",
+            lowStockQuantity: 400, calendar: utc
+        )
+        XCTAssertEqual(empty.badges.map(\.text), [PantryCopy.outOfStock])
+        XCTAssertEqual(PantryFinishedMath.shortage(quantity: 400, minimum: 1500), 1100)
+        XCTAssertEqual(PantryGroupStock.prefill(rows, ingredientId: "tomato", unit: "g", dictionary: dictionary).minimum, 200)
+        XCTAssertTrue(PantryGroupStock.prefill(rows, ingredientId: "tomato", unit: "g", dictionary: dictionary).autoAdd)
+    }
+
+    func testSiblingSettingsUseMaxAndOrUntilAnEditReplacesThem() {
+        let rows = [
+            PantryGroupRow(id: "fridge", ingredientId: "tomato", quantity: 400, unit: "g", location: .refrigerator, minimumQuantity: 200, autoAddToGrocery: false, dateType: nil, dateValue: nil),
+            PantryGroupRow(id: "pantry", ingredientId: "tomato", quantity: 1, unit: "kg", location: .pantry, minimumQuantity: 0.05, autoAddToGrocery: true, dateType: nil, dateValue: nil),
+        ]
+        let raised = PantryGroupStock.updates(rows: rows, ingredientId: "tomato", unit: "g", minimum: 100, autoAdd: false, mode: .raise, dictionary: dictionary)
+        XCTAssertEqual(raised.first { $0.id == "fridge" }?.minimumQuantity, 200)
+        XCTAssertEqual(raised.first { $0.id == "fridge" }?.autoAddToGrocery, false)
+        XCTAssertEqual(raised.first { $0.id == "pantry" }?.minimumQuantity, 0.1)
+        XCTAssertEqual(raised.first { $0.id == "pantry" }?.autoAddToGrocery, true)
+        let replaced = PantryGroupStock.updates(rows: rows, ingredientId: "tomato", unit: "g", minimum: 50, autoAdd: false, mode: .replace, dictionary: dictionary)
+        XCTAssertEqual(replaced.first { $0.id == "fridge" }?.minimumQuantity, 50)
+        XCTAssertEqual(replaced.first { $0.id == "fridge" }?.autoAddToGrocery, false)
+        XCTAssertEqual(replaced.first { $0.id == "pantry" }?.minimumQuantity, 0.05)
+        XCTAssertEqual(replaced.first { $0.id == "pantry" }?.autoAddToGrocery, false)
+    }
+
+    func testDateMergeKeepsTheTargetWhenTheTypesDiffer() {
+        let best = (type: PantryDateType.bestBefore, day: "2030-05-01")
+        let use = (type: PantryDateType.useBy, day: "2030-02-01")
+        XCTAssertEqual(PantryDateMerge.keeping(best, incoming: use)?.type, .bestBefore)
+        XCTAssertEqual(PantryDateMerge.keeping(best, incoming: use)?.day, "2030-05-01")
+        let earlier = (type: PantryDateType.bestBefore, day: "2030-04-01")
+        XCTAssertEqual(PantryDateMerge.keeping(best, incoming: earlier)?.day, "2030-04-01")
+        XCTAssertEqual(PantryDateMerge.keeping(best, incoming: nil)?.day, "2030-05-01")
+        XCTAssertEqual(PantryDateMerge.keeping(nil, incoming: use)?.type, .useBy)
+        XCTAssertNil(PantryDateMerge.keeping(nil, incoming: nil))
+    }
+
+    func testCoverageSumsEveryLocationBeforeTheNextLine() {
+        let lines = [
+            PantryMarketLine(ingredientId: "tomato", quantity: 500, unit: "g", isChecked: false, preserve: false),
+            PantryMarketLine(ingredientId: "tomatoes", quantity: 300, unit: "g", isChecked: false, preserve: false),
+        ]
+        let stock = [
+            PantryCoverageLine(ingredientId: "tomato", quantity: 200, unit: "g"),
+            PantryCoverageLine(ingredientId: "tomato", quantity: 400, unit: "g"),
+        ]
+        let adjusted = PantryMarketCoverage.adjust(lines, pantry: stock, dictionary: dictionary)
+        XCTAssertEqual(adjusted.map(\.quantity), [0, 200])
+        XCTAssertEqual(adjusted.first?.coveredByPantry, true)
+    }
+
     private func need(ingredientId: String = "tomato", quantity: Double, unit: String) -> PantryCookNeed {
         PantryCookNeed(ingredientId: ingredientId, displayName: "Domates", quantity: quantity, unit: unit)
     }

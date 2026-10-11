@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg'
 import { AppError } from './errors.js'
 import type { Ingredient } from './ingredients.js'
-import { pantryTimestamp, type PantryDraft, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
+import { pantryTimestamp, type PantryDraft, type PantryItem, type PantryPatch, type PantrySiblingPatch, type PantryStore } from './pantryTypes.js'
 import type { MemberRole } from './repository.js'
 
 type PantryDbRow = {
@@ -75,9 +75,20 @@ async function insertRow(db: Queryable, householdId: string, draft: PantryDraft,
   return fromRow(result.rows[0]!)
 }
 
-async function getRow(db: Queryable, householdId: string, itemId: string): Promise<PantryItem | null> {
-  const result = await db.query<PantryDbRow>(`SELECT ${columns} FROM pantry_items WHERE household_id = $1 AND id = $2`, [householdId, itemId])
+async function getRow(db: Queryable, householdId: string, itemId: string, lock = false): Promise<PantryItem | null> {
+  const result = await db.query<PantryDbRow>(
+    `SELECT ${columns} FROM pantry_items WHERE household_id = $1 AND id = $2${lock ? ' FOR UPDATE' : ''}`,
+    [householdId, itemId],
+  )
   return result.rows[0] ? fromRow(result.rows[0]) : null
+}
+
+async function writeSiblings(db: Queryable, householdId: string, siblings: PantrySiblingPatch[], now: Date): Promise<void> {
+  for (const sibling of siblings) {
+    const current = await getRow(db, householdId, sibling.id, true)
+    if (!current) continue
+    if (!(await updateRow(db, current, sibling.patch, now))) throw new AppError('conflict', 409, undefined, { current })
+  }
 }
 
 async function updateRow(db: Queryable, current: PantryItem, patch: PantryPatch, now: Date): Promise<PantryItem | null> {
@@ -119,16 +130,61 @@ export function createPgPantry(pool: Pool): PantryStore {
         translate(error)
       }
     },
-    async updatePantryItem(householdId, itemId, patch, baseVersion, now) {
-      const current = await getRow(pool, householdId, itemId)
-      if (!current) throw new AppError('not_found', 404)
-      if (baseVersion !== undefined && baseVersion !== current.version) throw new AppError('conflict', 409, undefined, { current })
+    async updatePantryItem(householdId, itemId, patch, baseVersion, now, siblings = []) {
+      if (siblings.length === 0) {
+        const current = await getRow(pool, householdId, itemId)
+        if (!current) throw new AppError('not_found', 404)
+        if (baseVersion !== undefined && baseVersion !== current.version) throw new AppError('conflict', 409, undefined, { current })
+        try {
+          const updated = await updateRow(pool, current, patch, now)
+          if (!updated) throw new AppError('conflict', 409, undefined, { current: await getRow(pool, householdId, itemId) })
+          return updated
+        } catch (error) {
+          translate(error)
+        }
+      }
+      const client = await pool.connect()
       try {
-        const updated = await updateRow(pool, current, patch, now)
-        if (!updated) throw new AppError('conflict', 409, undefined, { current: await getRow(pool, householdId, itemId) })
+        await client.query('BEGIN')
+        const current = await getRow(client, householdId, itemId, true)
+        if (!current) throw new AppError('not_found', 404)
+        if (baseVersion !== undefined && baseVersion !== current.version) throw new AppError('conflict', 409, undefined, { current })
+        const updated = await updateRow(client, current, patch, now)
+        if (!updated) throw new AppError('conflict', 409, undefined, { current })
+        await writeSiblings(client, householdId, siblings.filter((sibling) => sibling.id !== itemId), now)
+        await client.query('COMMIT')
         return updated
       } catch (error) {
+        await client.query('ROLLBACK')
         translate(error)
+      } finally {
+        client.release()
+      }
+    },
+    async mergePantryLocations(householdId, sourceId, sourceVersion, occupantId, occupantPatch, siblings, now) {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const source = await getRow(client, householdId, sourceId, true)
+        if (!source) throw new AppError('not_found', 404)
+        if (source.version !== sourceVersion) throw new AppError('conflict', 409, undefined, { current: source })
+        const occupant = await getRow(client, householdId, occupantId, true)
+        if (!occupant) throw new AppError('conflict', 409)
+        const updated = await updateRow(client, occupant, occupantPatch, now)
+        if (!updated) throw new AppError('conflict', 409, undefined, { current: occupant })
+        const removed = await client.query(
+          'DELETE FROM pantry_items WHERE household_id = $1 AND id = $2 AND version = $3',
+          [householdId, sourceId, sourceVersion],
+        )
+        if ((removed.rowCount ?? 0) === 0) throw new AppError('conflict', 409, undefined, { current: source })
+        await writeSiblings(client, householdId, siblings.filter((sibling) => sibling.id !== occupantId && sibling.id !== sourceId), now)
+        await client.query('COMMIT')
+        return updated
+      } catch (error) {
+        await client.query('ROLLBACK')
+        translate(error)
+      } finally {
+        client.release()
       }
     },
     async deletePantryItem(householdId, itemId, baseVersion) {
