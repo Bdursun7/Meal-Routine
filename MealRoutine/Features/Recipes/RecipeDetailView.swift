@@ -156,7 +156,8 @@ struct RecipeDetailView: View {
                 autoAddToGrocery: item.autoAddToGrocery,
                 version: item.revision,
                 dateType: item.dateType,
-                dateValue: item.dateValue
+                dateValue: item.dateValue,
+                location: item.location
             )
         }
     }
