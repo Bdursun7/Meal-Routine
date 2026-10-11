@@ -111,6 +111,7 @@ enum PantryCopy {
         let body = parts.map { "\($0.location): \($0.amount)" }.joined(separator: ", ")
         return "\(name) — \(body)"
     }
+    static let minimumFooter = "Minimum, bu malzeme ve birimin bütün konumlarındaki toplama bakılır. Altına inince “Azaldı” görünür."
     static let autoAddToggle = "Minimumun altına inince markete ekle"
     static let autoAddFooter = "Kapalıyken eşik, market listesine ürün eklemez. Açınca eksik miktar bir kez yazılır."
     static let lowStockToggle = "Düşük stok bildirimi"
@@ -155,7 +156,7 @@ enum PantryCopy {
         cookLocationHint, cookDeferred, cookAlready,
         locationInventory("Domates", parts: [("Buzdolabı", "2 adet"), ("Kiler", "3 adet")]),
         PantryLocationTabs.emptyMessage(for: .refrigerator),
-        addMissingToMarket, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
+        addMissingToMarket, minimumFooter, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
         dateReminderScheduleToggle, dateReminderFooter, notificationPermissionDenied, lowStockNoticeTitle,
         lowStockNoticeBody(name: "Süt"), reminderBestBefore(name: "Süt", day: "9 Ekim 2026"),
         reminderUseBy(name: "Süt", day: "9 Ekim 2026"),
@@ -496,6 +497,7 @@ struct PantryRowPresentation: Equatable, Sendable {
         dateValue: String?,
         sync: PantrySyncMark = .synced,
         today: String,
+        lowStockQuantity: Double? = nil,
         calendar: Calendar = .current
     ) -> PantryRowPresentation {
         let amount = QuantityFormat.quantityAndUnit(quantity: quantity, unit: unit)
@@ -519,9 +521,10 @@ struct PantryRowPresentation: Equatable, Sendable {
         case .none, .upcoming:
             break
         }
+        let compared = lowStockQuantity ?? quantity
         if quantity <= 0 {
             badges.append(PantryBadge(text: PantryCopy.outOfStock, symbol: "tray", tone: .warning))
-        } else if let minimumQuantity, quantity <= minimumQuantity {
+        } else if let minimumQuantity, compared <= minimumQuantity {
             badges.append(PantryBadge(text: PantryCopy.lowStock, symbol: "arrow.down.circle", tone: .warning))
         }
         if !ingredientResolved {
@@ -579,9 +582,137 @@ enum PantryFinishedFlow {
 
 enum PantryFinishedMath {
     /// Missing amount against the optional minimum. Nil when the user never set one.
+    /// `quantity` is the total still in every location after the chosen row is zeroed.
     static func shortage(quantity: Double, minimum: Double?) -> Double? {
         guard let minimum, minimum >= 0 else { return nil }
         return max(0, minimum - max(0, quantity))
+    }
+}
+
+// MARK: - Location identity
+
+/// Date rule when two rows become one. `kept` is the row that already occupies the place.
+/// Both undated stays undated. One dated side keeps that pair.
+/// The same date type keeps the earlier `YYYY-MM-DD`.
+/// `bestBefore` and `useBy` are not converted: the kept type and day stay, and the other type is dropped.
+enum PantryDateMerge {
+    static func keeping(
+        _ kept: (type: PantryDateType, day: String)?,
+        incoming: (type: PantryDateType, day: String)?
+    ) -> (type: PantryDateType, day: String)? {
+        switch (kept, incoming) {
+        case (nil, nil):
+            return nil
+        case (nil, let incoming?):
+            return incoming
+        case (let kept?, nil):
+            return kept
+        case (let kept?, let incoming?):
+            guard kept.type == incoming.type else { return kept }
+            return PantryDay.isBefore(incoming.day, kept.day) ? incoming : kept
+        }
+    }
+}
+
+struct PantryGroupRow: Equatable, Sendable {
+    var id: String
+    var ingredientId: String
+    var quantity: Double
+    var unit: String
+    var location: PantryLocation
+    var minimumQuantity: Double?
+    var autoAddToGrocery: Bool
+    var dateType: PantryDateType?
+    var dateValue: String?
+}
+
+struct PantrySiblingUpdate: Equatable, Sendable {
+    var id: String
+    var minimumQuantity: Double?
+    var autoAddToGrocery: Bool
+}
+
+enum PantrySiblingMode: Equatable, Sendable {
+    /// Create: max minimum, OR the auto-add flag. Never lowers, never turns the flag off.
+    case raise
+    /// Edit: the saved values replace every sibling, including a lower minimum or a flag turned off.
+    case replace
+}
+
+/// One ingredient and unit bucket, summed across locations.
+/// Reads use the max minimum (converted) and the OR of auto-add when stored siblings still differ.
+/// A create or an edit then writes that one value onto every sibling. No extra column.
+enum PantryGroupStock {
+    static func sameIngredient(_ lhs: String, _ rhs: String, dictionary: IngredientDictionary = .shared) -> Bool {
+        let left = dictionary.canonicalId(lhs)
+        let right = dictionary.canonicalId(rhs)
+        if let left, let right { return left == right }
+        return lhs == rhs
+    }
+
+    static func group(_ rows: [PantryGroupRow], ingredientId: String, unit: String, dictionary: IngredientDictionary = .shared) -> [PantryGroupRow] {
+        rows.filter { sameIngredient($0.ingredientId, ingredientId, dictionary: dictionary) && PantryUnitPolicy.compatible($0.unit, unit) }
+    }
+
+    static func total(_ rows: [PantryGroupRow], unit: String) -> Double {
+        PantryUnitPolicy.snap(rows.reduce(0) { sum, row in
+            sum + (PantryUnitPolicy.converted(row.quantity, from: row.unit, to: unit) ?? 0)
+        })
+    }
+
+    /// Highest stored minimum, converted into `unit`. Nil only when every sibling has none.
+    static func effectiveMinimum(_ rows: [PantryGroupRow], unit: String) -> Double? {
+        rows.reduce(nil) { best, row in
+            raisedMinimum(current: best, incoming: row.minimumQuantity.flatMap { PantryUnitPolicy.converted($0, from: row.unit, to: unit) })
+        }
+    }
+
+    static func effectiveAutoAdd(_ rows: [PantryGroupRow]) -> Bool {
+        rows.contains { $0.autoAddToGrocery }
+    }
+
+    static func raisedMinimum(current: Double?, incoming: Double?) -> Double? {
+        switch (current, incoming) {
+        case (nil, nil): return nil
+        case (nil, let incoming?): return incoming
+        case (let current?, nil): return current
+        case (let current?, let incoming?): return max(current, incoming)
+        }
+    }
+
+    /// Notify-once key for the ingredient and bucket. Old per-row keys do not match, so one extra notice can fire after this upgrade.
+    static func alertKey(ingredientId: String, unit: String, dictionary: IngredientDictionary = .shared) -> String {
+        let id = GroceryMerger.shoppingIngredientId(ingredientId, dictionary: dictionary)
+        return "\(id)|\(GroceryMerger.unitBucket(unit))"
+    }
+
+    static func prefill(_ rows: [PantryGroupRow], ingredientId: String, unit: String, dictionary: IngredientDictionary = .shared) -> (minimum: Double?, autoAdd: Bool) {
+        let rows = group(rows, ingredientId: ingredientId, unit: unit, dictionary: dictionary)
+        return (effectiveMinimum(rows, unit: unit), effectiveAutoAdd(rows))
+    }
+
+    static func updates(
+        rows: [PantryGroupRow],
+        ingredientId: String,
+        unit: String,
+        minimum: Double?,
+        autoAdd: Bool,
+        mode: PantrySiblingMode,
+        dictionary: IngredientDictionary = .shared
+    ) -> [PantrySiblingUpdate] {
+        group(rows, ingredientId: ingredientId, unit: unit, dictionary: dictionary).map { row in
+            let incoming = minimum.flatMap { PantryUnitPolicy.converted($0, from: unit, to: row.unit) }
+            switch mode {
+            case .raise:
+                return PantrySiblingUpdate(
+                    id: row.id,
+                    minimumQuantity: raisedMinimum(current: row.minimumQuantity, incoming: incoming),
+                    autoAddToGrocery: row.autoAddToGrocery || autoAdd
+                )
+            case .replace:
+                return PantrySiblingUpdate(id: row.id, minimumQuantity: incoming, autoAddToGrocery: autoAdd)
+            }
+        }
     }
 }
 
@@ -724,21 +855,27 @@ enum PantryMarketCoverage {
                 return PantryMarketAdjustment(quantity: line.quantity, unit: line.unit, incompatible: false, coveredByPantry: false, applied: false)
             }
             let sameIngredient = stock.indices.filter { stockKeys[$0] == key }
-            guard let index = sameIngredient.first(where: { PantryUnitPolicy.compatible(stock[$0].unit, line.unit) && stock[$0].quantity > 0 })
-                    ?? sameIngredient.first(where: { PantryUnitPolicy.compatible(stock[$0].unit, line.unit) }) else {
+            let indexes = sameIngredient.filter { PantryUnitPolicy.compatible(stock[$0].unit, line.unit) }
+            guard !indexes.isEmpty else {
                 return PantryMarketAdjustment(quantity: required, unit: line.unit, incompatible: !sameIngredient.isEmpty, coveredByPantry: false, applied: false)
             }
-            guard let available = PantryUnitPolicy.converted(stock[index].quantity, from: stock[index].unit, to: line.unit) else {
-                return PantryMarketAdjustment(quantity: required, unit: line.unit, incompatible: true, coveredByPantry: false, applied: false)
+            let available = indexes.reduce(0.0) { sum, index in
+                sum + (PantryUnitPolicy.converted(stock[index].quantity, from: stock[index].unit, to: line.unit) ?? 0)
             }
             if available + 0.000_1 >= required {
-                let used = PantryUnitPolicy.converted(required, from: line.unit, to: stock[index].unit) ?? required
-                stock[index].quantity = PantryUnitPolicy.snap(max(0, stock[index].quantity - used))
+                var still = required
+                for index in indexes {
+                    if still <= 0.000_1 { break }
+                    let have = PantryUnitPolicy.converted(stock[index].quantity, from: stock[index].unit, to: line.unit) ?? 0
+                    let take = min(have, still)
+                    let used = PantryUnitPolicy.converted(take, from: line.unit, to: stock[index].unit) ?? take
+                    stock[index].quantity = PantryUnitPolicy.snap(max(0, stock[index].quantity - used))
+                    still = PantryUnitPolicy.snap(max(0, still - take))
+                }
                 return PantryMarketAdjustment(quantity: 0, unit: line.unit, incompatible: false, coveredByPantry: true, applied: true)
             }
-            let remaining = PantryUnitPolicy.snap(required - available)
-            stock[index].quantity = 0
-            return PantryMarketAdjustment(quantity: remaining, unit: line.unit, incompatible: false, coveredByPantry: false, applied: true)
+            for index in indexes { stock[index].quantity = 0 }
+            return PantryMarketAdjustment(quantity: PantryUnitPolicy.snap(required - available), unit: line.unit, incompatible: false, coveredByPantry: false, applied: true)
         }
     }
 

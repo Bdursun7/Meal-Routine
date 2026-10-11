@@ -1,6 +1,6 @@
 # V5 yerel çalıştırma
 
-V4.1 adımları `docs/v4.1-local-runbook.md` içindedir. V5 aynı sunucuyu kullanır ve şemaya `0012_pantry.sql` ekler. V5.1 `0013_pantry_auto_add.sql` ile `pantry_items.auto_add_to_grocery` kolonunu ekler (`BOOLEAN NOT NULL DEFAULT false`). `0014_shared_grocery_quantity.sql` ortak market satırına `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve boş kalabilen `line_source` ekler; tamsayı `quantity` durur. `0001`–`0013` dosyaları yeniden yazılmaz. `0015` yoktur. Household saat dilimi kolonu yoktur.
+V4.1 adımları `docs/v4.1-local-runbook.md` içindedir. V5 aynı sunucuyu kullanır ve şemaya `0012_pantry.sql` ekler. V5.1 `0013_pantry_auto_add.sql` ile `pantry_items.auto_add_to_grocery` kolonunu ekler (`BOOLEAN NOT NULL DEFAULT false`). `0014_shared_grocery_quantity.sql` ortak market satırına `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve boş kalabilen `line_source` ekler; tamsayı `quantity` durur. `0015_pantry_location.sql` `pantry_items_one_row_per_bucket` kısıtını kaldırır ve `UNIQUE (household_id, ingredient_id, unit_bucket, location)` koyar. Mevcut satır silinmez. `0001`–`0014` dosyaları yeniden yazılmaz. Household saat dilimi kolonu yoktur.
 
 ## Şema
 
@@ -12,10 +12,10 @@ npm test
 npm run typecheck
 ```
 
-`npm run migrate` `0001`–`0014` uygular. `0012` üç tablo kurar:
+`npm run migrate` `0001`–`0015` uygular. `0012` üç tablo kurar:
 
 - `ingredients`: merkezi sözlük. Seed satırları (`household_id` boş) `server/db/ingredients.v1.json` ile aynıdır. Ev halkının eklediği `custom:<uuid>` satırları o eve bağlıdır.
-- `pantry_items`: household pantry. `ingredient_id` sözlüğe bağlıdır; `date_type` (`bestBefore` | `useBy`) ve `date_value` ya ikisi birden vardır ya hiçbiri. `version` her yazımda artar. `0013` `auto_add_to_grocery` ekler; varsayılan kapalıdır.
+- `pantry_items`: household pantry. `ingredient_id` sözlüğe bağlıdır; `date_type` (`bestBefore` | `useBy`) ve `date_value` ya ikisi birden vardır ya hiçbiri. `version` her yazımda artar. `0013` `auto_add_to_grocery` ekler; varsayılan kapalıdır. `0015` tekilliği `household_id`, `ingredient_id`, `unit_bucket` ve `location` üzerindedir.
 - `pantry_idempotency`: aynı `Idempotency-Key` ile gelen isteğin ilk cevabı. Hesap silinince o hesabın satırları silinir.
 
 Kişisel pantry sunucuya hiç gitmez; yalnız telefondaki SwiftData’dadır.

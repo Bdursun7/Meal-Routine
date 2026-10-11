@@ -2,14 +2,30 @@ import { randomUUID } from 'node:crypto'
 import { AppError } from './errors.js'
 import { seedIngredients, type Ingredient } from './ingredients.js'
 import type { MemberRole } from './repository.js'
-import { pantryTimestamp, type PantryDraft, type PantryIdempotencyHit, type PantryItem, type PantryPatch, type PantryStore } from './pantryTypes.js'
+import { pantryTimestamp, type PantryDraft, type PantryIdempotencyHit, type PantryItem, type PantryPatch, type PantrySiblingPatch, type PantryStore } from './pantryTypes.js'
 import { parsePantryUnit } from './pantryUnits.js'
 
 type IdempotencyRow = PantryIdempotencyHit & { accountId: string; key: string; householdId: string | null }
 
-/** Mirrors the `unit_bucket` column in 0012: g/kg and ml/l share a row, other units do not. */
+/** Mirrors the generated `unit_bucket` column: g/kg and ml/l share a bucket, other units do not. */
 export function unitBucket(unit: string): string {
   return parsePantryUnit(unit).family ?? unit
+}
+
+function applySiblings(
+  items: Map<string, PantryItem>,
+  householdId: string,
+  siblings: PantrySiblingPatch[],
+  now: Date,
+  patcher: (current: PantryItem, patch: PantryPatch, now: Date) => PantryItem,
+): Map<string, PantryItem> {
+  const copied = new Map<string, PantryItem>()
+  for (const sibling of siblings) {
+    const row = items.get(sibling.id)
+    if (!row || row.householdId !== householdId) continue
+    copied.set(sibling.id, patcher(row, sibling.patch, now))
+  }
+  return copied
 }
 
 export function createMemoryPantry(
@@ -22,8 +38,8 @@ export function createMemoryPantry(
   const clone = (item: PantryItem): PantryItem => ({ ...item })
   const cloneIngredient = (row: Ingredient): Ingredient => ({ ...row, synonyms: [...row.synonyms], sourceIds: [...row.sourceIds] })
 
-  function duplicate(householdId: string, ingredientId: string, unit: string, except?: string): boolean {
-    return [...items.values()].some((item) => item.id !== except && item.householdId === householdId && item.ingredientId === ingredientId && unitBucket(item.unit) === unitBucket(unit))
+  function duplicate(householdId: string, ingredientId: string, unit: string, location: string, except?: string): boolean {
+    return [...items.values()].some((item) => item.id !== except && item.householdId === householdId && item.ingredientId === ingredientId && item.location === location && unitBucket(item.unit) === unitBucket(unit))
   }
 
   function requireIngredient(id: string): void {
@@ -32,7 +48,7 @@ export function createMemoryPantry(
 
   function build(householdId: string, draft: PantryDraft, now: Date): PantryItem {
     requireIngredient(draft.ingredientId)
-    if (duplicate(householdId, draft.ingredientId, draft.unit)) throw new AppError('pantry_duplicate', 409)
+    if (duplicate(householdId, draft.ingredientId, draft.unit, draft.location)) throw new AppError('pantry_duplicate', 409)
     return { ...draft, id: draft.id || randomUUID(), householdId, version: 1, createdAt: pantryTimestamp(now), updatedAt: pantryTimestamp(now) }
   }
 
@@ -42,7 +58,7 @@ export function createMemoryPantry(
     if (next.quantity < 0 || (next.minimumQuantity !== null && next.minimumQuantity < 0)) throw new AppError('invalid_request', 400)
     if ((next.dateType === null) !== (next.dateValue === null)) throw new AppError('invalid_date', 400)
     requireIngredient(next.ingredientId)
-    if (duplicate(current.householdId, next.ingredientId, next.unit, current.id)) throw new AppError('pantry_duplicate', 409)
+    if (duplicate(current.householdId, next.ingredientId, next.unit, next.location, current.id)) throw new AppError('pantry_duplicate', 409)
     return next
   }
 
@@ -59,13 +75,28 @@ export function createMemoryPantry(
       items.set(item.id, item)
       return clone(item)
     },
-    async updatePantryItem(householdId, itemId, patch, baseVersion, now) {
+    async updatePantryItem(householdId, itemId, patch, baseVersion, now, siblings = []) {
       const current = items.get(itemId)
       if (!current || current.householdId !== householdId) throw new AppError('not_found', 404)
       if (baseVersion !== undefined && baseVersion !== current.version) throw new AppError('conflict', 409, undefined, { current: clone(current) })
       const next = patched(current, patch, now)
+      const copied = applySiblings(items, householdId, siblings, now, patched)
       items.set(itemId, next)
+      for (const [id, item] of copied) items.set(id, item)
       return clone(next)
+    },
+    async mergePantryLocations(householdId, sourceId, sourceVersion, occupantId, occupantPatch, siblings, now) {
+      const source = items.get(sourceId)
+      if (!source || source.householdId !== householdId) throw new AppError('not_found', 404)
+      if (source.version !== sourceVersion) throw new AppError('conflict', 409, undefined, { current: clone(source) })
+      const occupant = items.get(occupantId)
+      if (!occupant || occupant.householdId !== householdId) throw new AppError('conflict', 409)
+      const next = patched(occupant, occupantPatch, now)
+      const copied = applySiblings(items, householdId, siblings, now, patched)
+      items.set(occupantId, next)
+      items.delete(sourceId)
+      for (const [id, item] of copied) if (id !== sourceId) items.set(id, item)
+      return clone(items.get(occupantId) ?? next)
     },
     async deletePantryItem(householdId, itemId, baseVersion) {
       const current = items.get(itemId)

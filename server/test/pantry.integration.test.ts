@@ -57,8 +57,39 @@ describe.skipIf(!databaseUrl)('postgres pantry', () => {
     expect(plan.statusCode).toBe(200)
     const before = await counts()
 
-    const applied = await migrate(pool)
+    const stagedDir = await mkdtemp(path.join(tmpdir(), 'mr-v51-'))
+    const pantryFiles = await listMigrationFiles(migrationsDirectory())
+    for (const file of pantryFiles.filter((name) => name >= '0012' && name < '0015')) {
+      await copyFile(path.join(migrationsDirectory(), file), path.join(stagedDir, file))
+    }
+    const applied = await migrate(pool, stagedDir)
     expect(applied).toEqual(['0012_pantry', '0013_pantry_auto_add', '0014_shared_grocery_quantity'])
+    await rm(stagedDir, { recursive: true, force: true })
+    const keptId = '12121212-1212-4121-8121-121212121212'
+    await pool.query(
+      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location, minimum_quantity, auto_add_to_grocery, date_type, date_value)
+       VALUES ($1, $2, 'tomato', 'Domates', 1.5, 'kg', 'refrigerator', 0.2, true, 'useBy', '2030-04-01')`,
+      [keptId, householdId],
+    )
+    const readKept = async () => (await pool.query(
+      `SELECT id::text, ingredient_id, display_name, quantity::text, unit, location, minimum_quantity::text, auto_add_to_grocery, date_type::text, to_char(date_value, 'YYYY-MM-DD') AS date_value, version
+       FROM pantry_items WHERE id = $1`,
+      [keptId],
+    )).rows[0]
+    const beforeRow = await readKept()
+    const located = await migrate(pool)
+    expect(located).toEqual(['0015_pantry_location'])
+    expect(await readKept()).toEqual(beforeRow)
+    await pool.query(
+      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location)
+       VALUES ($1, $2, 'tomato', 'Domates', 2, 'kg', 'pantry')`,
+      ['12121212-1212-4121-8121-121212121213', householdId],
+    )
+    await expect(pool.query(
+      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location)
+       VALUES ($1, $2, 'tomato', 'Domates', 1, 'g', 'refrigerator')`,
+      ['12121212-1212-4121-8121-121212121214', householdId],
+    )).rejects.toMatchObject({ code: '23505' })
     expect(await counts()).toEqual(before)
     const board = await app.inject({ method: 'GET', url: `/v1/households/${householdId}/board`, headers: ada.auth })
     expect(board.statusCode).toBe(200)
@@ -109,7 +140,7 @@ describe.skipIf(!databaseUrl)('postgres pantry', () => {
       ['99999999-9999-4999-8999-999999999991', householdId],
     )).rejects.toMatchObject({ code: '23503' })
     await expect(pool.query(
-      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location) VALUES ($1, $2, 'tomato', 'Domates', 1, 'kg', 'pantry')`,
+      `INSERT INTO pantry_items (id, household_id, ingredient_id, display_name, quantity, unit, location) VALUES ($1, $2, 'tomato', 'Domates', 1, 'kg', 'refrigerator')`,
       ['99999999-9999-4999-8999-999999999992', householdId],
     )).rejects.toMatchObject({ code: '23505' })
     await expect(pool.query(
@@ -135,6 +166,37 @@ describe.skipIf(!databaseUrl)('postgres pantry', () => {
       const left = await pool.query<{ count: string }>(`SELECT count(*) FROM ${table} WHERE household_id = $1`, [householdId])
       expect(Number(left.rows[0]!.count), table).toBe(0)
     }
+  })
+
+  it('stores two locations, merges a move, and covers the total', async () => {
+    const ada = await devSignIn(app, 'pg-pantry-places', 'Ada')
+    const householdId = (await app.inject({ method: 'POST', url: '/v1/households', headers: ada.auth, payload: { name: 'Yerler' } })).json().household.id as string
+    const post = (key: string, payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: `/v1/households/${householdId}/pantry/items`, headers: { ...ada.auth, 'idempotency-key': key }, payload })
+    const fridge = await post('pg-place-fridge', { ingredientId: 'tomato', displayName: 'Domates', quantity: 400, unit: 'g', location: 'refrigerator', minimumQuantity: 1000, autoAddToGrocery: true })
+    const pantry = await post('pg-place-pantry', { ingredientId: 'tomato', displayName: 'Domates', quantity: 300, unit: 'g', location: 'pantry', minimumQuantity: 100, autoAddToGrocery: false })
+    expect(pantry.statusCode).toBe(200)
+    expect(pantry.json().id).not.toBe(fridge.json().id)
+    expect(pantry.json()).toMatchObject({ quantity: 300, minimumQuantity: 1000, autoAddToGrocery: true, location: 'pantry' })
+    const rows = (await app.inject({ method: 'GET', url: `/v1/households/${householdId}/pantry`, headers: ada.auth })).json().items as { id: string; quantity: number; location: string; version: number }[]
+    expect(rows).toHaveLength(2)
+    expect(rows.reduce((sum, row) => sum + row.quantity, 0)).toBe(700)
+    const fridgeRow = rows.find((row) => row.id === fridge.json().id)
+    const moved = await app.inject({
+      method: 'PATCH', url: `/v1/households/${householdId}/pantry/items/${fridge.json().id}?baseVersion=${fridgeRow?.version}`,
+      headers: { ...ada.auth, 'idempotency-key': 'pg-place-move' },
+      payload: { location: 'pantry', quantity: 400, unit: 'g', minimumQuantity: 1000, autoAddToGrocery: true },
+    })
+    expect(moved.statusCode).toBe(200)
+    expect(moved.json()).toMatchObject({ id: pantry.json().id, quantity: 700, location: 'pantry' })
+    const left = (await app.inject({ method: 'GET', url: `/v1/households/${householdId}/pantry`, headers: ada.auth })).json().items as { quantity: number }[]
+    expect(left).toHaveLength(1)
+    const missing = await app.inject({
+      method: 'POST', url: `/v1/households/${householdId}/pantry/reconcile-grocery`,
+      headers: { ...ada.auth, 'idempotency-key': 'pg-place-missing' },
+      payload: { operation: 'compute-missing', lines: [{ ingredientId: 'tomato', quantity: 1000, unit: 'g' }] },
+    })
+    expect(missing.json().lines[0]).toMatchObject({ quantity: 300, applied: true })
   })
 
   async function counts(): Promise<Record<string, number>> {

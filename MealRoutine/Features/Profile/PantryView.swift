@@ -3,6 +3,20 @@ import SwiftUI
 
 /// What the pantry sheet hands back. `ingredientId` is a dictionary id or a `custom:<uuid>`,
 /// never text folded from the name.
+private func pantryGroupRow(_ item: PantryItem) -> PantryGroupRow {
+    PantryGroupRow(
+        id: item.uuid.uuidString.lowercased(),
+        ingredientId: item.ingredientID,
+        quantity: item.quantity,
+        unit: item.unit,
+        location: item.location,
+        minimumQuantity: item.minimumQuantity,
+        autoAddToGrocery: item.autoAddToGrocery,
+        dateType: item.dateType,
+        dateValue: item.dateValue
+    )
+}
+
 struct PantryFormResult: Equatable, Identifiable {
     var ingredientId: String
     var name: String
@@ -47,7 +61,7 @@ struct PantryView: View {
         let allowed = Set(PantryLocationTabs.visible(listed, tab: locationTab, search: search).map(\.id))
         return scoped.filter { allowed.contains($0.uuid.uuidString) }
             .sorted {
-                if $0.isLowStock != $1.isLowStock { return $0.isLowStock }
+                if showsLow($0) != showsLow($1) { return showsLow($0) }
                 return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
             }
     }
@@ -329,18 +343,30 @@ struct PantryView: View {
     }
 
     private func presentation(_ item: PantryItem) -> PantryRowPresentation {
-        PantryRowPresentation.make(
+        let rows = groupRows(matching: item.ingredientID, unit: item.unit)
+        return PantryRowPresentation.make(
             name: item.displayName,
             ingredientResolved: item.ingredientResolved,
             quantity: item.quantity,
             unit: item.unit,
             location: item.location,
-            minimumQuantity: item.minimumQuantity,
+            minimumQuantity: PantryGroupStock.effectiveMinimum(rows, unit: item.unit) ?? item.minimumQuantity,
             dateType: item.dateType,
             dateValue: item.dateValue,
             sync: marks[item.uuid.uuidString.lowercased()] ?? .synced,
-            today: PantryDay.string(from: Date(), calendar: .current)
+            today: PantryDay.string(from: Date(), calendar: .current),
+            lowStockQuantity: PantryGroupStock.total(rows, unit: item.unit)
         )
+    }
+
+    private func showsLow(_ item: PantryItem) -> Bool {
+        item.quantity > 0 && presentation(item).badges.contains { $0.text == PantryCopy.lowStock }
+    }
+
+    private func groupRows(matching ingredientId: String, unit: String) -> [PantryGroupRow] {
+        scoped.filter {
+            PantryGroupStock.sameIngredient($0.ingredientID, ingredientId) && PantryUnitPolicy.compatible($0.unit, unit)
+        }.map(pantryGroupRow)
     }
 
     private func row(_ item: PantryItem) -> some View {
@@ -369,6 +395,8 @@ struct PantryView: View {
     private func flush() {
         Task { @MainActor in
             if await PantryOutbox.flush(in: modelContext) { errorMessage = PantryCopy.conflict }
+            guard let householdID, syncsHousehold else { return }
+            try? await PantryCache.refresh(householdID: householdID, in: modelContext)
         }
     }
 
@@ -384,7 +412,9 @@ struct PantryView: View {
             addMarket(name: item.displayName, ingredientId: item.ingredientID, quantity: recorded > 0 ? recorded : 1, unit: item.unit)
         case .missingAgainstMinimum:
             commitQuantity(item, PantryFinishedFlow.quantity(current: recorded, choice: choice))
-            guard let missing = PantryFinishedMath.shortage(quantity: 0, minimum: item.minimumQuantity) else {
+            let rows = groupRows(matching: item.ingredientID, unit: item.unit)
+            let remaining = PantryGroupStock.total(rows, unit: item.unit)
+            guard let missing = PantryFinishedMath.shortage(quantity: remaining, minimum: PantryGroupStock.effectiveMinimum(rows, unit: item.unit)) else {
                 errorMessage = PantryCopy.noMinimum
                 return
             }
@@ -420,11 +450,12 @@ struct PantryView: View {
 
     private func add(_ result: PantryFormResult, confirmSeparate: Bool) {
         guard result.quantity.isFinite, result.quantity >= 0 else { return }
-        let dictionary = IngredientDictionary.shared
-        let peers = scoped.filter { dictionary.canonicalId($0.ingredientID) == result.ingredientId }
-        let match = peers.first { PantryUnitPolicy.compatible($0.unit, result.unit) }
+        let peers = scoped.filter { PantryGroupStock.sameIngredient($0.ingredientID, result.ingredientId) }
+        let match = peers.first { $0.location == result.location && PantryUnitPolicy.compatible($0.unit, result.unit) }
+        let incompatible = peers.first { !PantryUnitPolicy.compatible($0.unit, result.unit) }
+        let blockingUnit: String? = confirmSeparate ? nil : incompatible?.unit
         switch PantryUnitPolicy.decision(
-            existingUnit: match?.unit ?? peers.first?.unit,
+            existingUnit: match?.unit ?? blockingUnit,
             existingQuantity: match?.quantity ?? 0,
             incomingUnit: result.unit,
             incomingQuantity: result.quantity,
@@ -440,34 +471,35 @@ struct PantryView: View {
             let previous = match.quantity
             match.quantity = total
             match.unit = storedUnit
-            match.location = result.location
-            match.autoAddToGrocery = result.autoAddToGrocery
-            if let minimum = result.minimum {
-                match.minimumQuantity = PantryUnitPolicy.converted(minimum, from: result.unit, to: storedUnit) ?? minimum
-            }
-            // Merged stock keeps the earlier date so a warning is never hidden by the newer pack.
-            if case .set(let type, let value) = result.dateEdit {
-                if let current = match.dateValue {
-                    if PantryDay.isBefore(value, current) { match.setDate(type, value) }
-                } else {
-                    match.setDate(type, value)
-                }
-            }
+            let incomingMinimum = result.minimum.flatMap { PantryUnitPolicy.converted($0, from: result.unit, to: storedUnit) }
+            let rows = groupRows(matching: result.ingredientId, unit: storedUnit)
+            let minimum = PantryGroupStock.raisedMinimum(current: PantryGroupStock.effectiveMinimum(rows, unit: storedUnit), incoming: incomingMinimum)
+            let autoAdd = PantryGroupStock.effectiveAutoAdd(rows) || result.autoAddToGrocery
+            match.minimumQuantity = minimum
+            match.autoAddToGrocery = autoAdd
+            let merged = PantryDateMerge.keeping(storedDate(match), incoming: incomingDate(result.dateEdit))
+            if let merged { match.setDate(merged.type, merged.day) }
             match.revision += 1
             match.updatedAt = .now
             try? modelContext.save()
             write(.update, match, baseVersion: base)
+            PantrySiblingSync.mirror(anchor: match, minimum: minimum, autoAdd: autoAdd, unit: storedUnit, mode: .replace, in: modelContext)
             PantryStockSideEffects.afterQuantityChange(item: match, previousQuantity: previous, in: modelContext)
         case .separate:
+            let storedUnit = UnitNormalization.parse(result.unit).code
+            let existing = groupRows(matching: result.ingredientId, unit: storedUnit)
+            let incomingMinimum = result.minimum.flatMap { PantryUnitPolicy.converted($0, from: result.unit, to: storedUnit) }
+            let minimum = PantryGroupStock.raisedMinimum(current: PantryGroupStock.effectiveMinimum(existing, unit: storedUnit), incoming: incomingMinimum)
+            let autoAdd = PantryGroupStock.effectiveAutoAdd(existing) || result.autoAddToGrocery
             let item = PantryItem(
                 householdID: householdID,
                 ingredientID: result.ingredientId,
                 displayName: result.name,
                 quantity: result.quantity,
-                unit: UnitNormalization.parse(result.unit).code,
+                unit: storedUnit,
                 location: result.location,
-                minimumQuantity: result.minimum,
-                autoAddToGrocery: result.autoAddToGrocery,
+                minimumQuantity: minimum,
+                autoAddToGrocery: autoAdd,
                 dateType: result.dateEdit.storedType,
                 dateValue: result.dateEdit.storedDay
             )
@@ -476,8 +508,19 @@ struct PantryView: View {
             if result.isNewCustom {
                 PantryIngredientStore.remember(IngredientEntry(id: result.ingredientId, name: result.name), householdID: householdID)
             }
-            write(.create, item, baseVersion: nil, confirmSeparate: confirmSeparate || !peers.isEmpty)
+            write(.create, item, baseVersion: nil, confirmSeparate: confirmSeparate || incompatible != nil)
+            PantrySiblingSync.mirror(anchor: item, minimum: minimum, autoAdd: autoAdd, unit: storedUnit, mode: .replace, in: modelContext)
         }
+    }
+
+    private func storedDate(_ item: PantryItem) -> (type: PantryDateType, day: String)? {
+        guard let type = item.dateType, let day = item.dateValue else { return nil }
+        return (type, day)
+    }
+
+    private func incomingDate(_ edit: PantryDateEdit) -> (type: PantryDateType, day: String)? {
+        if case .set(let type, let day) = edit { return (type, day) }
+        return nil
     }
 
     private func edit(_ item: PantryItem, with result: PantryFormResult) {
@@ -486,14 +529,13 @@ struct PantryView: View {
             errorMessage = PantryCopy.unknownUnit
             return
         }
-        let dictionary = IngredientDictionary.shared
-        let duplicate = scoped.contains { other in
+        if let occupant = scoped.first(where: { other in
             other.uuid != item.uuid
-                && dictionary.canonicalId(other.ingredientID) == result.ingredientId
+                && PantryGroupStock.sameIngredient(other.ingredientID, result.ingredientId)
                 && PantryUnitPolicy.compatible(other.unit, result.unit)
-        }
-        if duplicate {
-            errorMessage = PantryCopy.duplicateRow
+                && other.location == result.location
+        }) {
+            relocate(item, onto: occupant, result: result)
             return
         }
         let wasOnServer = item.ingredientResolved
@@ -528,7 +570,93 @@ struct PantryView: View {
             try? modelContext.save()
             write(.create, item, baseVersion: nil, confirmSeparate: true)
         }
+        PantrySiblingSync.mirror(anchor: item, minimum: item.minimumQuantity, autoAdd: item.autoAddToGrocery, unit: item.unit, mode: .replace, in: modelContext)
         PantryStockSideEffects.afterQuantityChange(item: item, previousQuantity: previous, in: modelContext)
+    }
+
+    /// One update of the source, still carrying only its own quantity. The server adds that
+    /// quantity onto the row already in the destination and deletes the source.
+    private func relocate(_ source: PantryItem, onto occupant: PantryItem, result: PantryFormResult) {
+        let storedUnit = UnitNormalization.parse(result.unit).code
+        let sourceQuantity = PantryUnitPolicy.editedQuantity(
+            previousQuantity: source.quantity,
+            previousUnit: source.unit,
+            typedQuantity: result.quantity,
+            newUnit: storedUnit
+        )
+        let previousGroup = PantryGroupStock.total(groupRows(matching: result.ingredientId, unit: storedUnit), unit: occupant.unit)
+        let wasOnServer = source.ingredientResolved
+        let base = source.revision
+        source.quantity = sourceQuantity
+        source.unit = storedUnit
+        source.location = result.location
+        source.autoAddToGrocery = result.autoAddToGrocery
+        source.minimumQuantity = result.minimum.flatMap { PantryUnitPolicy.converted($0, from: result.unit, to: storedUnit) }
+        source.ingredientID = result.ingredientId
+        source.displayName = result.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch result.dateEdit {
+        case .set(let type, let day):
+            source.setDate(type, day)
+        case .clear:
+            source.setDate(nil, nil)
+        case .leave:
+            break
+        }
+        source.revision += 1
+        source.updatedAt = .now
+        try? modelContext.save()
+        if result.isNewCustom {
+            PantryIngredientStore.remember(IngredientEntry(id: result.ingredientId, name: result.name), householdID: householdID)
+        }
+        if wasOnServer {
+            write(.update, source, baseVersion: base)
+        }
+        let added = PantryUnitPolicy.converted(sourceQuantity, from: storedUnit, to: occupant.unit) ?? sourceQuantity
+        let occupantPrevious = occupant.quantity
+        occupant.quantity = PantryUnitPolicy.snap(occupant.quantity + added)
+        let merged = PantryDateMerge.keeping(storedDate(occupant), incoming: storedDate(source))
+        if let merged {
+            occupant.setDate(merged.type, merged.day)
+        } else {
+            occupant.setDate(nil, nil)
+        }
+        occupant.minimumQuantity = source.minimumQuantity.flatMap { PantryUnitPolicy.converted($0, from: storedUnit, to: occupant.unit) }
+        occupant.autoAddToGrocery = result.autoAddToGrocery
+        occupant.displayName = source.displayName
+        if occupant.householdID == nil {
+            occupant.revision += 1
+            occupant.updatedAt = .now
+        } else if !wasOnServer, occupant.ingredientResolved {
+            // The source id was never on the server, so the added quantity is an edit of the row that stays.
+            let occupantBase = occupant.revision
+            occupant.revision += 1
+            occupant.updatedAt = .now
+            try? modelContext.save()
+            write(.update, occupant, baseVersion: occupantBase)
+        }
+        PantrySiblingSync.mirror(
+            anchor: occupant,
+            minimum: occupant.minimumQuantity,
+            autoAdd: occupant.autoAddToGrocery,
+            unit: occupant.unit,
+            mode: .replace,
+            in: modelContext
+        )
+        let removedId = source.uuid
+        modelContext.delete(source)
+        try? modelContext.save()
+        PantryStockSideEffects.deleted(removedId)
+        let nextGroup = PantryGroupStock.total(
+            groupRows(matching: occupant.ingredientID, unit: occupant.unit).filter { $0.id != removedId.uuidString.lowercased() },
+            unit: occupant.unit
+        )
+        PantryStockSideEffects.afterQuantityChange(
+            item: occupant,
+            previousQuantity: occupantPrevious,
+            previousGroupQuantity: previousGroup,
+            nextGroupQuantity: nextGroup,
+            in: modelContext
+        )
     }
 
     private func change(_ item: PantryItem, by amount: Double) {
@@ -906,6 +1034,7 @@ private struct PantryForm: View {
                     ForEach(suggestions) { entry in
                         Button {
                             draft.choose(entry, isNewCustom: false)
+                            prefillFromSiblings()
                         } label: {
                             PantryIngredientSuggestionLabel(entry: entry)
                         }
@@ -924,6 +1053,7 @@ private struct PantryForm: View {
                             Text(UnitLabels.turkish(code)).tag(code)
                         }
                     }
+                    .onChange(of: draft.unit) { _, _ in prefillFromSiblings() }
                     if let legacy = draft.legacyUnit, draft.unit.isEmpty {
                         Text("Kayıtlı birim “\(legacy)” tanınmıyor. Listeden bilinen bir birim seç.")
                             .font(.footnote)
@@ -941,7 +1071,7 @@ private struct PantryForm: View {
                         Toggle(PantryCopy.autoAddToggle, isOn: $draft.autoAddToGrocery)
                     }
                 } footer: {
-                    Text(draft.hasMinimum ? PantryCopy.autoAddFooter : "Minimum, miktarla aynı birimdedir. Altına inince satırda “Azaldı” görünür.")
+                    Text(draft.hasMinimum ? PantryCopy.autoAddFooter : PantryCopy.minimumFooter)
                 }
                 Section {
                     Toggle("Tarih ekle", isOn: $draft.hasDate)
@@ -969,6 +1099,16 @@ private struct PantryForm: View {
                 }
             }
         }
+    }
+
+    private func prefillFromSiblings() {
+        guard item == nil, let ingredientId = draft.ingredientId, PantryUnitPolicy.isKnown(draft.unit), !draft.hasMinimum else { return }
+        let rows = items.filter { $0.householdID == householdID }.map(pantryGroupRow)
+        let filled = PantryGroupStock.prefill(rows, ingredientId: ingredientId, unit: draft.unit)
+        guard let minimum = filled.minimum else { return }
+        draft.hasMinimum = true
+        draft.minimumText = QuantityFormat.string(minimum)
+        draft.autoAddToGrocery = filled.autoAdd
     }
 
     private func save() {

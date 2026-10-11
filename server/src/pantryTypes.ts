@@ -95,11 +95,22 @@ export interface PantryBatch {
   updates: { id: string; baseVersion: number; patch: PantryPatch }[]
 }
 
+/** Settings copied onto another row of the same ingredient and unit bucket. */
+export interface PantrySiblingPatch {
+  id: string
+  patch: PantryPatch
+}
+
 export interface PantryStore {
   listPantry(householdId: string): Promise<PantryItem[]>
   getPantryItem(householdId: string, itemId: string): Promise<PantryItem | null>
   insertPantryItem(householdId: string, draft: PantryDraft, now: Date): Promise<PantryItem>
-  updatePantryItem(householdId: string, itemId: string, patch: PantryPatch, baseVersion: number | undefined, now: Date): Promise<PantryItem>
+  updatePantryItem(householdId: string, itemId: string, patch: PantryPatch, baseVersion: number | undefined, now: Date, siblings?: PantrySiblingPatch[]): Promise<PantryItem>
+  /**
+   * Adds the source onto the row that already occupies the destination place,
+   * then deletes the source. One transaction. The source version must match.
+   */
+  mergePantryLocations(householdId: string, sourceId: string, sourceVersion: number, occupantId: string, occupantPatch: PantryPatch, siblings: PantrySiblingPatch[], now: Date): Promise<PantryItem>
   deletePantryItem(householdId: string, itemId: string, baseVersion: number | undefined): Promise<void>
   readPantryIdempotency(accountId: string, key: string): Promise<PantryIdempotencyHit | null>
   writePantryIdempotency(row: PantryIdempotencyHit & { accountId: string; key: string; householdId: string | null }): Promise<void>

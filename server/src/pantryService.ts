@@ -14,10 +14,12 @@ import type {
   PantryDateType,
   PantryDraft,
   PantryItem,
+  PantryLocation,
   PantryPatch,
   PantryReconcileLine,
   PantryReconcileOperation,
   PantryReconcileResultLine,
+  PantrySiblingPatch,
   PantryStore,
 } from './pantryTypes.js'
 
@@ -118,44 +120,97 @@ export function createPantryService(store: PantryStore, households: HouseholdSto
         }
         return withFreshState(async () => {
           const rows = await store.listPantry(householdId)
-          const compatible = rows.find((item) => item.ingredientId === normalized.ingredientId && unitsCompatible(item.unit, normalized.unit))
-          if (compatible) {
-            const added = convertPantryQuantity(normalized.quantity, normalized.unit, compatible.unit)
+          const samePlace = rows.find((item) => item.ingredientId === normalized.ingredientId && item.location === normalized.location && unitsCompatible(item.unit, normalized.unit))
+          if (samePlace) {
+            const added = convertPantryQuantity(normalized.quantity, normalized.unit, samePlace.unit)
             if (added === null) throw new AppError('invalid_unit', 400)
-            const hasDate = normalized.dateType !== null
-            return store.updatePantryItem(householdId, compatible.id, {
-              quantity: roundPantryQuantity(compatible.quantity + added),
+            // A merge is still a create: the group minimum can only rise, and auto-add stays on if any sibling has it.
+            const settings = effectiveCreateSettings(
+              rows.filter((item) => item.ingredientId === normalized.ingredientId && unitsCompatible(item.unit, normalized.unit)),
+              normalized,
+            )
+            const minimumQuantity = settings.minimumQuantity === null ? null : convertPantryQuantity(settings.minimumQuantity, normalized.unit, samePlace.unit)
+            if (settings.minimumQuantity !== null && minimumQuantity === null) throw new AppError('invalid_unit', 400)
+            const date = mergedDate(samePlace.dateType, samePlace.dateValue, normalized.dateType, normalized.dateValue)
+            return store.updatePantryItem(householdId, samePlace.id, {
+              quantity: roundPantryQuantity(samePlace.quantity + added),
               displayName: normalized.displayName,
-              location: normalized.location,
-              minimumQuantity: mergeMinimum(compatible, normalized),
-              autoAddToGrocery: compatible.autoAddToGrocery || normalized.autoAddToGrocery,
-              dateType: hasDate ? normalized.dateType : compatible.dateType,
-              dateValue: hasDate ? normalized.dateValue : compatible.dateValue,
-            }, compatible.version, now)
+              minimumQuantity,
+              autoAddToGrocery: settings.autoAddToGrocery,
+              dateType: date.dateType,
+              dateValue: date.dateValue,
+            }, samePlace.version, now, siblingPatches(rows, samePlace.ingredientId, samePlace.unit, { minimumQuantity, autoAddToGrocery: settings.autoAddToGrocery }, new Set([samePlace.id])))
           }
-          const blocked = rows.find((item) => item.ingredientId === normalized.ingredientId)
+          const blocked = rows.find((item) => item.ingredientId === normalized.ingredientId && !unitsCompatible(item.unit, normalized.unit))
           if (blocked && !confirmSeparate) {
             throw new AppError('pantry_unit_choice', 409, undefined, { existingUnit: blocked.unit, incomingUnit: normalized.unit, current: blocked })
           }
-          return store.insertPantryItem(householdId, { ...normalized, id: normalized.id ?? randomUUID() }, now)
+          const siblings = rows.filter((item) => item.ingredientId === normalized.ingredientId && unitsCompatible(item.unit, normalized.unit))
+          const settings = effectiveCreateSettings(siblings, normalized)
+          const id = normalized.id ?? randomUUID()
+          const draft = { ...normalized, id, minimumQuantity: settings.minimumQuantity, autoAddToGrocery: settings.autoAddToGrocery }
+          const copies = siblingPatches(siblings, draft.ingredientId, draft.unit, settings, new Set())
+          if (copies.length === 0) return store.insertPantryItem(householdId, draft, now)
+          await store.applyPantryBatch(householdId, {
+            inserts: [draft],
+            updates: copies.map((copy) => {
+              const current = siblings.find((item) => item.id === copy.id)
+              return { id: copy.id, baseVersion: current?.version ?? 0, patch: copy.patch }
+            }),
+          }, now)
+          const saved = await store.getPantryItem(householdId, id)
+          if (!saved) throw new AppError('conflict', 409)
+          return saved
         })
       }) as Promise<PantryItem>
     },
     async update(accountId, householdId, itemId, patch, baseVersion, key, now, options) {
       await authorize(households, householdId, accountId)
-      const current = await store.getPantryItem(householdId, itemId)
-      if (!current) throw new AppError('not_found', 404)
       const resolve = await resolver(householdId)
       const confirmSeparate = options?.confirmSeparate === true
-      const normalized = normalizePatch(current, patch, resolve)
-      return idempotent(store, accountId, householdId, key, { itemId, patch: normalized, baseVersion, confirmSeparate }, now, async () => {
-        const latest = await store.getPantryItem(householdId, itemId)
-        if (!latest) throw new AppError('not_found', 404)
-        if (baseVersion !== undefined && baseVersion !== latest.version) throw new AppError('conflict', 409, undefined, { current: latest })
-        if (normalized.unit && !unitsCompatible(latest.unit, normalized.unit) && !confirmSeparate) {
-          throw new AppError('pantry_unit_choice', 409, undefined, { existingUnit: latest.unit, incomingUnit: normalized.unit, current: latest })
-        }
-        return store.updatePantryItem(householdId, itemId, normalized, baseVersion, now)
+      // Hash the client patch. A location merge deletes the source, and the replay
+      // must still return the stored survivor before that missing row is a 404.
+      return idempotent(store, accountId, householdId, key, { itemId, patch, baseVersion, confirmSeparate }, now, async () => {
+        return withFreshState(async () => {
+          const latest = await store.getPantryItem(householdId, itemId)
+          if (!latest) throw new AppError('not_found', 404)
+          const normalized = normalizePatch(latest, patch, resolve)
+          if (baseVersion !== undefined && baseVersion !== latest.version) throw new AppError('conflict', 409, undefined, { current: latest })
+          if (normalized.unit && !unitsCompatible(latest.unit, normalized.unit) && !confirmSeparate) {
+            throw new AppError('pantry_unit_choice', 409, undefined, { existingUnit: latest.unit, incomingUnit: normalized.unit, current: latest })
+          }
+          const nextUnit = normalized.unit ?? latest.unit
+          const nextLocation = normalized.location ?? latest.location
+          const nextIngredient = normalized.ingredientId ?? latest.ingredientId
+          const rows = await store.listPantry(householdId)
+          const occupant = rows.find((item) => item.id !== latest.id && item.ingredientId === nextIngredient && item.location === nextLocation && unitsCompatible(item.unit, nextUnit))
+          if (occupant) {
+            const sourceQuantity = normalized.quantity ?? convertPantryQuantity(latest.quantity, latest.unit, nextUnit)
+            const added = sourceQuantity === null ? null : convertPantryQuantity(sourceQuantity, nextUnit, occupant.unit)
+            if (added === null) throw new AppError('invalid_unit', 400)
+            const incomingType = normalized.dateType !== undefined ? normalized.dateType : latest.dateType
+            const incomingValue = normalized.dateValue !== undefined ? normalized.dateValue : latest.dateValue
+            const date = mergedDate(occupant.dateType, occupant.dateValue, incomingType, incomingValue)
+            const minimumQuantity = normalized.minimumQuantity !== undefined
+              ? (normalized.minimumQuantity === null ? null : convertPantryQuantity(normalized.minimumQuantity, nextUnit, occupant.unit))
+              : occupant.minimumQuantity
+            const autoAddToGrocery = normalized.autoAddToGrocery !== undefined ? normalized.autoAddToGrocery : occupant.autoAddToGrocery
+            return store.mergePantryLocations(householdId, latest.id, latest.version, occupant.id, {
+              quantity: roundPantryQuantity(occupant.quantity + added),
+              displayName: normalized.displayName ?? latest.displayName,
+              minimumQuantity,
+              autoAddToGrocery,
+              dateType: date.dateType,
+              dateValue: date.dateValue,
+            }, siblingPatches(rows, occupant.ingredientId, occupant.unit, { minimumQuantity, autoAddToGrocery }, new Set([latest.id, occupant.id])), now)
+          }
+          const settingPatch: { minimumQuantity?: number | null; autoAddToGrocery?: boolean } = {}
+          if (minimumChanged(latest, normalized, nextUnit)) settingPatch.minimumQuantity = normalized.minimumQuantity
+          if (normalized.autoAddToGrocery !== undefined && normalized.autoAddToGrocery !== latest.autoAddToGrocery) {
+            settingPatch.autoAddToGrocery = normalized.autoAddToGrocery
+          }
+          return store.updatePantryItem(householdId, itemId, normalized, latest.version, now, siblingPatches(rows, nextIngredient, nextUnit, settingPatch, new Set([latest.id])))
+        })
       }) as Promise<PantryItem>
     },
     async remove(accountId, householdId, itemId, baseVersion, key, now) {
@@ -215,7 +270,9 @@ async function withFreshState<T>(work: () => Promise<T>): Promise<T> {
     try {
       return await work()
     } catch (error) {
-      if (attempt >= STALE_RETRIES || !(error instanceof AppError) || error.code !== 'conflict') throw error
+      // `pantry_duplicate` is the unique-key race after 0015. The next read merges into the row that won.
+      const retryable = error instanceof AppError && (error.code === 'conflict' || error.code === 'pantry_duplicate')
+      if (attempt >= STALE_RETRIES || !retryable) throw error
     }
   }
 }
@@ -245,8 +302,8 @@ function applyLine(
   if (!ingredient) return base
   if (!unit) return { ...base, incompatible: true }
   const sameIngredient = working.filter((item) => item.ingredientId === ingredient.id)
-  const compatible = sameIngredient.find((item) => unitsCompatible(item.unit, unit))
-  if (!compatible) {
+  const compatible = sameIngredient.filter((item) => unitsCompatible(item.unit, unit)).sort(byPlace)
+  if (compatible.length === 0) {
     if (operation === 'restock' && (sameIngredient.length === 0 || confirmSeparate)) {
       working.push({
         id: randomUUID(),
@@ -268,21 +325,57 @@ function applyLine(
     }
     return { ...base, incompatible: sameIngredient.length > 0 }
   }
-  const converted = convertPantryQuantity(line.quantity, unit, compatible.unit)
-  if (converted === null) return { ...base, incompatible: true }
   if (operation === 'compute-missing') {
-    const available = convertPantryQuantity(compatible.quantity, compatible.unit, unit) ?? 0
+    const available = stockInUnit(compatible, unit)
     const remaining = roundPantryQuantity(Math.max(0, line.quantity - available))
-    const consumed = convertPantryQuantity(line.quantity - remaining, unit, compatible.unit) ?? 0
-    compatible.quantity = roundPantryQuantity(Math.max(0, compatible.quantity - consumed))
+    deduct(compatible, roundPantryQuantity(line.quantity - remaining), unit)
     return { ...base, quantity: remaining, applied: true }
   }
   if (operation === 'consume') {
-    compatible.quantity = roundPantryQuantity(Math.max(0, compatible.quantity - converted))
+    deduct(compatible, line.quantity, unit)
     return { ...base, applied: true }
   }
-  compatible.quantity = roundPantryQuantity(compatible.quantity + converted)
+  const target = (line.location ? compatible.find((item) => item.location === line.location) : undefined) ?? compatible[0]
+  if (!target) return { ...base, incompatible: true }
+  const converted = convertPantryQuantity(line.quantity, unit, target.unit)
+  if (converted === null) return { ...base, incompatible: true }
+  target.quantity = roundPantryQuantity(target.quantity + converted)
   return { ...base, applied: true }
+}
+
+/** Earliest calendar day, undated last, then kiler / buzdolabı / dondurucu / diğer, then id. */
+function byPlace(a: PantryItem, b: PantryItem): number {
+  const aDay = a.dateValue ?? '9999-99-99'
+  const bDay = b.dateValue ?? '9999-99-99'
+  if (aDay !== bDay) return aDay < bDay ? -1 : 1
+  const rank = placeRank(a.location) - placeRank(b.location)
+  if (rank !== 0) return rank
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
+function placeRank(location: PantryLocation): number {
+  switch (location) {
+    case 'pantry': return 0
+    case 'refrigerator': return 1
+    case 'freezer': return 2
+    default: return 3
+  }
+}
+
+function stockInUnit(rows: PantryItem[], unit: string): number {
+  return roundPantryQuantity(rows.reduce((sum, row) => sum + (convertPantryQuantity(row.quantity, row.unit, unit) ?? 0), 0))
+}
+
+function deduct(rows: PantryItem[], amount: number, unit: string): void {
+  let left = roundPantryQuantity(Math.max(0, amount))
+  for (const row of rows) {
+    if (left <= 0) break
+    const have = convertPantryQuantity(row.quantity, row.unit, unit) ?? 0
+    const take = Math.min(have, left)
+    const taken = convertPantryQuantity(take, unit, row.unit) ?? 0
+    row.quantity = roundPantryQuantity(Math.max(0, row.quantity - taken))
+    left = roundPantryQuantity(Math.max(0, left - take))
+  }
 }
 
 async function persistWorking(store: PantryStore, householdId: string, original: PantryItem[], working: PantryItem[], now: Date): Promise<void> {
@@ -382,9 +475,79 @@ function normalizePatch(current: PantryItem, patch: PantryPatch, resolve: Resolv
   return next
 }
 
-function mergeMinimum(existing: PantryItem, incoming: PantryCreateInput): number | null {
-  if (incoming.minimumQuantity === null) return existing.minimumQuantity
-  return convertPantryQuantity(incoming.minimumQuantity, incoming.unit, existing.unit)
+/**
+ * Date rule when two rows become one. The target is the row that already
+ * occupies the destination (on create, the same-place row).
+ * Both undated stays undated. One dated side keeps that pair.
+ * The same date type keeps the earlier `YYYY-MM-DD`.
+ * `bestBefore` and `useBy` are not converted: the target's type and day stay,
+ * and the other type is dropped. Quantity still merges.
+ */
+function mergedDate(
+  keptType: PantryDateType | null,
+  keptValue: string | null,
+  incomingType: PantryDateType | null,
+  incomingValue: string | null,
+): { dateType: PantryDateType | null; dateValue: string | null } {
+  if (!keptType || !keptValue) {
+    if (incomingType && incomingValue) return { dateType: incomingType, dateValue: incomingValue }
+    return { dateType: null, dateValue: null }
+  }
+  if (!incomingType || !incomingValue) return { dateType: keptType, dateValue: keptValue }
+  if (keptType !== incomingType) return { dateType: keptType, dateValue: keptValue }
+  if (incomingValue < keptValue) return { dateType: incomingType, dateValue: incomingValue }
+  return { dateType: keptType, dateValue: keptValue }
+}
+
+/** Create never lowers the group minimum and never turns auto-add off. */
+function effectiveCreateSettings(siblings: PantryItem[], incoming: PantryCreateInput): { minimumQuantity: number | null; autoAddToGrocery: boolean } {
+  let minimum = incoming.minimumQuantity
+  let autoAddToGrocery = incoming.autoAddToGrocery
+  for (const row of siblings) {
+    autoAddToGrocery = autoAddToGrocery || row.autoAddToGrocery
+    if (row.minimumQuantity === null) continue
+    const converted = convertPantryQuantity(row.minimumQuantity, row.unit, incoming.unit)
+    if (converted === null) continue
+    minimum = minimum === null ? converted : roundPantryQuantity(Math.max(minimum, converted))
+  }
+  return { minimumQuantity: minimum === null ? null : roundPantryQuantity(minimum), autoAddToGrocery }
+}
+
+function sameQuantity(left: number | null | undefined, right: number | null | undefined): boolean {
+  if (left == null && right == null) return true
+  if (left == null || right == null) return false
+  return roundPantryQuantity(left) === roundPantryQuantity(right)
+}
+
+function minimumChanged(latest: PantryItem, patch: PantryPatch, nextUnit: string): boolean {
+  if (patch.minimumQuantity === undefined) return false
+  const previous = latest.minimumQuantity === null ? null : convertPantryQuantity(latest.minimumQuantity, latest.unit, nextUnit)
+  return !sameQuantity(previous, patch.minimumQuantity)
+}
+
+function siblingPatches(
+  rows: PantryItem[],
+  ingredientId: string,
+  unit: string,
+  settings: { minimumQuantity?: number | null; autoAddToGrocery?: boolean },
+  except: Set<string>,
+): PantrySiblingPatch[] {
+  const patches: PantrySiblingPatch[] = []
+  for (const row of rows) {
+    if (except.has(row.id)) continue
+    if (row.ingredientId !== ingredientId || !unitsCompatible(row.unit, unit)) continue
+    const patch: PantryPatch = {}
+    if (settings.minimumQuantity !== undefined) {
+      const minimumQuantity = settings.minimumQuantity === null ? null : convertPantryQuantity(settings.minimumQuantity, unit, row.unit)
+      if (settings.minimumQuantity !== null && minimumQuantity === null) continue
+      if (!sameQuantity(row.minimumQuantity, minimumQuantity)) patch.minimumQuantity = minimumQuantity
+    }
+    if (settings.autoAddToGrocery !== undefined && row.autoAddToGrocery !== settings.autoAddToGrocery) {
+      patch.autoAddToGrocery = settings.autoAddToGrocery
+    }
+    if (patch.minimumQuantity !== undefined || patch.autoAddToGrocery !== undefined) patches.push({ id: row.id, patch })
+  }
+  return patches
 }
 
 /** Both fields or neither. The server never fills in a date the user did not enter. */
