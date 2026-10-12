@@ -101,6 +101,25 @@ enum RecipePhoto {
         return true
     }
 
+    /// Point size of the hero bitmap when `measured` is the detail plate.
+    ///
+    /// The hero spinner stays up until this returns a size. Tarifler pushes a
+    /// list from a list, so the first width is often the source row (about
+    /// 300 pt) or a Commons pixel box (960×720, 320×240). Those must not paint:
+    /// the credit line is hidden until the plate is painted, and that line used
+    /// to be the only second layout pass. Callers have to measure the detail
+    /// list's own 220 pt band, then ask again after the push settles.
+    static func heroDrawSize(measuredWidth: Double, measuredHeight: Double) -> (width: Double, height: Double)? {
+        guard isReadyPhotoSlot(
+            width: measuredWidth,
+            height: measuredHeight,
+            minimumWidth: heroPointHeight,
+            minimumHeight: heroPointHeight,
+            widerThanTall: true
+        ) else { return nil }
+        return (measuredWidth, measuredHeight)
+    }
+
     struct AspectFillRect: Equatable, Sendable {
         var x: Double
         var y: Double

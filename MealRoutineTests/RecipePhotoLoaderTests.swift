@@ -177,6 +177,23 @@ final class RecipePhotoLoaderTests: XCTestCase {
             ),
             "the narrowest phone plate can draw"
         )
+        XCTAssertNil(
+            RecipePhoto.heroDrawSize(measuredWidth: 305, measuredHeight: 220),
+            "the Tarifler source row is not the detail plate, so the hero spinner must stay"
+        )
+        XCTAssertNil(
+            RecipePhoto.heroDrawSize(measuredWidth: 960, measuredHeight: 720),
+            "the 960 px rendition box must not clear the hero spinner"
+        )
+        XCTAssertEqual(
+            RecipePhoto.heroDrawSize(measuredWidth: 393, measuredHeight: 220)?.width,
+            393,
+            "the detail list width is the plate that clears the hero spinner"
+        )
+        XCTAssertEqual(
+            RecipePhoto.heroDrawSize(measuredWidth: 393, measuredHeight: 220)?.height,
+            220
+        )
     }
 
     func testDetailHeroVariantIsSharedByBothTabs() {
