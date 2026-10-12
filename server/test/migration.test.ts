@@ -231,6 +231,35 @@ describe('personal migration', () => {
     expect(confirmed.json().status).toBe('confirmed')
     await app.close()
   })
+
+  it('accepts an empty application/json body on confirm and rejects malformed JSON', async () => {
+    const app = buildApp({ repo: memoryRepo(), config: testConfig(), verifier: testVerifier() })
+    const ada = await signIn(app, 'ada-empty-confirm')
+    const confirmed = await app.inject({
+      method: 'POST',
+      url: '/v1/migration/confirm',
+      headers: {
+        authorization: `Bearer ${ada.token}`,
+        'content-type': 'application/json',
+      },
+      payload: '',
+    })
+    expect(confirmed.statusCode).toBe(200)
+    expect(confirmed.json().status).toBe('confirmed')
+
+    const malformed = await app.inject({
+      method: 'POST',
+      url: '/v1/migration/confirm',
+      headers: {
+        authorization: `Bearer ${ada.token}`,
+        'content-type': 'application/json',
+      },
+      payload: '{',
+    })
+    expect(malformed.statusCode).toBe(400)
+    expect(malformed.json()).toEqual({ error: 'invalid_request' })
+    await app.close()
+  })
 })
 
 async function signIn(app: ReturnType<typeof buildApp>, subject: string, email?: string) {

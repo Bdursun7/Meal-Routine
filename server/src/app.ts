@@ -188,6 +188,24 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     bodyLimit: options.bodyLimit ?? 1_048_576,
   })
 
+  // Fastify 5 rejects an empty application/json body (FST_ERR_CTP_EMPTY_JSON_BODY).
+  // Confirm is a POST with that header and no payload; treat the empty body as {}.
+  app.removeContentTypeParser('application/json')
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, rawBody, done) => {
+    const text = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8')
+    if (text.length === 0) {
+      done(null, {})
+      return
+    }
+    try {
+      done(null, JSON.parse(text))
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('invalid json')
+      ;(err as Error & { statusCode?: number }).statusCode = 400
+      done(err)
+    }
+  })
+
   if (options.dispatchIntervalMs && options.dispatchIntervalMs > 0) {
     const timer = setInterval(() => {
       void notifications.dispatch().catch(() => {

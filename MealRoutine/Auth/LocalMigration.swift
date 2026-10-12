@@ -735,11 +735,11 @@ struct MigrationHTTPClient: MigrationTransport {
         request.httpMethod = method
         request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(MealRoutineConfig.clientAPIVersion, forHTTPHeaderField: "X-Client-API-Version")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         if let body {
             request.httpBody = try JSONEncoder().encode(body)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
