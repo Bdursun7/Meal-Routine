@@ -220,6 +220,16 @@ private struct RefreshPayload: Encodable {
     var refreshToken: String
 }
 
+private struct ProfileNameBody: Encodable {
+    var givenName: String
+    var familyName: String
+    var displayName: String
+}
+
+private struct ProfileNameResponse: Decodable {
+    var account: AuthAccountDTO
+}
+
 struct AccountRepository {
     var client: APIClient
 
@@ -256,6 +266,15 @@ struct AccountRepository {
         )
         try client.validateAuth(response, data: data, authenticated: true)
         return try JSONDecoder().decode(AuthSessionDTO.self, from: data)
+    }
+
+    func updateName(displayName: String, givenName: String, familyName: String) async throws -> AuthAccountDTO {
+        let body = try JSONEncoder().encode(
+            ProfileNameBody(givenName: givenName, familyName: familyName, displayName: displayName)
+        )
+        let (data, response) = try await client.request(method: "PATCH", path: "/v1/auth/name", body: body, authenticated: true)
+        try client.validateAuth(response, data: data, authenticated: true)
+        return try JSONDecoder().decode(ProfileNameResponse.self, from: data).account
     }
 
     func me() async throws -> AuthMeDTO {

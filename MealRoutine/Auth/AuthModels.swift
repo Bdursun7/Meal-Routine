@@ -58,6 +58,26 @@ enum AuthProviderLabel {
     }
 }
 
+enum AccountDisplayName {
+    static func title(displayName: String, identities: [AuthIdentityDTO]) -> String {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        for identity in identities {
+            guard !identity.isPrivateRelay, let email = identity.email else { continue }
+            if email.lowercased().contains("privaterelay") { continue }
+            if let local = localPart(email) { return local }
+        }
+        return "İsimsiz hesap"
+    }
+
+    static func localPart(_ email: String) -> String? {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let at = trimmed.firstIndex(of: "@") else { return nil }
+        let local = String(trimmed[..<at])
+        return local.isEmpty ? nil : local
+    }
+}
+
 struct AuthAccountDTO: Codable, Equatable, Sendable {
     var id: String
     var displayName: String

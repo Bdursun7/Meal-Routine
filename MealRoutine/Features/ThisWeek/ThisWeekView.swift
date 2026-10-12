@@ -210,7 +210,7 @@ struct ThisWeekView: View {
 
     private var householdHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(HouseholdWeekCopy.headline(members: household.snapshot.members))
+            Text(HouseholdWeekCopy.headline(members: household.snapshot.members, selfUserId: household.account?.id ?? ""))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(Theme.textCharcoal)
             HStack {

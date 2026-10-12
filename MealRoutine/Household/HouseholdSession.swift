@@ -409,12 +409,15 @@ final class HouseholdSession {
     func updatePreference(
         cookingDays: [Int],
         maxWeekdayMinutes: Int,
-        preferredCategories: String,
-        preferredProteins: String,
-        avoidedIngredients: String,
+        preferredCategories: [String],
+        preferredProteins: [String],
+        avoidedIngredients: [String],
         in context: ModelContext
     ) {
         guard let account else { return }
+        let categories = HouseholdPreferenceChoices.categories(from: preferredCategories)
+        let proteins = HouseholdPreferenceChoices.proteins(from: preferredProteins)
+        let avoided = HouseholdPreferenceChoices.avoidedIds(from: avoidedIngredients)
         let preferenceBefore = snapshot.preference
         let preferenceBase = preferenceBefore.map { preference in
             preference.baseRevision == 0 ? preference.revision : preference.baseRevision
@@ -425,9 +428,9 @@ final class HouseholdSession {
                 userId: account.id,
                 cookingDays: cookingDays,
                 maxWeekdayMinutes: maxWeekdayMinutes,
-                preferredCategories: split(preferredCategories),
-                preferredProteins: split(preferredProteins),
-                avoidedIngredients: split(avoidedIngredients),
+                preferredCategories: categories,
+                preferredProteins: proteins,
+                avoidedIngredients: avoided,
                 now: .now
             )
             persist(in: context)
@@ -440,15 +443,26 @@ final class HouseholdSession {
                     baseRevision: preferenceBase,
                     cookingDays: cookingDays,
                     maxWeekdayMinutes: maxWeekdayMinutes,
-                    preferredCategories: split(preferredCategories),
-                    preferredProteins: split(preferredProteins),
-                    avoidedIngredients: split(avoidedIngredients)
+                    preferredCategories: categories,
+                    preferredProteins: proteins,
+                    avoidedIngredients: avoided
                 ),
                 in: context
             )
         } catch {
             statusMessage = error.localizedDescription
         }
+    }
+
+    /// Updates the signed-in member row after the account name changes, before the next refresh.
+    func applyOwnDisplayName(_ name: String, in context: ModelContext) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let id = account?.id else { return }
+        adoptAppleUser(id: id, displayName: trimmed)
+        if let index = snapshot.members.firstIndex(where: { $0.userId.caseInsensitiveCompare(id) == .orderedSame }) {
+            snapshot.members[index].displayName = trimmed
+        }
+        persist(in: context)
     }
 
     func generateSharedWeek(in context: ModelContext, now: Date = .now) {
@@ -1367,8 +1381,10 @@ final class HouseholdSession {
             persist(in: context)
         }
         if page.changes.contains(where: { $0.entityType == "grocery" }) {
-            let wires = (try? await api.board(householdId: householdId)) ?? []
-            try? HouseholdPlanBridge.materialize(wires, in: context)
+            if let board = try? await api.board(householdId: householdId) {
+                HouseholdRemoteMerge.applyBoardPreference(board.preference, householdId: householdId, to: &snapshot)
+                try? HouseholdPlanBridge.materialize(board.grocery, in: context)
+            }
         }
         let overridden = Set(BoardDeltaMerge.overriddenMealIDs(pending: pending, remoteRevisions: revisions))
         guard !overridden.isEmpty else { return false }
@@ -1674,7 +1690,11 @@ final class HouseholdSession {
 
     private func groceryWires() async -> [SharedGroceryWire] {
         guard usesHouseholdAPI, let householdId = snapshot.household?.id else { return [] }
-        return (try? await BoardSyncClient(client: lifecycleAPI().client).board(householdId: householdId)) ?? []
+        guard let page = try? await BoardSyncClient(client: lifecycleAPI().client).board(householdId: householdId) else {
+            return []
+        }
+        HouseholdRemoteMerge.applyBoardPreference(page.preference, householdId: householdId, to: &snapshot)
+        return page.grocery
     }
 
     private func activeTransport() -> any HouseholdSyncTransport {
@@ -1722,9 +1742,6 @@ final class HouseholdSession {
         HouseholdNotifier.deliver(fresh)
     }
 
-    private func split(_ text: String) -> [String] {
-        text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty }
-    }
 }
 
 @MainActor

@@ -132,6 +132,27 @@ final class AuthSession {
         }
     }
 
+    func saveDisplayName(_ raw: String) async {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        let given = parts.first.map(String.init) ?? trimmed
+        let family = parts.count > 1 ? String(parts[1]) : ""
+        await run {
+            let updated = try await self.repository().updateName(
+                displayName: trimmed,
+                givenName: given,
+                familyName: family
+            )
+            self.account = updated
+            if var stored = AuthServices.sharedTokens.load() {
+                stored.displayName = updated.displayName
+                AuthServices.sharedTokens.save(stored)
+            }
+            self.statusMessage = "Adın kaydedildi."
+        }
+    }
+
     func unlink(_ provider: String) async {
         await run {
             let session = try await self.repository().unlink(provider: provider)

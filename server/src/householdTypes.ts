@@ -65,6 +65,8 @@ export interface HouseholdTx {
 export interface HouseholdStore {
   transaction<T>(work: (tx: HouseholdTx) => Promise<T>): Promise<T>
   preferenceRetained(householdId: string): Promise<boolean>
+  /** Copies the account's display name onto every active household membership. */
+  setMemberDisplayName(accountId: string, displayName: string): Promise<void>
 }
 
 export interface PublicMember {

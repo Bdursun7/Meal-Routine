@@ -66,24 +66,34 @@ const linkBody = z.object({
   familyName: z.string().max(80).optional(),
 })
 
+// Swift `uuidString` is uppercase. Postgres returns lowercase text, and membership
+// checks compare those strings, so every id that is compared as text is folded here.
+const uuidId = z.string().uuid().transform((value) => value.toLowerCase())
+
 const householdParams = z.object({
-  householdId: z.string().uuid(),
+  householdId: uuidId,
 })
 
 const inviteParams = householdParams.extend({
-  inviteId: z.string().uuid(),
+  inviteId: uuidId,
 })
 
 const memberParams = householdParams.extend({
-  accountId: z.string().uuid(),
+  accountId: uuidId,
 })
 
 const nameBody = z.object({
   name: z.string().min(1).max(80),
 })
 
+const profileNameBody = z.object({
+  givenName: z.string().max(80).optional(),
+  familyName: z.string().max(80).optional(),
+  displayName: z.string().max(80).optional(),
+})
+
 const transferBody = z.object({
-  accountId: z.string().uuid(),
+  accountId: uuidId,
 })
 
 const codeParams = z.object({
@@ -116,7 +126,11 @@ const eventBody = z.object({
 
 const mutationBody = z.object({
   entityType: z.enum(['grocery', 'meal', 'reaction', 'plan', 'preference']),
-  entityId: z.string().min(1).max(80),
+  // Meal, plan, and grocery ids are UUIDs compared to lowercase rows. Non-UUID
+  // ids (authorization probes, item keys) stay as sent.
+  entityId: z.string().min(1).max(80).transform((value) => (
+    z.string().uuid().safeParse(value).success ? value.toLowerCase() : value
+  )),
   operationType: z.enum(['add', 'check', 'replace', 'set', 'upsert', 'update', 'cook', 'remove']),
   baseRevision: z.number().int().nonnegative(),
   payload: z.record(z.string().max(80), z.unknown()).refine((value) => JSON.stringify(value).length <= 16_000),
@@ -352,6 +366,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     return { account: me.account, identities: me.identities }
   })
 
+  app.patch('/v1/auth/name', async (request) => {
+    enforceWriteLimit(request, limiter, 'auth')
+    const accountId = await requireAccount(request, options)
+    const body = parse(profileNameBody, request.body)
+    const account = await service.setName(accountId, body)
+    await options.repo.setMemberDisplayName(accountId, account.displayName)
+    return { account }
+  })
+
   app.get('/v1/account/export', async (request) => {
     enforceWriteLimit(request, limiter, 'auth')
     const accountId = await requireAccount(request, options)
@@ -398,7 +421,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       verified.givenName = body.givenName?.trim() || verified.givenName
       verified.familyName = body.familyName?.trim() || verified.familyName
     }
-    return reply.send(await service.link(accountId, verified))
+    const session = await service.link(accountId, verified)
+    await options.repo.setMemberDisplayName(accountId, session.account.displayName)
+    return reply.send(session)
   })
 
   app.delete('/v1/auth/identities/:provider', async (request, reply) => {
@@ -732,7 +757,7 @@ const pantryItemFields = {
   confirmSeparate: z.boolean().optional(),
 }
 // Strict: a pre-gate client that still sends `bestBefore` is rejected instead of losing the date.
-const pantryCreateBody = z.object({ id: z.string().uuid().optional(), ...pantryItemFields }).strict()
+const pantryCreateBody = z.object({ id: uuidId.optional(), ...pantryItemFields }).strict()
 const pantryPatchBody = z.object(pantryItemFields).partial().strict()
 const pantryVersionQuery = z.object({
   baseVersion: z.coerce.number().int().positive().optional(),
@@ -751,7 +776,7 @@ const pantryReconcileBody = z.object({
   }).strict()).min(1).max(200),
 }).strict()
 const ingredientQuery = z.object({
-  householdId: z.string().uuid().optional(),
+  householdId: uuidId.optional(),
   q: z.string().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(1000).optional(),
 })

@@ -94,6 +94,36 @@ describe('auth service', () => {
     expect(again.session.account.id).toBe(apple.session.account.id)
   })
 
+  it('stores an Apple name when the identity is linked', async () => {
+    const repo = memoryRepo()
+    const service = createAuthService({ repo, config: testConfig() })
+    const first = await service.signInWithIdentity({
+      provider: 'google',
+      subject: 'google-link-name',
+      email: 'ada@example.com',
+      emailVerified: true,
+      isPrivateRelay: false,
+      givenName: '',
+      familyName: '',
+    })
+    expect(first.kind).toBe('session')
+    if (first.kind !== 'session') return
+    expect(first.session.account.displayName).toBe('')
+
+    const linked = await service.link(first.session.account.id, {
+      provider: 'apple',
+      subject: 'apple-link-name',
+      email: 'ada@example.com',
+      emailVerified: true,
+      isPrivateRelay: false,
+      givenName: 'Ada',
+      familyName: 'Lovelace',
+    })
+    expect(linked.account.givenName).toBe('Ada')
+    expect(linked.account.familyName).toBe('Lovelace')
+    expect(linked.account.displayName).toBe('Ada Lovelace')
+  })
+
   it('does not treat a private relay address as the same person', async () => {
     const repo = memoryRepo()
     const service = createAuthService({ repo, config: testConfig() })

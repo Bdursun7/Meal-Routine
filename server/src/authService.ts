@@ -47,6 +47,10 @@ export interface AuthService {
   link(accountId: string, identity: VerifiedIdentity): Promise<PublicSession>
   unlink(accountId: string, provider: string): Promise<PublicSession>
   me(accountId: string): Promise<PublicSession>
+  setName(
+    accountId: string,
+    input: { givenName?: string; familyName?: string; displayName?: string },
+  ): Promise<PublicAccount>
 }
 
 function displayName(givenName: string, familyName: string): string {
@@ -225,8 +229,34 @@ export function createAuthService(input: {
         }
         await repo.insertIdentity(identityRecord(accountId, identity))
       }
-      const session = await issue(account, randomUUID())
-      return session
+      const named = await rememberName(accountId, identity.givenName, identity.familyName)
+      return issue(named, randomUUID())
+    },
+
+    async setName(accountId, input) {
+      const existing = await repo.getAccount(accountId)
+      if (!existing) throw new AppError('session_expired', 401)
+      let givenName = cleanNamePart(input.givenName)
+      let familyName = cleanNamePart(input.familyName)
+      let nextDisplay = cleanNamePart(input.displayName)
+      if (!nextDisplay) nextDisplay = displayName(givenName, familyName)
+      if (!givenName && !familyName && nextDisplay) {
+        const parts = nextDisplay.split(/\s+/).filter(Boolean)
+        givenName = parts[0] ?? ''
+        familyName = parts.slice(1).join(' ')
+      }
+      if (!nextDisplay) throw new AppError('name_empty', 400)
+      const saved = await repo.updateNames(accountId, {
+        givenName,
+        familyName,
+        displayName: nextDisplay,
+      })
+      return {
+        id: saved.id,
+        displayName: saved.displayName,
+        givenName: saved.givenName,
+        familyName: saved.familyName,
+      }
     },
 
     async unlink(accountId, provider) {
@@ -260,6 +290,10 @@ export function createAuthService(input: {
       }
     },
   }
+}
+
+function cleanNamePart(value: string | undefined): string {
+  return (value ?? '').trim().slice(0, 80)
 }
 
 function identityRecord(accountId: string, identity: VerifiedIdentity): IdentityRow {

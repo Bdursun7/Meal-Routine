@@ -31,6 +31,16 @@ export function createPgHouseholdStore(pool: Pool): HouseholdStore {
       const result = await pool.query('SELECT 1 FROM household_preferences WHERE household_id = $1', [householdId])
       return (result.rowCount ?? 0) > 0
     },
+    async setMemberDisplayName(accountId, displayName) {
+      const name = displayName.trim()
+      if (!name) return
+      await pool.query(
+        `UPDATE household_members
+            SET display_name = $2, revision = revision + 1
+          WHERE account_id = $1 AND left_at IS NULL AND display_name IS DISTINCT FROM $2`,
+        [accountId, name],
+      )
+    },
   }
 }
 
