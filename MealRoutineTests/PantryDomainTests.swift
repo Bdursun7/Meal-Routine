@@ -1261,7 +1261,8 @@ final class PantryDomainTests: XCTestCase {
             dictionary: dictionary
         )
         let shown = try XCTUnwrap(rows.first)
-        XCTAssertEqual(shown.inventoryLine, "Domates — Kiler: 3 adet, Buzdolabı: 2 adet")
+        XCTAssertEqual(shown.inventoryLine, "Evdekiler: Kiler 3 · Buzdolabı 2")
+        XCTAssertEqual(shown.summary, PantryCopy.cookFromLocations(["Kiler'den 3 adet", "Buzdolabı'ndan 1 adet"]))
         XCTAssertEqual(shown.locations.map(\.selected), [3, 1])
         let overridden = PantryCookConsumption.classify(
             needs: [need(quantity: 4, unit: "piece")],
@@ -1275,6 +1276,14 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(overridden.first?.locations.map(\.id), ["pantry", "fridge"])
         XCTAssertEqual(overridden.first?.locations.map(\.selected), [1, 2])
         XCTAssertEqual(overridden.first?.shortfallQuantity, 1)
+        XCTAssertEqual(overridden.first?.kind, .insufficient)
+        XCTAssertEqual(
+            overridden.first?.summary,
+            PantryCopy.cookFromLocations(
+                ["Kiler'den 1 adet", "Buzdolabı'ndan 2 adet"],
+                shortfall: PantryCookConsumption.formatAmount(1, unit: "piece")
+            )
+        )
         let applied = PantryCookConsumption.apply(
             event: .markCooked, confirmed: true, mealId: "meal-1",
             needs: [need(quantity: 4, unit: "piece")],
@@ -1302,6 +1311,131 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(one[0].baseVersion, 3)
         XCTAssertEqual(one[0].newQuantity, 0)
         XCTAssertEqual(one[0].deducted, 400)
+    }
+
+    /// Screenshot case: recipe `tomatoes` / `adet` against pantry rows stored as `tomato` / `piece`
+    /// in three places. Default split follows date, then kiler, buzdolabı, dondurucu.
+    /// An explicit all-zero override is a real choice and stays insufficient; a missing override is not.
+    func testMultiLocationDefaultSplitUsesCanonicalIdAndClassifiesSufficient() throws {
+        let stock = [
+            PantryCookStock(id: "freezer", ingredientId: "tomato", displayName: "Domates", quantity: 8, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .freezer),
+            PantryCookStock(id: "fridge", ingredientId: "tomatoes", displayName: "Domates", quantity: 4, unit: "adet", minimumQuantity: nil, autoAddToGrocery: false, version: 2, location: .refrigerator),
+            PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 10, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 3, location: .pantry),
+            PantryCookStock(id: "cherry", ingredientId: "cherry-tomato", displayName: "Domates", quantity: 99, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+        ]
+        let rows = PantryCookConsumption.classify(
+            needs: [need(ingredientId: "tomatoes", quantity: 1, unit: "adet")],
+            stock: stock,
+            dictionary: dictionary
+        )
+        let shown = try XCTUnwrap(rows.first)
+        XCTAssertEqual(shown.kind, .matched)
+        XCTAssertTrue(shown.willDeduct)
+        XCTAssertFalse(shown.offerAddMissing)
+        XCTAssertEqual(shown.shortfallQuantity, 0)
+        XCTAssertEqual(shown.locations.map(\.id), ["pantry", "fridge", "freezer"])
+        XCTAssertEqual(shown.locations.map(\.selected), [1, 0, 0])
+        XCTAssertEqual(shown.inventoryLine, "Evdekiler: Kiler 10 · Buzdolabı 4 · Dondurucu 8")
+        XCTAssertEqual(shown.summary, PantryCopy.cookFromLocations(["Kiler'den 1 adet"]))
+        XCTAssertFalse(shown.locations.contains { $0.id == "cherry" })
+
+        let applied = PantryCookConsumption.apply(
+            event: .markCooked, confirmed: true, mealId: "meal-1",
+            needs: [need(ingredientId: "tomatoes", quantity: 1, unit: "adet")],
+            stock: stock, rows: [], appliedMeals: [], appliedCrossings: [], armedLow: [],
+            lowStockEnabled: false, dictionary: dictionary
+        )
+        XCTAssertEqual(applied.deductions.map(\.itemId), ["pantry"])
+        XCTAssertEqual(applied.deductions.map(\.deducted), [1])
+        XCTAssertEqual(applied.deductions.map(\.newQuantity), [9])
+        XCTAssertEqual(applied.shortages, [])
+
+        let cleared = PantryCookConsumption.classify(
+            needs: [need(ingredientId: "tomatoes", quantity: 1, unit: "adet")],
+            stock: stock,
+            splits: [0: ["pantry": 0, "fridge": 0, "freezer": 0]],
+            dictionary: dictionary
+        )
+        let zeroed = try XCTUnwrap(cleared.first)
+        XCTAssertEqual(zeroed.kind, .insufficient)
+        XCTAssertFalse(zeroed.willDeduct)
+        XCTAssertEqual(zeroed.locations.map(\.selected), [0, 0, 0])
+        XCTAssertEqual(zeroed.summary, PantryCopy.cookNotDeducted(shortfall: PantryCookConsumption.formatAmount(1, unit: "adet")))
+
+        let dated = [
+            PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 10, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+            PantryCookStock(id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 4, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, dateValue: "2026-06-01", location: .refrigerator),
+            PantryCookStock(id: "freezer", ingredientId: "tomato", displayName: "Domates", quantity: 8, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, dateValue: "2026-03-01", location: .freezer),
+        ]
+        let early = try XCTUnwrap(PantryCookConsumption.classify(
+            needs: [need(quantity: 1, unit: "piece")],
+            stock: dated,
+            dictionary: dictionary
+        ).first)
+        XCTAssertEqual(early.kind, .matched)
+        XCTAssertEqual(early.locations.map(\.id), ["freezer", "fridge", "pantry"])
+        XCTAssertEqual(early.locations.map(\.selected), [1, 0, 0])
+        XCTAssertEqual(early.summary, PantryCopy.cookFromLocations(["Dondurucu'dan 1 adet"]))
+
+        let short = try XCTUnwrap(PantryCookConsumption.classify(
+            needs: [need(ingredientId: "tomatoes", quantity: 25, unit: "piece")],
+            stock: stock,
+            dictionary: dictionary
+        ).first)
+        XCTAssertEqual(short.kind, .insufficient)
+        XCTAssertTrue(short.willDeduct)
+        XCTAssertEqual(short.locations.map(\.selected), [10, 4, 8])
+        XCTAssertEqual(short.shortfallQuantity, 3)
+        XCTAssertEqual(
+            short.summary,
+            PantryCopy.cookFromLocations(
+                ["Kiler'den 10 adet", "Buzdolabı'ndan 4 adet", "Dondurucu'dan 8 adet"],
+                shortfall: PantryCookConsumption.formatAmount(3, unit: "piece")
+            )
+        )
+
+        let mass = try XCTUnwrap(PantryCookConsumption.classify(
+            needs: [need(quantity: 600, unit: "g")],
+            stock: [
+                PantryCookStock(id: "fridge", ingredientId: "tomatoes", displayName: "Domates", quantity: 0.5, unit: "kg", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .refrigerator),
+                PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 200, unit: "g", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+            ],
+            dictionary: dictionary
+        ).first)
+        XCTAssertEqual(mass.kind, .matched)
+        XCTAssertEqual(mass.locations.map(\.id), ["pantry", "fridge"])
+        XCTAssertEqual(mass.locations.map(\.selected), [200, 0.4])
+        XCTAssertEqual(mass.inventoryLine, "Evdekiler: Kiler \(PantryCookConsumption.formatAmount(200, unit: "g")) · Buzdolabı \(PantryCookConsumption.formatAmount(0.5, unit: "kg"))")
+        XCTAssertEqual(
+            mass.summary,
+            PantryCopy.cookFromLocations([
+                "Kiler'den \(PantryCookConsumption.formatAmount(200, unit: "g"))",
+                "Buzdolabı'ndan \(PantryCookConsumption.formatAmount(0.4, unit: "kg"))",
+            ])
+        )
+
+        let places = [
+            PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 10, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .pantry),
+            PantryCookStock(id: "fridge", ingredientId: "tomato", displayName: "Domates", quantity: 4, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .refrigerator),
+            PantryCookStock(id: "freezer", ingredientId: "tomato", displayName: "Domates", quantity: 8, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .freezer),
+        ]
+        let pinned = PantryCookSplit.allocate(
+            need: need(quantity: 1, unit: "piece"),
+            rows: places,
+            override: ["pantry": 1, "fridge": 1, "freezer": 0],
+            pinnedId: "fridge"
+        )
+        XCTAssertEqual(pinned.takes["fridge"], 1)
+        XCTAssertEqual(pinned.takes["pantry"], 0)
+        XCTAssertEqual(pinned.shortfall, 0)
+        let unpinned = PantryCookSplit.allocate(
+            need: need(quantity: 1, unit: "piece"),
+            rows: places,
+            override: ["pantry": 1, "fridge": 1, "freezer": 0]
+        )
+        XCTAssertEqual(unpinned.takes["pantry"], 1)
+        XCTAssertEqual(unpinned.takes["fridge"], 0)
+        XCTAssertEqual(unpinned.shortfall, 0)
     }
 
     func testTwoLocationsStaySeparateAndTheTotalDrivesLowStock() {

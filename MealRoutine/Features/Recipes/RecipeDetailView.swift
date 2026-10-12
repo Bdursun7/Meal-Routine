@@ -1045,7 +1045,9 @@ private struct PantryCookConfirmSheet: View {
 
     @State private var excluded: Set<Int> = []
     @State private var added: Set<Int> = []
+    /// Per-need takes. Missing means the documented default split. A value is written only when the cook taps −/+.
     @State private var selections: [Int: [String: Double]] = [:]
+    @ScaledMetric(relativeTo: .body) private var stepHit: CGFloat = 44
 
     private var rows: [PantryCookSheetRow] {
         PantryCookConsumption.classify(needs: needs, stock: stock, excludedNeedIndexes: excluded, splits: selections)
@@ -1149,13 +1151,26 @@ private struct PantryCookConfirmSheet: View {
     }
 
     private func matchedRow(_ row: PantryCookSheetRow) -> some View {
-        Toggle(isOn: includedBinding(row)) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.textCharcoal)
-                    .fixedSize(horizontal: false, vertical: true)
-                amountLine(row)
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: includedBinding(row)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(row.displayName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.textCharcoal)
+                        .fixedSize(horizontal: false, vertical: true)
+                    amountLine(row)
+                    if row.locations.count <= 1 {
+                        Text(row.summary)
+                            .font(.subheadline)
+                            .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .tint(Theme.accent)
+            .accessibilityLabel(amountAccessibility(row))
+            .accessibilityHint(PantryCopy.cookExcludeHint)
+            if row.locations.count > 1 {
                 locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
@@ -1163,9 +1178,6 @@ private struct PantryCookConfirmSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .tint(Theme.accent)
-        .accessibilityLabel(amountAccessibility(row))
-        .accessibilityHint(PantryCopy.cookExcludeHint)
         .listRowBackground(Theme.cardSurface)
     }
 
@@ -1177,13 +1189,22 @@ private struct PantryCookConfirmSheet: View {
                     .foregroundStyle(Theme.textCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 amountLine(row)
+                if row.locations.count <= 1 {
+                    Text(row.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textCharcoal)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(amountAccessibility(row))
+            if row.locations.count > 1 {
                 locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .accessibilityElement(children: .combine)
             if row.offerAddMissing {
                 let already = added.contains(row.needIndex)
                 Button {
@@ -1222,17 +1243,17 @@ private struct PantryCookConfirmSheet: View {
         }
     }
 
+    /// One List row holds every location. SwiftUI's Stepper adopts the list style there,
+    /// stacks the −/+ controls on the same trailing edge, and can write the lower bound
+    /// back into `selections`. That write is an override, so the default split becomes 0
+    /// and the row is classified insufficient. These buttons write only on a tap.
     @ViewBuilder
     private func locationControls(_ row: PantryCookSheetRow) -> some View {
         if row.locations.count > 1 {
-            ForEach(row.locations) { line in
-                Stepper(value: takeBinding(row, line: line), in: 0...max(line.available, 0), step: PantryCookSplit.step(for: line.unit)) {
-                    Text("\(line.locationTitle): \(PantryCookConsumption.formatAmount(line.selected, unit: line.unit))")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textCharcoal)
-                        .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(row.locations) { line in
+                    locationRow(row, line: line)
                 }
-                .accessibilityLabel("\(row.displayName), \(line.locationTitle), elde \(line.availableText)")
             }
             Text(PantryCopy.cookLocationHint)
                 .font(.footnote)
@@ -1241,19 +1262,134 @@ private struct PantryCookConfirmSheet: View {
         }
     }
 
-    private func takeBinding(_ row: PantryCookSheetRow, line: PantryCookLocationLine) -> Binding<Double> {
-        Binding(
-            get: { line.selected },
-            set: { newValue in
-                var current = selections[row.needIndex] ?? Dictionary(uniqueKeysWithValues: row.locations.map { ($0.id, $0.selected) })
-                current[line.id] = newValue
-                selections[row.needIndex] = current
+    private func locationRow(_ row: PantryCookSheetRow, line: PantryCookLocationLine) -> some View {
+        let amount = PantryCookConsumption.formatAmount(line.selected, unit: line.unit)
+        let label = Text("\(line.locationTitle): \(amount)")
+            .font(.subheadline)
+            .foregroundStyle(Theme.textCharcoal)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                splitControls(row, line: line)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                label.frame(maxWidth: .infinity, alignment: .leading)
+                splitControls(row, line: line)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: stepHit, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.displayName), \(line.locationTitle), elde \(line.availableText)")
+        .accessibilityValue(amount)
+        .accessibilityHint(PantryCopy.cookLocationHint)
+        .accessibilityAdjustableAction { direction in
+            guard splitsAreEditable(row) else { return }
+            let step = PantryCookSplit.step(for: line.unit)
+            switch direction {
+            case .increment where canIncrease(row, line: line):
+                adjust(row, line: line, by: step)
+            case .decrement where line.selected > 0.0005:
+                adjust(row, line: line, by: -step)
+            default:
+                break
+            }
+        }
+        .accessibilityIdentifier("cook.split.\(row.needIndex).\(line.location.rawValue)")
+    }
+
+    private func splitControls(_ row: PantryCookSheetRow, line: PantryCookLocationLine) -> some View {
+        let step = PantryCookSplit.step(for: line.unit)
+        let editable = splitsAreEditable(row)
+        return HStack(spacing: 0) {
+            splitButton(
+                systemName: "minus",
+                enabled: editable && line.selected > 0.0005,
+                identifier: "cook.split.minus.\(row.needIndex).\(line.location.rawValue)"
+            ) {
+                adjust(row, line: line, by: -step)
+            }
+            Rectangle()
+                .fill(Theme.secondaryText.opacity(0.35))
+                .frame(width: 1, height: max(CGFloat(16), stepHit * 0.45))
+            splitButton(
+                systemName: "plus",
+                enabled: editable && canIncrease(row, line: line),
+                identifier: "cook.split.plus.\(row.needIndex).\(line.location.rawValue)"
+            ) {
+                adjust(row, line: line, by: step)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .background(Theme.secondaryText.opacity(0.12), in: Capsule())
+    }
+
+    private func splitButton(systemName: String, enabled: Bool, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.body.weight(.semibold))
+                .frame(minWidth: stepHit, minHeight: stepHit)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .disabled(!enabled)
+        .foregroundStyle(enabled ? Theme.accent : Theme.secondaryText.opacity(0.35))
+        .accessibilityLabel(systemName == "minus" ? "Azalt" : "Artır")
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func splitsAreEditable(_ row: PantryCookSheetRow) -> Bool {
+        !excluded.contains(row.needIndex)
+    }
+
+    /// Plus stays available while this place still has stock and either the recipe is short
+    /// or another place can give up some of its take.
+    private func canIncrease(_ row: PantryCookSheetRow, line: PantryCookLocationLine) -> Bool {
+        guard line.selected + 0.0005 < line.available else { return false }
+        if row.shortfallQuantity > 0.0005 { return true }
+        return row.locations.contains { $0.id != line.id && $0.selected > 0.0005 }
+    }
+
+    /// Applies one step, then clamps so the total stays inside the recipe need and each place's stock.
+    /// The stepped place is pinned, so increasing Buzdolabı can move the take off Kiler.
+    private func adjust(_ row: PantryCookSheetRow, line: PantryCookLocationLine, by delta: Double) {
+        guard splitsAreEditable(row), needs.indices.contains(row.needIndex) else { return }
+        var current: [String: Double] = [:]
+        for item in row.locations {
+            current[item.id] = item.selected
+        }
+        let base = current[line.id] ?? line.selected
+        current[line.id] = PantryUnitPolicy.snap(min(line.available, max(0, base + delta)))
+        let stock = row.locations.map { item in
+            PantryCookStock(
+                id: item.id,
+                ingredientId: row.ingredientId,
+                displayName: row.displayName,
+                quantity: item.available,
+                unit: item.unit,
+                minimumQuantity: nil,
+                autoAddToGrocery: false,
+                version: 0,
+                dateValue: item.dateValue,
+                location: item.location
+            )
+        }
+        let allocation = PantryCookSplit.allocate(
+            need: needs[row.needIndex],
+            rows: stock,
+            override: current,
+            pinnedId: line.id
         )
+        selections[row.needIndex] = allocation.takes
     }
 
     private func amountAccessibility(_ row: PantryCookSheetRow) -> String {
-        "\(row.displayName), tarif \(row.recipeAmount), evdekiler \(row.stockAmount ?? ""), \(row.summary)"
+        if let inventory = row.inventoryLine {
+            return "\(row.displayName), tarif \(row.recipeAmount), \(inventory), \(row.summary)"
+        }
+        return "\(row.displayName), tarif \(row.recipeAmount), evdekiler \(row.stockAmount ?? ""), \(row.summary)"
     }
 
     private func includedBinding(_ row: PantryCookSheetRow) -> Binding<Bool> {
