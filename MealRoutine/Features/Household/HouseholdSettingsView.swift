@@ -10,9 +10,10 @@ struct HouseholdSettingsView: View {
     @State private var inviteCode = ""
     @State private var cookingDays: Set<Int> = []
     @State private var maxMinutes = 60
-    @State private var categories = ""
-    @State private var proteins = ""
-    @State private var avoided = ""
+    @State private var selectedCategories: Set<String> = []
+    @State private var selectedProteins: Set<String> = []
+    @State private var avoidedIds: Set<String> = []
+    @State private var avoidedQuery = ""
     @State private var renameName = ""
     @State private var pendingAction: HouseholdDestructiveAction?
     @State private var migration = LocalMigrationCenter.shared
@@ -63,6 +64,9 @@ struct HouseholdSettingsView: View {
         }
         .onChange(of: session.snapshot.household?.name) { _, name in
             renameName = name ?? ""
+        }
+        .onChange(of: session.snapshot.preference?.revision) { _, _ in
+            loadPreference()
         }
         .confirmationDialog(
             pendingAction?.title ?? "",
@@ -214,15 +218,19 @@ struct HouseholdSettingsView: View {
     }
 
     private var membersSection: some View {
-        Section {
-            if let name = session.snapshot.household?.name {
+        let selfId = session.account?.id ?? ""
+        let names = HouseholdWeekCopy.headline(members: session.snapshot.members, selfUserId: selfId)
+        return Section {
+            if let name = session.snapshot.household?.name.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
                 Text(name)
                     .font(.headline)
-                Text(HouseholdWeekCopy.headline(members: session.snapshot.members))
+            }
+            if !names.isEmpty {
+                Text(names)
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
             }
-            if session.snapshot.role(of: session.account?.id ?? "") == .owner {
+            if session.snapshot.role(of: selfId) == .owner {
                 TextField("Ev halkının yeni adı", text: $renameName)
                     .textInputAutocapitalization(.words)
                     .accessibilityLabel("Ev halkının yeni adı")
@@ -233,22 +241,23 @@ struct HouseholdSettingsView: View {
                 .accessibilityIdentifier("household.rename")
             }
             ForEach(session.snapshot.members) { member in
+                let title = memberTitle(member)
                 HStack {
-                    Text(member.displayName)
+                    Text(title)
                     Spacer()
                     Text(member.role == .owner ? "Ev sahibi" : "Üye")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
                 }
                 .accessibilityElement(children: .combine)
-                if session.snapshot.role(of: session.account?.id ?? "") == .owner, member.role == .member {
+                if session.snapshot.role(of: selfId) == .owner, member.role == .member {
                     Button("Çıkar", role: .destructive) {
-                        pendingAction = .remove(member.userId, member.displayName)
+                        pendingAction = .remove(member.userId, title)
                     }
                     .accessibilityIdentifier("household.remove")
-                    .accessibilityHint("\(member.displayName) ev halkından çıkar")
+                    .accessibilityHint("\(title) ev halkından çıkar")
                     Button("Ev sahipliğini devret") {
-                        pendingAction = .transfer(member.userId, member.displayName)
+                        pendingAction = .transfer(member.userId, title)
                     }
                     .accessibilityIdentifier("household.transfer")
                 }
@@ -256,6 +265,13 @@ struct HouseholdSettingsView: View {
         } header: {
             Text("Üyeler")
         }
+    }
+
+    private func memberTitle(_ member: HouseholdMember) -> String {
+        let trimmed = member.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        if member.userId.caseInsensitiveCompare(session.account?.id ?? "") == .orderedSame { return "Sen" }
+        return "Üye"
     }
 
     @ViewBuilder
@@ -380,17 +396,16 @@ struct HouseholdSettingsView: View {
                     Text(CookTimeOptions.label(minutes)).tag(minutes)
                 }
             }
-            TextField("Tercih edilen türler", text: $categories)
-                .accessibilityHint("Virgülle ayır. Kişisel sevmediklerin buraya kopyalanmaz.")
-            TextField("Tercih edilen protein", text: $proteins)
-            TextField("Evde kaçınılan malzeme", text: $avoided)
+            categoryPicker
+            proteinPicker
+            avoidedPicker
             Button("Ev tercihlerini kaydet") {
                 session.updatePreference(
                     cookingDays: cookingDays.sorted(),
                     maxWeekdayMinutes: maxMinutes,
-                    preferredCategories: categories,
-                    preferredProteins: proteins,
-                    avoidedIngredients: avoided,
+                    preferredCategories: selectedCategories.sorted(),
+                    preferredProteins: selectedProteins.sorted(),
+                    avoidedIngredients: avoidedIds.sorted(),
                     in: modelContext
                 )
             }
@@ -422,6 +437,114 @@ struct HouseholdSettingsView: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var categoryPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tercih edilen türler")
+                .font(.subheadline)
+            FlowLayout(spacing: 8) {
+                ForEach(HouseholdPreferenceChoices.categories) { category in
+                    FilterChip(
+                        title: category.title,
+                        isSelected: selectedCategories.contains(category.rawValue),
+                        hint: "Bu türü ev tercihlerine ekler"
+                    ) {
+                        toggle(category.rawValue, in: &selectedCategories)
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var proteinPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tercih edilen protein")
+                .font(.subheadline)
+            FlowLayout(spacing: 8) {
+                ForEach(HouseholdPreferenceChoices.proteinKeys, id: \.self) { key in
+                    FilterChip(
+                        title: HouseholdPreferenceChoices.proteinTitle(key),
+                        isSelected: selectedProteins.contains(key),
+                        hint: "Bu proteini ev tercihlerine ekler"
+                    ) {
+                        toggle(key, in: &selectedProteins)
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var avoidedPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Evde kaçınılan malzeme")
+                .font(.subheadline)
+            TextField("Malzeme ara", text: $avoidedQuery)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("household.avoided.search")
+            if !avoidedIds.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(avoidedIds.sorted(), id: \.self) { id in
+                        FilterChip(
+                            title: HouseholdPreferenceChoices.ingredientTitle(id),
+                            isSelected: true,
+                            hint: "Listeden çıkarır"
+                        ) {
+                            avoidedIds.remove(id)
+                        }
+                    }
+                }
+            }
+            let query = avoidedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                let matches = IngredientDictionary.shared.search(query, limit: 8)
+                if matches.isEmpty {
+                    Text("Eşleşen malzeme yok.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                } else {
+                    ForEach(matches) { entry in
+                        Button {
+                            if avoidedIds.contains(entry.id) {
+                                avoidedIds.remove(entry.id)
+                            } else {
+                                avoidedIds.insert(entry.id)
+                            }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.name)
+                                    if !entry.synonyms.isEmpty {
+                                        Text(entry.synonyms.prefix(3).joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundStyle(Theme.secondaryText)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                                if avoidedIds.contains(entry.id) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Theme.accent)
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("household.avoided.\(entry.id)")
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func toggle(_ key: String, in selection: inout Set<String>) {
+        if selection.contains(key) {
+            selection.remove(key)
+        } else {
+            selection.insert(key)
+        }
     }
 
     private var activitySection: some View {
@@ -482,12 +605,17 @@ struct HouseholdSettingsView: View {
 
     private func loadPreference() {
         renameName = session.snapshot.household?.name ?? ""
-        guard let preference = session.snapshot.preference else { return }
+        guard let preference = session.snapshot.preference else {
+            selectedCategories = []
+            selectedProteins = []
+            avoidedIds = []
+            return
+        }
         cookingDays = Set(preference.cookingDays)
         maxMinutes = preference.maxWeekdayMinutes
-        categories = preference.preferredCategories.joined(separator: ", ")
-        proteins = preference.preferredProteins.joined(separator: ", ")
-        avoided = preference.avoidedIngredients.joined(separator: ", ")
+        selectedCategories = Set(HouseholdPreferenceChoices.categories(from: preference.preferredCategories))
+        selectedProteins = Set(HouseholdPreferenceChoices.proteins(from: preference.preferredProteins))
+        avoidedIds = Set(HouseholdPreferenceChoices.avoidedIds(from: preference.avoidedIngredients))
     }
 }
 

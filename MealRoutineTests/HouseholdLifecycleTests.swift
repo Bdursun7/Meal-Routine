@@ -113,6 +113,190 @@ final class HouseholdLifecycleTests: XCTestCase {
         XCTAssertEqual(HouseholdRemoteMerge.status("revoked"), .revoked)
     }
 
+    func testRemoteMergeInstallsPreferenceSoSaveAndSharedWeekSucceed() throws {
+        let owner = HouseholdUser(id: accountId, displayName: "", createdAt: now)
+        let merged = HouseholdRemoteMerge.apply(
+            HouseholdRemoteState(household: HouseholdRemoteBody(
+                id: householdId,
+                name: "Sofra",
+                role: "owner",
+                members: [HouseholdRemoteMember(accountId: owner.id, displayName: "", role: "owner")],
+                invites: []
+            )),
+            to: .empty(now: now),
+            now: now
+        )
+        XCTAssertEqual(merged.preference?.householdId, householdId)
+        XCTAssertEqual(merged.preference?.revision, merged.preference?.baseRevision)
+        XCTAssertEqual(
+            HouseholdWeekCopy.headline(members: merged.members, selfUserId: owner.id),
+            "Sen"
+        )
+
+        var snapshot = merged
+        try HouseholdReducer.updatePreference(
+            snapshot: &snapshot,
+            userId: owner.id,
+            cookingDays: [0, 2],
+            maxWeekdayMinutes: 45,
+            preferredCategories: ["chicken"],
+            preferredProteins: ["poultry"],
+            avoidedIngredients: ["tomato"],
+            now: now
+        )
+        XCTAssertEqual(snapshot.preference?.preferredCategories, ["chicken"])
+        try HouseholdReducer.installPlan(
+            snapshot: &snapshot,
+            drafts: [HouseholdMealDraft(dayOffset: 0, recipeSlug: "tavuk", title: "Tavuk", recipeOwnerUserId: nil)],
+            weekStart: now,
+            actor: owner,
+            now: now
+        )
+        XCTAssertEqual(snapshot.plan?.meals.map(\.recipeSlug), ["tavuk"])
+
+        HouseholdRemoteMerge.applyBoardPreference(
+            BoardPreferenceWire(
+                cookingDays: [1],
+                maxWeekdayMinutes: 30,
+                preferredCategories: ["fish"],
+                preferredProteins: ["seafood"],
+                avoidedIngredients: ["tomato"],
+                revision: 4
+            ),
+            householdId: householdId,
+            to: &snapshot
+        )
+        XCTAssertEqual(snapshot.preference?.preferredCategories, ["chicken"])
+
+        var fresh = merged
+        HouseholdRemoteMerge.applyBoardPreference(
+            BoardPreferenceWire(
+                cookingDays: [1],
+                maxWeekdayMinutes: 30,
+                preferredCategories: ["fish"],
+                preferredProteins: ["seafood"],
+                avoidedIngredients: ["tomato"],
+                revision: 4
+            ),
+            householdId: householdId,
+            to: &fresh
+        )
+        XCTAssertEqual(fresh.preference?.cookingDays, [1])
+        XCTAssertEqual(fresh.preference?.preferredCategories, ["fish"])
+        XCTAssertEqual(fresh.preference?.revision, 4)
+        XCTAssertEqual(fresh.preference?.baseRevision, 4)
+    }
+
+    func testPreferredCategoriesUseBrowseTagsInsteadOfDinner() {
+        let chicken = PickerCandidate(
+            slug: "tavuk",
+            totalMinutes: 45,
+            trDogfoodScore: 50,
+            ingredientIds: ["chicken"],
+            rating: nil,
+            cuisine: "TR",
+            category: "dinner",
+            tags: [],
+            protein: "poultry"
+        )
+        let plain = HouseholdRecommendation.score(
+            chicken,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: [],
+            preferredProteins: []
+        )
+        let category = HouseholdRecommendation.score(
+            chicken,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: ["chicken"],
+            preferredProteins: []
+        )
+        XCTAssertEqual(category - plain, 8)
+        let dinnerLabel = HouseholdRecommendation.score(
+            chicken,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: ["dinner", "Makarna"],
+            preferredProteins: []
+        )
+        XCTAssertEqual(dinnerLabel, plain)
+        var pasta = chicken
+        pasta.protein = ""
+        pasta.tags = ["pasta"]
+        let pastaScore = HouseholdRecommendation.score(
+            pasta,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: ["pasta"],
+            preferredProteins: []
+        )
+        XCTAssertEqual(pastaScore - plain, 8)
+        var quick = chicken
+        quick.protein = ""
+        quick.totalMinutes = 20
+        let quickScore = HouseholdRecommendation.score(
+            quick,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: ["quick"],
+            preferredProteins: []
+        )
+        XCTAssertEqual(quickScore - plain, 8)
+        let protein = HouseholdRecommendation.score(
+            chicken,
+            tastes: [],
+            memory: [],
+            anchors: [],
+            preferredCategories: [],
+            preferredProteins: ["poultry"]
+        )
+        XCTAssertEqual(protein - plain, 10)
+        XCTAssertEqual(HouseholdPreferenceChoices.categories(from: ["chicken", "Makarna", "dinner"]), ["chicken"])
+        XCTAssertEqual(HouseholdPreferenceChoices.proteins(from: ["poultry", "tavuk", "POULTRY"]), ["poultry"])
+        let dictionary = IngredientDictionary(entries: [
+            IngredientEntry(id: "tomato", name: "Domates", synonyms: ["İri domates"]),
+        ])
+        XCTAssertEqual(
+            HouseholdPreferenceChoices.avoidedIds(from: ["tomato", "serbest metin"], dictionary: dictionary),
+            ["tomato"]
+        )
+        XCTAssertEqual(HouseholdPreferenceChoices.proteinTitle("red-meat"), "Kırmızı et")
+        XCTAssertEqual(
+            AccountDisplayName.title(
+                displayName: "",
+                identities: [AuthIdentityDTO(provider: "apple", email: "ada@example.com", isPrivateRelay: false)]
+            ),
+            "ada"
+        )
+        XCTAssertEqual(
+            AccountDisplayName.title(
+                displayName: "",
+                identities: [AuthIdentityDTO(provider: "apple", email: "hide@privaterelay.appleid.com", isPrivateRelay: true)]
+            ),
+            "İsimsiz hesap"
+        )
+    }
+
+    func testNotMemberIsDistinctFromNotOwner() async throws {
+        HouseholdLifecycleURLProtocol.handler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/leave") {
+                return Self.http(Self.errorJSON("not_member"), status: 403)
+            }
+            return Self.http(Self.errorJSON("forbidden"), status: 403)
+        }
+        let api = makeAPI()
+        await expectHouseholdError(.notMember) { _ = try await api.leave(householdId: householdId) }
+        await expectHouseholdError(.notOwner) { _ = try await api.rename(householdId: householdId, name: "Yok") }
+    }
+
     func testFakeBackendRoundTripsRenameAndTransfer() async throws {
         let backend = FakeHouseholdBackend()
         let owner = HouseholdUser(id: "owner", displayName: "Berkay", createdAt: now)

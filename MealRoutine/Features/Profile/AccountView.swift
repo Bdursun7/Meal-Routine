@@ -8,6 +8,7 @@ struct AccountView: View {
     @State private var migration = LocalMigrationCenter.shared
     @State private var providerPendingUnlink: String?
     @State private var confirmsDeletion = false
+    @State private var nameDraft = ""
 
     var body: some View {
         Form {
@@ -40,6 +41,20 @@ struct AccountView: View {
                 Section {
                     Text(displayName)
                         .font(.headline)
+                    TextField("Adın", text: $nameDraft)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("account.name")
+                    Button("Adı kaydet") {
+                        let draft = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task {
+                            await auth.saveDisplayName(draft)
+                            guard auth.account?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) == draft else { return }
+                            HouseholdSession.shared.applyOwnDisplayName(draft, in: modelContext)
+                            await HouseholdSession.shared.refresh(in: modelContext)
+                        }
+                    }
+                    .disabled(nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("account.name.save")
                     if auth.identities.isEmpty {
                         Text("Bağlı giriş yok.")
                             .foregroundStyle(Theme.secondaryText)
@@ -121,7 +136,16 @@ struct AccountView: View {
         }
         .task {
             await auth.restore()
+            if nameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                nameDraft = auth.account?.displayName ?? ""
+            }
             await migration.runIfNeeded(in: modelContext)
+        }
+        .onChange(of: auth.account?.displayName) { old, name in
+            let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed == (old ?? "") {
+                nameDraft = name ?? ""
+            }
         }
     }
 
@@ -175,8 +199,10 @@ struct AccountView: View {
     }
 
     private var displayName: String {
-        let name = auth.account?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return name.isEmpty ? "İsimsiz hesap" : name
+        AccountDisplayName.title(
+            displayName: auth.account?.displayName ?? "",
+            identities: auth.identities
+        )
     }
 
     @ViewBuilder

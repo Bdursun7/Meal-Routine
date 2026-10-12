@@ -363,7 +363,7 @@ describe('household lifecycle', () => {
         payload: route.payload,
       })
       expect(response.statusCode, `${route.method} ${route.url}`).toBe(403)
-      expect(response.json().error).toBe('forbidden')
+      expect(response.json().error).toBe('not_member')
     }
 
     const memberRoutes: { method: 'PATCH' | 'POST' | 'DELETE'; url: string; payload?: { name: string } | { accountId: string } }[] = [
@@ -393,6 +393,149 @@ describe('household lifecycle', () => {
     })
     expect(missing.statusCode).toBe(404)
     expect(other.name).toBe('Başka')
+    await app.close()
+  })
+
+  it('accepts uppercase household, invite, and account ids from Swift', async () => {
+    const { app } = session()
+    const ada = await signIn(app, 'ada', 'Ada')
+    const bea = await signIn(app, 'bea', 'Bea')
+    const household = await createHousehold(app, ada.auth)
+    const invited = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/invites`,
+      headers: ada.auth,
+    })
+    expect(invited.statusCode).toBe(200)
+    const invite = invited.json().household.invites[0]
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/v1/households/${household.id.toUpperCase()}`,
+      headers: ada.auth,
+      payload: { name: 'Büyük' },
+    })
+    expect(renamed.statusCode).toBe(200)
+    expect(renamed.json().household.name).toBe('Büyük')
+
+    const resent = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/invites/${String(invite.id).toUpperCase()}/resend`,
+      headers: ada.auth,
+    })
+    expect(resent.statusCode).toBe(200)
+
+    const accepted = await app.inject({
+      method: 'POST',
+      url: `/v1/invites/${invite.code}/accept`,
+      headers: bea.auth,
+    })
+    expect(accepted.statusCode).toBe(200)
+
+    const transferred = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/transfer`,
+      headers: ada.auth,
+      payload: { accountId: bea.accountId.toUpperCase() },
+    })
+    expect(transferred.statusCode).toBe(200)
+    expect(transferred.json().household.role).toBe('member')
+
+    const board = await app.inject({
+      method: 'GET',
+      url: `/v1/households/${household.id.toUpperCase()}/board`,
+      headers: ada.auth,
+    })
+    expect(board.statusCode).toBe(200)
+
+    const changes = await app.inject({
+      method: 'GET',
+      url: `/v1/households/${household.id.toUpperCase()}/changes`,
+      headers: ada.auth,
+    })
+    expect(changes.statusCode).toBe(200)
+
+    const mutated = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/mutations`,
+      headers: { ...ada.auth, 'idempotency-key': 'upper-preference' },
+      payload: {
+        entityType: 'preference',
+        entityId: household.id.toUpperCase(),
+        operationType: 'update',
+        baseRevision: 1,
+        payload: { preferredCategories: ['chicken'] },
+      },
+    })
+    expect(mutated.statusCode).toBe(200)
+    expect(mutated.json().entity.preferredCategories).toEqual(['chicken'])
+
+    const groceryId = 'AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE'
+    const added = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/mutations`,
+      headers: { ...ada.auth, 'idempotency-key': 'upper-grocery-add' },
+      payload: {
+        entityType: 'grocery',
+        entityId: groceryId,
+        operationType: 'add',
+        baseRevision: 0,
+        payload: { itemKey: 'domates', quantity: 1 },
+      },
+    })
+    expect(added.statusCode).toBe(200)
+    expect(added.json().entity.id).toBe(groceryId.toLowerCase())
+
+    const checked = await app.inject({
+      method: 'POST',
+      url: `/v1/households/${household.id.toUpperCase()}/mutations`,
+      headers: { ...ada.auth, 'idempotency-key': 'upper-grocery-check' },
+      payload: {
+        entityType: 'grocery',
+        entityId: groceryId,
+        operationType: 'check',
+        baseRevision: 1,
+        payload: { isChecked: true },
+      },
+    })
+    expect(checked.statusCode).toBe(200)
+    expect(checked.json().entity.isChecked).toBe(true)
+    await app.close()
+  })
+
+  it('sets the account name and the household member display name', async () => {
+    const { app } = session()
+    const ada = await signIn(app, 'ada-noname', '')
+    const household = await createHousehold(app, ada.auth)
+    expect(household.members[0]?.displayName ?? '').toBe('')
+
+    const named = await app.inject({
+      method: 'PATCH',
+      url: '/v1/auth/name',
+      headers: ada.auth,
+      payload: { displayName: 'Ada Lovelace', givenName: 'Ada', familyName: 'Lovelace' },
+    })
+    expect(named.statusCode).toBe(200)
+    expect(named.json().account.displayName).toBe('Ada Lovelace')
+    expect(named.json().account.givenName).toBe('Ada')
+    expect(named.json().account.familyName).toBe('Lovelace')
+
+    const current = await app.inject({
+      method: 'GET',
+      url: '/v1/households/current',
+      headers: ada.auth,
+    })
+    expect(current.statusCode).toBe(200)
+    expect(current.json().household.members[0].displayName).toBe('Ada Lovelace')
+    expect(current.json().household.id).toBe(household.id)
+
+    const blank = await app.inject({
+      method: 'PATCH',
+      url: '/v1/auth/name',
+      headers: ada.auth,
+      payload: { displayName: '   ' },
+    })
+    expect(blank.statusCode).toBe(400)
+    expect(blank.json().error).toBe('name_empty')
     await app.close()
   })
 })

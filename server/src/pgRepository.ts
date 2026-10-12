@@ -158,6 +158,20 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
       if (!current.rows[0]) throw new AppError('not_found', 404)
       return accountFrom(current.rows[0])
     },
+    async updateNames(accountId, names) {
+      const result = await pool.query(
+        `UPDATE accounts
+            SET given_name = $2,
+                family_name = $3,
+                display_name = $4,
+                updated_at = now()
+          WHERE id = $1 AND deleted_at IS NULL
+        RETURNING id, display_name, given_name, family_name, created_at`,
+        [accountId, names.givenName, names.familyName, names.displayName],
+      )
+      if (!result.rows[0]) throw new AppError('not_found', 404)
+      return accountFrom(result.rows[0])
+    },
     async insertIdentity(identity) {
       try {
         await pool.query(
@@ -301,6 +315,7 @@ export function createPgRepository(pool: Pool): AuthRepository & HouseholdStore 
     },
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
+    setMemberDisplayName: household.setMemberDisplayName,
     boardTransaction: board.boardTransaction,
     ...pantry,
   }

@@ -146,5 +146,14 @@ export function createHouseholdMemory(
     async preferenceRetained(householdId) {
       return preferences.has(householdId)
     },
+    async setMemberDisplayName(accountId, displayName) {
+      const name = displayName.trim()
+      if (!name) return
+      for (const member of members) {
+        if (member.accountId === accountId && member.leftAt === null && member.displayName !== name) {
+          member.displayName = name
+        }
+      }
+    },
   }
 }

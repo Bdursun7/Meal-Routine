@@ -478,7 +478,7 @@ struct HouseholdSnapshot: Codable, Equatable, Sendable {
     var hasHousehold: Bool { household != nil }
 
     func member(_ userId: String) -> HouseholdMember? {
-        members.first { $0.userId == userId }
+        members.first { $0.userId.caseInsensitiveCompare(userId) == .orderedSame }
     }
 
     func role(of userId: String) -> HouseholdRole? {
@@ -1933,9 +1933,11 @@ enum HouseholdRecommendation {
         total += household(candidate.slug, memory: memory)
         total -= varietyPenalty(candidate, anchors: anchors)
         total += discovery(candidate.slug, tastes: tastes, memory: memory)
-        let category = candidate.category.lowercased()
-        if preferredCategories.contains(category) { total += 8 }
-        if !candidate.protein.isEmpty, preferredProteins.contains(candidate.protein) { total += 10 }
+        if matchesPreferredCategory(candidate, preferredCategories) { total += 8 }
+        if !candidate.protein.isEmpty,
+           preferredProteins.contains(where: { $0.caseInsensitiveCompare(candidate.protein) == .orderedSame }) {
+            total += 10
+        }
         return total
     }
 
@@ -1945,6 +1947,29 @@ enum HouseholdRecommendation {
         if memory.isFavorite || memory.lovedCount > 0 || memory.latestRating == .loved { return 3 }
         if memory.okayCount > 0 || memory.latestRating == .okay || memory.timesCooked > 0 { return 2 }
         return 0
+    }
+
+    /// Category keys are `RecipeBrowseCategory` raw values. `candidate.category` is the
+    /// course (always dinner in the catalog), so the bonus uses the same protein, diet,
+    /// and tag checks as the Tarifler chips.
+    private static func matchesPreferredCategory(_ candidate: PickerCandidate, _ preferredCategories: Set<String>) -> Bool {
+        let item = RecipeBrowseItem(
+            slug: candidate.slug,
+            displayName: candidate.slug,
+            nameEN: "",
+            country: candidate.cuisine,
+            totalMinutes: candidate.totalMinutes,
+            protein: candidate.protein,
+            diets: candidate.diets,
+            tags: candidate.tags,
+            isLoved: false
+        )
+        for raw in preferredCategories {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let category = RecipeBrowseCategory(rawValue: key), category != .all else { continue }
+            if RecipeBrowse.matchesCategory(item, category) { return true }
+        }
+        return false
     }
 
     private static func strongDislike(_ candidate: PickerCandidate, tastes: [MemberTaste]) -> Bool {
@@ -2258,13 +2283,69 @@ enum HouseholdReplacement {
 }
 
 enum HouseholdWeekCopy {
-    static func headline(members: [HouseholdMember]) -> String {
+    static func headline(members: [HouseholdMember], selfUserId: String = "") -> String {
         let names = members
             .sorted { lhs, rhs in
                 if lhs.role != rhs.role { return lhs.role == .owner }
                 return lhs.joinedAt < rhs.joinedAt
             }
-            .map(\.displayName)
+            .compactMap { member -> String? in
+                let trimmed = member.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+                if !selfUserId.isEmpty, member.userId.caseInsensitiveCompare(selfUserId) == .orderedSame {
+                    return "Sen"
+                }
+                return nil
+            }
         return names.joined(separator: " + ")
+    }
+}
+
+/// Stored household preference keys. Free text that is not one of these is dropped.
+enum HouseholdPreferenceChoices {
+    static let categories: [RecipeBrowseCategory] = RecipeBrowseCategory.allCases.filter { $0 != .all }
+    static let proteinKeys = ["poultry", "red-meat", "seafood", "egg", "legume", "tofu", "dairy"]
+
+    static func categories(from stored: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in stored {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard let category = RecipeBrowseCategory(rawValue: key), category != .all, seen.insert(key).inserted else { continue }
+            result.append(key)
+        }
+        return result
+    }
+
+    static func proteins(from stored: [String]) -> [String] {
+        let allowed = Set(proteinKeys)
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in stored {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard allowed.contains(key), seen.insert(key).inserted else { continue }
+            result.append(key)
+        }
+        return result
+    }
+
+    static func avoidedIds(from stored: [String], dictionary: IngredientDictionary = .shared) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for raw in stored {
+            guard let id = dictionary.canonicalId(raw), dictionary.entry(id) != nil, seen.insert(id).inserted else { continue }
+            result.append(id)
+        }
+        return result
+    }
+
+    static func proteinTitle(_ key: String) -> String {
+        let label = PreferenceInsightBuilder.proteinTitle(key) ?? key
+        guard let first = label.first else { return label }
+        return String(first).uppercased(with: Locale(identifier: "tr_TR")) + label.dropFirst()
+    }
+
+    static func ingredientTitle(_ id: String, dictionary: IngredientDictionary = .shared) -> String {
+        dictionary.entry(id)?.name ?? id
     }
 }

@@ -126,6 +126,8 @@ struct HouseholdLifecycleAPI: Sendable {
             return .alreadyMember
         case "name_empty":
             return .nameEmpty
+        case "not_member":
+            return .notMember
         case "forbidden":
             return .notOwner
         case "household_full":
@@ -215,9 +217,73 @@ enum HouseholdRemoteMerge {
         } else {
             next.invites = []
         }
+        next.preference = resolvedPreference(existing: next.preference, householdId: body.id)
         next.updatedAt = now
         next.revision = (next.revision) + 1
         return next
+    }
+
+    /// Keeps a preference that already belongs to this household. Otherwise uses the
+    /// server board row when one was loaded, and a local default when it was not.
+    static func resolvedPreference(
+        existing: HouseholdPreference?,
+        householdId: UUID,
+        board: BoardPreferenceWire? = nil
+    ) -> HouseholdPreference {
+        if let existing, existing.householdId == householdId {
+            return existing
+        }
+        if let board {
+            return preference(householdId: householdId, board: board)
+        }
+        return HouseholdPreference(
+            id: UUID(),
+            householdId: householdId,
+            cookingDays: [],
+            maxWeekdayMinutes: 60,
+            preferredCategories: [],
+            preferredProteins: [],
+            avoidedIngredients: [],
+            revision: 1,
+            baseRevision: 1
+        )
+    }
+
+    /// Copies a synced board preference onto the snapshot. A local edit that has not
+    /// reached the server stays put.
+    static func applyBoardPreference(
+        _ board: BoardPreferenceWire?,
+        householdId: UUID,
+        to snapshot: inout HouseholdSnapshot
+    ) {
+        guard let board else { return }
+        guard var preference = snapshot.preference, preference.householdId == householdId else {
+            snapshot.preference = preference(householdId: householdId, board: board)
+            return
+        }
+        guard preference.revision == preference.baseRevision, board.revision >= preference.revision else { return }
+        preference.cookingDays = board.cookingDays
+        preference.maxWeekdayMinutes = max(15, board.maxWeekdayMinutes)
+        preference.preferredCategories = board.preferredCategories
+        preference.preferredProteins = board.preferredProteins
+        preference.avoidedIngredients = board.avoidedIngredients
+        preference.revision = board.revision
+        preference.baseRevision = board.revision
+        snapshot.preference = preference
+    }
+
+    private static func preference(householdId: UUID, board: BoardPreferenceWire) -> HouseholdPreference {
+        HouseholdPreference(
+            id: UUID(),
+            householdId: householdId,
+            cookingDays: board.cookingDays,
+            maxWeekdayMinutes: max(15, board.maxWeekdayMinutes),
+            preferredCategories: board.preferredCategories,
+            preferredProteins: board.preferredProteins,
+            avoidedIngredients: board.avoidedIngredients,
+            revision: max(board.revision, 1),
+            baseRevision: max(board.revision, 1)
+        )
     }
 
     static func status(_ raw: String) -> HouseholdInviteStatus {

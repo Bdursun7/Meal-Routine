@@ -58,6 +58,10 @@ export interface AuthRepository {
     accountId: string,
     names: { givenName: string; familyName: string; displayName: string },
   ): Promise<AccountRow>
+  updateNames(
+    accountId: string,
+    names: { givenName: string; familyName: string; displayName: string },
+  ): Promise<AccountRow>
   insertIdentity(identity: IdentityRow): Promise<void>
   deleteIdentity(accountId: string, provider: string): Promise<boolean>
   insertSession(session: SessionRow): Promise<void>
@@ -134,6 +138,13 @@ export function createMemoryRepository(): MemoryRepository {
       }
       return { ...account }
     },
+    async updateNames(accountId, names) {
+      const account = requireAccount(accountId)
+      account.givenName = names.givenName
+      account.familyName = names.familyName
+      account.displayName = names.displayName
+      return { ...account }
+    },
     async insertIdentity(identity) {
       if (identities.some((row) => row.provider === identity.provider && row.subject === identity.subject)) {
         throw new AppError('identity_in_use', 409)
@@ -204,6 +215,7 @@ export function createMemoryRepository(): MemoryRepository {
     },
     transaction: household.transaction,
     preferenceRetained: household.preferenceRetained,
+    setMemberDisplayName: household.setMemberDisplayName,
     boardTransaction: board.boardTransaction,
     ...pantry,
   }

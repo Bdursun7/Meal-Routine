@@ -244,6 +244,10 @@ export function createHouseholdService(store: HouseholdStore, now: () => Date = 
   }
 }
 
+function sameId(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase()
+}
+
 function cleanName(raw: string): string {
   const name = raw.trim()
   if (!name || name.length > 80) throw new AppError('name_empty', 400)
@@ -260,7 +264,7 @@ async function requireMember(tx: HouseholdTx, householdId: string, accountId: st
   const household = await tx.household(householdId)
   if (!household || household.deletedAt) throw new AppError('not_found', 404)
   const membership = await tx.activeMembership(accountId)
-  if (!membership || membership.householdId !== householdId) throw new AppError('forbidden', 403)
+  if (!membership || !sameId(membership.householdId, householdId)) throw new AppError('not_member', 403)
   return membership
 }
 
