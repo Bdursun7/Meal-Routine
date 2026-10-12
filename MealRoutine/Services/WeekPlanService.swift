@@ -67,14 +67,14 @@ struct PlanRequest: Sendable {
 /// Builds and edits the current Monday-start week with `PersonalizedScoringService`.
 enum WeekPlanService {
     @MainActor
-    static func currentWeek(in context: ModelContext, now: Date = .now) throws -> PlanWeek? {
+    static func currentWeek(in context: ModelContext, now: Date = AppClock.now) throws -> PlanWeek? {
         let start = WeekCalendar.weekStart(containing: now)
         let weeks = try context.fetch(FetchDescriptor<PlanWeek>())
         return weeks.first { WeekCalendar.isSameDay($0.weekStart, start) }
     }
 
     @MainActor
-    static func ensureCurrentWeek(in context: ModelContext, now: Date = .now) throws -> PlanWeek? {
+    static func ensureCurrentWeek(in context: ModelContext, now: Date = AppClock.now) throws -> PlanWeek? {
         if let week = try currentWeek(in: context, now: now) {
             return week
         }

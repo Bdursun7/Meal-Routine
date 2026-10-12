@@ -13,6 +13,16 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 3. If you run on a device, pick your Development Team under Signing & Capabilities. The simulator can use Sign to Run Locally.
 4. Run. The first launch imports `MealRoutine/Recipes/recipes.v1.json` into SwiftData.
 
+## UI tests
+
+The **MealRoutine** scheme Test action already includes `MealRoutineUITests` (bundle id `com.berkaydursun.mealroutine.app.uitests`, team `L99MZR5MXZ`, host `MealRoutine`). `SmokeUITests` launches with `-uitest`: in-memory SwiftData, a fixed Istanbul clock, no household or product network, and a seeded week, pantry, and market card. On a Mac, with an iPhone 17 Pro simulator installed:
+
+```bash
+xcodebuild test -scheme MealRoutine -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:MealRoutineUITests
+```
+
+The same command is `Tools/run_ui_tests.sh`. `-only-testing:MealRoutineUITests` runs every test in that target, including `HouseholdFlowUITests`.
+
 ## V3 Personal Recipe Collection
 
 On branch `v3.0-import` (or a PR into that branch), a shared link is only a source. MealRoutine does not download or reconstruct the recipe.
@@ -76,6 +86,16 @@ Recipe data: UniTools — theunitools.com (CC BY-SA 4.0)
 2. **MealRoutine** şemasını ve iOS 18+ bir simülatör seç.
 3. Gerçek cihazda çalıştıracaksan Signing & Capabilities altından Development Team seç. Simülatör için Sign to Run Locally yeter.
 4. Çalıştır. İlk açılışta `MealRoutine/Recipes/recipes.v1.json` SwiftData'ya alınır.
+
+## Arayüz testleri
+
+**MealRoutine** şemasının Test eylemi `MealRoutineUITests` hedefini içerir (bundle id `com.berkaydursun.mealroutine.app.uitests`, takım `L99MZR5MXZ`, host `MealRoutine`). `SmokeUITests`, `-uitest` ile açılır: bellek içi SwiftData, sabit İstanbul saati, kapalı household ve ürün ağı, hazır hafta, kiler ve market kartı. Mac’te iPhone 17 Pro simülatörü kuruluysa:
+
+```bash
+xcodebuild test -scheme MealRoutine -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:MealRoutineUITests
+```
+
+Aynı komut `Tools/run_ui_tests.sh` içindedir. `-only-testing:MealRoutineUITests` o hedefin bütün testlerini koşar; `HouseholdFlowUITests` de buna dahildir.
 
 V3 kişisel tarif koleksiyonudur. Paylaşılan adres yalnızca kaynaktır; sayfa indirilmez ve tarif metni uydurulmaz. **Deneyeceğim** tarifi Denenecek listesine koyar. **Tarifi tamamla** ve **Yeni tarif** aynı formu kullanır. Haftaya, markete ve yemek hafızasına yalnız pişirmeye hazır tarifler girer.
 

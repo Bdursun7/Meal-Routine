@@ -98,6 +98,7 @@ struct CookRatingPrompt: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
             .disabled(selected == nil)
             .accessibilityHint("Puanı ve seçili notları kaydeder")
+            .accessibilityIdentifier("cook.rating.save")
 
             Button("Vazgeç", action: onCancel)
                 .font(.body.weight(.semibold))
@@ -140,6 +141,7 @@ struct CookRatingPrompt: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("cook.rating.\(rating.rawValue)")
         .accessibilityLabel(isCurrent ? "\(rating.title), mevcut puan" : rating.title)
         .accessibilityHint("Bu puanı kaydet")
     }

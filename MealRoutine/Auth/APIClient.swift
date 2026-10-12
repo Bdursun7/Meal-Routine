@@ -490,7 +490,7 @@ struct ProductEventUploader {
 @MainActor
 enum ProductEventSync {
     static func installIfNeeded() {
-        guard !HouseholdTestMode.shared.isEnabled else {
+        guard !HouseholdTestMode.shared.isEnabled, !UITestLaunch.isEnabled else {
             Analytics.resetProductSinkForTests()
             return
         }
@@ -501,7 +501,7 @@ enum ProductEventSync {
     }
 
     static func flushIfAllowed() async {
-        guard !HouseholdTestMode.shared.isEnabled else { return }
+        guard !HouseholdTestMode.shared.isEnabled, !UITestLaunch.isEnabled else { return }
         guard let baseURL = MealRoutineConfig.apiBaseURL else { return }
         guard AuthServices.sharedTokens.load() != nil else { return }
         let client = APIClient(

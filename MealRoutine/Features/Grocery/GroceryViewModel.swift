@@ -75,7 +75,7 @@ final class GroceryViewModel {
 
     static let manualUnits = ["piece", "g", "kg", "ml", "l", "tbsp", "tsp", "clove", "toTaste"]
 
-    func presentation(weeks: [PlanWeek], now: Date = .now) -> GroceryListPresentation {
+    func presentation(weeks: [PlanWeek], now: Date = AppClock.now) -> GroceryListPresentation {
         let rows = sortedRows(weeks: weeks, now: now)
         let open = rows.filter { !$0.isChecked }
         let checked = rows.filter(\.isChecked)

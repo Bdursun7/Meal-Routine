@@ -5,9 +5,9 @@
 **Durum:** Dört durum birbirinin yerine geçmez.
 
 - **Kodda uygulanmış:** Household pantry CRUD, `ingredientId` sözlüğü, `dateType` / `dateValue`, uyumlu birim birleştirme, açık kullanıcı eylemiyle market ↔ pantry, kişisel pantry’nin cihazda kalması, offline kuyruk ve `version` çakışması, planner’da geçmiş `useBy` stoğuna bonus verilmemesi. V5.1 buna ekler: onaylı pişirme düşümü, isteğe bağlı düşük stok bildirimi, `autoAddToGrocery` (varsayılan kapalı), cihaz saat diliminde takvim günü hatırlatması, hafta yenilenince elle ve pantry market satırlarının durması, ortak kısa satırın ondalık miktarı (`0014`), Evdekiler konum sekmeleri ve aynı malzemenin birden fazla konumda ayrı satır olması (`0015`, karar 2026-10-11, seçenek A). Kaynak: `server/db/migrations/0012_pantry.sql`, `server/db/migrations/0013_pantry_auto_add.sql`, `server/db/migrations/0014_shared_grocery_quantity.sql`, `server/db/migrations/0015_pantry_location.sql`, `server/src/pantryService.ts`, `server/src/boardApply.ts`, `MealRoutine/Services/PantryDomain.swift`, `MealRoutine/Services/PantryRules.swift`.
-- **Otomatik testle doğrulanmış (2026-10-12, Linux):** `cd server && npm test` Postgres 16.15 ile 74/74 geçti, atlanan yok. Bu sayı `#64` temel şema onarım testini de içerir (`pantry.foundation.integration.test.ts`: erken `0012` şeması onarılır, satırlar durur, `0015` uygulanır). `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 53/53 geçti (Swift 6.0.3). Sekiz `Tools/run_*.sh` betiği de geçti. Önceki kayıt 73/73 ve 50/50 idi (2026-10-11, konum satırları); ondan önce 68/68 ve 46/46 (aynı gün, gözden geçirme düzeltmeleri); ondan önce 66/66 ve 42/42 (2026-10-10); kanonik market kartı 44/44 idi. Bu satır SwiftData mağazasını, tarih seçiciyi, `UNUserNotificationCenter` teslimini, iki simülatörü ve Evdekiler / pişirme ekranlarını geçmiş saymaz.
-- **Xcode / iOS cihazında doğrulanmış:** Doğrulanmadı. `PantryTests`, `PantryView`, VoiceOver, Dynamic Type ve Dark Mode Mac + Xcode ister. Bu belge onları geçmiş saymaz.
-- **Ürün kabul kapısı kapandı:** Hayır. Nötr metin Linux testinde geçti. SwiftData yükseltmesi, tarih seçici ve iOS ekran kontrolleri Not verified (Mac). Not verified, Pass değildir. V6 başlamaz.
+- **Otomatik testle doğrulanmış (2026-10-12, Linux):** `cd server && npm test` Postgres 16.15 ile 74/74 geçti, atlanan yok. Bu sayı `#64` temel şema onarım testini de içerir (`pantry.foundation.integration.test.ts`: erken `0012` şeması onarılır, satırlar durur, `0015` uygulanır). `npm run typecheck` geçti. `Tools/run_pantry_domain_tests.sh` 53/53 geçti (Swift 6.0.3). Sekiz `Tools/run_*.sh` betiği de geçti. Önceki kayıt 73/73 ve 50/50 idi (2026-10-11, konum satırları); ondan önce 68/68 ve 46/46 (aynı gün, gözden geçirme düzeltmeleri); ondan önce 66/66 ve 42/42 (2026-10-10); kanonik market kartı 44/44 idi. Bu satır Mac ekranını, `UNUserNotificationCenter` teslimini ve iki simülatörü geçmiş saymaz.
+- **Xcode / iOS cihazında doğrulanmış (proje sahibi, Mac, 2026-10-12):** Testler geçti. `0012`–`0015` uygulandı. Pişirme onay sayfası doğruydu. Tarif kahraman fotoğrafları yüklendi. Evdekiler tarihleri yeniden açılışta aynı kaldı (`AUD-V5-002` Pass). VoiceOver, Dynamic Type, Dark Mode, işletim sistemi bildirim teslimi ve APNs bu doğrulamada yoktu; Not verified kalır ve Pass sayılmaz. İki simülatörlü household turu çalıştırılmadı: Not verified, isteğe bağlı, V6 için engel değil (sahip kararı). `MealRoutineUITests` duman akışları bu belgeden sonra eklendi; Xcode’suz Linux ortamında koşulmadı.
+- **V5.1 kapandı (2026-10-12).** `AUD-V5-002` Pass. V6 engeli kalktı. Kalan Not verified satırlar Pass’e çevrilmedi. Household timezone (`AUD-GLOB-001`) hâlâ V7’dedir.
 
 > V5.0 pantry işlevleri uygulanmış durumda; V5 kabul kapısının kapanması için doküman-kod uyumu, geçmiş `useBy` tarihindeki nötr metin ve platforma özgü iOS kontrolleri doğrulanmalıdır. Bu belgede test sonucu olarak yalnızca gerçek komut çıktısı veya CI kanıtı bulunan kontroller işaretlenir.
 
@@ -413,11 +413,11 @@ CRUD, validation, household authorization, idempotency, conflict ve migration te
 
 ### Faz 3 — Local cache ve sync
 
-SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. `PantryTests` Mac’te koşar; bu belgede geçti denmez.
+SwiftData cache, pending operation, retry ve conflict recovery kodu vardır. Proje sahibi 2026-10-12’de Mac’te testlerin geçtiğini ve pantry tarihlerinin yeniden açılışta sabit kaldığını bildirdi (`AUD-V5-002` Pass). Bu belge o Mac oturumunun ham komut çıktısını taşımaz.
 
 ### Faz 4 — Pantry UI
 
-Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. V5.1, Evdekiler ekranına düşük stok ve tarih hatırlatması anahtarlarını ekler. İzin reddi `PantryCopy.notificationPermissionDenied` ile yazılır; pantry yazmaya devam eder. Bu ekran Mac’te doğrulanmadı.
+Liste, ekleme, düzenleme, konum, minimum miktar, tarih türü ve boş/yükleme/hata/çevrimdışı metinleri kodda vardır. Geçmiş tarih rozetleri bölüm 6’daki nötr cümlelerdir. V5.1, Evdekiler ekranına düşük stok ve tarih hatırlatması anahtarlarını ekler. İzin reddi `PantryCopy.notificationPermissionDenied` ile yazılır; pantry yazmaya devam eder. Proje sahibi 2026-10-12’de pişirme onay sayfasını, kahraman fotoğrafının yüklenmesini ve yeniden açılışta sabit kalan pantry tarihini doğruladı. VoiceOver, Dynamic Type, Dark Mode ve bildirim teslimi Not verified kaldı.
 
 ### Faz 5 — Market entegrasyonu
 
@@ -429,7 +429,7 @@ Pantry kullanım sinyali ve geçmiş `useBy` için bonus verilmemesi kodda vard�
 
 ### Faz 7 — QA ve release
 
-Sunucu testleri ve Linux domain testleri audit report’ta kayıtlıdır. VoiceOver, Dynamic Type, Dark Mode ve Xcode `PantryTests` doğrulanmamıştır. Kabul kapısı açıktır.
+Sunucu testleri ve Linux domain testleri audit report’ta kayıtlıdır. V5.1, 2026-10-12 Mac doğrulamasıyla kapandı (`AUD-V5-002` Pass, V6 engeli kalktı). VoiceOver, Dynamic Type, Dark Mode, bildirim teslimi ve iki simülatör Not verified kaldı. İki simülatör isteğe bağlıdır ve engel değildir. Bu satırlar Pass değildir.
 
 ## 17. V5 kabul kapısı
 
@@ -483,7 +483,7 @@ Uygulama açıkken yalnız pantry düşük stok ve tarih hatırlatması banner, 
 
 Kullanıcı evdeki malzemeleri görür, miktarı günceller ve ortak markette eksik miktarı kendi eylemiyle hesaplar. Household üyeleri aynı pantry state’ini sunucu üzerinden paylaşır. Offline değişiklikler kaybolmaz ve çakışmalar sessizce veri silmez.
 
-V5, stok farkındalığı katar. Fiyat ve bütçe V5’te yoktur. V6 Balanced Nutrition ayrı bir ürün belgesindedir: yemek örüntüsü tercihleri (`balanced`, `vegetableForward`, `proteinForward`, `plantForward`). Bu modlar tercih sinyalidir; alerji, `Never Again`, malzeme dışlama ve ev halkı vetosunu geçersiz kılmaz. V6 kalori, makro, klinik iddia, market fiyatı ve bütçe içermez. V7 Globalization & Localization, çok dilli arayüz ve bölgesel/global lansmandır. V6 bu belgeyle başlatılmaz.
+V5, stok farkındalığı katar. Fiyat ve bütçe V5’te yoktur. V6 Balanced Nutrition ayrı bir ürün belgesindedir: yemek örüntüsü tercihleri (`balanced`, `vegetableForward`, `proteinForward`, `plantForward`). Bu modlar tercih sinyalidir; alerji, `Never Again`, malzeme dışlama ve ev halkı vetosunu geçersiz kılmaz. V6 kalori, makro, klinik iddia, market fiyatı ve bütçe içermez. V7 Globalization & Localization, çok dilli arayüz ve bölgesel/global lansmandır. V6 özellikleri bu belgenin kapsamı değildir. 2026-10-12 kararıyla V5.1 kapandı ve V6’nın V5.1 engeli kalktı.
 
 ## 21. V5.1 pişirme düşümü ve eşik
 
@@ -532,4 +532,6 @@ Koridor, kanonik id ile seçilir; `pantry-auto:` anahtarı koridor aramaz. Saya�
 
 Hafta yoksa Bitti yeni satır açmaz, ortak listeye yazmaz ve “Önce bu haftanın planını kur. Market listesi o zaman açılır.” der.
 
-Linux kanıtı: `PantryDomainTests` içindeki decline, tavan, birim uyuşmazlığı, retry, bildirim, autoAdd, kanonik eksik satırı ve saat dilimi testleri; `Tools/grocery_merge_checks.swift` kanonik plan kimliği ve kart dökümü; `Tools/portion_scale_checks.swift` eski id’nin işaret kaybetmeden tek satıra inmesi; `pantry.test.ts` bayrağın create/patch/list yolu; `board.test.ts` iki üyeli `mode: set`. Ekran, bildirim izni ve SwiftData Mac kontrol listesindedir.
+Linux kanıtı: `PantryDomainTests` içindeki decline, tavan, birim uyuşmazlığı, retry, bildirim, autoAdd, kanonik eksik satırı ve saat dilimi testleri; `Tools/grocery_merge_checks.swift` kanonik plan kimliği ve kart dökümü; `Tools/portion_scale_checks.swift` eski id’nin işaret kaybetmeden tek satıra inmesi; `pantry.test.ts` bayrağın create/patch/list yolu; `board.test.ts` iki üyeli `mode: set`.
+
+Mac kapanış (proje sahibi, 2026-10-12): testler geçti, `0012`–`0015` uygulandı, pişirme onay sayfası doğruydu, kahraman fotoğraflar yüklendi, pantry tarihleri yeniden açılışta sabit kaldı. `AUD-V5-002` Pass. V5.1 kapandı. V6 engeli kalktı. İki simülatör Not verified, isteğe bağlı, engel değil. VoiceOver, Dynamic Type, Dark Mode, işletim sistemi bildirim teslimi ve APNs Pass değildir. `MealRoutineUITests` (`-uitest`) bu kuralların duman akışını Mac simülatöründe koşmak içindir; bu depo kopyasında Xcode olmadığı için o hedef burada koşulmadı.

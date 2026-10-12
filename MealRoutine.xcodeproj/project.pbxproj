@@ -106,6 +106,9 @@
 		T17B00000000000000000009 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 		T17B0000000000000000000A /* RecipePhotoLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T17F0000000000000000000A /* RecipePhotoLoaderTests.swift */; };
 		U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000001 /* HouseholdFlowUITests.swift */; };
+		U1B0000000000000000003 /* SmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U1F0000000000000000003 /* SmokeUITests.swift */; };
+		U2B0000000000000000001 /* UITestLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = U2F0000000000000000001 /* UITestLaunch.swift */; };
+		U2B0000000000000000002 /* UITestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = U2F0000000000000000002 /* UITestFixture.swift */; };
 		U1B0000000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = T17F00000000000000000009 /* XCTest.framework */; };
 		V3B0000000000000000001 /* RecipeImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000001 /* RecipeImportModels.swift */; };
 		V3B0000000000000000004 /* RecipeImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = V3F0000000000000000004 /* RecipeImportService.swift */; };
@@ -300,6 +303,9 @@
 		T17F00000000000000000009 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		T17F0000000000000000000A /* RecipePhotoLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipePhotoLoaderTests.swift; sourceTree = "<group>"; };
 		U1F0000000000000000001 /* HouseholdFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdFlowUITests.swift; sourceTree = "<group>"; };
+		U1F0000000000000000003 /* SmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeUITests.swift; sourceTree = "<group>"; };
+		U2F0000000000000000001 /* UITestLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestLaunch.swift; sourceTree = "<group>"; };
+		U2F0000000000000000002 /* UITestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestFixture.swift; sourceTree = "<group>"; };
 		U1F0000000000000000002 /* MealRoutineUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MealRoutineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		V3EXT000000000000002 /* MealRoutineShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MealRoutineShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		V3F0000000000000000001 /* RecipeImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeImportModels.swift; sourceTree = "<group>"; };
@@ -676,6 +682,7 @@
 			isa = PBXGroup;
 			children = (
 				U1F0000000000000000001 /* HouseholdFlowUITests.swift */,
+				U1F0000000000000000003 /* SmokeUITests.swift */,
 			);
 			path = MealRoutineUITests;
 			sourceTree = "<group>";
@@ -737,6 +744,8 @@
 				V4F0000000000000000008 /* HouseholdBackend.swift */,
 				V4F0000000000000000009 /* FakeHouseholdBackend.swift */,
 				V4F000000000000000000A /* HouseholdTestMode.swift */,
+				U2F0000000000000000001 /* UITestLaunch.swift */,
+				U2F0000000000000000002 /* UITestFixture.swift */,
 			);
 			path = Household;
 			sourceTree = "<group>";
@@ -1000,6 +1009,8 @@
 				V4B0000000000000000008 /* HouseholdBackend.swift in Sources */,
 				V4B0000000000000000009 /* FakeHouseholdBackend.swift in Sources */,
 				V4B000000000000000000A /* HouseholdTestMode.swift in Sources */,
+				U2B0000000000000000001 /* UITestLaunch.swift in Sources */,
+				U2B0000000000000000002 /* UITestFixture.swift in Sources */,
 				V4B000000000000000000B /* HouseholdTestControls.swift in Sources */,
 				V41B41A0000000000000001 /* MealRoutineConfig.swift in Sources */,
 				V41B41A0000000000000002 /* AuthModels.swift in Sources */,
@@ -1048,6 +1059,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				U1B0000000000000000001 /* HouseholdFlowUITests.swift in Sources */,
+				U1B0000000000000000003 /* SmokeUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

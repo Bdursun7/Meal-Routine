@@ -4,6 +4,14 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 
 `MARKETING_VERSION` `5.0.0`. `CURRENT_PROJECT_VERSION` `5`. Migration `0012_pantry`, `0013_pantry_auto_add`, `0014_shared_grocery_quantity` ve `0015_pantry_location`. `0001`–`0014` dosyaları bu değişiklikte yeniden yazılmadı. `server/test/migrations.test.ts` `0001`–`0011` içinde pantry izi olmadığını, `0013` kolonunun `ADD COLUMN` olduğunu, `0014` dosyasının `DROP` / `DELETE` / `TRUNCATE` içermediğini ve `0015` dosyasının `pantry_items_one_row_per_bucket` kısıtını kaldırıp `DROP TABLE` içermediğini doğrular.
 
+## V5.1 kapanış (2026-10-12)
+
+Proje sahibi Mac’te doğruladı: testler geçti, `0012`–`0015` uygulandı, pişirme onay sayfası doğruydu, tarif kahraman fotoğrafları yüklendi, Evdekiler tarihleri yeniden açılışta aynı kaldı. Bu, `AUD-V5-002` **Pass** kaydıdır. **V5.1 kapandı. V6 engeli kalktı.**
+
+İki simülatörlü household turu çalıştırılmadı. Sahip bunu isteğe bağlı ve V6 için engel saymayan bir karar olarak bıraktı: **Not verified (non-blocking)**. Not verified, Pass değildir. VoiceOver, Dynamic Type, Dark Mode, işletim sistemi bildirim teslimi, APNs ve `AUD-GLOB-001` (household timezone, hâlâ V7) bu kararla Pass olmadı.
+
+`MealRoutine` şemasının Test eylemi `MealRoutineUITests` hedefini zaten içerir (`skipped = NO`). Duman akışları `-uitest` ile bellek içi SwiftData, sabit İstanbul saati (2026-10-12 09:00) ve kapalı ağ/household kullanır. Bu Linux ortamında Xcode yoktur; `MealRoutineUITests` burada koşulmadı. Mac komutu `Tools/run_ui_tests.sh` içindedir. Aynı ortamda Swift 6.0.3 ile sekiz `Tools/run_*.sh` betiği yeniden geçti; `PantryDomainTests` 53/53.
+
 ## Bu ortamda koşan kontroller
 
 | Komut | Sonuç |
@@ -26,7 +34,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Uyumlu birimler | pass | 400 g + 1 kg → 1400 g tek satır; g ↔ kg düzenlemesi stoku korur (`testSwitchingGramsToKilogramsKeepsTheSameStock`) |
 | Uyumsuz birimler | pass | Adet gram satırına karışmaz; `confirmSeparate` ile ayrı satır. Bilinmeyen birim `confirmSeparate` ile de reddedilir |
 | Yalnız ingredient kimliği | pass | Sunucu ve istemci `ingredientId` ile eşler. “Domates” / “Cherry domates” ayrı kalır. Sözlük `0012` ile seed edilir. Serbest ad, tekil birebir ad/eş anlamlıysa ona bağlanır; değilse `custom:<uuid>` olur (`testFreeTextLinksOneExactNameAndOtherwiseCreatesACustomIngredient`) |
-| `bestBefore` / `useBy` | Linux metin Pass; Mac ekran ve SwiftData Not verified | Tarih yalnız kullanıcı girerse vardır ve `YYYY-MM-DD` olarak kalır. Geçmiş `useBy` “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` “Girilen tavsiye edilen tüketim tarihi geçti”. Bu cümleler güvenlik veya tazelik hükmü değildir. Planner geçmiş `useBy` stoğa bonus vermez. Ekran ve SwiftData mağazası Mac’te doğrulanır. Not verified, Pass sayılmaz |
+| `bestBefore` / `useBy` | Pass (`AUD-V5-002`, Mac 2026-10-12) | Tarih yalnız kullanıcı girerse vardır ve `YYYY-MM-DD` olarak kalır. Geçmiş `useBy` “Girilen son tüketim tarihi geçti”, geçmiş `bestBefore` “Girilen tavsiye edilen tüketim tarihi geçti”. Bu cümleler güvenlik veya tazelik hükmü değildir. Planner geçmiş `useBy` stoğa bonus vermez. Proje sahibi yeniden açılışta pantry tarihlerinin sabit kaldığını doğruladı. VoiceOver, Dynamic Type ve Dark Mode bu satırın Pass’i değildir |
 | Eksik miktar | pass | 1000 g ihtiyaç, 400 g stok → 600 g. Replay aynı gövdeyi döner, stok değişmez. İstemcide iki kez hesaplamak tekrar düşmez (`PantryTests`) |
 | İşaretli market satırı | pass | `checked` satır hesapta aynen kalır (sunucu ve `testIncompatibleUnitsAndCheckedRowsStayAsWritten`) |
 | Sessiz düşüm yok | pass (Linux kural) / Mac ekran | Plan, planı açmak, işaretlemek, market satırını tamamlamak ve planı yenilemek stok düşmez. “Pişirdim” tek başına düşmez. Red stoku değiştirmez. Onay, aynı `ingredientId` ve g/kg ile ml/l için stokla sınırlı düşer (`testDeclineAndOtherPlanEventsDoNotChangeStock`, `testConfirmDeductsOnlyConvertibleStockAndCapsAtWhatIsThere`). `PantryTests.testPlanningAndCookingNeverChangePantry` Mac’te |
@@ -34,12 +42,12 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Offline queue | pass | Her household yazımı önce cache’e, sonra sabit `Idempotency-Key` ve `baseVersion` ile kuyruğa girer. Çevrimdışıyken gönderilmez, dönüşte bir kez gönderilir; sunucu replay’i ikinci kez uygulamaz |
 | Conflict | pass | Eski `baseVersion` 409 ve `current` döner. Kuyruk `requiresResolution`, satır sunucu halini gösterir, “Bu malzeme başka bir cihazda güncellendi.” görünür. “Sunucudaki hali kullan” veya “Değişikliğimi yeniden uygula”; ikisinde de sessiz kayıp yok |
 | Reddedilen istek | pass | 400/422 sonsuz retry olmaz, `failed` olur; kullanıcı yeniden dener veya atar |
-| Migration | pass | `0012`, `0013`, `0014` ve `0015` V4.1 verisi olan Postgres’te household, board ve hesap satırlarını silmeden uygulanır (`pantry.integration.test.ts`). `0013` yalnız `auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false` ekler. `0014` `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve `line_source` ekler; tamsayı `quantity` durur. `0015` `pantry_items_one_row_per_bucket` kısıtını `UNIQUE (household_id, ingredient_id, unit_bucket, location)` ile değiştirir; mevcut satır aynı kalır. `DROP TABLE` yok |
+| Migration | pass | `0012`, `0013`, `0014` ve `0015` V4.1 verisi olan Postgres’te household, board ve hesap satırlarını silmeden uygulanır (`pantry.integration.test.ts`). `0013` yalnız `auto_add_to_grocery BOOLEAN NOT NULL DEFAULT false` ekler. `0014` `quantity_decimal NUMERIC(12,3)`, boş kalabilen `unit` ve `line_source` ekler; tamsayı `quantity` durur. `0015` `pantry_items_one_row_per_bucket` kısıtını `UNIQUE (household_id, ingredient_id, unit_bucket, location)` ile değiştirir; mevcut satır aynı kalır. `DROP TABLE` yok. Proje sahibi 2026-10-12’de Mac’te `0012`–`0015` uygulandığını doğruladı |
 | Account deletion | pass | Tek üyeli ev silinince pantry gider; partner kalırsa kalır. Silinen hesabın idempotency satırı silinir; telefon kişisel pantry’yi ve ev kopyasını temizler. Evden çıkınca o evin cache’i telefonda kalmaz |
 | V1–V4.1 regresyon | pass (Linux) / Mac | Sunucu paketi yeşil. Linux check betikleri yeşil. Boş pantry V4.1 planını ve açıklamasını değiştirmez. Tam XCTest paketi Mac’te |
 | Türkçe metinler | pass | Yükleniyor, boş, hata + yeniden dene, çevrimdışı, conflict, failed metinleri `PantryCopy` içinde; boş metin yönergedeki cümle |
 | VoiceOver / Dynamic Type / Dark Mode | Mac | Satır tek VoiceOver etiketi okur (ad, miktar, konum, minimum, tarih, uyarılar, eşitleme). Varsayılan yazı boyutunda satır içeriğe göre sıkıdır; kontroller yalnız erişilebilirlik boyutlarında alt alta dizilir. Renkler sistem semantik renkleri. Cihazda görsel tur Mac + simülatör gerektirir |
-| Onaylı pişirme düşümü | Linux pass / Mac ekran | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez. Aynı malzeme birden fazla konum satırındaysa sıra en erken gün, sonra kiler / buzdolabı / dondurucu / diğer, sonra kimliktir. Kullanıcı bölüşümü değiştirebilir; toplam ihtiyacı ve stoku geçmez (`testCookUsesEveryCompatibleRowInDateThenLocationOrder`) |
+| Onaylı pişirme düşümü | Linux pass / Mac sayfa Pass (2026-10-12) | Red ve plan olayları stok yazmaz. Onay tavanlar, uyumsuz birimi atlar, aynı yemeği ikinci kez düşmez. Aynı malzeme birden fazla konum satırındaysa sıra en erken gün, sonra kiler / buzdolabı / dondurucu / diğer, sonra kimliktir. Kullanıcı bölüşümü değiştirebilir; toplam ihtiyacı ve stoku geçmez (`testCookUsesEveryCompatibleRowInDateThenLocationOrder`). Proje sahibi pişirme onay sayfasını doğru buldu. Çok konumlu bölüşümün XCUITest’i (`SmokeUITests`) bu Linux ortamında koşulmadı |
 | Düşük stok bildirimi | Linux pass / Mac teslim | Grup toplamı üstten alta bir kez iner; anahtar `kanonikId\|kova`. Aynı bölümde tekrar yok; üstüne çıkınca yeniden kurulur. Son satır silinince anahtar kalkar; kardeş satır kalırsa toplam yeniden değerlendirilir. Eski satır anahtarı eşleşmez, yükseltmeden sonra bir fazla bildirim gidebilir. Kapalıyken geçiş spam yapmaz. Uzak push yok. Ön planda banner yalnız pantry bildirimi içindir |
 | `autoAddToGrocery` | Linux pass | Varsayılan kapalı. Açıkken eksik miktar `pantry-auto:<kanonikId>\|<kova>` anahtarına bir kez yazılır (`family:mass`, `unit:piece`). İşaretli satır durur. İki üye `mode: set` ile tek satır (`board.test.ts`). `pantry-cook:` eşik miktarını ezmez |
 | Market kartı | Linux pass | Plan kimliği kanonik id + birim kovası (2026-10-11). `tomato` ve `tomatoes` tek satır; `cherry-tomato` ayrı. Görünen ad birleştirmez. Kart parçaları toplanmaz. Etiketler Plan, Evdekiler eksiği, Eşik, Pişirme eksiği, Elle eklendi. Eski kısa satırlar tek `pantry-auto:` satırına iner; 1 ve 2 toplanmaz, büyük olan kalır. Aynı etiket iki kez görünmez |
@@ -47,7 +55,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Hafta yenileme | Linux pass / Mac SwiftData | `HouseholdPlanBridge.apply` elle, `pantry-auto:` ve `pantry-cook:` satırlarını silmez. Plan satırları yeniden kurulur. `Tools/household_checks.swift` ve `HouseholdGroceryPreserveTests` (Xcode) |
 | Ortak kısa miktar | Linux pass | `0,6 kg` 1 olmaz. `1500 g` kabul edilir. `1000000 g` 400 döner. Plan satırı birim göndermez ve `1`…`999` tamsayı kalır (`board.test.ts`) |
 | Evdekiler sekmeleri | Linux kural / Mac ekran | Tümü her konum satırını etiketle gösterir. Kiler, Buzdolabı, Dondurucu, Diğer listeyi süzer; o sekmeden ekleme yalnız o yerde birleşir. Market bölünmez (`testLocationTabsFilterThePantryListAndPreselectAPlace`) |
-| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 53 / 53. `PantryTests` ve `HouseholdGroceryPreserveTests` Xcode’da koşulur |
+| iOS XCTest | Mac’te geçti (2026-10-12, sahip); yeni UI hedefi burada koşulmadı | `PantryDomainTests` Linux’ta 53 / 53. Proje sahibi Mac testlerinin geçtiğini bildirdi. `MealRoutineUITests` duman akışları `-uitest` ile eklendi; Xcode bu ortamda yok |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |
 
 Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi çıkarımı, fiyat / bütçe (V6), harici son kullanma API’si, otomatik tarih tahmini, üye sınırı artışı, Apple Sign in / APNs / TestFlight.
@@ -63,9 +71,11 @@ Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi ç
 7. Market’te “Domates” ara. `tomato` ve `tomatoes` tek karttır. Plan, evdekiler eksiği ve elle eklenen miktar ayrı ayrı görünür, toplanmaz. Kartın kutusu bütün parçaları işaretler; kısmi durumda eksi görünür. Koridor “Sebze ve meyve”dir. “X daha alınacak” plan kalanıdır. Bitti ikinci bir eksik satırı açmaz. Hafta yokken Bitti “Önce bu haftanın planını kur…” der.
 8. Tarih hatırlatmasını aç. İzin verilmezse “Bildirim izni kapalı…” cümlesi görünür ve Evdekiler kaydı yine çalışır. Tarih değişince eski gün, silinince bekleyen hatırlatma kalkar.
 9. VoiceOver, en büyük Dynamic Type ve Dark Mode ile pişirme onay sayfasını ve Evdekiler anahtarlarını gez. Evdekiler sekmeleri kaydırılabilir çiplerdir; VoiceOver “Buzdolabı, 2 malzeme, seçili” gibi okur.
-10. İki simülatör, aynı ev. Adımlar aşağıdaki listededir.
+10. İki simülatör, aynı ev. Adımlar aşağıdaki listededir. **2026-10-12: çalıştırılmadı. Not verified. Sahip kararıyla isteğe bağlı ve V6 için engel değil.**
 
 ## İki simülatör
+
+**Durum (2026-10-12): Not verified.** Tur isteğe bağlıdır ve çalıştırılmadı. Proje sahibi bunu V6 engeli saymaz. Aşağıdaki adımlar hâlâ durur; Pass yazılmaz.
 
 Aynı `Debug-Local` sunucusu, aynı ev, iki iOS 18 simülatörü. `0014` migrate edilmiş olmalı.
 
@@ -79,4 +89,4 @@ Aynı `Debug-Local` sunucusu, aynı ev, iki iOS 18 simülatörü. `0014` migrate
 8. Tarih lead penceresinin içindeyse geçmiş lead hemen ateşlenmez. Silmek, sıfırlamak veya kapatmak hatırlatmayı iptal eder; geri gelmez.
 9. Kişisel `autoAddToGrocery` Aktar ve Kopyala’da durur. Birleştirmede OR uygulanır.
 10. Evdekiler sekmeleri süzer, sayıları gösterir, konumdan eklemede o yeri seçer, oturumda son sekmeyi hatırlar, boş konum nötr Türkçe yazar, VoiceOver etiketi okur. Market tek listedir.
-11. Bildirim izni reddedilince şerit görünür. VoiceOver, Dynamic Type ve Dark Mode; kahraman çerçevesi; cihazda Apple imzası ve paylaşım uzantısı.
+11. Bildirim izni reddedilince şerit görünür. VoiceOver, Dynamic Type ve Dark Mode; cihazda Apple imzası ve paylaşım uzantısı. Bunlar Not verified. Kahraman fotoğrafının yüklendiğini proje sahibi 2026-10-12’de ayrı doğruladı; bu satırın geri kalanı o doğrulamaya dahil değildir.

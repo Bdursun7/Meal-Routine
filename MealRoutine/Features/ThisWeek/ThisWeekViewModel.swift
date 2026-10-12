@@ -83,7 +83,7 @@ final class ThisWeekViewModel {
         )
     }
 
-    func explanation(weeks: [PlanWeek], now: Date = .now) -> String {
+    func explanation(weeks: [PlanWeek], now: Date = AppClock.now) -> String {
         let start = WeekCalendar.weekStart(containing: now)
         return weeks.first { WeekCalendar.isSameDay($0.weekStart, start) }?.explanation ?? ""
     }
@@ -95,7 +95,7 @@ final class ThisWeekViewModel {
         householdSize: Int,
         memories: [MealMemory] = [],
         pantryStock: [PantryPlanningStock] = [],
-        now: Date = .now
+        now: Date = AppClock.now
     ) -> [WeekMealPresentation] {
         let start = WeekCalendar.weekStart(containing: now)
         guard let week = weeks.first(where: { WeekCalendar.isSameDay($0.weekStart, start) }) else {

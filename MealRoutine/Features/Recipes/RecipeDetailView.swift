@@ -132,7 +132,7 @@ struct RecipeDetailView: View {
     private func cookNeeds(_ recipe: Recipe) -> [PantryCookNeed] {
         let meal = viewModel.cookStockMealID.flatMap { id in plannedMeals.first { $0.uuid == id } } ?? currentWeekCookMeal
         let servings = ActiveServings.resolve(mealServings: meal?.servings, householdSize: prefs.first?.householdSize ?? 1)
-        return recipe.ingredients.compactMap { line in
+        return recipe.ingredients.sorted { $0.sortIndex < $1.sortIndex }.compactMap { line in
             guard let quantity = PortionScaler.scale(
                 quantity: line.quantity,
                 scaling: line.scaling,
@@ -753,6 +753,7 @@ struct RecipeDetailView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(cooked || viewModel.isShowingRatingPrompt)
+            .accessibilityIdentifier("cook.mark")
             .accessibilityHint(cooked ? "Bu akşam zaten pişirildi" : "Pişirme puanını sorar")
         }
         .padding(.horizontal, Theme.screenPadding)
@@ -776,7 +777,7 @@ struct RecipeDetailView: View {
         if let mealUUID = route.plannedMealUUID {
             return plannedMeals.first { $0.uuid == mealUUID }
         }
-        let start = WeekCalendar.weekStart(containing: .now)
+        let start = WeekCalendar.weekStart(containing: AppClock.now)
         return plannedMeals.first { meal in
             meal.recipeSlug == route.slug
                 && meal.week.map { WeekCalendar.isSameDay($0.weekStart, start) } == true
@@ -1164,18 +1165,21 @@ private struct PantryCookConfirmSheet: View {
                             .font(.subheadline)
                             .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("cook.summary.\(row.needIndex)")
                     }
                 }
             }
             .tint(Theme.accent)
             .accessibilityLabel(amountAccessibility(row))
             .accessibilityHint(PantryCopy.cookExcludeHint)
+            .accessibilityIdentifier("cook.include.\(row.needIndex)")
             if row.locations.count > 1 {
                 locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
                     .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
             }
         }
         .listRowBackground(Theme.cardSurface)
@@ -1190,6 +1194,7 @@ private struct PantryCookConfirmSheet: View {
                 .tint(Theme.accent)
                 .accessibilityLabel(amountAccessibility(row))
                 .accessibilityHint(PantryCopy.cookExcludeHint)
+                .accessibilityIdentifier("cook.include.\(row.needIndex)")
             } else {
                 insufficientTitle(row)
                     .accessibilityElement(children: .combine)
@@ -1201,6 +1206,7 @@ private struct PantryCookConfirmSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
             }
             if row.offerAddMissing {
                 let already = added.contains(row.needIndex)
@@ -1233,6 +1239,7 @@ private struct PantryCookConfirmSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
             }
         }
     }
@@ -1294,7 +1301,7 @@ private struct PantryCookConfirmSheet: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: stepHit, alignment: .leading)
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("\(row.displayName), \(line.locationTitle), elde \(line.availableText)")
         .accessibilityValue(amount)
         .accessibilityHint(PantryCopy.cookLocationHint)
