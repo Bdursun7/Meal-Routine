@@ -84,6 +84,7 @@
 		BAF4925D090A30A7CE56935A /* RecipeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAECC4845BB7251D105C954C /* RecipeRoute.swift */; };
 		BAF6B40C853A51939533E57C /* PortionScaler.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD8545137AD1A735412E0E2 /* PortionScaler.swift */; };
 		BAFB10B793E735F56C5AB380 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD072FDD67F994E7F3B9179 /* RootView.swift */; };
+		LNCHB1A000000000000001 /* LaunchIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LNCHF1A000000000000001 /* LaunchIntroView.swift */; };
 		BAFDF82D8BA293179B331943 /* ThisWeekViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA197BDEDFA96DDB7489736E /* ThisWeekViewModel.swift */; };
 		BAFFDD22284AE9CCCC936592 /* WeekPlanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2B97BCA1BF25AEC1FBE495 /* WeekPlanService.swift */; };
 		C07086A76E91591FD60CEEC0 /* DiscoverySections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D35EDEF6D29087F9AD1D018 /* DiscoverySections.swift */; };
@@ -281,6 +282,7 @@
 		FAC71FE3F8721C3482A26C2A /* Attribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attribution.swift; sourceTree = "<group>"; };
 		FACDB1564B1462C4B8C5E1CC /* PlanWeek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanWeek.swift; sourceTree = "<group>"; };
 		FAD072FDD67F994E7F3B9179 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		LNCHF1A000000000000001 /* LaunchIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchIntroView.swift; sourceTree = "<group>"; };
 		FAD8545137AD1A735412E0E2 /* PortionScaler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortionScaler.swift; sourceTree = "<group>"; };
 		FADB4F03D57FE022FE3FDF8D /* FeedbackIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackIndex.swift; sourceTree = "<group>"; };
 		FADC63741379F18114BE26B5 /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
@@ -463,6 +465,7 @@
 		CA15498533B3A710E48C4523 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				LNCHF1A000000000000001 /* LaunchIntroView.swift */,
 				FA8AED7A3E7C62A7A94B6367 /* MainTabView.swift */,
 				FA7D0BF68A037EDC997BE0B4 /* MealRoutineApp.swift */,
 				FA78A63829EDF5668299B751 /* ModelContainerFactory.swift */,
@@ -923,6 +926,7 @@
 				BADD9375E68D80C456D17AB1 /* MealRoutineApp.swift in Sources */,
 				BA7E98C80EB05AA30CE6E8AA /* ModelContainerFactory.swift in Sources */,
 				BAFB10B793E735F56C5AB380 /* RootView.swift in Sources */,
+				LNCHB1A000000000000001 /* LaunchIntroView.swift in Sources */,
 				BA1FDF56DC9FE0CD11E0BBF1 /* FlowLayout.swift in Sources */,
 				BA48B2F1EACF16B9861A58BB /* Theme.swift in Sources */,
 				BA7585936B65BFA058FFCD8B /* GroceryView.swift in Sources */,
@@ -1162,7 +1166,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1171,7 +1175,6 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1195,7 +1198,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1204,7 +1207,6 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1250,7 +1252,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = MealRoutine/MealRoutine.Local.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1259,7 +1261,6 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1281,7 +1282,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.Local.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
@@ -1440,7 +1441,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
@@ -1467,7 +1468,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L99MZR5MXZ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
