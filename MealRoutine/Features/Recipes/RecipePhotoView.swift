@@ -43,6 +43,11 @@ struct RecipePhotoView: View {
     @State private var painted: UIImage?
     @State private var paintedSlot: CGSize = .zero
     @State private var paintedToken = 0
+    /// Bumped once the push animation can no longer be holding the source row's width.
+    @State private var plateEpoch = 0
+    @State private var loadTask: Task<Void, Never>?
+    @State private var settleTask: Task<Void, Never>?
+    @State private var activeLoadKey = ""
     @Environment(\.displayScale) private var displayScale
 
     init(
@@ -80,53 +85,152 @@ struct RecipePhotoView: View {
             .transaction { transaction in
                 transaction.animation = nil
             }
-            .task(id: loadsPhoto ? "\(urlString)|\(localImagePath)|\(fetchMaxPixel)" : "") {
-                guard loadsPhoto else { return }
-                // Drop whatever the row had decoded. A 320 px thumbnail must not
-                // sit in the hero until the shared detail rendition arrives.
-                image = nil
-                painted = nil
-                paintedSlot = .zero
-                paintedToken = 0
-                imageToken = 0
-                decodedForMaxPixel = 0
-                isPhotoShown = false
-                let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
-                let hasLocalPhoto = !localImagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                phase = (hasRemotePhoto || hasLocalPhoto) ? .loading : .missing
-                await load()
+            .onAppear(perform: startLoad)
+            .onChange(of: loadKey) { _, _ in
+                startLoad()
+            }
+            .onDisappear {
+                // The detail hero is one image. A list-to-list push can send
+                // onDisappear without a later onAppear; cancelling there left
+                // the spinner on `.loading` forever. Rows still cancel.
+                guard layout != .hero else { return }
+                loadTask?.cancel()
+                loadTask = nil
+                settleTask?.cancel()
+                settleTask = nil
             }
     }
 
+    /// Identity of the bytes this view should show. Empty while list rows are
+    /// still waiting out the tab animation.
+    private var loadKey: String {
+        guard loadsPhoto else { return "" }
+        return "\(urlString)|\(localImagePath)|\(fetchMaxPixel)"
+    }
+
+    /// Starts a fetch that is not SwiftUI's `.task`.
+    ///
+    /// `.task` on a row inside the detail `List` is cancelled when the push,
+    /// a sheet, or a parent state write reconfigures the cell, and a stable id
+    /// does not start it again. The hero then stays on the spinner. `UIImage?`
+    /// is not `Equatable`, so assigning `image = nil` at the start of that task
+    /// also invalidates the row even when the image was already nil.
+    private func startLoad() {
+        let key = loadKey
+        guard !key.isEmpty else {
+            if layout != .hero {
+                loadTask?.cancel()
+                loadTask = nil
+            }
+            return
+        }
+        if key == activeLoadKey, painted != nil { return }
+        if key == activeLoadKey, let loadTask, !loadTask.isCancelled { return }
+        loadTask?.cancel()
+        activeLoadKey = key
+        resetDecodedImage()
+        loadTask = Task { @MainActor in
+            await load()
+        }
+        watchSettledPlate()
+    }
+
+    /// The push animation's first width is the Tarifler row, not this list.
+    /// Reading the plate again after that animation is what used to happen
+    /// only once the credit line appeared — and the credit waits on the paint.
+    private func watchSettledPlate() {
+        guard layout == .hero else { return }
+        settleTask?.cancel()
+        settleTask = Task { @MainActor in
+            // Push is about a third of a second. Read twice in case the first
+            // pass is still the source row's width.
+            for _ in 0..<2 {
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled else { return }
+                plateEpoch += 1
+            }
+        }
+    }
+
+    private func resetDecodedImage() {
+        // A 320 px thumbnail must not sit in the hero until the detail rendition arrives.
+        if image != nil { image = nil }
+        if painted != nil { painted = nil }
+        paintedSlot = .zero
+        paintedToken = 0
+        imageToken = 0
+        decodedForMaxPixel = 0
+        if isPhotoShown { isPhotoShown = false }
+        let hasRemotePhoto = RecipePhoto.remoteURL(from: urlString) != nil
+        let hasLocalPhoto = !localImagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let next: Phase = (hasRemotePhoto || hasLocalPhoto) ? .loading : .missing
+        if phase != next { phase = next }
+    }
+
     /// Hero measures the plate, not the bitmap. The image stays in the overlay.
+    ///
+    /// A preference key inside this list row does not deliver the plate on a
+    /// Tarifler push (list onto list). `plateSize` stayed zero, `paint` never
+    /// ran, and the spinner stayed up after the JPEG had loaded. The credit
+    /// line used to force the second pass, and it stays hidden until paint.
     @ViewBuilder
     private var measuredPlate: some View {
         if layout == .hero {
+            // The push proposes the Tarifler row's width first (~300 pt). That
+            // fails the plate check, and the credit line can no longer force a
+            // second pass. `plateEpoch` reads this plate again after the push.
             photoPlate
                 .background {
                     GeometryReader { geo in
-                        Color.clear.preference(key: HeroPlateSizeKey.self, value: geo.size)
+                        Color.clear
+                            .onChange(of: geo.size, initial: true) { _, newSize in
+                                reportPlate(newSize)
+                            }
+                            .onChange(of: plateEpoch) { _, _ in
+                                reportPlate(geo.size)
+                            }
                     }
-                }
-                .onPreferenceChange(HeroPlateSizeKey.self) { newSize in
-                    guard !sameSlot(newSize, plateSize) else { return }
-                    plateSize = newSize
-                    paint(in: newSize)
                 }
         } else {
             photoPlate
         }
     }
 
+    /// State writes during the list's layout pass are dropped, which left
+    /// `plateSize` at zero. Apply the measurement on the next turn.
+    private func reportPlate(_ size: CGSize) {
+        let reported = size
+        Task { @MainActor in
+            applyReportedPlate(reported)
+        }
+    }
+
+    private func applyReportedPlate(_ size: CGSize) {
+        guard layout == .hero else { return }
+        guard size.width > 1, size.height > 1 else { return }
+        if heroSlotIsReady(plateSize), !heroSlotIsReady(size) {
+            paint(in: plateSize)
+            return
+        }
+        if !sameSlot(size, plateSize) {
+            plateSize = size
+        }
+        paint(in: size)
+    }
+
+    private func heroSlotIsReady(_ size: CGSize) -> Bool {
+        RecipePhoto.heroDrawSize(measuredWidth: Double(size.width), measuredHeight: Double(size.height)) != nil
+    }
+
     @ViewBuilder
     private var bitmapOverlay: some View {
         if layout == .hero {
-            // Already cropped to the plate. Its point size is the slot, so the
-            // first draw cannot be an unscaled slice of the 960 px rendition
-            // or of the list thumbnail.
-            if let painted {
+            // Already cropped to the plate. `.resizable` keeps the JPEG's pixel
+            // size out of the list measurement; the frame is the plate.
+            if let painted, paintedSlot.width > 1, paintedSlot.height > 1 {
                 Image(uiImage: painted)
-                    .frame(width: plateSize.width, height: plateSize.height)
+                    .resizable()
+                    .frame(width: paintedSlot.width, height: paintedSlot.height)
             }
         } else {
             GeometryReader { geo in
@@ -184,16 +288,20 @@ struct RecipePhotoView: View {
     /// Composite the hero into the settled plate. Until this runs, the placeholder stays.
     private func paint(in slot: CGSize) {
         guard layout == .hero else { return }
+        guard let draw = RecipePhoto.heroDrawSize(
+            measuredWidth: Double(slot.width),
+            measuredHeight: Double(slot.height)
+        ) else { return }
+        let target = CGSize(width: draw.width, height: draw.height)
         guard let image,
               phase == .shown,
               decodedForMaxPixel == fetchMaxPixel,
               canDrawBitmap(image),
-              slotIsReady(slot),
-              let composited = RecipePhotoCompositor.image(image, filling: slot, scale: displayScale)
+              let composited = RecipePhotoCompositor.image(image, filling: target, scale: displayScale)
         else { return }
-        if painted != nil, paintedToken == imageToken, sameSlot(paintedSlot, slot) { return }
+        if painted != nil, paintedToken == imageToken, sameSlot(paintedSlot, target) { return }
         painted = composited
-        paintedSlot = slot
+        paintedSlot = target
         paintedToken = imageToken
         isPhotoShown = true
     }
@@ -344,9 +452,27 @@ struct RecipePhotoView: View {
         phase = .shown
         if layout == .hero {
             paint(in: plateSize)
+            // A list-to-list push often never reports the 220 pt plate (the
+            // preference is dropped, or the width is still the source row).
+            // The hero is full-bleed, so the screen width is that plate.
+            if painted == nil, let fallback = screenHeroPlate(), !sameSlot(fallback, plateSize) {
+                plateSize = fallback
+                paint(in: fallback)
+            }
         } else {
             isPhotoShown = true
         }
+    }
+
+    /// Full-bleed hero band. Nil when the screen is narrower than the plate rule.
+    private func screenHeroPlate() -> CGSize? {
+        let sceneWidth = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen.bounds.width }
+            .first
+        let width = sceneWidth ?? UIScreen.main.bounds.width
+        let size = CGSize(width: width, height: CGFloat(RecipePhoto.heroPointHeight))
+        guard heroSlotIsReady(size) else { return nil }
+        return size
     }
 
     private func localBitmap() -> UIImage? {
@@ -477,13 +603,6 @@ private enum RecipePhotoDecoder {
             return UIImage(cgImage: cgImage)
         }
         return UIImage(data: data)
-    }
-}
-
-private struct HeroPlateSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
     }
 }
 

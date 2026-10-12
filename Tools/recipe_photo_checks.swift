@@ -270,6 +270,12 @@ private func checkPhotoSlot() {
         ),
         "narrowest phone plate can draw"
     )
+    let sourceRow = RecipePhoto.heroDrawSize(measuredWidth: 305, measuredHeight: 220)
+    check(sourceRow == nil, "Tarifler source-row width does not clear the hero spinner, got \(String(describing: sourceRow))")
+    let bitmapBox = RecipePhoto.heroDrawSize(measuredWidth: 960, measuredHeight: 720)
+    check(bitmapBox == nil, "960 px box does not clear the hero spinner, got \(String(describing: bitmapBox))")
+    let plate = RecipePhoto.heroDrawSize(measuredWidth: 393, measuredHeight: 220)
+    check(plate?.width == 393 && plate?.height == 220, "detail list width clears the hero spinner, got \(String(describing: plate))")
 }
 
 private func checkDetailVariant() {
