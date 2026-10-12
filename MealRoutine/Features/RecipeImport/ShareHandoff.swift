@@ -4,7 +4,7 @@ import Observation
 /// App Group files the share extension writes before it closes.
 /// The main app copies them into SwiftData the next time it is open.
 enum RecipeCaptureStore {
-    static let appGroupID = "group.com.mealroutine.app"
+    static let appGroupID = "group.com.berkaydursun.mealroutine.app"
     static let capturesName = "captures.json"
     static let indexName = "collection-index.json"
     static let imageDirectory = "RecipeImages"

@@ -29,7 +29,7 @@ On branch `v3.0-import` (or a PR into that branch), a shared link is only a sour
 
 Share to MealRoutine, tap **Deneyeceğim**, and the discovery lands in Tarifler → **Denenecek** with its title, URL, platform, and image when the system provides them. No ingredients are required yet. **Tarifi tamamla** or Tarifler → **+** → **Yeni tarif** opens the same editor. A recipe becomes **Pişirmeye hazır** only after a name, at least one ingredient with a quantity, at least one step, and servings. Only those recipes enter the week, the grocery list, and Meal Memory. Favorites stay the existing Sevdiklerim heart.
 
-The share sheet target is `MealRoutineShare` (`group.com.mealroutine.app`). It writes a capture file before it closes, and the app copies that into SwiftData on the next launch. On the simulator, **Yeni tarif** works without the extension. The share sheet needs the App Group signed. Duplicate detection compares a normalized source URL and never overwrites a saved recipe.
+The share sheet target is `MealRoutineShare` (`group.com.berkaydursun.mealroutine.app`). It writes a capture file before it closes, and the app copies that into SwiftData on the next launch. On the simulator, **Yeni tarif** works without the extension. The share sheet needs the App Group signed. Duplicate detection compares a normalized source URL and never overwrites a saved recipe.
 
 `project.yml` is an optional [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec. You do not need it to open the checked-in project. Running `xcodegen generate` rewrites `MealRoutine.xcodeproj`.
 

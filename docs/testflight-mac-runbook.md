@@ -175,7 +175,7 @@ Takım `L99MZR5MXZ`.
 
 1. Identifiers → App ID `com.berkaydursun.mealroutine.app`: Sign in with Apple, Push Notifications, App Groups.
 2. App ID `com.berkaydursun.mealroutine.app.share`: App Groups.
-3. App Group kimliği kodda durduğu gibi **`group.com.mealroutine.app`**. İki App ID’ye de ekle. Yeniden adlandırma.
+3. App Group kimliği kodda durduğu gibi **`group.com.berkaydursun.mealroutine.app`**. İki App ID’ye de ekle. Yeniden adlandırma.
 4. APNs anahtarını yeniden oluşturma. Key ID `9SM8YS7B5H` yeter.
 5. Release arşivi iCloud kabı istemez. `MealRoutine.Release.entitlements` içinde CloudKit yok. `aps-environment` production’dır. Debug dosyası development’ta kalır.
 
