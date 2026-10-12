@@ -4,7 +4,7 @@ import { assertRuntimeConfig, loadConfig } from './config.js'
 import { loadEnvFile } from './env.js'
 import { createJwksVerifier } from './jwks.js'
 import { migrate } from './migrate.js'
-import { createPgNotificationStore, createPushSender } from './notifications.js'
+import { createPgNotificationStore, createPushSender, DISPATCH_INTERVAL_MS } from './notifications.js'
 import { createErrorReporter } from './observability.js'
 import { createPgMigrationStore } from './pgMigration.js'
 import { createPgObservability } from './pgObservability.js'
@@ -34,6 +34,7 @@ async function main(): Promise<void> {
     config,
     verifier: createJwksVerifier(config),
     logger: true,
+    dispatchIntervalMs: DISPATCH_INTERVAL_MS,
   })
   const address = await app.listen({ port: config.port, host: '0.0.0.0' })
   app.log.info({ address, apiVersion: config.apiVersion }, 'mealroutine api listening')

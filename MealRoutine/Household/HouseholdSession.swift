@@ -175,6 +175,7 @@ final class HouseholdSession {
             Task { await self.createRemote(name: name, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             snapshot = try HouseholdReducer.createHousehold(user: account, name: name, now: .now)
             statusMessage = "Ev halkı kuruldu. Partnerini davet edebilirsin."
@@ -196,6 +197,7 @@ final class HouseholdSession {
             Task { await self.inviteRemote(in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             let invite = try HouseholdReducer.createInvite(
                 snapshot: &snapshot,
@@ -230,6 +232,7 @@ final class HouseholdSession {
             if snapshot.hasHousehold { offerPantryTransferIfNeeded(in: context) }
             return
         }
+        if refuseMissingServer() { return }
         syncState = .syncing
         do {
             let transport = activeTransport()
@@ -267,6 +270,7 @@ final class HouseholdSession {
             Task { await self.cancelRemote(inviteId: inviteId, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             try HouseholdReducer.revokeInvite(snapshot: &snapshot, userId: account.id, inviteId: inviteId, now: .now)
             persist(in: context)
@@ -282,6 +286,7 @@ final class HouseholdSession {
             Task { await self.removeRemote(memberId: memberId, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             try HouseholdReducer.removeMember(snapshot: &snapshot, actorId: account.id, memberUserId: memberId, now: .now)
             persist(in: context)
@@ -301,6 +306,7 @@ final class HouseholdSession {
             Task { await self.leaveRemote(message: message, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         let householdId = snapshot.household?.id
         let ownerAlone = snapshot.role(of: account.id) == .owner && snapshot.members.count <= 1
         do {
@@ -326,6 +332,7 @@ final class HouseholdSession {
             Task { await self.renameRemote(name: name, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             try HouseholdReducer.rename(snapshot: &snapshot, userId: account.id, name: name, now: .now)
             persist(in: context)
@@ -342,6 +349,7 @@ final class HouseholdSession {
             Task { await self.resendRemote(inviteId: inviteId, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             let invite = try HouseholdReducer.resendInvite(snapshot: &snapshot, userId: account.id, inviteId: inviteId, now: .now)
             persist(in: context)
@@ -357,6 +365,7 @@ final class HouseholdSession {
             Task { await self.rejectRemote(code: code, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         Task { await self.rejectOnFake(code: code, in: context) }
     }
 
@@ -366,6 +375,7 @@ final class HouseholdSession {
             Task { await self.transferRemote(memberId: memberId, in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             try HouseholdReducer.transferOwnership(snapshot: &snapshot, actorId: account.id, memberUserId: memberId, now: .now)
             persist(in: context)
@@ -382,6 +392,7 @@ final class HouseholdSession {
             Task { await self.deleteRemote(in: context) }
             return
         }
+        if refuseMissingServer() { return }
         do {
             snapshot = try HouseholdReducer.deleteHousehold(snapshot: &snapshot, userId: account.id)
             persist(in: context)
@@ -856,6 +867,7 @@ final class HouseholdSession {
             await refreshFromAPI(in: context)
             return
         }
+        if refuseMissingServer() { return }
         syncState = .syncing
         do {
             let transport = activeTransport()
@@ -917,6 +929,7 @@ final class HouseholdSession {
     }
 
     private func push(in context: ModelContext) async {
+        if refuseMissingServer() { return }
         do {
             snapshot = try await pushThrowing()
             persist(in: context)
@@ -1436,6 +1449,14 @@ final class HouseholdSession {
         !isTestMode && MealRoutineConfig.apiBaseURL != nil
     }
 
+    /// Test mode keeps the in-memory board. Everyone else needs an API address.
+    private func refuseMissingServer() -> Bool {
+        guard !isTestMode, MealRoutineConfig.apiBaseURL == nil else { return false }
+        statusMessage = APIBaseURLResolver.missingServerMessage
+        syncState = .offline
+        return true
+    }
+
     private func lifecycleAPI() -> HouseholdLifecycleAPI {
         let base = MealRoutineConfig.apiBaseURL ?? URL(string: "http://127.0.0.1:8080")!
         return HouseholdLifecycleAPI(
@@ -1716,6 +1737,10 @@ enum HouseholdNotifier {
         #if HOUSEHOLD_LOCAL
         return
         #else
+        guard HouseholdLocalPushGate.deliversLocalNotification(
+            testMode: false,
+            remoteAPIConfigured: MealRoutineConfig.apiBaseURL != nil
+        ) else { return }
         #if canImport(UserNotifications)
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in

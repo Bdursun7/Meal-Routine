@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.berkaydursun.mealroutine.backup</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/ABSOLUTE/Meal-Routine/Tools/backup_postgres.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PGPASSWORD</key>
+		<string>mealroutine</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>15</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/OWNER/Library/Logs/mealroutine-backup.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/OWNER/Library/Logs/mealroutine-backup.log</string>
+</dict>
+</plist>

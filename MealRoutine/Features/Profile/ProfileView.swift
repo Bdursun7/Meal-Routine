@@ -12,6 +12,9 @@ struct ProfileView: View {
     @State private var showsProfile = false
     @State private var testMode = HouseholdTestMode.shared
     @State private var migration = LocalMigrationCenter.shared
+    @State private var versionTaps = 0
+    @State private var lastVersionTap = Date.distantPast
+    @State private var showsServerAddress = false
     @AppStorage("mealroutine.analyticsOptOut") private var analyticsOptOut = false
     @AppStorage("mealroutine.crashReportsOptIn") private var crashReports = false
 
@@ -314,6 +317,9 @@ struct ProfileView: View {
                     Text("Sürüm \(appVersion)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .onTapGesture(perform: registerVersionTap)
+                        .accessibilityIdentifier("profile.version")
+                        .accessibilityHint("Sunucu adresini açmak için yedi kez dokun")
                 }
             }
             .navigationTitle("Profil")
@@ -339,6 +345,9 @@ struct ProfileView: View {
                 Button("Vazgeç", role: .cancel) {}
             } message: {
                 Text("Bu işlem geri alınamaz. Kurulum yeniden açılır.")
+            }
+            .sheet(isPresented: $showsServerAddress) {
+                ServerAddressSheet()
             }
     }
 
@@ -367,6 +376,19 @@ struct ProfileView: View {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2"
         return "\(short) (\(build))"
+    }
+
+    private func registerVersionTap() {
+        let now = Date()
+        if now.timeIntervalSince(lastVersionTap) > 2 {
+            versionTaps = 0
+        }
+        lastVersionTap = now
+        versionTaps += 1
+        if versionTaps >= 7 {
+            versionTaps = 0
+            showsServerAddress = true
+        }
     }
 
     private var statusIsPresented: Binding<Bool> {

@@ -25,6 +25,8 @@
 	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
 	<key>MealRoutineAPIBaseURL</key>
 	<string>$(MEALROUTINE_API_BASE_URL)</string>
+	<key>MealRoutineRemoteConfigURL</key>
+	<string>$(MEALROUTINE_REMOTE_CONFIG_URL)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

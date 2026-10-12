@@ -501,6 +501,73 @@ private final class HitCount: @unchecked Sendable {
     }
 }
 
+final class APIBaseURLResolverTests: XCTestCase {
+    func testManualBeatsCacheRemotePlistAndLocalhost() {
+        let input = APIBaseURLResolver.Input(
+            manual: "https://manual.example/path",
+            cached: "https://cache.example",
+            remote: "https://remote.example",
+            plist: "https://plist.example",
+            localFallback: "http://localhost:8080"
+        )
+        let manual = APIBaseURLResolver.resolve(input)
+        XCTAssertEqual(manual.source, .manual)
+        XCTAssertEqual(manual.url?.absoluteString, "https://manual.example")
+
+        var cache = input
+        cache.manual = " "
+        let cached = APIBaseURLResolver.resolve(cache)
+        XCTAssertEqual(cached.source, .cache)
+
+        var remote = cache
+        remote.cached = nil
+        XCTAssertEqual(APIBaseURLResolver.resolve(remote).source, .remote)
+
+        var plist = remote
+        plist.remote = "$(MEALROUTINE_REMOTE_CONFIG_URL)"
+        XCTAssertEqual(APIBaseURLResolver.resolve(plist).source, .plist)
+
+        var local = plist
+        local.plist = ""
+        let fallback = APIBaseURLResolver.resolve(local)
+        XCTAssertEqual(fallback.source, .local)
+        XCTAssertEqual(fallback.url?.absoluteString, "http://localhost:8080")
+
+        var missing = local
+        missing.localFallback = nil
+        XCTAssertEqual(APIBaseURLResolver.resolve(missing).source, .none)
+        XCTAssertNil(APIBaseURLResolver.resolve(missing).url)
+    }
+
+    func testNormalizeRejectsCleartextAndUserinfoAndKeepsASuccessfulGist() {
+        XCTAssertEqual(
+            APIBaseURLResolver.normalize("https://abc.trycloudflare.com/v1?x=1")?.absoluteString,
+            "https://abc.trycloudflare.com"
+        )
+        XCTAssertNil(APIBaseURLResolver.normalize("http://192.168.1.20:8080"))
+        XCTAssertNil(APIBaseURLResolver.normalize("https://user:secret@abc.trycloudflare.com"))
+        XCTAssertEqual(
+            APIBaseURLResolver.normalize("http://127.0.0.1:8080/")?.absoluteString,
+            "http://127.0.0.1:8080"
+        )
+        let payload = Data("{\"apiBaseURL\":\"https://new.trycloudflare.com/ignored\"}".utf8)
+        XCTAssertEqual(
+            APIBaseURLResolver.cacheAfterRemotePayload(payload, currentCache: "https://old.trycloudflare.com"),
+            "https://new.trycloudflare.com"
+        )
+        XCTAssertEqual(
+            APIBaseURLResolver.cacheAfterRemotePayload(Data("nope".utf8), currentCache: "https://old.trycloudflare.com"),
+            "https://old.trycloudflare.com"
+        )
+    }
+
+    func testLocalHouseholdBannerIsSuppressedWhenTheAPIIsConfigured() {
+        XCTAssertTrue(HouseholdLocalPushGate.deliversLocalNotification(testMode: false, remoteAPIConfigured: false))
+        XCTAssertFalse(HouseholdLocalPushGate.deliversLocalNotification(testMode: false, remoteAPIConfigured: true))
+        XCTAssertFalse(HouseholdLocalPushGate.deliversLocalNotification(testMode: true, remoteAPIConfigured: false))
+    }
+}
+
 final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 

@@ -64,9 +64,8 @@ struct OfflineHouseholdTransport: HouseholdSyncTransport {
 }
 
 enum HouseholdSyncRouting {
-    /// Test mode stays on the in-memory fake. Every other launch talks to the
-    /// MealRoutine API when a base URL is configured. CloudKit remains available
-    /// for a build that has no API address.
+    /// Test mode stays on the in-memory fake. A configured API address uses HTTP.
+    /// No address stays offline. CloudKit is not the fallback.
     static func makeTransport(testMode: Bool) -> any HouseholdSyncTransport {
         if testMode {
             return FakeHouseholdBackend.shared
@@ -74,14 +73,6 @@ enum HouseholdSyncRouting {
         if let baseURL = MealRoutineConfig.apiBaseURL {
             return HTTPHouseholdTransport(baseURL: baseURL)
         }
-        #if HOUSEHOLD_LOCAL
         return OfflineHouseholdTransport()
-        #else
-        #if canImport(CloudKit)
-        return CloudKitHouseholdBackend()
-        #else
-        return OfflineHouseholdTransport()
-        #endif
-        #endif
     }
 }

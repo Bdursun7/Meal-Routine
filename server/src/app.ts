@@ -139,6 +139,8 @@ export interface BuildAppOptions {
   observability?: ObservabilityStore
   errorReporter?: ErrorReporter
   metrics?: Metrics
+  /** When set, flushes the notification window on this interval. Production uses 30 seconds. */
+  dispatchIntervalMs?: number
 }
 
 declare module 'fastify' {
@@ -185,6 +187,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: options.bodyLimit ?? 1_048_576,
   })
+
+  if (options.dispatchIntervalMs && options.dispatchIntervalMs > 0) {
+    const timer = setInterval(() => {
+      void notifications.dispatch().catch(() => {
+        metrics.notePushFailure()
+      })
+    }, options.dispatchIntervalMs)
+    timer.unref()
+    app.addHook('onClose', async () => {
+      clearInterval(timer)
+    })
+  }
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('X-Request-Id', request.id)

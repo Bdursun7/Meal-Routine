@@ -58,4 +58,7 @@ export function assertRuntimeConfig(config: AppConfig): void {
   if (config.sentryDsn && !parseSentryDsn(config.sentryDsn)) {
     throw new Error('SENTRY_DSN must be a valid DSN. Leave it empty to disable error reporting.')
   }
+  if (config.nodeEnv === 'production' && (!config.appleBundleId || config.appleBundleId === 'com.mealroutine.app')) {
+    throw new Error('APPLE_BUNDLE_ID must be the shipping bundle id when NODE_ENV=production.')
+  }
 }

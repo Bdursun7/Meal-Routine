@@ -159,6 +159,26 @@ describe('account privacy', () => {
       databaseUrl: 'postgres://local/meal',
       corsOrigin: '*',
     }))).toThrow(/CORS_ORIGIN/)
+    expect(() => assertRuntimeConfig(testConfig({
+      nodeEnv: 'production',
+      databaseUrl: 'postgres://local/meal',
+      appleBundleId: 'com.mealroutine.app',
+    }))).toThrow(/APPLE_BUNDLE_ID/)
+    expect(() => assertRuntimeConfig(testConfig({
+      nodeEnv: 'production',
+      databaseUrl: 'postgres://local/meal',
+      appleBundleId: '',
+    }))).toThrow(/APPLE_BUNDLE_ID/)
+    expect(() => assertRuntimeConfig(testConfig({
+      nodeEnv: 'production',
+      databaseUrl: 'postgres://local/meal',
+      appleBundleId: 'com.berkaydursun.mealroutine.app',
+    }))).not.toThrow()
+    expect(() => assertRuntimeConfig(testConfig({
+      nodeEnv: 'development',
+      databaseUrl: 'postgres://local/meal',
+      appleBundleId: 'com.mealroutine.app',
+    }))).not.toThrow()
 
     const tiny = buildApp({
       repo: memoryRepo(),

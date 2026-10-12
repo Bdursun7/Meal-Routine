@@ -22,3 +22,5 @@ Package.resolved
 server/node_modules/
 server/dist/
 server/.env
+*.p8
+AuthKey_*.p8

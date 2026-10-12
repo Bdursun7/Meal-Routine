@@ -182,7 +182,8 @@ struct AccountView: View {
     @ViewBuilder
     private var linkSection: some View {
         let linked = Set(auth.identities.map(\.provider))
-        if !linked.contains("apple") || !linked.contains("google") {
+        let googleOffered = !linked.contains("google") && AccountSignInButtons.offersGoogle
+        if !linked.contains("apple") || googleOffered {
             Section {
                 if !linked.contains("apple") {
                     if HouseholdTestLaunch.allowsAppleServices {
@@ -202,7 +203,7 @@ struct AccountView: View {
                             .foregroundStyle(Theme.secondaryText)
                     }
                 }
-                if !linked.contains("google") {
+                if !linked.contains("google"), AccountSignInButtons.offersGoogle {
                     if MealRoutineConfig.googleClientID.isEmpty {
                         Text(MealRoutineConfig.googleClientMissingMessage)
                             .font(.footnote)
@@ -224,6 +225,16 @@ struct AccountView: View {
 struct AccountSignInButtons: View {
     @State private var auth = AuthSession.shared
 
+    /// Release hides the developer hint when no Google client id is compiled in.
+    static var offersGoogle: Bool {
+        if !MealRoutineConfig.googleClientID.isEmpty { return true }
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
     var body: some View {
         if HouseholdTestLaunch.allowsAppleServices {
             SignInWithAppleButton(.signIn) { request in
@@ -240,10 +251,12 @@ struct AccountSignInButtons: View {
         }
 
         if MealRoutineConfig.googleClientID.isEmpty {
+            #if DEBUG
             Text(MealRoutineConfig.googleClientMissingMessage)
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
                 .accessibilityIdentifier("auth.googleMissing")
+            #endif
         } else {
             Button("Google ile giriş") {
                 Task { await auth.signInWithGoogle() }

@@ -4,6 +4,7 @@ import http2 from 'node:http2'
 import type { Pool } from 'pg'
 
 export const GROUP_WINDOW_MS = 2 * 60 * 1000
+export const DISPATCH_INTERVAL_MS = 30 * 1000
 
 export const notificationKinds = ['invite', 'weekly_plan', 'meal_veto', 'meal_replacement', 'plan_finalized'] as const
 export type NotificationKind = (typeof notificationKinds)[number]

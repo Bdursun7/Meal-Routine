@@ -14,7 +14,7 @@ final class HouseholdTestModeTests: XCTestCase {
         #if HOUSEHOLD_LOCAL
         XCTAssertTrue(production is HTTPHouseholdTransport)
         #else
-        XCTAssertTrue(production is CloudKitHouseholdBackend)
+        XCTAssertTrue(production is OfflineHouseholdTransport)
         #endif
     }
 

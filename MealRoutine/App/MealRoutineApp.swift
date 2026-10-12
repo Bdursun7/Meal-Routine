@@ -34,8 +34,22 @@ struct MealRoutineApp: App {
                     }
                     CollectionRouter.shared.handleOpenURL(url)
                 }
+                .modifier(RemoteConfigRefresh())
         }
         .modelContainer(container)
+    }
+}
+
+private struct RemoteConfigRefresh: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .task { await RemoteAPIConfigRefresher.refresh() }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await RemoteAPIConfigRefresher.refresh() }
+            }
     }
 }
 

@@ -12,31 +12,36 @@ enum MealRoutineConfig {
         cleaned(Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String)
     }
 
-    /// Nil on a paid build that has not set an API address. Debug-Local always has one.
+    /// Resolved origin. Manual entry, then the last gist address, then Info.plist,
+    /// then localhost on the Local scheme. Nil means the beta has no server yet.
     static var apiBaseURL: URL? {
-        if let url = url(from: Bundle.main.object(forInfoDictionaryKey: "MealRoutineAPIBaseURL") as? String) {
-            return url
-        }
+        currentResolution().url
+    }
+
+    static var remoteConfigURL: URL? {
+        APIBaseURLResolver.normalize(Bundle.main.object(forInfoDictionaryKey: "MealRoutineRemoteConfigURL") as? String)
+    }
+
+    static func currentResolution(defaults: UserDefaults = .standard) -> APIBaseURLResolver.Resolution {
         #if HOUSEHOLD_LOCAL
-        return URL(string: "http://localhost:8080")
+        let localFallback = "http://localhost:8080"
         #else
-        return nil
+        let localFallback: String? = nil
         #endif
+        return APIBaseURLResolver.resolve(
+            APIBaseURLResolver.Input(
+                manual: defaults.string(forKey: APIBaseURLResolver.manualKey),
+                cached: defaults.string(forKey: APIBaseURLResolver.cacheKey),
+                remote: nil,
+                plist: Bundle.main.object(forInfoDictionaryKey: "MealRoutineAPIBaseURL") as? String,
+                localFallback: localFallback
+            )
+        )
     }
 
     private static func cleaned(_ raw: String?) -> String {
         let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.contains("$(") { return "" }
         return trimmed
-    }
-
-    private static func url(from raw: String?) -> URL? {
-        let value = cleaned(raw)
-        guard let url = URL(string: value),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
-            return nil
-        }
-        return url
     }
 }
