@@ -344,6 +344,7 @@ struct GroceryView: View {
                 }
             }
         }
+        .accessibilityIdentifier("grocery.card.\(row.id.replacingOccurrences(of: "|", with: "."))")
         .swipeActions {
             if let partID = row.primaryPartID {
                 Button {

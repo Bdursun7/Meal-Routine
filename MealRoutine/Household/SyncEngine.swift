@@ -276,6 +276,10 @@ final class SyncEngine {
     #endif
 
     func start(onReconnect: @escaping @MainActor () -> Void) {
+        if UITestLaunch.isEnabled {
+            online = false
+            return
+        }
         self.onReconnect = onReconnect
         guard !started else { return }
         started = true

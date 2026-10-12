@@ -388,6 +388,7 @@ private struct RecipeListRow: View {
                 }
                 .contentShape(Rectangle())
             }
+            .accessibilityIdentifier("recipe.row.\(recipe.slug)")
             .accessibilityHint("Tarif detayını açar")
 
             Button(action: onToggleFavorite) {

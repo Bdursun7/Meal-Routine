@@ -100,6 +100,7 @@ struct PantryView: View {
             statusSections
             content
         }
+        .accessibilityIdentifier("pantry.list")
         .navigationTitle(PantryCopy.screenTitle)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Malzeme ara")
@@ -224,6 +225,7 @@ struct PantryView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .accessibilityIdentifier("pantry.location.scroller")
         }
     }
 
@@ -231,6 +233,7 @@ struct PantryView: View {
     private var statusSections: some View {
         Section {
             Toggle(PantryCopy.lowStockToggle, isOn: preferenceBinding(\.lowStockNotificationsEnabled))
+                .accessibilityIdentifier("pantry.lowStock")
             Toggle(PantryCopy.dateReminderToggle, isOn: preferenceBinding(\.dateReminderEnabled))
             Toggle(PantryCopy.dateReminderScheduleToggle, isOn: scheduleBinding)
                 .disabled(!notificationPreferences.dateReminderEnabled)
@@ -354,7 +357,7 @@ struct PantryView: View {
             dateType: item.dateType,
             dateValue: item.dateValue,
             sync: marks[item.uuid.uuidString.lowercased()] ?? .synced,
-            today: PantryDay.string(from: Date(), calendar: .current),
+            today: PantryDay.string(from: AppClock.now, calendar: .current),
             lowStockQuantity: PantryGroupStock.total(rows, unit: item.unit)
         )
     }
@@ -370,7 +373,11 @@ struct PantryView: View {
     }
 
     private func row(_ item: PantryItem) -> some View {
-        PantryRow(shown: presentation(item)) {
+        PantryRow(
+            shown: presentation(item),
+            identifier: "pantry.row.\(item.ingredientID).\(item.location.rawValue)",
+            editIdentifier: "pantry.edit.\(item.ingredientID).\(item.location.rawValue)"
+        ) {
             change(item, by: -1)
         } onIncrement: {
             change(item, by: 1)
@@ -723,6 +730,8 @@ struct PantryView: View {
 private struct PantryRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var shown: PantryRowPresentation
+    var identifier: String
+    var editIdentifier: String
     var onDecrement: () -> Void
     var onIncrement: () -> Void
     var onEdit: () -> Void
@@ -741,7 +750,9 @@ private struct PantryRow: View {
         VStack(alignment: .leading, spacing: stacksControls ? 10 : 4) {
             details
                 .accessibilityElement(children: .ignore)
+                .accessibilityIdentifier(identifier)
                 .accessibilityLabel(shown.accessibilityLabel)
+                .accessibilityValue(shown.amount)
             controls
         }
     }
@@ -835,6 +846,7 @@ private struct PantryRow: View {
                 .font(.footnote.weight(.semibold))
                 .buttonStyle(.borderless)
                 .fixedSize(horizontal: true, vertical: true)
+                .accessibilityIdentifier(editIdentifier)
                 .accessibilityHint("Açılır. Miktar ancak Kaydet ile yazılır.")
             Button("Bitti", action: onFinish)
                 .font(.footnote.weight(.semibold))
@@ -1058,6 +1070,7 @@ private struct PantryForm: View {
                         } label: {
                             PantryIngredientSuggestionLabel(entry: entry)
                         }
+                        .accessibilityIdentifier("pantry.suggestion.\(entry.id)")
                     }
                 } header: {
                     Text("Malzeme")
@@ -1067,6 +1080,7 @@ private struct PantryForm: View {
                 Section("Miktar") {
                     TextField("Miktar", text: $draft.quantityText)
                         .keyboardType(.decimalPad)
+                        .accessibilityIdentifier("pantry.form.quantity")
                     Picker("Birim", selection: $draft.unit) {
                         if draft.unit.isEmpty { Text("Birim seç").tag("") }
                         ForEach(PantryUnitPolicy.pickerUnits, id: \.self) { code in
@@ -1088,6 +1102,7 @@ private struct PantryForm: View {
                     if draft.hasMinimum {
                         TextField("Minimum (\(UnitLabels.turkish(draft.unit)))", text: $draft.minimumText)
                             .keyboardType(.decimalPad)
+                            .accessibilityIdentifier("pantry.form.minimum")
                         Toggle(PantryCopy.autoAddToggle, isOn: $draft.autoAddToGrocery)
                     }
                 } footer: {
@@ -1116,6 +1131,7 @@ private struct PantryForm: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(item == nil ? "Ekle" : "Kaydet") { save() }
                         .disabled(!draft.canSave)
+                        .accessibilityIdentifier("pantry.form.save")
                 }
             }
         }

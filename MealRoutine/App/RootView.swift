@@ -103,9 +103,13 @@ struct RootView: View {
         isSeeding = true
         seedError = nil
         LegacyPersonalPantryDateUpgrade.runIfNeeded(in: modelContext)
-        try? GroceryListService.reconcileStoredShortfalls(in: modelContext)
         do {
-            try await RecipeSeedService.seedIfNeeded(context: modelContext)
+            if UITestLaunch.isEnabled {
+                try UITestFixture.seed(in: modelContext)
+            } else {
+                try? GroceryListService.reconcileStoredShortfalls(in: modelContext)
+                try await RecipeSeedService.seedIfNeeded(context: modelContext)
+            }
             try CatalogIndexCache.warm(in: modelContext)
             isSeeding = false
             drainCaptures()

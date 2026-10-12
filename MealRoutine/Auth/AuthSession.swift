@@ -17,6 +17,7 @@ final class AuthSession {
     private var didInstallExpiry = false
 
     func restore() async {
+        if UITestLaunch.isEnabled { return }
         installExpiryHandler()
         guard let stored = AuthServices.sharedTokens.load() else { return }
         account = AuthAccountDTO(

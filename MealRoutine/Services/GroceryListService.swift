@@ -78,7 +78,7 @@ enum GroceryListService {
 
     @MainActor
     @discardableResult
-    static func rebuild(in context: ModelContext, now: Date = .now, applyingPantry: Bool = false) throws -> PantryCoverageStamp {
+    static func rebuild(in context: ModelContext, now: Date = AppClock.now, applyingPantry: Bool = false) throws -> PantryCoverageStamp {
         guard let week = try WeekPlanService.currentWeek(in: context, now: now) else { return .idle }
         try reconcileStoredShortfalls(in: context)
         guard let prefs = try UserPrefsStore.existing(in: context) else { return .idle }

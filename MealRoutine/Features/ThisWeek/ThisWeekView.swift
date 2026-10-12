@@ -648,6 +648,7 @@ private struct TonightDinnerCard: View {
                             .clipShape(RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("week.open.\(meal.slug)")
                     .accessibilityLabel("Tarifi aç")
                     .accessibilityHint("\(meal.recipeName) tarifini açar")
                 } second: {

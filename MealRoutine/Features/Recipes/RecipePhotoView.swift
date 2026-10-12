@@ -80,6 +80,7 @@ struct RecipePhotoView: View {
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier(layout == .hero ? "recipe.photo.hero" : "recipe.photo.row")
             .accessibilityLabel(accessibilityText)
             .accessibilityAddTraits(bitmapIsVisible ? .isImage : [])
             .transaction { transaction in

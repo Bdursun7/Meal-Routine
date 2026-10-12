@@ -10,8 +10,9 @@ struct MealRoutineApp: App {
     private let container: ModelContainer
 
     init() {
+        UITestLaunch.install()
         do {
-            container = try ModelContainerFactory.make()
+            container = try ModelContainerFactory.make(inMemory: UITestLaunch.isEnabled)
         } catch {
             fatalError("MealRoutine SwiftData store could not be created: \(error)")
         }

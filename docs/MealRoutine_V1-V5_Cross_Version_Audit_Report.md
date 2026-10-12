@@ -1,6 +1,11 @@
 # MealRoutine — V1–V5 Cross-Version Audit Report
 
-**Latest decision (pantry locations, 2026-10-11, option A):** `FAIL — V6 blocked`  
+**Latest decision (V5.1 closed, 2026-10-12):** `PASS — V6 may start`  
+**Evidence:** The project owner verified on a Mac on 2026-10-12: tests pass, migrations `0012`–`0015` are applied, the cook sheet is correct, recipe hero photos load, and pantry dates stay stable across relaunch. That is `AUD-V5-002` **Pass**. V5.1 is closed. V6 is unblocked.  
+**Still Not verified, and not Pass:** VoiceOver, Dynamic Type, Dark Mode, OS notification delivery, APNs, and `AUD-GLOB-001` (household timezone, still V7). The two-simulator household test was not executed. The owner marked it optional and non-blocking. `Not verified` is not `Pass`. The V6 unblock is the owner’s explicit close of V5.1 after `AUD-V5-002` Pass; it does not convert those other rows into Pass.  
+**UI smoke target:** `MealRoutineUITests` with `-uitest` was added on `cursor/v51-close-uitests-8226` from `V5-Alignment-Audit` `474bb53`. `V5.0` was not modified. This environment has no Xcode, so that target was not executed. Section 13 records the close. Earlier `FAIL — V6 blocked` headers stay as history. Where they disagree with this decision, this header and section 13 win.
+
+**Earlier decision (pantry locations, 2026-10-11, option A):** `FAIL — V6 blocked`  
 **Code under test:** `cursor/pantry-location-rows-2826`, branched from `V5-Alignment-Audit` `fb94588`. `V5.0` was not modified.  
 **Why V6 stays blocked:** `AUD-V5-002` is still not `Pass`. Linux rules for `AUD-V5-016` passed. The SwiftData store, DatePicker, cook sheet with real location rows, Evdekiler tabs, notification delivery, and a two-simulator household were not executed. That is **Not verified (Mac)**.  
 **Location rule:** The same canonical ingredient and unit bucket may sit in more than one location. `0015_pantry_location` drops `pantry_items_one_row_per_bucket` and adds `UNIQUE (household_id, ingredient_id, unit_bucket, location)`. Existing rows are not deleted or rewritten. Create merges only into the same place. Moving a row onto an occupied place adds the quantity and deletes the source. Dates: the row already in that place is the target. Both undated stays undated. One dated side keeps that pair. The same type keeps the earlier `YYYY-MM-DD`. `bestBefore` and `useBy` are not converted; the target’s type and day stay. Settings are ingredient-level with no new column: reads use the max minimum (converted) and the OR of auto-add. A create never lowers that minimum and never turns auto-add off. An edit writes the saved values onto every sibling, and only the fields that changed. Threshold, “Azaldı”, Bitti’s shortfall, and “Eksik miktarı hesapla” use the total. Date reminders stay on the row. The low-stock key is `canonicalId|unit bucket`. Old per-row keys do not match, so one extra notice can fire after the upgrade. `AUD-V5-009` already names the partner shortfall gap, so this finding is `AUD-V5-016`.  
@@ -682,5 +687,29 @@ Host: Ubuntu 24.04, x86_64. Node from nvm. Swift 6.0.3. PostgreSQL 16.15. `DATAB
 
 Not a defect. The owner asked for tabs on Evdekiler: Tümü, Kiler, Buzdolabı, Dondurucu, Diğer. They filter the list, show counts, preselect location when adding from a location tab, remember the last tab for the session only, and speak a VoiceOver label. Empty copy is “Kiler konumunda malzeme yok.” Market stays one list. No schema change. Test: `testLocationTabsFilterThePantryListAndPreselectAPlace`. The chips are Not verified (Mac).
 
-**Decision:** `FAIL — V6 blocked`. `AUD-V5-002` remains open.
+**Decision at the end of §12 (2026-10-11):** `FAIL — V6 blocked`. `AUD-V5-002` was still open. Section 13 closes it.
+
+## 13. V5.1 close (owner, Mac, 2026-10-12)
+
+`V5.0` was not modified.
+
+| Check | Result |
+| --- | --- |
+| Mac tests | Pass, as reported by the owner. This report does not paste that Xcode log. |
+| Migrations `0012`–`0015` applied | Pass, owner. |
+| Cook sheet | Pass, owner: the sheet was correct. |
+| Recipe hero photos | Pass, owner: photos load. |
+| Pantry dates across relaunch | Pass. This is `AUD-V5-002` Pass. |
+| Two-simulator household | **Not verified.** Optional. Non-blocking by owner decision. Not Pass. |
+| VoiceOver, Dynamic Type, Dark Mode | Not verified. Not Pass. |
+| OS notification delivery, APNs | Not verified. Not Pass. |
+| `AUD-GLOB-001` household timezone | Still V7. Not Pass. |
+
+`AUD-V5-002` status in §§4–9 stays as the before record. The Pass is this section.
+
+### UI smoke target (not executed here)
+
+`MealRoutineUITests` already existed (`com.berkaydursun.mealroutine.app.uitests`, team `L99MZR5MXZ`, host `MealRoutine`). The `MealRoutine` scheme Test action already lists it with `skipped = NO`. This change adds `SmokeUITests` and the `-uitest` launch hook: in-memory SwiftData, a fixture week/pantry/market card, household and product network skipped, clock fixed at Monday 2026-10-12 09:00 Europe/Istanbul. Flows: five tabs; Tarifler hero leaves the spinner; Bu Hafta → Bunu pişirdim → rating → Evdekilerden düş (default Kiler 1, stepper moves the take to Buzdolabı, partial row off says “Bu onayda düşülmez”, Düş changes only the chosen location); Evdekiler tabs and the same ingredient in two locations; Market source labels; low-stock threshold UI. Mac command: `Tools/run_ui_tests.sh`. Linux cannot run it. The eight `Tools/run_*.sh` scripts were re-run on this branch with Swift 6.0.3 and exited 0. `PantryDomainTests` was 53/53.
+
+**Decision:** `PASS — V6 may start`. V5.1 is closed. `AUD-V5-002` is Pass. The two-simulator household test remains Not verified and does not block V6.
 

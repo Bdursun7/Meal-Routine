@@ -1,7 +1,7 @@
 # MealRoutine V5.1 — Integration Readiness Fixes
 
-**Status:** Implemented on `cursor/v51-integration-readiness-ef13`, not merged.  
-**Scope:** AUD-V5-001 and AUD-V5-002 only. This is not a license to add V6 behavior.  
+**Status:** Closed 2026-10-12. The owner verified on a Mac: tests pass, migrations `0012`–`0015` applied, cook sheet correct, recipe hero photos load, pantry dates stable across relaunch. `AUD-V5-002` is Pass. V6 is unblocked. The two-simulator household test was not executed: Not verified, optional, non-blocking. VoiceOver, Dynamic Type, Dark Mode, OS notification delivery, APNs, and `AUD-GLOB-001` are not Pass.  
+**Scope of the original note:** AUD-V5-001 and AUD-V5-002 only. Later V5.1 cook, threshold, and location work is in the audit report. This note is not a license to add V6 behavior.  
 **Base:** `V5-Alignment-Audit`. `V5.0` was not modified.
 
 The locked instruction is the attached spec `05_MealRoutine_V5.1_Integration_Readiness_Fixes`. This note records what the code does, including the exception the project owner accepted on 2026-10-10.
@@ -35,4 +35,4 @@ The acceptance-matrix row “Eski kişisel kaydın tek seferlik dönüşümü”
 
 ## V6
 
-V6 does not start from this note. The audit report records Pass / Fail / Not verified. A Not verified Mac check is not a Pass.
+The 2026-10-12 owner verification closed V5.1 and unblocked V6. The audit report is the decision record. A Not verified Mac check is still not a Pass. The two-simulator household test stays Not verified and does not block V6. V6 behavior is not added by this note.

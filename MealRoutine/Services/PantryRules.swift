@@ -168,9 +168,10 @@ enum PantryOutbox {
     private static var flushing = false
     private static var rerun = false
 
-    /// Test mode and builds without an API keep household rows on the phone only.
+    /// Test mode, `-uitest`, and builds without an API keep household rows on the phone only.
     static var syncsHousehold: Bool {
-        !HouseholdSession.shared.isTestMode && MealRoutineConfig.apiBaseURL != nil
+        if UITestLaunch.isEnabled { return false }
+        return !HouseholdSession.shared.isTestMode && MealRoutineConfig.apiBaseURL != nil
     }
 
     enum Action: String {

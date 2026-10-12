@@ -46,6 +46,10 @@ final class HouseholdSession {
     }
 
     func start(in context: ModelContext) async {
+        if UITestLaunch.isEnabled {
+            isStarted = true
+            return
+        }
         if HouseholdTestLaunch.isRequestedByLaunch {
             HouseholdTestMode.shared.setEnabled(true)
         }

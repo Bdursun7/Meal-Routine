@@ -117,7 +117,8 @@ targets:
       - target: MealRoutine
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mealroutine.app.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.berkaydursun.mealroutine.app.uitests
+        DEVELOPMENT_TEAM: L99MZR5MXZ
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
         TEST_TARGET_NAME: MealRoutine
