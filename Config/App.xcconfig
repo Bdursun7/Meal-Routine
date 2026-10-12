@@ -1,4 +1,4 @@
 // Public raw URL of the server-address JSON. This is not the tunnel host.
 // Replace the placeholder with the Gist raw URL before a TestFlight archive.
 // See docs/testflight-mac-runbook.md.
-MEALROUTINE_REMOTE_CONFIG_URL = https://example.invalid/mealroutine-server.json
+MEALROUTINE_REMOTE_CONFIG_URL = https:/$()/gist.githubusercontent.com/Bdursun7/cf5b1918c9372cd39698d2200588818b/raw/mealroutine-server.json
