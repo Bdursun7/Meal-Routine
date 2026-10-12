@@ -3,9 +3,24 @@ import XCTest
 /// Smoke flows against the `-uitest` fixture. No `sleep`. Every wait is `waitForExistence`
 /// or an `XCTNSPredicateExpectation`.
 final class SmokeUITests: XCTestCase {
+    private var launched: XCUIApplication?
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+    }
+
+    override func record(_ issue: XCTIssue) {
+        let app = launched ?? XCUIApplication()
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "UI hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "Failure screenshot"
+        shot.lifetime = .keepAlways
+        add(shot)
+        super.record(issue)
     }
 
     func testLaunchShowsTheFiveTabs() {
@@ -66,16 +81,19 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Buzdolabı: 1 adet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Kiler: 0 adet"].waitForExistence(timeout: 5))
 
-        let partial = app.switches["cook.include.1"]
+        let partial = reveal("cook.include.1", in: app, within: "cook.sheet", hittable: true)
         XCTAssertTrue(partial.waitForExistence(timeout: 5))
-        if (partial.value as? String) == "1" {
+        if deductsOnThisConfirm(partial) {
             partial.tap()
         }
-        let leftOut = NSPredicate(format: "label CONTAINS %@", "Bu onayda düşülmez")
-        XCTAssertEqual(
-            XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: leftOut, object: partial)], timeout: 5),
-            .completed
+        // The sentence is `accessibilityValue` on cook.summary.1, not the switch's on/off value.
+        let leftOut = NSPredicate(
+            format: "identifier == %@ AND value == %@",
+            "cook.summary.1",
+            "Bu onayda düşülmez"
         )
+        let summary = app.descendants(matching: .any).matching(leftOut).firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 5), "cook.summary.1 value == Bu onayda düşülmez")
 
         app.buttons["cook.deduct"].tap()
         let sheet = app.navigationBars["Evdekilerden düş"]
@@ -86,15 +104,18 @@ final class SmokeUITests: XCTestCase {
         )
 
         openPantry(app)
-        let fridgeRow = app.descendants(matching: .any)["pantry.row.tomato.refrigerator"]
-        let pantryRow = app.descendants(matching: .any)["pantry.row.tomato.pantry"]
-        let onionRow = app.descendants(matching: .any)["pantry.row.onion.pantry"]
+        let fridgeRow = reveal("pantry.row.tomato.refrigerator", in: app, within: "pantry.list")
+        let pantryRow = reveal("pantry.row.tomato.pantry", in: app, within: "pantry.list")
+        let onionRow = reveal("pantry.row.onion.pantry", in: app, within: "pantry.list")
         XCTAssertTrue(fridgeRow.waitForExistence(timeout: 8))
         XCTAssertTrue(pantryRow.waitForExistence(timeout: 5))
         XCTAssertTrue(onionRow.waitForExistence(timeout: 5))
+        XCTAssertEqual(fridgeRow.value as? String, "1 adet")
         XCTAssertTrue(fridgeRow.label.contains("1 adet"))
         XCTAssertFalse(fridgeRow.label.contains("2 adet"))
+        XCTAssertEqual(pantryRow.value as? String, "1 adet")
         XCTAssertTrue(pantryRow.label.contains("1 adet"))
+        XCTAssertEqual(onionRow.value as? String, "1 adet")
         XCTAssertTrue(onionRow.label.contains("1 adet"))
     }
 
@@ -102,27 +123,38 @@ final class SmokeUITests: XCTestCase {
         let app = launch()
         openPantry(app)
 
-        app.buttons["pantry.location.pantry"].tap()
-        let kilerTomato = app.descendants(matching: .any)["pantry.row.tomato.pantry"]
+        selectPantryLocation("pantry", in: app)
+        let kilerTomato = reveal("pantry.row.tomato.pantry", in: app, within: "pantry.list")
         XCTAssertTrue(kilerTomato.waitForExistence(timeout: 8))
         XCTAssertFalse(app.descendants(matching: .any)["pantry.row.tomato.refrigerator"].exists)
 
         addMiso(quantity: "2", in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["pantry.row.miso.pantry"].waitForExistence(timeout: 8))
+        let kilerMiso = reveal("pantry.row.miso.pantry", in: app, within: "pantry.list")
+        XCTAssertTrue(kilerMiso.waitForExistence(timeout: 8))
+        XCTAssertEqual(kilerMiso.value as? String, "2 adet")
 
-        app.buttons["pantry.location.refrigerator"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["pantry.row.tomato.refrigerator"].waitForExistence(timeout: 8))
+        selectPantryLocation("refrigerator", in: app)
+        XCTAssertTrue(reveal("pantry.row.tomato.refrigerator", in: app, within: "pantry.list").waitForExistence(timeout: 8))
         XCTAssertFalse(app.descendants(matching: .any)["pantry.row.miso.pantry"].exists)
 
         addMiso(quantity: "1", in: app)
-        let fridgeMiso = app.descendants(matching: .any)["pantry.row.miso.refrigerator"]
+        let fridgeMiso = reveal("pantry.row.miso.refrigerator", in: app, within: "pantry.list")
         XCTAssertTrue(fridgeMiso.waitForExistence(timeout: 8))
+        XCTAssertEqual(fridgeMiso.value as? String, "1 adet")
         XCTAssertTrue(fridgeMiso.label.contains("1 adet"))
         XCTAssertFalse(app.descendants(matching: .any)["pantry.row.miso.pantry"].exists)
 
-        app.buttons["pantry.location.all"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["pantry.row.miso.pantry"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["pantry.row.miso.refrigerator"].exists)
+        selectPantryLocation("all", in: app)
+        XCTAssertTrue(reveal("pantry.row.miso.pantry", in: app, within: "pantry.list").waitForExistence(timeout: 8))
+        XCTAssertEqual(
+            app.descendants(matching: .any)["pantry.row.miso.pantry"].value as? String,
+            "2 adet"
+        )
+        XCTAssertTrue(reveal("pantry.row.miso.refrigerator", in: app, within: "pantry.list").waitForExistence(timeout: 8))
+        XCTAssertEqual(
+            app.descendants(matching: .any)["pantry.row.miso.refrigerator"].value as? String,
+            "1 adet"
+        )
     }
 
     func testMarketCanonicalCardShowsSourceLabels() {
@@ -164,9 +196,67 @@ final class SmokeUITests: XCTestCase {
 
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
+        launched = app
         app.launchArguments = ["-uitest"]
         app.launch()
         return app
+    }
+
+    /// Switch value may be "1"/1 while on, or the summary sentence once `accessibilityValue` is the copy.
+    private func deductsOnThisConfirm(_ element: XCUIElement) -> Bool {
+        let raw = element.value
+        if let number = raw as? NSNumber { return number.intValue != 0 }
+        if let number = raw as? Int { return number != 0 }
+        guard let text = raw as? String else { return true }
+        if text == "0" || text.caseInsensitiveCompare("false") == .orderedSame { return false }
+        if text == "1" || text.caseInsensitiveCompare("true") == .orderedSame { return true }
+        return !text.contains("Bu onayda düşülmez")
+    }
+
+    private func selectPantryLocation(_ raw: String, in app: XCUIApplication) {
+        let identifier = "pantry.location.\(raw)"
+        let chip = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), identifier)
+        let scroller = app.descendants(matching: .any)["pantry.location.scroller"]
+        if !chip.isHittable && scroller.exists {
+            for _ in 0..<3 where !chip.isHittable {
+                scroller.swipeRight(velocity: .slow)
+            }
+            for _ in 0..<3 where !chip.isHittable {
+                scroller.swipeLeft(velocity: .slow)
+            }
+        }
+        chip.tap()
+        let selected = NSPredicate(format: "identifier == %@ AND selected == true", identifier)
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(selected).firstMatch.waitForExistence(timeout: 5),
+            identifier
+        )
+    }
+
+    /// SwiftUI lists omit off-screen cells. Swipe the named scroller until the identifier exists.
+    @discardableResult
+    private func reveal(
+        _ identifier: String,
+        in app: XCUIApplication,
+        within scrollerID: String,
+        hittable: Bool = false
+    ) -> XCUIElement {
+        let target = app.descendants(matching: .any)[identifier]
+        let scroller = app.descendants(matching: .any)[scrollerID]
+        let host = scroller.exists ? scroller : app
+        func ready() -> Bool {
+            guard target.exists else { return false }
+            return hittable ? target.isHittable : true
+        }
+        if target.waitForExistence(timeout: 1), ready() { return target }
+        for _ in 0..<5 where !ready() {
+            host.swipeUp(velocity: .slow)
+        }
+        for _ in 0..<6 where !ready() {
+            host.swipeDown(velocity: .slow)
+        }
+        return target
     }
 
     private func openRecipes(_ app: XCUIApplication) {

@@ -100,6 +100,7 @@ struct PantryView: View {
             statusSections
             content
         }
+        .accessibilityIdentifier("pantry.list")
         .navigationTitle(PantryCopy.screenTitle)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Malzeme ara")
@@ -224,6 +225,7 @@ struct PantryView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .accessibilityIdentifier("pantry.location.scroller")
         }
     }
 
@@ -750,6 +752,7 @@ private struct PantryRow: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityIdentifier(identifier)
                 .accessibilityLabel(shown.accessibilityLabel)
+                .accessibilityValue(shown.amount)
             controls
         }
     }

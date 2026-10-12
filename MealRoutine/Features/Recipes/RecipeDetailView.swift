@@ -1126,6 +1126,7 @@ private struct PantryCookConfirmSheet: View {
                     }
                 }
             }
+            .accessibilityIdentifier("cook.sheet")
             .scrollContentBackground(.hidden)
             .background(Theme.bgCream)
             .navigationTitle(PantryCopy.cookConfirmTitle)
@@ -1160,27 +1161,17 @@ private struct PantryCookConfirmSheet: View {
                         .foregroundStyle(Theme.textCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                     amountLine(row)
-                    if row.locations.count <= 1 {
-                        Text(row.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("cook.summary.\(row.needIndex)")
-                    }
                 }
             }
             .tint(Theme.accent)
             .accessibilityLabel(amountAccessibility(row))
+            .accessibilityValue(row.summary)
             .accessibilityHint(PantryCopy.cookExcludeHint)
             .accessibilityIdentifier("cook.include.\(row.needIndex)")
             if row.locations.count > 1 {
                 locationControls(row)
-                Text(row.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
             }
+            cookSummary(row)
         }
         .listRowBackground(Theme.cardSurface)
     }
@@ -1193,21 +1184,19 @@ private struct PantryCookConfirmSheet: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityLabel(amountAccessibility(row))
+                .accessibilityValue(row.summary)
                 .accessibilityHint(PantryCopy.cookExcludeHint)
                 .accessibilityIdentifier("cook.include.\(row.needIndex)")
             } else {
                 insufficientTitle(row)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(amountAccessibility(row))
+                    .accessibilityValue(row.summary)
             }
             if row.locations.count > 1 {
                 locationControls(row)
-                Text(row.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
             }
+            cookSummary(row)
             if row.offerAddMissing {
                 let already = added.contains(row.needIndex)
                 Button {
@@ -1234,14 +1223,21 @@ private struct PantryCookConfirmSheet: View {
                 .foregroundStyle(Theme.textCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
             amountLine(row)
-            if row.locations.count <= 1 {
-                Text(row.summary)
-                    .font(.subheadline)
-                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("cook.summary.\(row.needIndex)")
-            }
         }
+    }
+
+    /// The sentence the cook reads (“Bu onayda düşülmez”, “1 adet düşülür…”).
+    /// It sits beside the switch, not inside it, so the toggle does not swallow the identifier.
+    /// `accessibilityValue` is that sentence and nothing else.
+    private func cookSummary(_ row: PantryCookSheetRow) -> some View {
+        Text(row.summary)
+            .font(.subheadline)
+            .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("cook.summary.\(row.needIndex)")
+            .accessibilityLabel(row.summary)
+            .accessibilityValue(row.summary)
     }
 
     @ViewBuilder
@@ -1407,9 +1403,9 @@ private struct PantryCookConfirmSheet: View {
 
     private func amountAccessibility(_ row: PantryCookSheetRow) -> String {
         if let inventory = row.inventoryLine {
-            return "\(row.displayName), tarif \(row.recipeAmount), \(inventory), \(row.summary)"
+            return "\(row.displayName), tarif \(row.recipeAmount), \(inventory)"
         }
-        return "\(row.displayName), tarif \(row.recipeAmount), evdekiler \(row.stockAmount ?? ""), \(row.summary)"
+        return "\(row.displayName), tarif \(row.recipeAmount), evdekiler \(row.stockAmount ?? "")"
     }
 
     private func includedBinding(_ row: PantryCookSheetRow) -> Binding<Bool> {
