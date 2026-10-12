@@ -45,7 +45,10 @@ private struct RemoteConfigRefresh: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .task { await RemoteAPIConfigRefresher.refresh() }
+            .task {
+                await RemoteAPIConfigRefresher.refresh()
+                LaunchStartup.shared.markRemoteConfigFinished()
+            }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
                 Task { await RemoteAPIConfigRefresher.refresh() }
