@@ -40,7 +40,7 @@ Sonra `npm run migrate`. Yayınlanmış bir ortamda taslak hiç uygulanmadı.
 DATABASE_URL=postgres://kullanici:sifre@localhost:5433/mealroutine npm test
 ```
 
-`pantry.integration.test.ts` boş bir şemaya `0001`–`0011` uygular, V4.1 verisi yazar, `0012`, `0013` ve `0014`’ü uygular ve hiçbir satırın kaybolmadığını, kısıtların veritabanında da tuttuğunu doğrular. 2026-10-11 Postgres 16.15 koşusu: `npm test` 68/68, atlanan yok; `Tools/run_pantry_domain_tests.sh` 46/46.
+`pantry.integration.test.ts` boş bir şemaya `0001`–`0011` uygular, V4.1 verisi yazar, `0012`, `0013` ve `0014`’ü uygular ve hiçbir satırın kaybolmadığını, kısıtların veritabanında da tuttuğunu doğrular. `#64` temel şema onarım testi (`pantry.foundation.integration.test.ts`) erken `0012` şemasını onarır, satırları tutar ve `0015`’i uygular. 2026-10-12 Postgres 16.15 koşusu: `npm test` 74/74, atlanan yok; `Tools/run_pantry_domain_tests.sh` 53/53. Önceki kayıt 73/73 ve 50/50 (2026-10-11), ondan önce 68/68 ve 46/46.
 
 ## Ingredient sözlüğü
 

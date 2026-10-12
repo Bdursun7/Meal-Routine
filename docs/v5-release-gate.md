@@ -10,9 +10,9 @@ Yönerge bölüm 16. Ürün sınırı `docs/v5-smart-pantry.md`. Yerel kurulum `
 | --- | --- |
 | `cd server && npm run typecheck` | geçti |
 | `cd server && npm test` | Postgres yokken önceki kayıt (2026-10-11 kısa-satır düzeltmesi): 63 geçti, 4 atlandı. Bu turda yeniden ölçülmedi |
-| `cd server && DATABASE_URL=postgres://… npm test` | 73 / 73 geçti, Postgres 16.15, atlanan yok (2026-10-11, konum satırları). Önceki kayıt 68 / 68 (aynı gün, gözden geçirme) ve 66 / 66 (2026-10-10) |
-| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 50 / 50, XCTest, Swift 6.0.3 Linux (2026-10-11, konum satırları). Önceki kayıt 46 / 46 (gözden geçirme), 44 / 44 (kanonik kart) ve 42 / 42 (2026-10-10) |
-| `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh`, `run_recipe_photo_checks.sh` | 2026-10-11 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır |
+| `cd server && DATABASE_URL=postgres://… npm test` | 74 / 74 geçti, Postgres 16.15, atlanan yok (2026-10-12). Sayı `#64` temel şema onarım testini içerir (`pantry.foundation.integration.test.ts`). Önceki kayıt 73 / 73 (2026-10-11, konum satırları), 68 / 68 (gözden geçirme) ve 66 / 66 (2026-10-10) |
+| `Tools/run_pantry_domain_tests.sh` | `PantryDomainTests` 53 / 53, XCTest, Swift 6.0.3 Linux (2026-10-12). Önceki kayıt 50 / 50 (konum satırları), 46 / 46 (gözden geçirme), 44 / 44 (kanonik kart) ve 42 / 42 (2026-10-10) |
+| `Tools/run_grocery_checks.sh`, `run_portion_checks.sh`, `run_household_checks.sh`, `run_memory_checks.sh`, `run_recommender_checks.sh`, `run_product_gap_checks.sh`, `run_recipe_photo_checks.sh` | 2026-10-12 geçti. 125 g + 1 kg `1,125 kg` kalır. `tomato` + `tomatoes` tek satır |
 
 Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRules`, `GroceryView`, `GroceryViewModel`, `HouseholdSession`, `APIClient`) ve `MealRoutineTests/PantryTests.swift` Linux’ta derlenemez. Bunlar Mac’te Xcode ile derlenip koşulur.
 
@@ -47,7 +47,7 @@ Swift dosyalarından SwiftUI ve SwiftData kullananlar (`PantryView`, `PantryRule
 | Hafta yenileme | Linux pass / Mac SwiftData | `HouseholdPlanBridge.apply` elle, `pantry-auto:` ve `pantry-cook:` satırlarını silmez. Plan satırları yeniden kurulur. `Tools/household_checks.swift` ve `HouseholdGroceryPreserveTests` (Xcode) |
 | Ortak kısa miktar | Linux pass | `0,6 kg` 1 olmaz. `1500 g` kabul edilir. `1000000 g` 400 döner. Plan satırı birim göndermez ve `1`…`999` tamsayı kalır (`board.test.ts`) |
 | Evdekiler sekmeleri | Linux kural / Mac ekran | Tümü her konum satırını etiketle gösterir. Kiler, Buzdolabı, Dondurucu, Diğer listeyi süzer; o sekmeden ekleme yalnız o yerde birleşir. Market bölünmez (`testLocationTabsFilterThePantryListAndPreselectAPlace`) |
-| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 46 / 46. `PantryTests` ve `HouseholdGroceryPreserveTests` Xcode’da koşulur |
+| iOS XCTest | Mac | `PantryDomainTests` Linux’ta 53 / 53. `PantryTests` ve `HouseholdGroceryPreserveTests` Xcode’da koşulur |
 | API, migration, runbook | pass | `docs/v5-local-runbook.md`, `server/db/README.md` |
 
 Kapsam dışı ve bilerek yapılmayan: barkod, OCR, LLM tanıma, tarif sitesi çıkarımı, fiyat / bütçe (V6), harici son kullanma API’si, otomatik tarih tahmini, üye sınırı artışı, Apple Sign in / APNs / TestFlight.
