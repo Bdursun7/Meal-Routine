@@ -969,12 +969,31 @@ enum PantryStockSideEffects {
         }
     }
 
+    /// `previousTotal` and `remaining` are the canonical group before this row disappears.
+    /// The last row clears `canonicalId|bucket`. Siblings are re-checked against that total.
     @MainActor
-    static func deleted(_ itemId: UUID) {
+    static func deleted(
+        _ itemId: UUID,
+        ingredientId: String,
+        unit: String,
+        displayName: String,
+        previousTotal: Double,
+        remaining: [PantryGroupRow]
+    ) {
         let id = itemId.uuidString.lowercased()
-        var armed = PantryEffectLedger.armed()
-        armed.remove(id)
-        PantryEffectLedger.saveArmed(armed)
+        let preferences = PantryNotificationPreferenceStore.load()
+        let result = PantryLowStockLedger.afterDelete(
+            deletedId: id,
+            ingredientId: ingredientId,
+            unit: unit,
+            displayName: displayName,
+            previousTotal: previousTotal,
+            remaining: remaining,
+            armed: PantryEffectLedger.armed(),
+            notificationsEnabled: preferences.lowStockNotificationsEnabled
+        )
+        PantryEffectLedger.saveArmed(result.armed)
+        if let notice = result.notice { PantryLocalNotifications.deliver([notice]) }
         PantryLocalNotifications.cancel(itemId: id)
     }
 

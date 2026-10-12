@@ -15,6 +15,8 @@ struct MealRoutineApp: App {
         } catch {
             fatalError("MealRoutine SwiftData store could not be created: \(error)")
         }
+        // Earlier than didFinishLaunching, so a pantry notice can present while the app is already open.
+        UNUserNotificationCenter.current().delegate = appDelegate
     }
 
     var body: some Scene {
@@ -37,6 +39,11 @@ struct MealRoutineApp: App {
 }
 
 final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
+    }
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -61,6 +68,16 @@ final class MealRoutineAppDelegate: NSObject, UIApplicationDelegate, UNUserNotif
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         _ = error
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        guard PantryForegroundPresentation.includes(identifier: notification.request.identifier) else {
+            return []
+        }
+        return [.banner, .list, .sound]
     }
 
     func userNotificationCenter(

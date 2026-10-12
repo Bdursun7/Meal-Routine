@@ -90,6 +90,9 @@ enum PantryCopy {
         "Düşülmez. \(shortfall) eksik"
     }
 
+    /// A matched or partial row the cook turned off. Does not say the amount will be deducted.
+    static let cookLeftOut = "Bu onayda düşülmez"
+
     static func cookAddNamed(_ name: String) -> String {
         "\(name) eksiğini markete ekle"
     }
@@ -166,6 +169,7 @@ enum PantryCopy {
         cookFull(deducted: "200 g", remaining: "300 g"),
         cookPartial(deducted: "400 g", shortfall: "0,6 kg"),
         cookNotDeducted(shortfall: "2 adet"),
+        cookLeftOut,
         cookAddNamed("Domates"), cookConfirmed(3), stillToBuy("1 adet"),
         cookLocationHint, cookDeferred, cookAlready,
         locationInventory([("Kiler", "10"), ("Buzdolabı", "4"), ("Dondurucu", "8")]),
@@ -2026,6 +2030,57 @@ enum PantryLowStockNotifications {
     }
 }
 
+struct PantryLowStockDeletion: Equatable, Sendable {
+    var armed: Set<String>
+    var notice: LowStockNotice?
+}
+
+/// Notify-once ledger after a pantry row is removed.
+/// The armed key is `canonicalId|bucket`, not the row id. Deleting the row id alone leaves the group armed.
+enum PantryLowStockLedger {
+    static func afterDelete(
+        deletedId: String,
+        ingredientId: String,
+        unit: String,
+        displayName: String,
+        previousTotal: Double,
+        remaining: [PantryGroupRow],
+        armed: Set<String>,
+        notificationsEnabled: Bool,
+        dictionary: IngredientDictionary = .shared
+    ) -> PantryLowStockDeletion {
+        var nextArmed = armed
+        nextArmed.remove(deletedId)
+        let key = PantryGroupStock.alertKey(ingredientId: ingredientId, unit: unit, dictionary: dictionary)
+        let siblings = PantryGroupStock.group(remaining, ingredientId: ingredientId, unit: unit, dictionary: dictionary)
+            .filter { $0.id != deletedId }
+        let nextTotal = PantryGroupStock.total(siblings, unit: unit)
+        let minimum = PantryGroupStock.effectiveMinimum(siblings, unit: unit)
+        guard !siblings.isEmpty, PantryThreshold.isLow(quantity: nextTotal, minimum: minimum) else {
+            nextArmed.remove(key)
+            return PantryLowStockDeletion(armed: nextArmed, notice: nil)
+        }
+        let stepped = PantryLowStockNotifications.step(
+            itemId: key,
+            name: displayName,
+            previousQuantity: previousTotal,
+            nextQuantity: nextTotal,
+            minimum: minimum,
+            enabled: notificationsEnabled,
+            armed: nextArmed
+        )
+        return PantryLowStockDeletion(armed: stepped.armed, notice: stepped.notice)
+    }
+}
+
+/// Foreground banners are only for pantry low-stock and date reminders.
+/// Household pushes keep the existing tap path and are not presented while the app is open.
+enum PantryForegroundPresentation {
+    static func includes(identifier: String) -> Bool {
+        identifier.hasPrefix("pantry-low.") || identifier.hasPrefix("pantry-date.")
+    }
+}
+
 struct PantryDateReminderSchedule: Equatable, Codable, Sendable {
     var enabled: Bool
     var bestBeforeDaysBefore: [Int]
@@ -2352,7 +2407,8 @@ struct PantryCookSheetRow: Equatable, Sendable, Identifiable {
     var shortfallQuantity: Double
     var shortfallUnit: String
     var offerAddMissing: Bool
-    /// Only a full match can be left out. Insufficient rows still deduct the capped amount.
+    /// A full match, or a partial row that would still deduct some stock, can be left out.
+    /// Zero stock has nothing to deduct.
     var canExclude: Bool
     var willDeduct: Bool
     /// More than one compatible pantry row. Empty when a single row covers the line.
@@ -2424,7 +2480,7 @@ enum PantryCookConsumption {
     }
 
     /// Groups recipe lines the way the cook sheet shows them.
-    /// `excludedNeedIndexes` are full matches the cook turned off. They do not reduce the stock the next line sees.
+    /// `excludedNeedIndexes` are full matches or partial rows the cook turned off. They do not reduce the stock the next line sees.
     /// The walk matches `apply`: the same ingredient and a convertible unit, capped at what is there, never below zero.
     static func classify(
         needs: [PantryCookNeed],
@@ -2474,16 +2530,18 @@ enum PantryCookConsumption {
                 }
             }
             let kind: PantryCookRowKind = gap > 0 || !anyTake ? .insufficient : .matched
-            let summary = cookSummary(
-                taken: snappedTaken,
-                takenUnit: primary.unit,
-                remaining: remaining,
-                gap: gap,
-                needUnit: need.unit,
-                several: compatible.count > 1,
-                takes: allocation.takes,
-                rows: compatible
-            )
+            let summary = excluded && anyTake
+                ? PantryCopy.cookLeftOut
+                : cookSummary(
+                    taken: snappedTaken,
+                    takenUnit: primary.unit,
+                    remaining: remaining,
+                    gap: gap,
+                    needUnit: need.unit,
+                    several: compatible.count > 1,
+                    takes: allocation.takes,
+                    rows: compatible
+                )
             let lines = locationLines(compatible, takes: allocation.takes)
             rows.append(row(
                 index: index, need: need, recipeAmount: recipeAmount, kind: kind,
@@ -2493,7 +2551,7 @@ enum PantryCookConsumption {
                 remaining: compatible.count > 1 ? nil : remaining,
                 shortfall: gap,
                 offerAddMissing: gap > 0 && !compatible.contains(where: \.autoAddToGrocery),
-                canExclude: kind == .matched,
+                canExclude: anyTake,
                 willDeduct: consumes,
                 locations: compatible.count > 1 ? lines : [],
                 inventoryLine: compatible.count > 1

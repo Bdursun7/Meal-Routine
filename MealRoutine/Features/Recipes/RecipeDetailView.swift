@@ -1183,26 +1183,23 @@ private struct PantryCookConfirmSheet: View {
 
     private func insufficientRow(_ row: PantryCookSheetRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.textCharcoal)
-                    .fixedSize(horizontal: false, vertical: true)
-                amountLine(row)
-                if row.locations.count <= 1 {
-                    Text(row.summary)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textCharcoal)
-                        .fixedSize(horizontal: false, vertical: true)
+            if row.canExclude {
+                Toggle(isOn: includedBinding(row)) {
+                    insufficientTitle(row)
                 }
+                .tint(Theme.accent)
+                .accessibilityLabel(amountAccessibility(row))
+                .accessibilityHint(PantryCopy.cookExcludeHint)
+            } else {
+                insufficientTitle(row)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(amountAccessibility(row))
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(amountAccessibility(row))
             if row.locations.count > 1 {
                 locationControls(row)
                 Text(row.summary)
                     .font(.subheadline)
-                    .foregroundStyle(Theme.textCharcoal)
+                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if row.offerAddMissing {
@@ -1222,6 +1219,22 @@ private struct PantryCookConfirmSheet: View {
             }
         }
         .listRowBackground(Theme.cardSurface)
+    }
+
+    private func insufficientTitle(_ row: PantryCookSheetRow) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(row.displayName)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.textCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+            amountLine(row)
+            if row.locations.count <= 1 {
+                Text(row.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(row.willDeduct ? Theme.textCharcoal : Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     @ViewBuilder

@@ -870,7 +870,7 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(partial.shortfallQuantity, 0.6)
         XCTAssertEqual(partial.shortfallUnit, "kg")
         XCTAssertTrue(partial.offerAddMissing)
-        XCTAssertFalse(partial.canExclude)
+        XCTAssertTrue(partial.canExclude)
         XCTAssertTrue(partial.willDeduct)
         XCTAssertEqual(partial.summary, PantryCopy.cookPartial(
             deducted: PantryCookConsumption.formatAmount(400, unit: "g"),
@@ -895,6 +895,7 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(empty.deductedQuantity, 0)
         XCTAssertEqual(empty.shortfallQuantity, 2)
         XCTAssertFalse(empty.willDeduct)
+        XCTAssertFalse(empty.canExclude)
         XCTAssertTrue(empty.offerAddMissing)
         XCTAssertEqual(empty.summary, PantryCopy.cookNotDeducted(shortfall: PantryCookConsumption.formatAmount(2, unit: "piece")))
         XCTAssertFalse(empty.summary.localizedCaseInsensitiveContains("Stok kadar"))
@@ -948,6 +949,8 @@ final class PantryDomainTests: XCTestCase {
         XCTAssertEqual(skipped.map(\.willDeduct), [false, true])
         XCTAssertEqual(skipped.map(\.deductedQuantity), [0, 300])
         XCTAssertEqual(skipped[1].remainingQuantity, 100)
+        XCTAssertEqual(skipped[0].summary, PantryCopy.cookLeftOut)
+        XCTAssertFalse(skipped[0].summary.contains("düşülür"))
 
         let raw = QuantityFormat.quantityAndUnit(quantity: (0.5).squareRoot(), unit: "tsp")
         XCTAssertTrue(raw.contains("71"), raw)
@@ -1002,6 +1005,102 @@ final class PantryDomainTests: XCTestCase {
             autoAdd: true, version: 2, rows: [], applied: []
         )
         XCTAssertNil(exact.mutation, "landing on the minimum is low for the badge, and the shortfall is zero")
+        XCTAssertTrue(PantryForegroundPresentation.includes(identifier: PantryLowStockNotifications.identifier(itemId: "tomato|family:mass")))
+        XCTAssertTrue(PantryForegroundPresentation.includes(identifier: PantryDateReminders.identifier(itemId: "milk", type: .bestBefore, daysBefore: 2)))
+        XCTAssertFalse(PantryForegroundPresentation.includes(identifier: "8f1c0c2e-6b4a-4d1e-9c3a-1b2d3e4f5a6b"))
+    }
+
+    func testDeletingTheLastCanonicalRowClearsTheGroupAlertAndSiblingsReevaluateTheTotal() {
+        let key = PantryGroupStock.alertKey(ingredientId: "tomatoes", unit: "g", dictionary: dictionary)
+        XCTAssertEqual(key, "tomato|family:mass")
+        let fridge = PantryGroupRow(
+            id: "fridge", ingredientId: "tomato", quantity: 100, unit: "g", location: .refrigerator,
+            minimumQuantity: 200, autoAddToGrocery: false, dateType: nil, dateValue: nil
+        )
+        let crossed = PantryLowStockLedger.afterDelete(
+            deletedId: "pantry", ingredientId: "tomatoes", unit: "g", displayName: "Domates",
+            previousTotal: 1100, remaining: [fridge], armed: ["pantry"],
+            notificationsEnabled: true, dictionary: dictionary
+        )
+        XCTAssertEqual(crossed.notice?.identifier, "pantry-low.\(key)")
+        XCTAssertTrue(crossed.armed.contains(key))
+        XCTAssertFalse(crossed.armed.contains("pantry"))
+
+        let stayedLow = PantryLowStockLedger.afterDelete(
+            deletedId: "pantry", ingredientId: "tomato", unit: "g", displayName: "Domates",
+            previousTotal: 180, remaining: [fridge], armed: [key],
+            notificationsEnabled: true, dictionary: dictionary
+        )
+        XCTAssertNil(stayedLow.notice)
+        XCTAssertTrue(stayedLow.armed.contains(key))
+
+        let stillAbove = PantryLowStockLedger.afterDelete(
+            deletedId: "pantry", ingredientId: "tomato", unit: "g", displayName: "Domates",
+            previousTotal: 1300,
+            remaining: [PantryGroupRow(
+                id: "fridge", ingredientId: "tomato", quantity: 800, unit: "g", location: .refrigerator,
+                minimumQuantity: 200, autoAddToGrocery: false, dateType: nil, dateValue: nil
+            )],
+            armed: [key], notificationsEnabled: true, dictionary: dictionary
+        )
+        XCTAssertNil(stillAbove.notice)
+        XCTAssertFalse(stillAbove.armed.contains(key))
+
+        let cleared = PantryLowStockLedger.afterDelete(
+            deletedId: "fridge", ingredientId: "tomatoes", unit: "kg", displayName: "Domates",
+            previousTotal: 100, remaining: [], armed: crossed.armed.union([key, "fridge"]),
+            notificationsEnabled: true, dictionary: dictionary
+        )
+        XCTAssertNil(cleared.notice)
+        XCTAssertFalse(cleared.armed.contains(key))
+        XCTAssertFalse(cleared.armed.contains("fridge"))
+        let again = PantryLowStockNotifications.step(
+            itemId: key, name: "Domates", previousQuantity: 500, nextQuantity: 100,
+            minimum: 200, enabled: true, armed: cleared.armed
+        )
+        XCTAssertEqual(again.notice?.identifier, "pantry-low.\(key)")
+    }
+
+    func testExcludedPartialRowIsNotDeductedAndSaysSo() throws {
+        let shown = try XCTUnwrap(PantryCookConsumption.classify(
+            needs: [need(quantity: 1, unit: "kg")],
+            stock: [cookStock(quantity: 400, unit: "g")],
+            excludedNeedIndexes: [0],
+            dictionary: dictionary
+        ).first)
+        XCTAssertEqual(shown.kind, .insufficient)
+        XCTAssertTrue(shown.canExclude)
+        XCTAssertFalse(shown.willDeduct)
+        XCTAssertEqual(shown.deductedQuantity, 0)
+        XCTAssertEqual(shown.summary, PantryCopy.cookLeftOut)
+        XCTAssertFalse(shown.summary.contains("düşülür"))
+
+        let applied = PantryCookConsumption.apply(
+            event: .markCooked, confirmed: true, mealId: "meal-1",
+            needs: [need(quantity: 1, unit: "kg")],
+            stock: [cookStock(quantity: 400, unit: "g")],
+            rows: [], appliedMeals: [], appliedCrossings: [], armedLow: [],
+            lowStockEnabled: false, excludedNeedIndexes: [0], dictionary: dictionary
+        )
+        XCTAssertEqual(applied.deductions, [])
+        XCTAssertEqual(applied.stock.map(\.quantity), [400])
+        XCTAssertEqual(applied.shortages, [])
+
+        let places = try XCTUnwrap(PantryCookConsumption.classify(
+            needs: [need(ingredientId: "tomatoes", quantity: 25, unit: "piece")],
+            stock: [
+                PantryCookStock(id: "freezer", ingredientId: "tomato", displayName: "Domates", quantity: 8, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 1, location: .freezer),
+                PantryCookStock(id: "fridge", ingredientId: "tomatoes", displayName: "Domates", quantity: 4, unit: "adet", minimumQuantity: nil, autoAddToGrocery: false, version: 2, location: .refrigerator),
+                PantryCookStock(id: "pantry", ingredientId: "tomato", displayName: "Domates", quantity: 10, unit: "piece", minimumQuantity: nil, autoAddToGrocery: false, version: 3, location: .pantry),
+            ],
+            excludedNeedIndexes: [0],
+            dictionary: dictionary
+        ).first)
+        XCTAssertEqual(places.kind, .insufficient)
+        XCTAssertTrue(places.canExclude)
+        XCTAssertFalse(places.willDeduct)
+        XCTAssertEqual(places.summary, PantryCopy.cookLeftOut)
+        XCTAssertFalse(places.summary.contains("düşülür"))
     }
 
     func testAutoAddIsOffByDefaultAndSetsTheShortfallOnce() throws {
