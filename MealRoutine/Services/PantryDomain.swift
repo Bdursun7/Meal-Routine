@@ -106,10 +106,24 @@ enum PantryCopy {
     static let cookDeferred = "Ev halkı kaydı sunucuya yazılınca düşülecek."
     static let cookAlready = "Bu yemek evde zaten düşüldü."
 
-    /// Available stock by place, in deduction order. Example: `Domates — Kiler: 3 adet, Buzdolabı: 2 adet`.
-    static func locationInventory(_ name: String, parts: [(location: String, amount: String)]) -> String {
-        let body = parts.map { "\($0.location): \($0.amount)" }.joined(separator: ", ")
-        return "\(name) — \(body)"
+    /// Stock by place, in deduction order. The ingredient name is already the row title.
+    /// Example: `Evdekiler: Kiler 10 · Buzdolabı 4 · Dondurucu 8`.
+    static func locationInventory(_ parts: [(location: String, amount: String)]) -> String {
+        let body = parts.map { "\($0.location) \($0.amount)" }.joined(separator: " · ")
+        return "Evdekiler: \(body)"
+    }
+
+    /// Multi-location deduction. Each piece is already `Kiler'den 1 adet`.
+    /// A shortfall is appended; an empty list falls back to the zero-stock sentence.
+    static func cookFromLocations(_ pieces: [String], shortfall: String? = nil) -> String {
+        let body = pieces.joined(separator: ", ")
+        guard !body.isEmpty else {
+            return shortfall.map { cookNotDeducted(shortfall: $0) } ?? ""
+        }
+        if let shortfall, !shortfall.isEmpty {
+            return "\(body) düşülür, \(shortfall) eksik"
+        }
+        return "\(body) düşülür"
     }
     static let minimumFooter = "Minimum, bu malzeme ve birimin bütün konumlarındaki toplama bakılır. Altına inince “Azaldı” görünür."
     static let autoAddToggle = "Minimumun altına inince markete ekle"
@@ -154,7 +168,9 @@ enum PantryCopy {
         cookNotDeducted(shortfall: "2 adet"),
         cookAddNamed("Domates"), cookConfirmed(3), stillToBuy("1 adet"),
         cookLocationHint, cookDeferred, cookAlready,
-        locationInventory("Domates", parts: [("Buzdolabı", "2 adet"), ("Kiler", "3 adet")]),
+        locationInventory([("Kiler", "10"), ("Buzdolabı", "4"), ("Dondurucu", "8")]),
+        cookFromLocations(["Kiler'den 1 adet"]),
+        cookFromLocations(["Kiler'den 3 adet", "Buzdolabı'ndan 1 adet"], shortfall: "1 adet"),
         PantryLocationTabs.emptyMessage(for: .refrigerator),
         addMissingToMarket, minimumFooter, autoAddToggle, autoAddFooter, lowStockToggle, dateReminderToggle,
         dateReminderScheduleToggle, dateReminderFooter, notificationPermissionDenied, lowStockNoticeTitle,
@@ -168,6 +184,16 @@ enum PantryLocation: String, CaseIterable, Codable, Identifiable, Sendable {
     var id: String { rawValue }
     var title: String {
         switch self { case .pantry: "Kiler"; case .refrigerator: "Buzdolabı"; case .freezer: "Dondurucu"; case .other: "Diğer" }
+    }
+
+    /// Ablative used in the cook sheet: "Kiler'den 1 adet düşülür".
+    var ablative: String {
+        switch self {
+        case .pantry: "Kiler'den"
+        case .refrigerator: "Buzdolabı'ndan"
+        case .freezer: "Dondurucu'dan"
+        case .other: "Diğer'den"
+        }
     }
 
     /// Earlier in cook deduction when two rows share a calendar day.
@@ -2143,6 +2169,8 @@ struct PantryCookStock: Equatable, Sendable, Identifiable {
 struct PantryCookLocationLine: Equatable, Sendable, Identifiable {
     var id: String
     var locationTitle: String
+    var location: PantryLocation
+    var dateValue: String?
     var available: Double
     var selected: Double
     var unit: String
@@ -2155,7 +2183,9 @@ struct PantryCookLocationLine: Equatable, Sendable, Identifiable {
 /// The same day uses location rank (kiler, buzdolabı, dondurucu, diğer), then id.
 /// The default fills that order until the recipe need is met, never past a row's stock.
 /// A user override is clamped the same way: each take stays inside that row, and the
-/// total in the recipe unit never exceeds the need. Shortfall is what the final takes leave.
+/// total in the recipe unit never exceeds the need. `pinnedId` is the row the cook just
+/// stepped; excess comes off the other rows first so the step is not immediately undone.
+/// Shortfall is what the final takes leave.
 enum PantryCookSplit {
     struct Result: Equatable, Sendable {
         var takes: [String: Double]
@@ -2184,11 +2214,12 @@ enum PantryCookSplit {
     static func allocate(
         need: PantryCookNeed,
         rows: [PantryCookStock],
-        override: [String: Double]? = nil
+        override: [String: Double]? = nil,
+        pinnedId: String? = nil
     ) -> Result {
         let ordered = ordered(rows)
         if let override {
-            return clamp(need: need, rows: ordered, requested: override)
+            return clamp(need: need, rows: ordered, requested: override, pinnedId: pinnedId)
         }
         var remaining = PantryUnitPolicy.snap(max(0, need.quantity))
         var takes: [String: Double] = [:]
@@ -2207,7 +2238,12 @@ enum PantryCookSplit {
         return Result(takes: takes, shortfall: remaining)
     }
 
-    private static func clamp(need: PantryCookNeed, rows: [PantryCookStock], requested: [String: Double]) -> Result {
+    private static func clamp(
+        need: PantryCookNeed,
+        rows: [PantryCookStock],
+        requested: [String: Double],
+        pinnedId: String? = nil
+    ) -> Result {
         var takes: [String: Double] = [:]
         for row in rows {
             let asked = requested[row.id] ?? 0
@@ -2215,7 +2251,8 @@ enum PantryCookSplit {
         }
         var covered = coveredNeed(takes, rows: rows, need: need)
         if covered > need.quantity + 0.0005 {
-            for row in rows.reversed() {
+            let reducible = rows.reversed().filter { $0.id != pinnedId } + rows.reversed().filter { $0.id == pinnedId }
+            for row in reducible {
                 let extra = covered - need.quantity
                 guard extra > 0.0005, let take = takes[row.id], take > 0 else { continue }
                 let extraInStock = PantryUnitPolicy.converted(extra, from: need.unit, to: row.unit) ?? extra
@@ -2320,7 +2357,7 @@ struct PantryCookSheetRow: Equatable, Sendable, Identifiable {
     var willDeduct: Bool
     /// More than one compatible pantry row. Empty when a single row covers the line.
     var locations: [PantryCookLocationLine] = []
-    /// `Domates — Kiler: 3 adet, Buzdolabı: 2 adet` when several places hold the ingredient.
+    /// `Evdekiler: Kiler 10 · Buzdolabı 4 · Dondurucu 8` when several places hold the ingredient.
     var inventoryLine: String? = nil
 }
 
@@ -2460,7 +2497,7 @@ enum PantryCookConsumption {
                 willDeduct: consumes,
                 locations: compatible.count > 1 ? lines : [],
                 inventoryLine: compatible.count > 1
-                    ? PantryCopy.locationInventory(need.displayName, parts: lines.map { ($0.locationTitle, $0.availableText) })
+                    ? PantryCopy.locationInventory(lines.map { ($0.locationTitle, inventoryAmount($0.available, unit: $0.unit)) })
                     : nil
             ))
         }
@@ -2481,15 +2518,10 @@ enum PantryCookConsumption {
             let pieces = rows.compactMap { row -> String? in
                 let take = takes[row.id] ?? 0
                 guard take > 0 else { return nil }
-                return "\(row.location.title) \(formatAmount(take, unit: row.unit))"
+                return "\(row.location.ablative) \(formatAmount(take, unit: row.unit))"
             }
-            let body = pieces.joined(separator: ", ")
-            if gap > 0 {
-                return body.isEmpty
-                    ? PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit))
-                    : "\(body). \(PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit)))"
-            }
-            return body
+            let shortfall = gap > 0 ? formatAmount(gap, unit: needUnit) : nil
+            return PantryCopy.cookFromLocations(pieces, shortfall: shortfall)
         }
         if taken <= 0 {
             return PantryCopy.cookNotDeducted(shortfall: formatAmount(gap, unit: needUnit))
@@ -2506,11 +2538,22 @@ enum PantryCookConsumption {
         )
     }
 
+    /// Piece counts drop the word "adet" in the inventory line. Other units keep their label.
+    private static func inventoryAmount(_ quantity: Double, unit: String) -> String {
+        let shown = displayQuantity(quantity, unit: unit)
+        if UnitNormalization.parse(unit).code == "piece" {
+            return QuantityFormat.string(shown)
+        }
+        return formatAmount(quantity, unit: unit)
+    }
+
     private static func locationLines(_ rows: [PantryCookStock], takes: [String: Double]) -> [PantryCookLocationLine] {
         rows.map { row in
             PantryCookLocationLine(
                 id: row.id,
                 locationTitle: row.location.title,
+                location: row.location,
+                dateValue: row.dateValue,
                 available: row.quantity,
                 selected: takes[row.id] ?? 0,
                 unit: row.unit,
