@@ -1165,7 +1165,6 @@ private struct PantryCookConfirmSheet: View {
             }
             .tint(Theme.accent)
             .accessibilityLabel(amountAccessibility(row))
-            .accessibilityValue(row.summary)
             .accessibilityHint(PantryCopy.cookExcludeHint)
             .accessibilityIdentifier("cook.include.\(row.needIndex)")
             if row.locations.count > 1 {
@@ -1184,7 +1183,6 @@ private struct PantryCookConfirmSheet: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityLabel(amountAccessibility(row))
-                .accessibilityValue(row.summary)
                 .accessibilityHint(PantryCopy.cookExcludeHint)
                 .accessibilityIdentifier("cook.include.\(row.needIndex)")
             } else {
@@ -1236,8 +1234,8 @@ private struct PantryCookConfirmSheet: View {
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .ignore)
             .accessibilityIdentifier("cook.summary.\(row.needIndex)")
-            .accessibilityLabel(row.summary)
-            .accessibilityValue(row.summary)
+            .accessibilityLabel(Text(row.summary))
+            .accessibilityValue(Text(row.summary))
     }
 
     @ViewBuilder

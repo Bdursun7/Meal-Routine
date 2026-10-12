@@ -81,12 +81,9 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Buzdolabı: 1 adet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Kiler: 0 adet"].waitForExistence(timeout: 5))
 
-        let partial = reveal("cook.include.1", in: app, within: "cook.sheet", hittable: true)
-        XCTAssertTrue(partial.waitForExistence(timeout: 5))
-        if deductsOnThisConfirm(partial) {
-            partial.tap()
-        }
-        // The sentence is `accessibilityValue` on cook.summary.1, not the switch's on/off value.
+        // Index 1 is the seeded onion: need 2, Kiler stock 1, so it is the Yetersiz stok row.
+        // A List Toggle's center hit is the label on iOS 26. The switch sits on the trailing edge.
+        turnOffCookInclude(1, in: app)
         let leftOut = NSPredicate(
             format: "identifier == %@ AND value == %@",
             "cook.summary.1",
@@ -202,15 +199,56 @@ final class SmokeUITests: XCTestCase {
         return app
     }
 
-    /// Switch value may be "1"/1 while on, or the summary sentence once `accessibilityValue` is the copy.
-    private func deductsOnThisConfirm(_ element: XCUIElement) -> Bool {
+    /// Turns off `cook.include.<needIndex>`. The switch value stays "1"/"0"; the sentence is `cook.summary`.
+    private func turnOffCookInclude(_ needIndex: Int, in app: XCUIApplication) {
+        let identifier = "cook.include.\(needIndex)"
+        let row = reveal(identifier, in: app, within: "cook.sheet", hittable: true)
+        XCTAssertTrue(row.waitForExistence(timeout: 5), identifier)
+        let named = app.switches[identifier]
+        let host = named.exists ? named : row
+        let nested = host.switches.firstMatch
+        if nested.waitForExistence(timeout: 1) {
+            nested.tap()
+        } else {
+            host.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+        if !waitUntilIncludedSwitchIsOff(identifier, in: app, timeout: 2) {
+            if nested.exists {
+                host.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            } else if host.switches.firstMatch.exists {
+                host.switches.firstMatch.tap()
+            }
+            XCTAssertTrue(
+                waitUntilIncludedSwitchIsOff(identifier, in: app, timeout: 4),
+                "\(identifier) value == 0"
+            )
+        }
+    }
+
+    private func waitUntilIncludedSwitchIsOff(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        let off = NSPredicate { _, _ in
+            self.includedSwitchIsOff(identifier, in: app)
+        }
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: off, object: app)], timeout: timeout) == .completed
+    }
+
+    private func includedSwitchIsOff(_ identifier: String, in app: XCUIApplication) -> Bool {
+        let candidates = [
+            app.switches[identifier],
+            app.switches[identifier].switches.firstMatch,
+            app.descendants(matching: .any)[identifier],
+            app.descendants(matching: .any)[identifier].switches.firstMatch,
+        ]
+        return candidates.contains { $0.exists && isSwitchOff($0) }
+    }
+
+    private func isSwitchOff(_ element: XCUIElement) -> Bool {
         let raw = element.value
-        if let number = raw as? NSNumber { return number.intValue != 0 }
-        if let number = raw as? Int { return number != 0 }
-        guard let text = raw as? String else { return true }
-        if text == "0" || text.caseInsensitiveCompare("false") == .orderedSame { return false }
-        if text == "1" || text.caseInsensitiveCompare("true") == .orderedSame { return true }
-        return !text.contains("Bu onayda düşülmez")
+        if let number = raw as? NSNumber { return number.intValue == 0 }
+        if let text = raw as? String {
+            return text == "0" || text.caseInsensitiveCompare("false") == .orderedSame
+        }
+        return false
     }
 
     private func selectPantryLocation(_ raw: String, in app: XCUIApplication) {
