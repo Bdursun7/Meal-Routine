@@ -38,7 +38,7 @@ cd server
 cp .env.example .env
 ```
 
-`.env` içinde `JWT_SECRET` değerini en az 32 karakterlik rastgele bir metinle değiştir. Sunucu bu sırrı kodun içine gömmez; boşsa açılmaz. `GOOGLE_CLIENT_ID_IOS` boş kalabilir; Google ile giriş ancak bu kimlik doluyken çalışır. `APPLE_BUNDLE_ID` `com.mealroutine.app` olarak kalır. `CORS_ORIGIN` iOS uygulaması için boş kalır. Tarayıcıdan çağrı varsa tam bir origin yaz; `*` kabul edilmez.
+`.env` içinde `JWT_SECRET` değerini en az 32 karakterlik rastgele bir metinle değiştir. Sunucu bu sırrı kodun içine gömmez; boşsa açılmaz. `GOOGLE_CLIENT_ID_IOS` boş kalabilir; Google ile giriş ancak bu kimlik doluyken çalışır. `APPLE_BUNDLE_ID` `com.berkaydursun.mealroutine.app` olarak kalır. `CORS_ORIGIN` iOS uygulaması için boş kalır. Tarayıcıdan çağrı varsa tam bir origin yaz; `*` kabul edilmez.
 
 ## 4. Şemayı kur
 
@@ -91,7 +91,7 @@ npm test
 
 ## Google iOS istemci kimliği
 
-Ücretli bir Apple hesabı gerekmez. Google Cloud Console’da bir proje aç, OAuth consent screen’i test kullanıcısıyla doldur, kimlik bilgisi türü **iOS** olan bir OAuth client oluştur. Bundle id `com.mealroutine.app` olsun. Çıkan istemci kimliğini iki yere yaz:
+Ücretli bir Apple hesabı gerekmez. Google Cloud Console’da bir proje aç, OAuth consent screen’i test kullanıcısıyla doldur, kimlik bilgisi türü **iOS** olan bir OAuth client oluştur. Bundle id `com.berkaydursun.mealroutine.app` olsun. Çıkan istemci kimliğini iki yere yaz:
 
 - `server/.env` → `GOOGLE_CLIENT_ID_IOS`
 - Xcode’da `Config/Debug-Local.xcconfig` → `GOOGLE_IOS_CLIENT_ID` ve `GOOGLE_REVERSED_CLIENT_ID`

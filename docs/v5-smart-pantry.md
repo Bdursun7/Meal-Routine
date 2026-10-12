@@ -466,7 +466,9 @@ Tarih hatırlatması yalnız kullanıcı tarih girdiyse ve hatırlatma açıksa 
 
 Metin hatırlatmadır. “Güvenli”, “yenmez” veya tazelik hükmü yoktur. İşletim sistemi bildirimi erteleyebilir. İzin reddedilirse `mealroutine.pantry.notificationPermissionDenied` yazılır ve Evdekiler çalışmaya devam eder.
 
-Düşük stok bildirimi, grubun toplamı minimumun üstünden minimuma veya altına ilk inince bir kez gider. Anahtar satır kimliği değil, `kanonikId|birim kovası`dır (`PantryGroupStock.alertKey`, örneğin `tomato|family:mass`). Eski satır anahtarları bu anahtarla eşleşmez; yükseltmeden sonra bir fazla bildirim gidebilir. “Azaldı” rozeti aynı toplama bakar: satırın kendi miktarı 0’dan büyükken grup toplamı etkin minimumun altındaysa görünür. Miktarı 0 olan satır “Tükendi” yazar, “Azaldı” yazmaz. Eşitlikte bildirim bir kez gider; eksik miktar 0 olduğu için market satırı açılmaz. Aynı düşük bölümde tekrar gitmez. Toplam yeniden üstüne çıkınca kuruluş kalkar; tekrar inince yeni bildirim olabilir. Bildirim kapalıyken geçiş olursa kayıt yine tutulur, böylece kullanıcı bölüm ortasında açarsa spam olmaz. Tarih hatırlatması satırdadır: her konumun kendi günü vardır.
+Düşük stok bildirimi, grubun toplamı minimumun üstünden minimuma veya altına ilk inince bir kez gider. Anahtar satır kimliği değil, `kanonikId|birim kovası`dır (`PantryGroupStock.alertKey`, örneğin `tomato|family:mass`). Eski satır anahtarları bu anahtarla eşleşmez; yükseltmeden sonra bir fazla bildirim gidebilir. “Azaldı” rozeti aynı toplama bakar: satırın kendi miktarı 0’dan büyükken grup toplamı etkin minimumun altındaysa görünür. Miktarı 0 olan satır “Tükendi” yazar, “Azaldı” yazmaz. Eşitlikte bildirim bir kez gider; eksik miktar 0 olduğu için market satırı açılmaz. Aynı düşük bölümde tekrar gitmez. Toplam yeniden üstüne çıkınca kuruluş kalkar; tekrar inince yeni bildirim olabilir. Grubun son satırı silinince anahtar da silinir; malzeme yeniden eklenip yeniden düşünce bildirim yine gider. Kardeş satır duruyorsa silme, kalan toplama göre yeniden değerlendirilir: toplam hâlâ düşükse ikinci bildirim gitmez, üstteyse anahtar kalkar, bu silme eşiği ilk kez geçtiyse bir bildirim gider. Bildirim kapalıyken geçiş olursa kayıt yine tutulur, böylece kullanıcı bölüm ortasında açarsa spam olmaz. Tarih hatırlatması satırdadır: her konumun kendi günü vardır.
+
+Uygulama açıkken yalnız pantry düşük stok ve tarih hatırlatması banner, liste ve ses olarak görünür (`willPresent`). Ev halkı bildirimlerinin dokunma yolu aynı kalır; onlar ön planda banner açmaz. Delege, uygulama `init` içinde atanır.
 
 ## 19. Global-readiness kuralları
 
@@ -489,7 +491,7 @@ Kararlar (2026-10-10): hatırlatma cihazın geçerli saat dilimindedir (D1=a). `
 
 ### Onaylı düşüm
 
-Planlı yemek pişmiş işaretlendikten sonra tek sayfa açılır: başlık “Evdekilerden düş”, “Vazgeç” stok yazmaz, “Düş” onaydır. Sayfa tarif satırlarını ve Evdekiler miktarını listeler. Kişisel pantry `householdID == nil` satırlarını, ortak pantry o evin satırlarını kullanır. “Düşülecek” satırı kapatılırsa o malzeme bu onayda düşülmez. Red, stok yazmaz. Onay:
+Planlı yemek pişmiş işaretlendikten sonra tek sayfa açılır: başlık “Evdekilerden düş”, “Vazgeç” stok yazmaz, “Düş” onaydır. Sayfa tarif satırlarını ve Evdekiler miktarını listeler. Kişisel pantry `householdID == nil` satırlarını, ortak pantry o evin satırlarını kullanır. “Düşülecek” satırı kapatılırsa o malzeme bu onayda düşülmez. Kısmi “Yetersiz stok” satırı da aynı anahtarla kapatılır; kapatılınca özet “Bu onayda düşülmez” der ve o satır düşülmez. Stok 0 zaten düşülmez ve anahtar göstermez. Red, stok yazmaz. Onay:
 
 - Yalnız aynı `ingredientId` (sözlük kanonik kimliği; `tomatoes` ve `tomato` birleşir, `cherry-tomato` birleşmez).
 - Yalnız güvenilir dönüşüm: g/kg ve ml/l. Adet ile gram düşülmez; satır atlanır, stok aynı kalır.

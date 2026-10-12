@@ -643,13 +643,20 @@ struct PantryView: View {
             in: modelContext
         )
         let removedId = source.uuid
+        let removedName = source.displayName
         modelContext.delete(source)
         try? modelContext.save()
-        PantryStockSideEffects.deleted(removedId)
-        let nextGroup = PantryGroupStock.total(
-            groupRows(matching: occupant.ingredientID, unit: occupant.unit).filter { $0.id != removedId.uuidString.lowercased() },
-            unit: occupant.unit
+        let remaining = groupRows(matching: occupant.ingredientID, unit: occupant.unit)
+            .filter { $0.id != removedId.uuidString.lowercased() }
+        PantryStockSideEffects.deleted(
+            removedId,
+            ingredientId: occupant.ingredientID,
+            unit: occupant.unit,
+            displayName: removedName,
+            previousTotal: previousGroup,
+            remaining: remaining
         )
+        let nextGroup = PantryGroupStock.total(remaining, unit: occupant.unit)
         PantryStockSideEffects.afterQuantityChange(
             item: occupant,
             previousQuantity: occupantPrevious,
@@ -665,10 +672,23 @@ struct PantryView: View {
 
     private func delete(_ item: PantryItem) {
         let id = item.uuid
+        let ingredientId = item.ingredientID
+        let unit = item.unit
+        let name = item.displayName
+        let before = groupRows(matching: ingredientId, unit: unit)
+        let previousTotal = PantryGroupStock.total(before, unit: unit)
+        let remaining = before.filter { $0.id != id.uuidString.lowercased() }
         if item.ingredientResolved { write(.delete, item, baseVersion: item.revision) }
         modelContext.delete(item)
         try? modelContext.save()
-        PantryStockSideEffects.deleted(id)
+        PantryStockSideEffects.deleted(
+            id,
+            ingredientId: ingredientId,
+            unit: unit,
+            displayName: name,
+            previousTotal: previousTotal,
+            remaining: remaining
+        )
     }
 
     private func delete(at offsets: IndexSet) {
