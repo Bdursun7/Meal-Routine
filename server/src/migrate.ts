@@ -1,9 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Pool } from 'pg'
+import type { Pool } from 'pg'
 import { loadConfig } from './config.js'
 import { loadEnvFile } from './env.js'
+import { consolePoolLogger, createDatabasePool } from './pgPool.js'
 
 export function migrationsDirectory(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../db/migrations')
@@ -87,7 +88,7 @@ async function main(): Promise<void> {
   if (!config.databaseUrl) {
     throw new Error('DATABASE_URL is required. See server/db/README.md.')
   }
-  const pool = new Pool({ connectionString: config.databaseUrl })
+  const pool = createDatabasePool({ connectionString: config.databaseUrl }, consolePoolLogger())
   try {
     const applied = await migrate(pool)
     if (applied.length === 0) {
