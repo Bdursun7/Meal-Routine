@@ -107,6 +107,8 @@ struct RootView: View {
         }
     }
 
+    /// Crossfade only. `LaunchIntroTiming` already held the wordmark: no earlier
+    /// than 3s, and no later than 4.5s when startup is still running.
     private func dismissLaunchIntro() {
         guard showsLaunchIntro else { return }
         let fade = reduceMotion ? 0.2 : LaunchIntroTiming.crossfadeSeconds

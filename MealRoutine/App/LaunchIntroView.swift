@@ -4,14 +4,66 @@ import SwiftUI
 ///
 /// Startup work keeps running underneath. The intro never waits past `maximum`,
 /// and it does not leave before `minimum` even when that work finished early.
+/// The staged wordmark is also held fully still for `wordmarkHold` before the
+/// crossfade, so a ready launch leaves a little after `minimum`.
 enum LaunchIntroTiming {
-    static let minimum: Duration = .milliseconds(1500)
-    static let maximum: Duration = .milliseconds(3000)
+    static let minimum: Duration = .milliseconds(3000)
+    static let maximum: Duration = .milliseconds(4500)
     static let crossfadeSeconds: Double = 0.45
+    /// Reduce Motion fades the wordmark in. The orbit stays skipped.
+    static let reduceMotionFadeMs = 350
+    /// Fully settled wordmark and subtitle, then this long before the crossfade.
+    static let wordmarkHold: Duration = .milliseconds(1200)
 
-    static func shouldDismiss(elapsed: Duration, startupReady: Bool) -> Bool {
+    /// Plate, orbit, drop, and morph, each about 1.5× the previous intro.
+    enum Phase {
+        static let plateLeadInMs = 150
+        static let orbitMs = 960
+        static let dropMs = 390
+        static let beforeSubtitleMs = 105
+
+        static let plateSpringMs = 720
+        static let plateGlowMs = 675
+        static let ingredientSpringMs = 690
+        static let orbitEaseMs = 930
+        static let dropSpringMs = 750
+        static let dropStaggerMs = 75
+        static let morphSpringMs = 825
+        static let subtitleEaseMs = 480
+        /// Damping 0.78 still moves a little after the spring response.
+        static let settleMs = 175
+
+        static var morphStartMs: Int { plateLeadInMs + orbitMs + dropMs }
+
+        /// Morph begins at 1.5s. The 825ms spring plus 175ms of settle makes the
+        /// wordmark still at 2.5s. The subtitle finishes earlier (2.085s).
+        static var wordmarkReadableMs: Int {
+            let wordmark = morphStartMs + morphSpringMs + settleMs
+            let subtitle = morphStartMs + beforeSubtitleMs + subtitleEaseMs
+            return max(wordmark, subtitle)
+        }
+
+        static func seconds(_ milliseconds: Int) -> Double {
+            Double(milliseconds) / 1000
+        }
+    }
+
+    static var wordmarkReadableAt: Duration {
+        .milliseconds(Phase.wordmarkReadableMs)
+    }
+
+    /// Ready launches wait out the wordmark hold. Reduce Motion is already still
+    /// after its fade, so the 3s minimum is what keeps that path up.
+    static func earliestDismiss(reduceMotion: Bool) -> Duration {
+        let readable = reduceMotion
+            ? Duration.milliseconds(reduceMotionFadeMs)
+            : wordmarkReadableAt
+        return max(minimum, readable + wordmarkHold)
+    }
+
+    static func shouldDismiss(elapsed: Duration, startupReady: Bool, reduceMotion: Bool) -> Bool {
         if elapsed >= maximum { return true }
-        return elapsed >= minimum && startupReady
+        return startupReady && elapsed >= earliestDismiss(reduceMotion: reduceMotion)
     }
 }
 
@@ -31,7 +83,7 @@ enum LaunchIntroPalette {
 
 /// Catalog seed, session restore, and household start share one flag.
 /// Remote config / server-address resolve shares the other.
-/// The intro reads both and still moves on at three seconds.
+/// The intro reads both and still moves on at four and a half seconds.
 @MainActor
 final class LaunchStartup {
     static let shared = LaunchStartup()
@@ -51,8 +103,10 @@ final class LaunchStartup {
 }
 
 /// Plate, orbiting ingredients, then the MealRoutine wordmark.
+/// The wordmark and subtitle stay fully still before the crossfade.
 /// Reduce Motion fades the wordmark in and skips the orbit.
 struct LaunchIntroView: View {
+    private typealias Phase = LaunchIntroTiming.Phase
     var onFinished: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -95,7 +149,7 @@ struct LaunchIntroView: View {
                 endRadius: 280
             )
             .opacity(plateIn ? 1 : 0)
-            .animation(.easeIn(duration: 0.45), value: plateIn)
+            .animation(.easeIn(duration: Phase.seconds(Phase.plateGlowMs)), value: plateIn)
             .ignoresSafeArea()
             .allowsHitTesting(false)
 
@@ -103,8 +157,8 @@ struct LaunchIntroView: View {
                 .scaleEffect(plateIn ? (morphed ? 0.48 : 1) : 0.12)
                 .offset(y: morphed ? -62 : 0)
                 .opacity(plateIn ? 1 : 0)
-                .animation(.spring(response: 0.48, dampingFraction: 0.68), value: plateIn)
-                .animation(.spring(response: 0.55, dampingFraction: 0.78), value: morphed)
+                .animation(.spring(response: Phase.seconds(Phase.plateSpringMs), dampingFraction: 0.68), value: plateIn)
+                .animation(.spring(response: Phase.seconds(Phase.morphSpringMs), dampingFraction: 0.78), value: morphed)
 
             ForEach(LaunchIngredient.orbit) { item in
                 let angle = item.baseAngle + orbit * 210
@@ -116,10 +170,11 @@ struct LaunchIntroView: View {
                     .rotationEffect(.degrees(angle))
                     .scaleEffect(dropped ? 0.12 : (plateIn ? 1 : 0.3))
                     .opacity(dropped ? 0 : (plateIn ? 1 : 0))
-                    .animation(.easeInOut(duration: 0.62), value: orbit)
-                    .animation(.spring(response: 0.46, dampingFraction: 0.62), value: plateIn)
+                    .animation(.easeInOut(duration: Phase.seconds(Phase.orbitEaseMs)), value: orbit)
+                    .animation(.spring(response: Phase.seconds(Phase.ingredientSpringMs), dampingFraction: 0.62), value: plateIn)
                     .animation(
-                        .spring(response: 0.5, dampingFraction: 0.55).delay(Double(item.id) * 0.05),
+                        .spring(response: Phase.seconds(Phase.dropSpringMs), dampingFraction: 0.55)
+                            .delay(Double(item.id) * Phase.seconds(Phase.dropStaggerMs)),
                         value: dropped
                     )
                     .accessibilityHidden(true)
@@ -129,7 +184,7 @@ struct LaunchIntroView: View {
                 .scaleEffect(morphed ? 1 : 0.42)
                 .opacity(morphed ? 1 : 0)
                 .offset(y: morphed ? 42 : 0)
-                .animation(.spring(response: 0.55, dampingFraction: 0.78), value: morphed)
+                .animation(.spring(response: Phase.seconds(Phase.morphSpringMs), dampingFraction: 0.78), value: morphed)
         }
     }
 
@@ -171,7 +226,7 @@ struct LaunchIntroView: View {
                 .offset(y: subtitleIn ? 0 : 8)
         }
         .padding(.horizontal, 24)
-        .animation(.easeOut(duration: 0.32), value: subtitleIn)
+        .animation(.easeOut(duration: Phase.seconds(Phase.subtitleEaseMs)), value: subtitleIn)
     }
 
     private func playAndGate() async {
@@ -188,7 +243,7 @@ struct LaunchIntroView: View {
 
     private func playVisual() async {
         if reduceMotion {
-            withAnimation(.easeInOut(duration: 0.35)) {
+            withAnimation(.easeInOut(duration: Phase.seconds(LaunchIntroTiming.reduceMotionFadeMs))) {
                 morphed = true
                 subtitleIn = true
             }
@@ -196,20 +251,24 @@ struct LaunchIntroView: View {
         }
 
         plateIn = true
-        guard await pause(100) else { return }
+        guard await pause(Phase.plateLeadInMs) else { return }
         orbit = 1
-        guard await pause(640) else { return }
+        guard await pause(Phase.orbitMs) else { return }
         dropped = true
-        guard await pause(260) else { return }
+        guard await pause(Phase.dropMs) else { return }
         morphed = true
-        guard await pause(70) else { return }
+        guard await pause(Phase.beforeSubtitleMs) else { return }
         subtitleIn = true
     }
 
     private func holdUntilDismissible(since start: ContinuousClock.Instant, clock: ContinuousClock) async {
         while !Task.isCancelled {
             let elapsed = start.duration(to: clock.now)
-            if LaunchIntroTiming.shouldDismiss(elapsed: elapsed, startupReady: LaunchStartup.shared.isReady) {
+            if LaunchIntroTiming.shouldDismiss(
+                elapsed: elapsed,
+                startupReady: LaunchStartup.shared.isReady,
+                reduceMotion: reduceMotion
+            ) {
                 return
             }
             do {
